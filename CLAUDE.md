@@ -85,6 +85,26 @@ Attach to the shared implementation in `platform/` instead. See
   chat history. Update the docs when a decision changes, so future sessions
   don't have to rediscover it.
 
+## Supabase migrations
+
+Migrations live in `supabase/migrations/<timestamp>_<name>.sql`. The local
+filename timestamp must match the version Supabase records remotely.
+
+- Author migrations locally as a new timestamped file (`supabase migration
+  new <name>`, or a hand-written file following the same naming pattern).
+- Apply with the Supabase CLI (`supabase link` once per machine, then
+  `supabase db push`). The CLI reads the filename's timestamp and records
+  that exact value as the migration version remotely.
+- Do not use the Supabase MCP `apply_migration` tool to apply migrations.
+  It records an apply-time timestamp instead of the filename's timestamp,
+  which desyncs local and remote migration history. Reserve MCP Supabase
+  tools for read-only inspection (`list_migrations`, `list_tables`,
+  `execute_sql` for read queries).
+- `supabase link` and `supabase db push` need CLI authentication
+  (`supabase login`, or a `SUPABASE_ACCESS_TOKEN` environment variable set
+  in your own shell) and the project's database password. Never put these
+  in Git, in `CLAUDE.md`, or in any committed file.
+
 ## Frontend / UI
 
 All frontend implementation must comply with `docs/UI_SYSTEM.md`.
