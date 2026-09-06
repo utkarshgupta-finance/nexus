@@ -86,6 +86,25 @@ ungoverned dumping ground this design avoids. Full schema in
 Reference and master data tables that carry no workflow, audit, task, or
 event relationship do not register in the Resource Registry.
 
+**Evidence anchor.** A future attachments or evidence table needs exactly
+one thing to attach cleanly to a resource, approval, task, workflow
+instance, or exception: a stable identity to reference. The Resource
+Registry already provides that. No schema change is needed now to support
+future evidence; the anchor already exists and is deferred to
+implementation, not design.
+
+**Data lineage (future pattern, not implemented).** A record in Nexus may
+eventually be manually entered, imported by file, received through an
+API, synchronized from an external system, or derived by Nexus itself.
+Source columns are not added to every table now, speculatively; where a
+record came from is not yet a question any real feature needs answered.
+When the first integration or import feature is built, provenance is
+recorded then, either as columns on that specific feature table or as a
+thin companion table keyed by `resource_id` if more than one feature ends
+up needing the same shape. Deciding the general provenance pattern now,
+before a real integration exists to validate it against, would be
+designing for a feature that does not exist yet.
+
 ## 4. Platform capabilities
 
 | Capability | Responsibility | Detailed in |
@@ -172,7 +191,62 @@ explicitly deferred; see §12. `tasks` is deliberately not a general task
 management product: no subtasks, no arbitrary personal to-do items, no
 kanban boards, no dependency graphs.
 
+### Segregation of duties (future pattern, not implemented)
+
+Nexus is a Finance platform subject to internal and statutory audit.
+When the workflow engine is built, it must be able to enforce, not merely
+suggest through UI, patterns such as:
+
+- a maker cannot approve their own submission,
+- approval authority depends on the approver's permission and scope
+  (`docs/AUTHORIZATION_MODEL.md`), not on who happens to be looking at the
+  screen,
+- certain transitions require a reason before they can proceed,
+- certain transitions require evidence to be attached before they can
+  proceed, and
+- an override of a normal rule requires a separate authority from the
+  authority that made the original decision.
+
+These are workflow-engine requirements to design for when the workflow
+engine is built (§6 above), not a reason to build workflow now. A disabled
+button is a UX convenience; the actual control is the transition being
+rejected by the engine regardless of what the UI allowed someone to click,
+the same principle already established for authorization in
+`docs/AUTHORIZATION_MODEL.md` §6.
+
+### Approval evidence (future pattern, not implemented)
+
+When a workflow transition represents an approval, the record it produces
+must eventually preserve, without ambiguity, even after the underlying
+business record is later amended: the approver's identity, the approval
+time, which workflow instance and task it belongs to, the exact resource
+and version approved (the amendment model in
+`docs/DATA_ARCHITECTURE.md` §7 is what makes "exact version" answerable
+later), the action taken, any comment or reason, any evidence reference,
+and the authority/scope context the approver acted under. This shape is
+recorded here so the first workflow implementation does not invent its
+own, not because approval tables are being built now.
+
+### Exceptions and overrides (future pattern, not implemented)
+
+The same reasoning applies to rule exceptions. When a business rule can be
+overridden, the future record of that override must preserve: which rule
+was violated, who requested the override, who approved it, the reason,
+any evidence, the date and time, which version of the rule or
+configuration was in effect, and the result. No exception-management
+system is built now; this is the shape a future one must follow.
+
 ## 7. Audit and domain events are not the same thing
+
+**Audit-readiness principle.** Every material business action must leave
+enough durable evidence for a reviewer who was not present at the time to
+understand: what happened, who performed it, who authorized it where
+applicable, when it happened, what changed, what rule or configuration
+applied, what evidence supported it where applicable, and why an
+exception or override occurred where applicable. Controls are enforced by
+the platform wherever practical, rather than relying on a person
+remembering the process. This principle governs every section below and
+every future feature.
 
 These are two different mechanisms and must not be confused:
 
@@ -201,6 +275,43 @@ Approved records are not silently overwritten. Once a record has passed
 approval, a further change is an amendment, a new linked entry that
 preserves the original rather than replacing it in place; see
 `docs/DATA_ARCHITECTURE.md` §7 and §9.
+
+**Ordering.** `audit_log` carries a monotonically increasing sequence
+number in addition to its UUID primary key, because multiple changes
+inside one transaction can share an identical `occurred_at` timestamp and
+neither a UUID nor a timestamp alone can tell a reviewer which of two
+audit rows happened first. See `docs/DATA_ARCHITECTURE.md` §9.
+
+**Actor and context trust contract.** The audit mechanism accepts
+`app.current_user_id`, `app.request_id`, and `app.actor_context` from
+transaction-local settings, and this is only safe because of who is
+allowed to set them. Only the application-service layer sets
+`app.current_user_id`, and only after it has independently verified the
+caller's identity from a trusted, authenticated session (never from a
+value a client claims in a request body or header). A client cannot claim
+to be another user and have that accepted as audit identity; the
+authenticated session is the sole source of truth for "who." The
+application-service layer likewise generates `app.request_id` per
+request, job run, or integration call, and sets a small, structured
+`app.actor_context` (for example, role or workflow context relevant to the
+action), never an arbitrary dump of request data. Where actor identity
+cannot be validly established (a system-originated write with no
+authenticated user behind it), `app.current_user_id` is left unset and
+`actor_user_id` is `NULL`, which is a valid, meaningful audit state, not
+an error. `audit_log` also captures the database session role that
+performed the write, a small piece of technical origin metadata that
+costs nothing and helps a reviewer distinguish the trusted application
+path from any other origin.
+
+**Audit data sensitivity.** `audit_log` stores full before/after row
+values as JSON, which means anything that ends up in an audited table's
+row ends up in the audit trail too, permanently and without redaction.
+The rule this creates is not something to fix in the audit layer: secrets,
+credentials, and similarly sensitive values must never be stored in an
+ordinary audited application table in the first place. Integration
+credentials belong in a dedicated secret mechanism (out of scope for now,
+see `docs/DATA_ARCHITECTURE.md` §8), referenced by configuration, never
+embedded in it or in any table the generic audit trigger is attached to.
 
 ## 8. Eight platform concepts
 
@@ -287,12 +398,72 @@ a redesign. None of them are built now:
 - A configuration UI for values that have no real business owner yet.
 - The append-only amendment pattern and effective dating, applied only
   when a real feature needs them.
+- Approval, exception/override, and evidence/attachment tables (§6
+  patterns defined, nothing implemented).
+- Any source/provenance columns or table, decided at the first
+  integration or import feature, not before (§3).
+- A dedicated secret-management mechanism for integration credentials
+  (§7); credentials simply do not exist as configuration yet.
 
 Preserving the extension path for each of these is a design decision made
 now. Building any of them is a decision deferred until a real feature
 requires it.
 
-## 13. Non-goals for this document
+## 13. Stage 5B technology boundaries (accepted, not implemented)
+
+Nexus has accepted the following external-technology boundaries for the
+next stage. None of them are installed, configured, or implemented as of
+this document; recording the boundary now is what lets each be adopted
+later without renegotiating what it is responsible for.
+
+**SurveyJS** owns configurable form definitions: field rendering,
+validation, conditional visibility and requiredness, sections, and form
+versions. SurveyJS is not the authoritative Finance data model; material
+Finance facts remain modeled relationally, per
+`docs/DATA_ARCHITECTURE.md`, regardless of how a form collected them.
+
+**Flowable** is the primary engine for human and business-process
+workflow: routing, send-back, reject, resubmit, request-information,
+reassignment, escalation, multi-level approvals, approval routing, and
+configurable business routing rules (decision tables). Flowable is the
+concrete technology that will eventually implement the workflow concept
+already defined in §6; it does not change that concept, and the
+segregation-of-duties, approval-evidence, and exception patterns already
+defined there apply to whatever Flowable orchestrates.
+
+**Temporal** owns durable technical and system orchestration: external
+API calls, retries, long-running system jobs, scheduled and bulk
+processing, reliable integration execution, and future AI orchestration.
+Temporal must not duplicate Flowable's human-approval or business-process
+state. The permanent boundary: Flowable is human/business process
+orchestration; Temporal is technical/system orchestration. Nexus itself
+remains the system of record for Nexus business data and audit/control
+evidence regardless of which engine is driving a given action; both
+ultimately act through the same application-service layer (§2), not
+around it.
+
+**Notification Engine** remains a Nexus platform capability, not
+delegated to either external engine. Flowable, Temporal, and Nexus domain
+actions may all emit events; the Notification Engine (§7,
+`docs/EVENTS_AND_NOTIFICATIONS.md`) is what resolves recipients,
+relevance, channel, template, and timing, regardless of which of the
+three raised the underlying event. Channels will eventually include
+in-app, email, and Google Chat, with more added later. Temporal may
+eventually execute the reliable delivery/retry mechanics for a
+notification, but notification policy, what fires, to whom, and through
+which channel, belongs to Nexus, never to the delivery engine.
+
+**AI** will eventually be reached through a provider-independent service
+boundary. Business features must not directly depend on a specific
+provider's SDK (OpenAI, Anthropic, or otherwise); the boundary exists so
+the provider can change without every feature that uses AI changing with
+it. Whatever that boundary looks like, any AI-initiated action must still
+respect the same controls as a human-initiated one: authorization
+(`docs/AUTHORIZATION_MODEL.md`), audit (§7), data classification, human
+approval where required, model/provider provenance, secret management,
+and rate/cost controls. No AI capability is implemented now.
+
+## 14. Non-goals for this document
 
 This document does not define database schemas
 (`docs/DATA_ARCHITECTURE.md`), the authorization data model in detail

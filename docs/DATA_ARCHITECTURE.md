@@ -244,6 +244,7 @@ Two related but distinct mechanisms:
   ```
   audit_log
     id              uuid, primary key
+    audit_sequence  bigint, generated always as identity, unique
     resource_id     uuid, references resources(resource_id)
     table_name      text, not null
     row_id          uuid, not null   -- the audited row's own primary key
@@ -253,6 +254,8 @@ Two related but distinct mechanisms:
     occurred_at     timestamptz, not null
     actor_user_id   uuid             -- references app_users; null for
                                      -- system-originated writes
+    db_role         text, not null   -- session role that performed the
+                                     -- write; technical origin metadata
     request_id      uuid             -- correlates rows from one
                                      -- request/job/integration call
     actor_context   jsonb            -- role/workflow context, supplied by
@@ -269,6 +272,32 @@ Two related but distinct mechanisms:
   joined on. This mechanism is distinct from domain events, which
   represent business meaning, not row mutation; see
   `docs/PLATFORM_ARCHITECTURE.md` §7 and `docs/EVENTS_AND_NOTIFICATIONS.md`.
+
+  **Ordering.** `id` is a UUID, generated for external reference safety,
+  not for ordering. Multiple rows produced within one transaction can
+  share an identical `occurred_at`, so `audit_sequence`, a monotonically
+  increasing identity column, exists to give a reviewer a deterministic
+  row-insertion order that neither the UUID nor the timestamp can provide
+  alone. Precisely: `audit_sequence` orders when rows were inserted
+  (assigned at write time), not when their transactions committed.
+  PostgreSQL sequences are non-transactional, a value is consumed
+  immediately and never rolled back, so under concurrent transactions a
+  row assigned an earlier `audit_sequence` value is not guaranteed to
+  belong to a transaction that committed first. This is sufficient for
+  reconstructing the order of statements within one transaction (which is
+  what motivated adding it) and is not claimed to be more than that.
+
+  **Actor identity is never client-supplied.** `actor_user_id` is only
+  ever populated from `app.current_user_id`, which only the
+  application-service layer sets, and only after independently verifying
+  the caller's identity from a trusted, authenticated session; see
+  `docs/PLATFORM_ARCHITECTURE.md` §7 for the full trust contract. `db_role`
+  is captured automatically (the session's current role at write time) and
+  needs no application cooperation.
+
+  **Sensitivity.** Because `before_value`/`after_value` capture a row in
+  full, no audited table may ever store a secret or credential in a plain
+  column; see `docs/PLATFORM_ARCHITECTURE.md` §7.
 
   **Immutability is enforced at the database level, not only assumed.**
   `audit_log` has no application role granted `UPDATE` or `DELETE`, and
@@ -325,7 +354,60 @@ authenticated user is not created merely to make development easier.
 Service credentials capable of bypassing RLS are never present in source
 code or this public repository.
 
-## 13. What this document does not cover
+**Direct privilege hardening.** Supabase grants broad ordinary privileges
+(`SELECT`/`INSERT`/`UPDATE`/`DELETE`/etc. on tables, `USAGE`/`SELECT`/
+`UPDATE` on sequences, `EXECUTE` on functions) to `anon` and
+`authenticated` on every `public` schema object by default, relying on RLS
+alone to restrict actual table access, and confirmed read-only against the
+project's `pg_default_acl` before this was implemented, not assumed. Since
+Nexus's browser and mobile clients have no legitimate reason to reach
+Platform Core tables, sequences, or functions directly, those default
+privileges are revoked outright on every current Platform Core object,
+and `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public` is set,
+explicitly naming the role, so future tables, sequences, and functions in
+the schema do not silently regain them either. `FOR ROLE` is explicit
+rather than implied, because a default-privilege rule attached to the
+wrong object-creating role would create false confidence while leaving
+future objects exposed; `postgres` was confirmed, read-only, to be both
+the actual owner of every existing Platform Core object and the role
+Supabase migrations execute as in this project. This is defense-in-depth
+beneath RLS, not a replacement for it: if a future policy were ever
+misconfigured to be permissive, the underlying privilege would already be
+absent. The trusted server-side path (`service_role`) is never touched by
+any of this; it already bypasses RLS by attribute and continues to hold
+the ordinary privileges it needs. `EXECUTE` on the audit and immutability
+trigger functions is additionally revoked from `PUBLIC` directly: trigger
+invocation does not require the writing role to hold `EXECUTE` on the
+trigger function, so revoking it removes a direct-call surface with zero
+effect on the triggers themselves.
+
+## 13. Historical grant records
+
+`user_roles` and `role_permissions` are historical grant records rather
+than rows that are hard-deleted on revoke; see
+`docs/AUTHORIZATION_MODEL.md` §4 for the reasoning. Both tables add:
+
+```
+  granted_at         -- reuses created_at
+  granted_by         -- reuses created_by
+  revoked_at         timestamptz, null while active
+  revoked_by         uuid, references app_users, null while active
+  revocation_reason  text, null; populated per application-level policy,
+                     not a blanket database requirement
+  updated_at         timestamptz, not null   -- revoking is now an update
+```
+
+An active grant is `revoked_at IS NULL`. The uniqueness rule from §5 (keys
+and constraints) extends here: the partial unique indexes that enforce
+"one active assignment" are scoped to `WHERE revoked_at IS NULL`, so a
+revoked row never collides with a later, new grant of the same
+role/scope, or the same permission, to the same target. Revoking is an
+`UPDATE`, not a `DELETE`, which the existing generic audit trigger already
+covers without any change to the trigger itself, and which additionally
+means the grant/revoke history is directly queryable from the table
+itself, without reconstructing it from `audit_log`.
+
+## 14. What this document does not cover
 
 No table here is a finalized schema. Column lists above are the standard
 shape every table follows, not the complete definition of any real Nexus

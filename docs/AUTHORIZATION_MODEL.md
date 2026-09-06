@@ -64,13 +64,37 @@ Role assignment (User, Role) is optionally qualified by a Scope
 | `app_users` | Application profile, 1:1 with Supabase `auth.users` (§2). This document covers authorization, not authentication. |
 | `roles` | Named, configurable groupings of permissions. |
 | `permissions` | Resource + action pairs, registered as features are built. |
-| `role_permissions` | Which permissions a role grants. |
-| `user_roles` | Which roles a user holds, optionally scoped (§5). |
+| `role_permissions` | Which permissions a role grants. Historical grant record, see below. |
+| `user_roles` | Which roles a user holds, optionally scoped (§5). Historical grant record, see below. |
 
 A feature that introduces a new resource registers its permissions the
 same way any feature registers a reference value: as configuration,
 reviewed like any other configuration change, never as a schema change
 scattered through feature code.
+
+**Historical grant records, not hard delete.** For a Finance platform
+subject to audit, "who has access now" is not the only question that must
+be efficiently answerable; "who had access on a given historical date,
+under which role and scope, who granted it, when, who revoked it, when,
+and why" must be too. Reconstructing that solely by replaying generic
+`audit_log` JSON works, but is not the primary path Nexus relies on for
+something this material. `user_roles` and `role_permissions` are
+therefore historical grant records, not rows that are physically deleted
+on revoke: granting reuses the existing `created_at`/`created_by`
+semantics (no duplicate columns for naming purity), and revoking sets
+`revoked_at`, `revoked_by`, and an optional `revocation_reason` on the
+same row rather than deleting it. An active grant is
+`revoked_at IS NULL`; a revoked one is preserved exactly as it was. The
+partial-unique-index pattern already used for global versus scoped
+assignment (§5) extends naturally: uniqueness applies only among currently
+active rows, never among historical ones, so a user can be re-granted a
+role they previously held without colliding with their own history. Grant
+and revoke are still each independently captured by the generic audit
+trigger (an `INSERT` and a later `UPDATE` respectively), which is a
+byproduct of this design, not a replacement for it: the grant/revoke
+history is queryable directly from `user_roles`/`role_permissions`
+without joining `audit_log` at all. Full column shape in
+`docs/DATA_ARCHITECTURE.md` §13.
 
 ## 5. Scope: immediate model and extension path
 
@@ -121,6 +145,13 @@ the full `roles`/`permissions`/`scope` model; they exist to deny
 unauthorized direct table access if the application layer is ever
 bypassed, while the application-service layer remains the primary,
 authoritative enforcement point.
+
+Beneath RLS is a third layer: ordinary PostgreSQL table privileges. Since
+Nexus's browser and mobile clients have no legitimate reason to reach
+Platform Core tables directly, direct-access privileges for those roles
+are revoked, not merely denied by an RLS policy that a future migration
+could accidentally weaken. Full detail in
+`docs/DATA_ARCHITECTURE.md` §12.
 
 ## 7. Authorization, assignment, and workflow are distinct
 
