@@ -85,6 +85,10 @@ platform-level capabilities. Never reimplement one of these inside a feature
   chat history — update the docs when a decision changes, so future sessions
   don't have to rediscover it.
 
+## Frontend / UI
+
+All frontend implementation must comply with `docs/UI_SYSTEM.md`.
+
 ## Build order
 
 Do not build ahead of the current step. Features are added one at a time,
