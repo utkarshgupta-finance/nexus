@@ -463,6 +463,24 @@ respect the same controls as a human-initiated one: authorization
 approval where required, model/provider provenance, secret management,
 and rate/cost controls. No AI capability is implemented now.
 
+**Entitlement Ledger** (deferred, evaluation required before implementation).
+Before any Nexus Entitlement Ledger is implemented, a dedicated
+technology/library evaluation must be performed first. Nexus must not
+default to building a bespoke entitlement engine. That evaluation should
+compare mature open-source or otherwise reusable systems and libraries
+against Nexus's actual requirements before any schema is implemented,
+across candidate categories such as entitlement engines, feature/plan
+entitlement systems, usage/metering engines, and grant/balance ledgers.
+The evaluation must test Nexus-specific requirements including: customer
+plus module entitlement, effective dating, add/remove/change of module,
+quantity/slab/limit changes, historical "what was entitled on date X"
+queries, suspension, reinstatement, disconnection, churn, provenance back
+to the approved commercial source that granted it, the relationship to
+usage, the relationship to billing eligibility, and immutable/auditable
+history. No product is selected and nothing is installed as of this
+document; this paragraph records only that the evaluation is mandatory
+before the ledger is built, not what the ledger will contain.
+
 ## 14. Non-goals for this document
 
 This document does not define database schemas
