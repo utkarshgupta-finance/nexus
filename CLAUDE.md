@@ -1,10 +1,10 @@
-# Nexus — Claude Code instructions
+# Nexus: Claude Code instructions
 
 Nexus is an internal finance process platform. This file is engineering
-guidance only — no business rules or confidential context live here. Full
+guidance only. No business rules or confidential context live here. Full
 structural rationale is in `docs/ARCHITECTURE.md`.
 
-## Public repository — hard rules
+## Public repository: hard rules
 
 This repository is **public**.
 
@@ -14,7 +14,7 @@ This repository is **public**.
 - Environment-specific values go through env vars; only `.env.example`
   (placeholder names, no real values) is committed.
 - All example/fixture/seed data must be fictional.
-- If something looks even possibly confidential, don't commit it — ask
+- If something looks even possibly confidential, don't commit it. Ask
   first.
 
 ## Stack
@@ -26,7 +26,7 @@ Lucide icons. `src/` layout, `@/*` import alias, npm.
 
 ```
 src/
-  app/                  routes — thin, composition only
+  app/                  routes: thin, composition only
   components/ui/         generic design-system primitives (shadcn)
   components/product/    Nexus-branded components shared across features
   features/              one folder per business feature, self-contained
@@ -36,25 +36,25 @@ src/
 ```
 
 Full rules on what goes where, and dependency direction, are in
-`docs/ARCHITECTURE.md` — read it before adding a new module.
+`docs/ARCHITECTURE.md`. Read it before adding a new module.
 
 ## Coding principles
 
-- Keep `page.tsx` thin — routing/composition only, no business logic.
+- Keep `page.tsx` thin: routing/composition only, no business logic.
 - Separate presentation, domain logic, data access, and validation; don't
   mix them in one file or component.
 - Prefer feature-local code. Only move something into `platform/` or
   `components/product/` once it's actually needed by more than one feature.
-- Reuse existing components/utilities before creating new ones — check
+- Reuse existing components/utilities before creating new ones. Check
   `components/ui/`, `components/product/`, and `lib/` first.
-- Avoid premature abstraction — don't build for hypothetical future
+- Avoid premature abstraction. Don't build for hypothetical future
   requirements.
-- Avoid giant components and giant utility files — split by responsibility.
-- Avoid duplicate logic — if you're about to copy-paste business logic,
+- Avoid giant components and giant utility files. Split by responsibility.
+- Avoid duplicate logic. If you're about to copy-paste business logic,
   it belongs in `platform/` or a shared feature module instead.
 - Avoid unnecessary dependencies. Do not add UI/component libraries beyond
   shadcn/ui + Lucide without asking.
-- Do not refactor unrelated areas while implementing a feature — stay in
+- Do not refactor unrelated areas while implementing a feature. Stay in
   scope.
 - Strict TypeScript. Avoid `any`; prefer precise types or `unknown` with
   narrowing.
@@ -62,11 +62,11 @@ Full rules on what goes where, and dependency direction, are in
   in `docs/ARCHITECTURE.md`, don't invent parallel terms for the same thing.
 - Optimize for readability over cleverness.
 
-## Shared platform capabilities — build once, reuse everywhere
+## Shared platform capabilities: build once, reuse everywhere
 
 `workflow`, `approvals`, `audit`, `permissions`, `policy`, `attachments` are
-platform-level capabilities. Never reimplement one of these inside a feature
-— attach to the shared implementation in `platform/` instead. See
+platform-level capabilities. Never reimplement one of these inside a feature.
+Attach to the shared implementation in `platform/` instead. See
 `docs/ARCHITECTURE.md` §2–3 for the dependency rules that enforce this.
 
 ## Working efficiently in this repo
@@ -76,13 +76,13 @@ platform-level capabilities. Never reimplement one of these inside a feature
 - Use targeted search (grep/glob) before opening files; use an Explore-style
   subagent for genuinely broad investigation, not for a single lookup.
 - Don't reread a file you've already read and understood in this session.
-- Don't paste large unchanged file contents back into responses — reference
+- Don't paste large unchanged file contents back into responses. Reference
   the file path instead.
 - Don't explain obvious implementation details; keep responses concise.
 - Prefer starting a fresh session (`/clear`) when switching to an unrelated
   feature rather than carrying over irrelevant context.
 - Architecture and structural decisions belong in `docs/` files, not only in
-  chat history — update the docs when a decision changes, so future sessions
+  chat history. Update the docs when a decision changes, so future sessions
   don't have to rediscover it.
 
 ## Frontend / UI
@@ -93,3 +93,45 @@ All frontend implementation must comply with `docs/UI_SYSTEM.md`.
 
 Do not build ahead of the current step. Features are added one at a time,
 each proven end-to-end (data → domain → UI) before the next one starts.
+
+## Writing style
+
+Never use em dashes anywhere in the project.
+
+This applies to:
+- UI copy
+- labels
+- helper text
+- error messages
+- empty states
+- tooltips
+- documentation
+- README files
+- code comments
+- test/example text
+- commit messages generated by Claude
+
+Do not use the character "—".
+
+Instead, rewrite the sentence using whichever is clearest: comma, colon,
+semicolon, parentheses, full stop, or a simple hyphen where grammatically
+appropriate. Prefer short, simple sentences over replacing every em dash
+mechanically.
+
+When editing existing text, remove em dashes if you encounter them.
+
+Do not change code operators, syntax, or data formats merely to enforce this
+writing rule.
+
+## Prototype UI fields
+
+Fields, columns, labels, filters, statuses, and example records used in
+visual prototypes are illustrative unless explicitly defined by the product
+brief. Do not treat prototype UI choices as permanent schema or business
+requirements.
+
+When implementing a real feature:
+1. Derive the fields from the approved product requirements.
+2. Decide which information the user actually needs on the primary screen.
+3. Use progressive disclosure for secondary information.
+4. Do not preserve prototype columns merely because they already exist.

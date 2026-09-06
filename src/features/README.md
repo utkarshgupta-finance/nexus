@@ -1,8 +1,8 @@
 # features/
 
 One folder per business feature (e.g. `customers`, `registration`,
-`commercial-terms`, `go-live`, `entitlement-ledger`). Nothing lives here yet —
-features are added one at a time, in later steps.
+`commercial-terms`, `go-live`, `entitlement-ledger`). Nothing lives here yet.
+Features are added one at a time, in later steps.
 
 Each feature folder is expected to be self-contained:
 

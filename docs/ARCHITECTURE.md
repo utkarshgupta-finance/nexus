@@ -1,7 +1,7 @@
-# Nexus — Engineering Architecture
+# Nexus: Engineering Architecture
 
 This document explains *how the code is organized and why*. It contains no
-business rules — for what Nexus does, that context lives outside this public
+business rules: for what Nexus does, that context lives outside this public
 repository. This file is about structure, boundaries, and conventions only.
 
 ## 1. Top-level shape
@@ -23,13 +23,13 @@ src/
 needs: the maker-checker workflow engine, the approval log, audit trail,
 permissions, policy/config, attachments. These are built **once** and
 consumed everywhere. A feature must never reimplement its own version of a
-platform capability — if two features need similar behaviour, that behaviour
+platform capability. If two features need similar behaviour, that behaviour
 belongs in `platform/`, not duplicated.
 
 **Features** (`src/features/`) hold business logic specific to one part of
 the product (e.g. registration, commercial terms, go-live). A feature may
 depend on `platform/`, `components/`, and `lib/`. A feature must not import
-another feature's internals directly — if two features need to share
+another feature's internals directly. If two features need to share
 something, promote that thing to `platform/` or `components/product/`
 instead of cross-importing.
 
@@ -45,7 +45,7 @@ app  →  features  →  platform  →  lib
 - `platform/` never imports from `features/` or `app/`.
 - `features/` may import from `platform/`, `components/`, `lib/`.
 - `features/` must not import from another feature.
-- `components/ui/` has no dependency on `platform/` or `features/` — it
+- `components/ui/` has no dependency on `platform/` or `features/`. It
   knows nothing about Nexus's domain.
 - `components/product/` may depend on `components/ui/` and on `platform/`
   types (e.g. a status badge that renders a workflow state), but not on any
@@ -92,10 +92,10 @@ feature's `domain/` or `components/`, not into the page itself.
 ## 7. Adding a new feature module
 
 1. Create `src/features/<feature-name>/` with `domain/`, `data/`,
-   `components/`, `types.ts` as needed — only create the subfolders the
+   `components/`, `types.ts` as needed, only create the subfolders the
    feature actually uses.
 2. If the feature needs maker-checker approval, attach it to the shared
-   workflow engine in `platform/workflow/` once that exists — do not build a
+   workflow engine in `platform/workflow/` once that exists. Do not build a
    parallel state machine.
 3. If the feature introduces a new configurable threshold, add it to
    `platform/policy/` as data, not as a hardcoded constant.
