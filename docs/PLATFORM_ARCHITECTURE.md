@@ -20,6 +20,50 @@ reinventing it. That shared implementation is the platform core, and it
 exists to answer one question consistently everywhere in Nexus: who can do
 what, to which record, and what happens as a result.
 
+**Library-first, not framework-first-guessing.** Before implementing a
+substantial horizontal Nexus capability, Nexus performs a technology/
+library evaluation of mature, reusable, or open-source solutions before
+writing bespoke infrastructure for it. Nexus preferentially builds the
+things that are actually Nexus: Bizom-specific business rules, Finance
+controls, application/domain semantics, canonical data models,
+integration boundaries, and audit/provenance requirements. It does not
+preferentially rebuild mature commodity infrastructure that already
+exists and is well tested elsewhere. The presence of a library never
+automatically means Nexus adopts it: each evaluation weighs functional
+fit, architecture fit, licensing, security, auditability, self-hosting/
+deployment implications, maintainability, extensibility, vendor lock-in,
+data ownership, and integration complexity, and concludes with one of
+**adopt**, **adopt with a Nexus wrapper**, **use only as a UI/engine
+component**, or **build**. This principle does not itself list every
+library currently being considered; individual technology choices and
+their evaluations belong in the stage that actually needs them (for
+example, SurveyJS's evaluation was Stage 5B1A; §13 records each named
+technology boundary as it is accepted).
+
+The following future platform areas are recorded now as requiring this
+evaluation before any bespoke implementation, without committing to any
+product: decision/rule authoring, approval matrix/DMN, workflow
+modelling (Flowable is already the accepted boundary for this, §13),
+notifications, evidence/file upload infrastructure, spreadsheet/grid
+infrastructure, the Entitlement Ledger (already recorded, §13), API
+tooling, observability, and any other substantial horizontal platform
+capability identified later. This is a decision checkpoint each of these
+must pass through, not a commitment to any named product, and not an
+exhaustive list of every area that will ever qualify.
+
+**Permanent Nexus design principles.** Library-first, above, is one of
+eight permanent principles that govern every substantial Nexus design and
+implementation decision, not just technology adoption. The full set,
+their engineering implications, and the Nexus Design Review checklist
+that applies them are codified in `docs/guide/NEXUS_PRINCIPLES.md`
+(plain English) and `docs/engineering/NEXUS_ENGINEERING_PRINCIPLES.md`
+(technical translation); this document does not repeat them. How Nexus
+organizes documentation itself, including this document's own future
+place in it, is `docs/DOCUMENTATION_STRATEGY.md`. Nothing in this section
+is superseded by those documents; the library-first statement above
+remains this document's own instance of Principle 1, consistent with the
+fuller framework.
+
 ## 2. Layered architecture
 
 Business logic does not live directly inside React components, pages, or

@@ -17,6 +17,35 @@ This repository is **public**.
 - If something looks even possibly confidential, don't commit it. Ask
   first.
 
+## The Nexus Design Review
+
+Before substantial Nexus design or implementation work, apply the Nexus
+Design Review: Library, API, Nexus-owned contract, Scale, Human, CFO,
+CEO, Documentation. Full framework in `docs/guide/NEXUS_PRINCIPLES.md`
+(plain English) and `docs/engineering/NEXUS_ENGINEERING_PRINCIPLES.md`
+(technical); documentation organization in
+`docs/DOCUMENTATION_STRATEGY.md`. In short:
+
+- Library-first: evaluate mature reusable/OSS solutions before building
+  horizontal infrastructure ourselves.
+- API-capable: business logic sits in application services, so a future
+  API/job/integration reaches it without duplicating it.
+- Nexus-owned contracts: external engines (SurveyJS, Flowable, Temporal)
+  stay behind Nexus's own adapters, never exposed as Nexus's own API.
+- Scale-ready, not scale-heavy: build for today's load, protect what's
+  expensive to retrofit (stable IDs, boundaries, audit), skip complexity
+  nothing currently needs.
+- Human simplicity: the system absorbs complexity, not the user.
+- Finance control (CFO mindset): ownership, evidence, approval, audit,
+  and effective dating are database-enforced defaults, not conventions.
+- Leadership visibility (CEO mindset): materiality, risk, and exceptions
+  are structured data, not buried in free text.
+- Docs as code: documentation lives in Git alongside the code it
+  describes, and grows with the platform.
+
+This is a thinking framework applied while working, not a separate
+approval step.
+
 ## Stack
 
 Next.js (App Router) + React + TypeScript + Tailwind CSS + shadcn/ui +
