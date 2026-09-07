@@ -813,5 +813,7 @@ own implementation stage, not a design gap.
 
 Not a migration. Not an implementation. Not a decision on the Form Data
 Source Resolver, Commercial Master, Decision Engine, Flowable, approval
-evidence, or attachments. Every schema shape above is a proposal for
-Stage 5B1C2 to translate into SQL.
+evidence, or attachments. Every schema shape above is a proposal for the
+future Stage 5B1C1 database implementation to translate into SQL. Stage
+5B1C2 remains the Form Data Source / Master Data Resolver stage, a
+distinct later stage this document does not design.
