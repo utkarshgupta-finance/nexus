@@ -2,17 +2,15 @@
 
 ## MIGRATION DESIGN
 
-**NO SQL YET. NO DATABASE CHANGES YET.**
-
-**STATUS: LOCKED.**
-
-**PRE-APPLY GATE: Supabase CLI migration atomicity is VERIFIED / PASSED
-for CLI 2.117.0 on the tested Docker-backed local execution path (§22).
-Migration 7 (`supabase/migrations/20260908013210_master_data_foundation.sql`,
-committed) has been authored, principal-reviewed, and dry-run against
-the linked remote project (planning exactly that one file). Migration 7
-is eligible for controlled apply as a separate, later stage; this
-document does not itself apply it.**
+**STATUS: COMPLETE.** Migration 7
+(`supabase/migrations/20260908013210_master_data_foundation.sql`) has
+been applied to the linked remote Nexus database and its full locked
+40-test runtime break-test suite (§18-21) has passed: **40/40 PASS, 0
+FAIL, 0 BLOCKED, zero persistent test residue.** See §27 for the
+consolidated closeout record. Every gate this document defined
+(principal SQL review, atomicity verification, remote dry-run, and now
+runtime execution) is satisfied; no further pre-apply or post-apply gate
+remains open.
 
 This document is the implementation blueprint for the next migration,
 translating the locked `docs/MASTER_DATA_FOUNDATION_DESIGN.md` into an
@@ -897,28 +895,24 @@ Nexus working tree was confirmed unchanged throughout, Migration 7 was
 not applied during this test, and `.claude/launch.json` remained the
 only untracked file in the real repository.
 
-**What this closes, and what it does not.** This closes the atomicity
-pre-apply gate for CLI 2.117.0 on the tested local path. It does not
-mean Migration 7 has been applied anywhere, and it does not mean the 40
-break tests (§18) have passed: those require Migration 7 itself to be
-applied to a real database first, which has not happened. A remote
-`db push --dry-run` for the actual Migration 7 file already passed
-separately (planning exactly
-`20260908013210_master_data_foundation.sql` and nothing else), and
-remains a distinct, already-recorded piece of evidence from this
-atomicity check. Migration 7's actual controlled apply, and running the
-40 break tests against the applied schema, remain separate, later,
-not-yet-performed stages.
+**What this closed, and what it did not, at the time this section was
+written.** This closed only the atomicity pre-apply gate for CLI 2.117.0
+on the tested local path; it did not by itself mean Migration 7 had been
+applied anywhere, and did not mean the 40 break tests (§18) had passed,
+since those required Migration 7 to be applied to a real database first.
+**Both have since happened; see §27 for the consolidated closeout
+record.** This paragraph is left as written for its historical accuracy
+about what this atomicity check alone proved, not as a current status
+statement.
 
 ## 23. Failure / retry behavior
 
-**DESIGN STATUS: LOCKED (the principles below). EXECUTION STATUS:
-retry policy for one specific contingency (whether earlier statements
-survive a later failure) cannot be finalized until §22's gate is
-satisfied; both contingencies are documented and neither blocks locking
-this design.** The following principles are locked for Migration 7 and
-any future migration that does not have a specific, documented reason to
-differ:
+**DESIGN STATUS: LOCKED. EXECUTION STATUS: COMPLETE** (§22's atomicity
+gate is satisfied for the tested path and version, and Migration 7 has
+since applied cleanly on the first attempt, so the failure/retry
+contingency below was never actually exercised). The following
+principles are locked for Migration 7 and any future migration that does
+not have a specific, documented reason to differ:
 
 - **Unexpected pre-existing `customers`/`capabilities` schema fails
   loudly.** Migration 7 uses plain `CREATE TABLE`, `CREATE FUNCTION`, and
@@ -986,13 +980,9 @@ None of these five steps are performed as part of this design task.
 
 ## 25. Migration verification checklist (for the future implementation turn)
 
-**DESIGN STATUS: LOCKED. EXECUTION STATUS: every gate below is now
-satisfied through dry-run; only the actual apply and post-apply steps
-remain, as a separate, later stage.** Authoring, diffing, building,
-linting, principal SQL review, the §22 atomicity check, and
-`db push --dry-run` have all been completed and passed; nothing here
-blocks proceeding to a controlled apply when that stage is deliberately
-started.
+**DESIGN STATUS: LOCKED. EXECUTION STATUS: COMPLETE.** Every step below,
+including the actual apply and post-apply steps, has been performed and
+passed; see §27 for the consolidated closeout record.
 
 **Before writing SQL:**
 - `git status` (confirm a clean, expected working tree before starting).
@@ -1020,47 +1010,44 @@ started.
   proceeding. **Completed** against the linked remote project: planned
   exactly `20260908013210_master_data_foundation.sql` and nothing else.
 
-**After remote apply:**
-- Confirm migration history now includes the new migration at its
+**After remote apply, all completed (§27):**
+- Migration history confirmed to include the new migration at its
   correct version.
-- Inspect `customers`/`capabilities` table shape, constraints, and
-  indexes directly (read-only `execute_sql`/`list_tables` via the
-  Supabase MCP is acceptable for this inspection step, per `CLAUDE.md`'s
-  own carve-out for read-only MCP use).
-- Inspect triggers on both tables and confirm the exact set and ordering
-  designed in §11.
-- Inspect RLS status and policy count (§9, §18 tests 14-15/34-35).
-- Inspect table and function privileges (§10, §19).
-- Execute the full break-test plan (§18) and privilege matrix (§19)
-  against the applied schema.
-- Confirm no test residue remains (§21).
-- `npm run build`.
-- `npm run lint`.
+- `customers`/`capabilities` table shape, constraints, indexes,
+  triggers, RLS status, and privileges all confirmed against the applied
+  schema.
+- The full break-test plan (§18) and privilege matrix (§19) executed
+  against the applied schema: 40/40 PASS.
+- No test residue confirmed remaining (§21).
+- `npm run build` / `npm run lint`: both passed.
 
 ## 26. Remaining implementation questions
 
-**DESIGN STATUS: LOCKED, no remaining design question. EXECUTION
-STATUS: no apply-time gate remains open.** None block *writing*
-Migration 7 against this blueprint, and the one item that gated safely
-*applying* it, the §22 empirical atomicity check, is now VERIFIED /
-PASSED for CLI 2.117.0 on a Docker-backed local execution path (§22).
-Migration 7 is committed
-(`supabase/migrations/20260908013210_master_data_foundation.sql`,
-principal-reviewed, remote `db push --dry-run` passed) and eligible for
-controlled apply as a separate, later, not-yet-performed stage. No
-runtime break test (§18) has passed yet, because Migration 7 has not
-been applied to any database; that remains a distinct, later step from
-this atomicity verification.
+**DESIGN STATUS: LOCKED. EXECUTION STATUS: COMPLETE.** None remain.
+Migration 7 (`supabase/migrations/20260908013210_master_data_foundation.sql`)
+has been principal-reviewed, atomicity-verified, remote-dry-run-verified,
+applied to the linked remote database, and its full locked runtime
+break-test suite has passed 40/40. See §27 for the consolidated record.
 
-Genuinely deferred, non-blocking implementation detail: the exact
-PL/pgSQL body text for `fn_protect_customer_lifecycle()`/
-`fn_protect_capability_lifecycle()` (this document settles *what* each
-must guarantee and *why*, §6, the same settled-versus-SQL split already
-used in `docs/FORM_VERSIONING_MODEL.md` §23); the exact regenerated
-migration filename timestamp at the moment the file is actually authored
-(§2); and the exact test harness/script used to execute §18/§21's break
-tests (a one-off manual `psql`/Supabase-SQL-editor session, or a
-lightweight script, is an implementation choice, not a design gap).
+Genuinely deferred, non-blocking detail that was never a design gap: the
+exact test harness/script used to execute §18/§21's break tests was a
+disposable, temporary artifact (`.runtime-tests/`), authored, used once,
+and removed after this closeout, per the same discipline already applied
+to the atomicity-check throwaway migration in §22.
+
+## 27. Closeout record
+
+**Master Data Foundation status: COMPLETE.**
+
+- Migration applied: `supabase/migrations/20260908013210_master_data_foundation.sql`, applied to the linked remote Nexus database.
+- Supabase CLI version used for the controlled apply and atomicity check: **2.117.0**.
+- Atomicity gate: PASSED, empirically verified for CLI 2.117.0 on the tested Docker-backed local execution path (§22); scoped to that path and version, not generalized further.
+- Runtime break-test gate: PASSED. Total tests recorded: **40**. PASS: **40**. FAIL: **0**. BLOCKED: **0**. Zero persistent Customer/Capability/audit test residue after the run (§18 test 39).
+- Privilege matrix (§19): runtime-verified for all four roles named in the locked matrix, not inferred: **postgres** (connected/migration-owner path), **service_role** (trusted path), **authenticated**, **anon**.
+- Every locked control area passed at runtime: key/identity immutability, `is_active` reversibility (Customer) and one-way `status` (Capability), `row_version` optimistic concurrency (including the stale-precondition zero-rows case), DELETE rejection, positive audit capture, rejected-mutation audit-negative behavior, RLS enabled with zero policies, and Resource Registry non-participation.
+- The temporary runtime harness (`.runtime-tests/`) was disposable verification infrastructure, used once and removed; it is not part of the permanent repository surface and this document's own design content does not depend on it existing.
+
+No further gate remains open for the Master Data Foundation. Commercial's own future migration remains the next, separate, not-yet-started stage that depends on `customers`/`capabilities` now existing (§17).
 
 ## Review for overdesign (§33 self-check)
 

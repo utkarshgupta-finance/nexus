@@ -2,9 +2,13 @@
 
 ## CUSTOMER + CAPABILITY
 
-**DESIGN ONLY. NO MIGRATION YET.**
-
-**STATUS: LOCKED.**
+**STATUS: COMPLETE.** Migration 7
+(`supabase/migrations/20260908013210_master_data_foundation.sql`) has
+been applied to the linked remote Nexus database and its full runtime
+break-test suite has passed (40/40). Full execution evidence lives in
+`docs/MASTER_DATA_FOUNDATION_MIGRATION_DESIGN.md`, not duplicated here;
+this document remains the authoritative record of the business/database
+design decisions themselves, which are unchanged by that execution.
 
 **CORRECTION NOTICE**: Finance has corrected the Customer lifecycle
 rule. `customers.is_active` is not a one-way switch: it may move
@@ -743,10 +747,13 @@ this reason).
 
 ## What this document is not
 
-Not a migration. Not an implementation. Not a decision on Commercial
-pricing, usage, entitlement, Customer 360, CRM, a Product Catalog, or
-workflow configuration. Not a redesign of
-`docs/SUBMISSION_DATA_CONTRACT.md`, `docs/FORM_VERSIONING_MODEL.md`, or
-`docs/COMMERCIAL_DATABASE_DESIGN.md`; none of those documents is
-modified. Every schema shape above is a proposal for a future,
-not-yet-started Master Data migration to translate into SQL.
+Not a migration file itself, not a decision on Commercial pricing,
+usage, entitlement, Customer 360, CRM, a Product Catalog, or workflow
+configuration. Not a redesign of `docs/SUBMISSION_DATA_CONTRACT.md`,
+`docs/FORM_VERSIONING_MODEL.md`, or `docs/COMMERCIAL_DATABASE_DESIGN.md`;
+none of those documents is modified. Every schema shape above has since
+been translated into SQL and applied
+(`supabase/migrations/20260908013210_master_data_foundation.sql`,
+execution evidence in `docs/MASTER_DATA_FOUNDATION_MIGRATION_DESIGN.md`);
+this document remains the design-level record of *why* each decision was
+made, not a log of that execution.
