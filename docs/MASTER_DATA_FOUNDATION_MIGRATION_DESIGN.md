@@ -6,10 +6,13 @@
 
 **STATUS: LOCKED.**
 
-**PRE-APPLY GATE: Supabase CLI migration atomicity remains UNVERIFIED
-for the execution environment. Migration 7 may be authored and
-reviewed, but must not be applied to any database until the gate in
-§22 is satisfied.**
+**PRE-APPLY GATE: Supabase CLI migration atomicity is VERIFIED / PASSED
+for CLI 2.117.0 on the tested Docker-backed local execution path (§22).
+Migration 7 (`supabase/migrations/20260908013210_master_data_foundation.sql`,
+committed) has been authored, principal-reviewed, and dry-run against
+the linked remote project (planning exactly that one file). Migration 7
+is eligible for controlled apply as a separate, later stage; this
+document does not itself apply it.**
 
 This document is the implementation blueprint for the next migration,
 translating the locked `docs/MASTER_DATA_FOUNDATION_DESIGN.md` into an
@@ -800,117 +803,112 @@ or bypassed as a cleanup mechanism anywhere in this strategy.
 
 ## 22. Migration atomicity
 
-**DESIGN STATUS: LOCKED. EXECUTION STATUS: APPLY BLOCKED UNTIL ATOMICITY
-GATE IS SATISFIED.** This section is an execution gate on *applying*
-Migration 7, not an open database-design question. Nothing about the
-`customers`/`capabilities` shape, constraints, lifecycle rules, audit,
-concurrency, or privilege boundary depends on this section's outcome;
-those are already locked (§3 through §21). Authoring Migration 7's SQL
-and reviewing it may proceed; a `db push --dry-run` may be performed,
-since it executes no schema change; actually applying Migration 7 to
-any database, local or remote, may not, until the gate below is
-satisfied.
+**DESIGN STATUS: LOCKED. EXECUTION STATUS: VERIFIED / PASSED for
+Supabase CLI 2.117.0 on the tested Docker-backed local execution path.**
+This section is an execution gate on *applying* Migration 7, not an open
+database-design question. Nothing about the `customers`/`capabilities`
+shape, constraints, lifecycle rules, audit, concurrency, or privilege
+boundary ever depended on this section's outcome; those were already
+locked independently (§3 through §21). This gate is now closed for the
+tested path; Migration 7 is eligible for controlled apply as a separate,
+later stage.
 
-**This section was missing from the first draft and was added in the
-prior correction pass on reasoned-but-unverified grounds. This pass
-attempted the required empirical verification against the exact
-installed CLI and could not complete it, for an environmental reason
-recorded honestly below, not a design reason.** The finding remains
-unverified; it is not being escalated to "confirmed" without actual
-evidence, and it is not being silently left as "most likely" either.
+**Provenance of this evidence.** Two prior passes attempted this
+empirical check from within the Claude Code task environment used to
+author this design and could not complete it: that sandboxed environment
+has no Docker, no local Postgres binary, and no package manager able to
+install either. The empirical test recorded below was performed
+separately, outside that sandboxed session, in an environment with
+Docker actually available, following the exact reproduction procedure
+this document itself specified. This section records that reported
+result; it does not claim the test was executed inside the same session
+that authored this document.
 
-**Exact CLI version in use, confirmed this pass**: `npx supabase
---version` reports **2.117.0**. This project does not pin a Supabase CLI
-version anywhere: `package.json`/`package-lock.json` contain no
-`supabase` entry at all (confirmed by direct inspection), so every
-invocation resolves via `npx` to whatever version `npx` fetches at that
-moment (observed this pass: `npm warn exec The following package was
-not found and will be installed: supabase@2.117.0`), not a lockfile-
-pinned version. This matters directly to the concern raised this pass:
-a reported migration-execution regression in CLI 2.115.0/2.116.0
-(a pipelined extended-protocol path not equivalent to a transaction
-block) would **not** be caught by inspecting `--help` text or by
-reasoning from generic PostgreSQL protocol semantics alone, which is
-exactly why an empirical test against this exact installed version
-(2.117.0, a later version than the ones named in that regression report,
-but not thereby assumed to be unaffected or fixed) was attempted this
-pass rather than only reasoned about.
+**Exact CLI version tested**: **2.117.0**, the same version identified in
+the prior passes. This project still does not pin a Supabase CLI version
+anywhere (`package.json`/`package-lock.json` contain no `supabase`
+entry); every invocation resolves via `npx` to whatever version `npx`
+fetches at that moment. This matters directly to the regression context
+that motivated this check: a reported migration-execution regression in
+CLI 2.115.0/2.116.0 (a pipelined extended-protocol path not equivalent to
+a transaction block) would not be caught by reasoning from generic
+PostgreSQL protocol semantics alone, which is exactly why this was
+tested empirically against the exact installed version rather than only
+reasoned about.
 
-**Empirical test: attempted, not completed.** The intended approach
-followed the task's own design exactly: start the local Supabase stack,
-author a throwaway `..._TEMP_atomicity_probe.sql` migration (a uniquely
-named fictional probe table, an insert, then a deterministic failing
-statement), apply it through `npx supabase db push --local` (or the
-equivalent local-only command surfaced by `--help` for this installed
-version), and inspect whether the probe table survived the deliberate
-failure.
+**Test environment**: Docker Desktop, Docker Engine 29.7.2, aarch64.
 
-**This could not be executed in this sandboxed task environment.**
-Supabase's local stack (`supabase start`) runs Postgres and its
-supporting services inside Docker containers; this environment has
-neither `docker` nor any local `psql`/`postgres`/`pg_ctl` binary
-available (confirmed: `docker`, `psql`, `postgres`, `pg_ctl` all report
-"not found"; `brew` is also unavailable, so nothing could be installed
-to work around this). There is no local Postgres of any kind reachable
-from this environment to test against, and per the task's own explicit
-instruction, the remote linked project must not be used for this
-experiment. No workaround (installing software, reaching for the remote
-project, or reasoning around the gap) was attempted; the honest
-conclusion is that this specific empirical check requires an
-environment with Docker (or a directly reachable local Postgres) that
-this task environment does not have.
+**Isolation method**: a detached temporary Git worktree at
+`/tmp/nexus-atomicity-21170`, created from commit
+`8914240642b87c9eb2516c567ca524c6363bfb7c`, the commit immediately before
+Migration 7 was added to this repository. That commit's
+`supabase/migrations/` contained exactly the six canonical migrations
+(`20260906084244_platform_core_foundation.sql` through
+`20260907054608_request_resource_type_integrity.sql`) and did not
+contain Migration 7. This kept the experiment fully isolated from the
+real Migration 7 file and from the remote linked project: no remote
+command was used at any point in this test.
 
-**What remains true from the prior pass, restated, not upgraded in
-confidence:**
+**Baseline**: starting the local Supabase stack from that worktree
+applied exactly the six canonical migrations; local migration history
+confirmed exactly those six versions before the probe was introduced.
 
-- None of the six existing migration files contain a top-level `BEGIN`,
-  `COMMIT`, or `ROLLBACK` statement (confirmed by grep; every
-  `begin`/`end` found is inside a `plpgsql` function body).
-- Standard, documented PostgreSQL multi-statement query-string behavior
-  (an implicit all-or-nothing transaction when no internal
-  `BEGIN`/`COMMIT` is present) is real and independent of Supabase, but,
-  per the regression context raised this pass, is **not** sufficient by
-  itself to characterize CLI 2.117.0's actual migration-application
-  behavior, since a pipelined extended-protocol execution path is not
-  guaranteed to preserve simple-query implicit-transaction semantics.
+**Probe migration**: `20260908021336_TEMP_atomicity_probe.sql`, created
+only inside the temporary worktree, never committed to this repository.
+Its SQL: create a uniquely named fictional table
+(`public._temp_atomicity_probe_21170`), insert one row (`id = 1`), then
+`SELECT 1 / 0` as a deterministic final failure. A local dry-run before
+applying it planned exactly that one migration. No Nexus business table,
+no Commercial object, and no confidential data of any kind was
+referenced.
 
-**Conclusion: UNVERIFIED, not "most likely," and not "confirmed atomic"
-or "confirmed non-atomic."** This document does not claim either
-outcome. It does not add an explicit `BEGIN`/`COMMIT` to Migration 7 (no
-workaround is invented for an unconfirmed risk, per the task's own
-instruction), and it does not claim the empirical gate from the prior
-pass has been satisfied, because it has not.
+**Observed failure**: the local apply failed exactly as designed, with
+`SQLSTATE 22012` (division by zero).
 
-**Required next step, unchanged in kind, now more specific:** the
-empirical check described above must be performed once, by someone with
-Docker (or a reachable local Postgres) available, against CLI **2.117.0
-specifically** (re-running `npx supabase --version` immediately before
-the test, since this project's unpinned resolution means a later `npx`
-invocation could silently fetch a different version). Exact reproduction
-steps for that environment:
+**Post-failure evidence**:
 
-```
-npx supabase --version                     # confirm 2.117.0 (or note the
-                                            # actual version if it has
-                                            # since changed)
-npx supabase start                          # local stack, requires Docker
-# author supabase/migrations/<ts>_TEMP_atomicity_probe.sql:
-#   create table _temp_atomicity_probe_<random> (id int);
-#   insert into _temp_atomicity_probe_<random> values (1);
-#   select 1/0;                             -- deterministic failure
-npx supabase db push --local --dry-run      -- confirm target is local
-npx supabase db push --local
-# then inspect the local db: does _temp_atomicity_probe_<random> exist?
-# and does supabase_migrations.schema_migrations contain that version?
-npx supabase db reset                       -- restores canonical six-
-                                            -- migration local state
-rm supabase/migrations/<ts>_TEMP_atomicity_probe.sql
-```
+1. `select to_regclass('public._temp_atomicity_probe_21170')` (the probe
+   table) returned `NULL`: the table created earlier in the same
+   migration did not survive the later failure.
+2. Because the table itself did not survive, the row inserted into it
+   did not survive either.
+3. `supabase_migrations.schema_migrations` contained zero rows for
+   version `20260908021336`: the failed migration was not recorded as
+   applied.
 
-Until that result exists, Migration 7 must not be applied to any real
-database (local or remote) on the assumption of whole-file atomicity;
-`db push --dry-run` review remains safe and unaffected, since it does
-not execute anything.
+**Conclusion**: Supabase CLI 2.117.0 was empirically confirmed to
+execute the tested Docker-backed local migration path atomically at
+whole-file level. A deterministic failure in a later statement rolled
+back the earlier DDL and DML from the same migration file, and the
+failed migration version was not recorded in
+`supabase_migrations.schema_migrations`. **This evidence supports
+exactly the tested path and CLI version; it is not a claim that every
+Supabase CLI execution path, version, environment, or deployment mode is
+universally atomic.** A future CLI upgrade that changes migration
+execution mechanics should trigger re-verification before being relied
+upon.
+
+**Cleanup, reported alongside the result**: the local Supabase stack was
+stopped with no backup of its state; the temporary Git worktree was
+removed; the probe migration was destroyed along with the worktree
+(never present in the real repository); `git worktree prune` was run;
+no Supabase Docker containers remained running afterward. The real
+Nexus working tree was confirmed unchanged throughout, Migration 7 was
+not applied during this test, and `.claude/launch.json` remained the
+only untracked file in the real repository.
+
+**What this closes, and what it does not.** This closes the atomicity
+pre-apply gate for CLI 2.117.0 on the tested local path. It does not
+mean Migration 7 has been applied anywhere, and it does not mean the 40
+break tests (§18) have passed: those require Migration 7 itself to be
+applied to a real database first, which has not happened. A remote
+`db push --dry-run` for the actual Migration 7 file already passed
+separately (planning exactly
+`20260908013210_master_data_foundation.sql` and nothing else), and
+remains a distinct, already-recorded piece of evidence from this
+atomicity check. Migration 7's actual controlled apply, and running the
+40 break tests against the applied schema, remain separate, later,
+not-yet-performed stages.
 
 ## 23. Failure / retry behavior
 
@@ -949,25 +947,16 @@ differ:
   --dry-run`'s own comparison) is the diagnostic step; a mismatch is
   resolved by understanding why local and remote disagree, never by
   force-applying regardless.
-- **A failed migration is diagnosed before any retry is attempted, and
-  retry policy itself is currently gated on an unresolved question.**
-  §22's empirical atomicity check remains **unperformed** (blocked in
-  this task's environment by the absence of Docker/local Postgres, not
-  resolved either way). Two contingencies must both be treated as live
-  until that check actually runs:
-  - **If whole-file atomicity holds**: a failure partway through
-    Migration 7 leaves the schema exactly as it was before the attempt,
-    so a diagnosed-and-fixed retry is simply re-running `db push`
-    against the corrected file, with no manual partial-schema cleanup.
-  - **If it does not hold**: retry requires first manually inspecting
-    and reconciling whatever partial state the failed attempt left
-    behind before reapplying, and the migration may need restructuring
-    into smaller, independently-safe files.
-  This document does not pick between these two contingencies, because
-  doing so would mean guessing at exactly the question §22 exists to
-  answer empirically. Migration 7 must not be applied to any real
-  database, local or remote, until §22's check has actually been run and
-  one of the two contingencies above is confirmed.
+- **A failed migration is diagnosed before any retry is attempted.**
+  §22's empirical atomicity check is now VERIFIED / PASSED for CLI
+  2.117.0 on the tested Docker-backed local path: a failure partway
+  through a migration file leaves the schema exactly as it was before
+  the attempt, so a diagnosed-and-fixed retry is simply re-running
+  `db push` against the corrected file, with no manual partial-schema
+  cleanup expected. This is confirmed for the tested path and CLI
+  version specifically (§22); a future CLI upgrade that changes
+  migration execution mechanics should trigger re-verification before
+  this retry policy is relied upon again without question.
 - **Local migration history and remote migration history must remain
   aligned.** The normal workflow (§24) is the only sanctioned path:
   author the local migration file, review it, `db push --dry-run`, then
@@ -997,11 +986,13 @@ None of these five steps are performed as part of this design task.
 
 ## 25. Migration verification checklist (for the future implementation turn)
 
-**DESIGN STATUS: LOCKED. EXECUTION STATUS: the "Before remote apply"
-gate below (§22) is the only step this checklist cannot yet be run
-past.** Every earlier step (authoring, diffing, building, linting,
-`--dry-run`) may proceed freely; nothing about them depends on §22's
-outcome.
+**DESIGN STATUS: LOCKED. EXECUTION STATUS: every gate below is now
+satisfied through dry-run; only the actual apply and post-apply steps
+remain, as a separate, later stage.** Authoring, diffing, building,
+linting, principal SQL review, the §22 atomicity check, and
+`db push --dry-run` have all been completed and passed; nothing here
+blocks proceeding to a controlled apply when that stage is deliberately
+started.
 
 **Before writing SQL:**
 - `git status` (confirm a clean, expected working tree before starting).
@@ -1016,19 +1007,18 @@ outcome.
 - `npm run lint`.
 
 **Before remote apply:**
-- Perform the §22 empirical atomicity check against the local Supabase
+- Perform the §22 empirical atomicity check against a local Supabase
   stack (a throwaway local migration with a deliberate late failure,
   confirming whether earlier statements persist), against the exact
   installed CLI version confirmed via `npx supabase --version`
-  immediately beforehand. **This check remains unperformed as of this
-  document's latest pass** (blocked in the task environment that
-  produced this document by the absence of Docker/local Postgres, §22);
-  it is a hard gate, not an optional one, given the CLI regression
-  context §22 records: do not apply Migration 7 to any real database,
-  local or remote, before this gate is actually satisfied in an
-  environment that can run it.
+  immediately beforehand. **Completed**: VERIFIED / PASSED for CLI
+  2.117.0 on a Docker-backed local path (§22). A future CLI upgrade that
+  changes migration execution mechanics should trigger
+  re-verification before this step is treated as satisfied again
+  without question.
 - `npx supabase db push --dry-run`; read the planned DDL in full before
-  proceeding.
+  proceeding. **Completed** against the linked remote project: planned
+  exactly `20260908013210_master_data_foundation.sql` and nothing else.
 
 **After remote apply:**
 - Confirm migration history now includes the new migration at its
@@ -1050,21 +1040,17 @@ outcome.
 ## 26. Remaining implementation questions
 
 **DESIGN STATUS: LOCKED, no remaining design question. EXECUTION
-STATUS: one apply-time gate remains open (§22).** None block *writing*
-Migration 7 against this blueprint. One item gates safely *applying*
-it: the §22 empirical atomicity check (a one-time,
-cheap, local-only verification against this project's actual installed
-Supabase CLI, 2.117.0) was attempted this pass and **could not be
-completed**, because this task's environment has no Docker and no
-reachable local Postgres of any kind, and the remote linked project must
-not be used for this experiment per explicit instruction. This is an
-environment limitation, not a design gap or an unresolved design
-question: §22 states exactly what to run, in what order, and what
-result to record; someone with Docker (or a reachable local Postgres)
-available still needs to actually run it, against CLI 2.117.0 (re-
-confirmed via `npx supabase --version`, since this project's unpinned
-resolution means a later invocation could fetch a different version),
-before Migration 7 is pushed to any real database, local or remote.
+STATUS: no apply-time gate remains open.** None block *writing*
+Migration 7 against this blueprint, and the one item that gated safely
+*applying* it, the §22 empirical atomicity check, is now VERIFIED /
+PASSED for CLI 2.117.0 on a Docker-backed local execution path (§22).
+Migration 7 is committed
+(`supabase/migrations/20260908013210_master_data_foundation.sql`,
+principal-reviewed, remote `db push --dry-run` passed) and eligible for
+controlled apply as a separate, later, not-yet-performed stage. No
+runtime break test (§18) has passed yet, because Migration 7 has not
+been applied to any database; that remains a distinct, later step from
+this atomicity verification.
 
 Genuinely deferred, non-blocking implementation detail: the exact
 PL/pgSQL body text for `fn_protect_customer_lifecycle()`/
@@ -1101,10 +1087,11 @@ lightweight script, is an implementation choice, not a design gap).
   assertion remains possible (§18, §21, corrected this pass); `DELETE`
   being forbidden never blocks test cleanup, and no test is left in an
   unusable aborted transaction state.
-- Migration atomicity is no longer asserted as a certainty from a
-  mischaracterized guarantee ("per-statement DDL transactionality" was
-  imprecise); §22 now states exactly what is confirmed, what is not, and
-  requires an empirical local check before Migration 7 is implemented.
+- Migration atomicity is no longer asserted from a mischaracterized
+  guarantee ("per-statement DDL transactionality" was imprecise) or left
+  as an unverified finding; §22 now records an empirical, Docker-backed
+  local test result for the exact CLI version this project uses, scoped
+  explicitly to the tested path and version, not generalized further.
 - No ordinary role privilege is left open: `anon`/`authenticated` table
   and function access is explicitly revoked in addition to the
   already-sufficient Migration 2 default-privilege baseline (§10).
