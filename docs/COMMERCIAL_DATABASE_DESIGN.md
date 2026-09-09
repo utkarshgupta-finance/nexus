@@ -967,6 +967,17 @@ divided across components when a spend commitment's threshold is
 breached, since Finance did not raise that as a question this pass and
 this document does not invent one.
 
+Not a log of execution. The Migration 8 portion of this design
+(`measurement_definitions`, `commercial_configurations`,
+`commercial_changes`, `commercial_components`,
+`commercial_component_capabilities`, `commercial_commitments`,
+`commercial_commitment_components`) has since been translated into SQL
+and applied; execution evidence lives in
+`docs/COMMERCIAL_FOUNDATION_MIGRATION_DESIGN.md` §23, not duplicated
+here. The remaining eight tables (Migrations 9 and 10) remain
+not-yet-authored. This document stays the design-level record of *why*
+each decision was made, not a status log of any migration.
+
 ## 23. Customer / Capability Master sequencing (new)
 
 **This document does not create Customer Master or Capability/Workflow

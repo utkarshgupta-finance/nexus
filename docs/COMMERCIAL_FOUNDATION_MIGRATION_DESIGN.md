@@ -2,9 +2,15 @@
 
 ## MIGRATION DESIGN
 
-**STATUS: LOCKED.**
-
-**NO SQL YET. NO MIGRATION YET. NO DATABASE CHANGES YET.**
+**STATUS: LOCKED** (design, all three migrations). **Migration 8:
+COMPLETE.** Migration 8
+(`supabase/migrations/20260908210000_commercial_configuration_foundation.sql`)
+has been applied to the linked remote Nexus database and its runtime
+gate has passed 24/24. Full execution evidence is in §23; this document
+remains the authoritative record of the design decisions themselves,
+which are unchanged by that execution. **Migrations 9 and 10: SQL NOT
+YET AUTHORED**, remain separate, not-yet-started stages against this
+same locked design.
 
 ## 0. Principal architect review: corrections applied this revision
 
@@ -1018,10 +1024,13 @@ existing).
 Not a migration file. Not executable SQL. Not a redesign of any locked
 Commercial business or database decision. Not a decision on Pricing
 Kernel calculation logic, Entitlement, Wallet, Invoicing orchestration,
-or Flowable. Every shape above is a blueprint for three future,
-separate, not-yet-authored migration files (8, 9, 10) to translate into
-SQL, following the exact patterns already proven in Migrations 1 through
-7.
+or Flowable. Migration 8's shape above has since been translated into
+SQL and applied
+(`supabase/migrations/20260908210000_commercial_configuration_foundation.sql`,
+execution evidence in §23); Migrations 9 and 10 remain future, separate,
+not-yet-authored migration files to translate the remaining shapes above
+into SQL, following the exact patterns already proven in Migrations 1
+through 8.
 
 ## 22. Principal architect recommendation
 
@@ -1054,3 +1063,124 @@ now reads **STATUS: LOCKED**, matching `docs/COMMERCIAL_DATABASE_DESIGN.md`
 and `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md`.
 
 **COMMERCIAL FOUNDATION MIGRATION DESIGN LOCKED.**
+
+## 23. Migration 8 closeout record
+
+**Commercial Configuration Foundation status: COMPLETE.** This section
+records only Migration 8's own execution. Migrations 9 and 10 remain
+separate, not-yet-started stages against the same locked design (§0-18a);
+nothing in this section marks the Commercial Foundation as a whole
+complete.
+
+**Migration applied**:
+`supabase/migrations/20260908210000_commercial_configuration_foundation.sql`
+(commit `0dff254`, "Add Commercial Configuration foundation").
+
+**Migration history alignment**: local migration version
+`20260908210000` matches the remote version recorded after apply;
+GitHub (`origin/main`) is aligned with the applied state. Applied using
+`npx supabase@2.117.0 db push`. The preceding `db push --dry-run`
+planned exactly `20260908210000_commercial_configuration_foundation.sql`
+and no other migration.
+
+**Runtime gate**: **24/24 PASS, 0 FAIL, 0 BLOCKED.** Tests 1-21 are the
+locked Commercial Configuration Foundation break-test baseline (§14);
+the locked design baseline remains 21 tests, unchanged by execution.
+Tests 22-24 are additional RPC privilege-hardening tests accepted after
+principal review, strengthening verification without changing the
+locked business design:
+
+- **22.** `service_role` successfully executes
+  `create_commercial_configuration_with_change(...)`.
+- **23.** `anon` direct `EXECUTE` denied, `SQLSTATE 42501`.
+- **24.** `authenticated` direct `EXECUTE` denied, `SQLSTATE 42501`.
+
+**DIAGNOSTIC A1 (deferred FK verification): PASS.** The circular foreign
+key `commercial_changes.commercial_configuration_id ->
+commercial_configurations(id)` is `DEFERRABLE INITIALLY DEFERRED`.
+Because the runtime suite is rollback-bound (no `COMMIT` anywhere in the
+harness), commit-time behavior was verified safely, in-transaction, by
+forcing `SET CONSTRAINTS ALL IMMEDIATE`: a valid atomic graph resolved
+successfully, and a deliberately invalid deferred reference rejected
+with `SQLSTATE 23503`, with no permanent test rows required. This is
+in-transaction forced deferred-constraint verification, not an actual
+`COMMIT` test.
+
+**DIAGNOSTIC C1 (concurrency posture): NOT EXECUTED as a live
+two-session test.** The minimum-spend currency race this migration fixes
+was already closed by taking a `FOR UPDATE` lock on the parent
+`commercial_commitments` row. Release evidence is Test 21's sequential
+invariant verification plus principal static proof that the row lock
+serializes concurrent inserts. This is not a Migration 8 blocker. A
+genuine two-session concurrency regression test remains a future,
+non-blocking opportunity if this trigger is ever modified.
+
+**RLS diagnostic: PASS.** All 7 Migration 8 tables verified at runtime:
+RLS enabled, `FORCE RLS` false, zero policies.
+
+**Residue evidence: ZERO.** The final successful 24/24 runtime
+transaction executed `ROLLBACK`. The integrated `run.sh` runner then
+hung at its second, interactive password/residue stage; the stuck Docker
+residue process was terminated locally. A separate, independent manual
+Dockerized `psql` connection then executed
+`.runtime-tests/002_residue_check.sql` directly and returned
+`residue_row_count = 0`. `run.sh` did not itself complete the residue
+stage for this final run; the zero-residue evidence comes from that
+independent post-rollback connection using the same residue SQL.
+
+**Harness-failure history.** Two harness defects were discovered during
+live verification and corrected before the final successful gate, both
+in `.runtime-tests/` (disposable, untracked, never part of the
+migration), neither a production/migration defect:
+
+- A PL/pgSQL composite multi-target `INTO` error.
+- Test 22 initially evaluated a harness fixture lookup while already
+  under `service_role`, causing `permission denied for table
+  rt_fixture`.
+
+Each failed run was followed by an independent residue check that
+returned `residue_row_count = 0`. The final corrected run achieved
+24/24.
+
+**Final defect status**: P0 outstanding: 0. P1 outstanding: 0. P2
+outstanding: 0.
+
+**Accepted P3 observations (non-blocking, not reopened)**:
+
+1. The deferred FK uses PostgreSQL's default `NO ACTION` rather than an
+   explicit `ON DELETE` clause, because of the `DEFERRABLE` constraint
+   posture and because Commercial Configuration deletion is already
+   prohibited.
+2. Reciprocal Commercial Change / initial Commercial Configuration
+   pairing is correct-by-construction through the atomic RPC rather than
+   fully schema-constrained, matching the locked trust boundary (§3a).
+
+**Platform Core hardening follow-up (next step, before Migration 9
+begins).** Before Migration 9 starts, Nexus must perform a retrospective
+Foundation Regression & Hardening Review of earlier migrations, bringing
+them up to the verification standard Migration 8 established. Special
+focus on Migrations 1-3, which predate the mature runtime-gate standard;
+Migrations 4-7 also need review for any remaining gap against the
+current standard, rather than assuming prior testing is equivalent. The
+review should cover: callable RPC `EXECUTE` privilege matrix; explicit
+`service_role` trusted-path grants; `anon`/`authenticated` denials;
+Resource-backed identity integrity; atomic creation behavior; RLS /
+zero-policy posture; function `EXECUTE` leakage; `SECURITY INVOKER`/
+`SECURITY DEFINER` posture; immutable-history protection; important
+concurrency assumptions; rollback / zero-residue runtime verification;
+and current remote database state against the intended repository
+contract. Any correction found must be implemented through new, forward
+migration(s); historical Migrations 1-8 are never edited. Already
+observed, and specifically retained for that review rather than fixed
+here: `create_form_version`, `publish_form_version`,
+`create_request_with_draft`, `submit_revision`, and `create_next_revision`
+appear to rely on environment-level `service_role` `EXECUTE`
+provisioning rather than a repository-explicit `GRANT`, unlike Migration
+8's own `create_commercial_configuration_with_change`, which grants
+`EXECUTE` to `service_role` explicitly. No migration numbers are
+assigned yet for this review.
+
+No further gate remains open for the Commercial Configuration
+Foundation. Migrations 9 (Usage and Earned) and 10 (Billing, Invoice,
+Reconciliation) remain the next, separate, not-yet-started stages
+against this same locked design.
