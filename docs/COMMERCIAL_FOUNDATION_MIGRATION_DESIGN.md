@@ -1180,6 +1180,15 @@ provisioning rather than a repository-explicit `GRANT`, unlike Migration
 `EXECUTE` to `service_role` explicitly. No migration numbers are
 assigned yet for this review.
 
+**Update: that specific five-RPC finding is now closed.** It was
+addressed by the separate forward migration
+`supabase/migrations/20260909080000_foundation_rpc_privilege_hardening.sql`,
+runtime-verified 20/20 with zero residue rows. See
+`docs/FOUNDATION_RPC_PRIVILEGE_HARDENING_DESIGN.md` §21. This closes only
+that one finding: the wider retrospective Foundation Regression and
+Hardening Review described in this paragraph is still outstanding, and
+Migration 9 remains blocked until it closes.
+
 No further gate remains open for the Commercial Configuration
 Foundation. Migrations 9 (Usage and Earned) and 10 (Billing, Invoice,
 Reconciliation) remain the next, separate, not-yet-started stages

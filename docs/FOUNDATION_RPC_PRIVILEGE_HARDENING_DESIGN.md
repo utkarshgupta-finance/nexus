@@ -2,15 +2,19 @@
 
 ## MIGRATION DESIGN
 
-**STATUS: LOCKED.**
+**STATUS: LOCKED. FOUNDATION RPC PRIVILEGE HARDENING COMPLETE.**
 
 **SQL AUTHORED: YES. PRINCIPAL REVIEWED: YES. DRY-RUN: PASSED. REMOTE
 APPLY: PASSED. LOCAL/REMOTE MIGRATION HISTORY: ALIGNED AT
-`20260909080000`. RUNTIME VERIFICATION: NOT YET RUN. HARDENING CLOSEOUT:
-NOT YET COMPLETE.**
+`20260909080000`. RUNTIME VERIFICATION: PASSED, 20/20. RESIDUE ROWS:
+ZERO. HARDENING CLOSEOUT: COMPLETE.**
 
-See §19 for the applied-state evidence and §20 for the consolidated
-current status.
+This closes the RPC privilege hardening effort only. It does not close
+the Foundation 1-7 retrospective hardening program (§17), and Commercial
+Migration 9 remains blocked (§18).
+
+See §19 for the applied-state evidence, §20 for the consolidated current
+status, and §21 for the closeout record.
 
 ## Amendment record
 
@@ -218,7 +222,7 @@ platform defaults or from a separate `ALTER DEFAULT PRIVILEGES` rule.
 Trigger-only functions remain a separate category: `REVOKE` as already
 practiced, never `GRANT` to any role.
 
-## 13. Underlying service_role table access: REQUIRES LIVE VERIFICATION
+## 13. Underlying service_role table access: LIVE-VERIFIED (§21)
 
 Because all five RPCs are `SECURITY INVOKER`, an explicit `EXECUTE` grant
 proves only that the function is callable, not that `service_role` holds
@@ -233,6 +237,15 @@ each RPC's successful path actually works end-to-end as `service_role` is
 an empirical question, to be proven by the runtime test plan below
 (§14), the same way Migration 8's own Test 22 proved it for its own RPC;
 until then it is marked **REQUIRES LIVE VERIFICATION**, not assumed.
+
+**Resolved.** All five `service_role` positive tests passed at runtime
+(§21), so points 1, 2, and 3 below are now proven for the tested remote
+environment rather than assumed. This changed no repository SQL: no table
+grant was added here or by the harness, and the posture of leaving
+`service_role`'s table privileges to Supabase's environment-level
+provisioning is unchanged. What the tests established is an observed
+property of that environment on the tested path, not a new repository
+contract.
 
 No table grant is added here or by the eventual harness. The five
 `service_role` positive tests (§14.1 A) are the empirical proof, and they
@@ -571,21 +584,266 @@ have raised `42883 undefined_function` before any privilege was altered.
 | Gate | Status |
 |---|---|
 | SQL authored | **YES** |
-| Independent principal review | **YES** (P0 = 0, P1 = 0, SQL APPROVED, no SQL revision required) |
+| Independent principal review (SQL) | **YES** (P0 = 0, P1 = 0, SQL APPROVED, no SQL revision required) |
 | Dry-run | **PASSED** |
 | Remote apply | **PASSED** |
 | Local/remote migration history | **ALIGNED** at `20260909080000` |
-| Runtime verification (20 official tests) | **NOT YET RUN** |
-| Runtime harness | **NOT YET AUTHORED** |
-| Hardening closeout | **NOT YET COMPLETE** |
+| Runtime harness | **AUTHORED** and independently principal-reviewed (P0 = 0, P1 = 0) |
+| Runtime verification (20 official tests) | **PASSED, 20/20** (§21) |
+| Independent post-rollback residue-row proof | **PASSED, `residue_row_count = 0`** (§21) |
+| Hardening closeout | **COMPLETE** (§21) |
 | Foundation M1-7 retrospective harness (§17) | **NOT STARTED** (separate, subsequent stage) |
 | Commercial Migration 9 | **BLOCKED** (§18) |
 
 The one P2 the principal review raised was a runtime-verification gap in
-§14's original 15-test plan, not a defect in the applied SQL. It is closed
-in this document by the amendment to 20 official tests, and is closed in
-practice only once that 20-test harness has been authored and run
-20/20 PASS with zero residue.
+§14's original 15-test plan, not a defect in the applied SQL. It was
+closed in this document by the amendment to 20 official tests, and is now
+closed in practice: that 20-test harness was authored, independently
+reviewed, and run 20/20 PASS with zero residue rows (§21).
 
 Migration SQL is not to be modified. Migrations 1-8 and this migration are
 now all immutable history.
+
+## 21. Closeout record
+
+**Foundation RPC Privilege Hardening status: COMPLETE.** This section
+records only this one hardening migration's own design, apply, and
+runtime evidence. It does **not** mark the Foundation 1-7 retrospective
+hardening program complete (§17), and it does not unblock Commercial
+Migration 9 (§18). This migration is referred to throughout by its
+descriptive name, never as "Migration 9": that number remains reserved by
+`docs/COMMERCIAL_FOUNDATION_MIGRATION_DESIGN.md` for the Usage and Earned
+stage, and this closeout does not amend that numbering.
+
+**Migration applied**:
+`supabase/migrations/20260909080000_foundation_rpc_privilege_hardening.sql`.
+Design locked at commit `41fd69b`; migration added at commit `ee21b09`;
+runtime gate strengthened from 15 to 20 official tests at commit
+`54100f8`.
+
+**Dry-run**: `npx supabase@2.117.0 db push --dry-run` planned exactly one
+pending migration, `20260909080000_foundation_rpc_privilege_hardening.sql`,
+and no other.
+
+**Remote apply**: `npx supabase@2.117.0 db push` succeeded.
+
+**Migration history alignment**: local `20260909080000`, remote
+`20260909080000`, aligned. The filename timestamp is the version recorded
+remotely, as `CLAUDE.md`'s Supabase migration rules require.
+
+**Atomicity, stated without overclaiming.** This apply succeeded as a
+whole on this remote path, and local/remote history is aligned at the
+single expected version. That is the extent of what this execution
+evidences. It is not a claim that every Supabase CLI execution path,
+version, environment, or deployment mode is universally atomic (§19).
+
+### Runtime gate
+
+**20 / 20 official tests PASS. 20 distinct official test numbers. 0
+FAIL.** Machine summary emitted by the harness and machine-checked by its
+runner on all four fields:
+
+```
+MACHINE_SUMMARY official_total=20 official_distinct=20 official_passed=20 official_failed=0
+```
+
+**Tests 01-15 (execution matrix, §14.1)**: five RPCs times three role
+outcomes, all PASS.
+
+- Five `service_role` positive tests: successful execution, verified by
+  the returned row's ids and lifecycle state after `RESET ROLE`.
+- Five `anon` denial tests: PASS, SQLSTATE `42501`.
+- Five `authenticated` denial tests: PASS, SQLSTATE `42501`.
+
+The `42501` assertion was deliberately kept non-discriminating and
+locale-independent (§14.1). Those ten denial tests were therefore
+supplemented, not trusted alone: SQLSTATE `42501` cannot distinguish a
+function `EXECUTE` denial from a downstream table-privilege denial, and
+Tests 16-20 supplied the discriminating privilege proof.
+
+**Tests 16-20 (catalog privilege contract, §14.2 and §14.4)**: one
+complete test per RPC, all PASS. These switched no role, invoked no RPC,
+parsed no error message, and wrote nothing.
+
+### The five RPCs proven
+
+Each signature resolved once by exact `::regprocedure` identity, so a
+missing or mismatched signature would have failed loudly rather than
+silently matching another overload:
+
+| # | Exact signature |
+|---|---|
+| 1 | `public.create_form_version(uuid, uuid, uuid, jsonb, jsonb, text, text)` |
+| 2 | `public.publish_form_version(uuid, integer, uuid, uuid, jsonb)` |
+| 3 | `public.create_request_with_draft(uuid, uuid, jsonb, uuid, uuid, jsonb)` |
+| 4 | `public.submit_revision(uuid, integer, jsonb, uuid, uuid, jsonb)` |
+| 5 | `public.create_next_revision(uuid, uuid, uuid, uuid, jsonb)` |
+
+For every one of the five, the runtime contract proved:
+
+| Assertion | Result |
+|---|---|
+| `service_role` effective EXECUTE | **true** |
+| `anon` effective EXECUTE | **false** |
+| `authenticated` effective EXECUTE | **false** |
+| `PUBLIC` direct EXECUTE ACL entry | **none** |
+| `service_role` direct EXECUTE ACL entries | **exactly one, not grantable** |
+| `anon` direct EXECUTE ACL entry | **none** |
+| `authenticated` direct EXECUTE ACL entry | **none** |
+| `proacl` | **explicit, non-NULL** |
+
+### ACL verification method
+
+Two independent layers, because they answer different questions.
+
+**Effective privileges** were resolved with `has_function_privilege()`,
+which accounts for privileges held directly, through inheritable role
+membership, and through `PUBLIC`. That last property is what makes the
+two `false` results also a proof of the `PUBLIC` leg: a live `PUBLIC`
+grant would have made every role resolve to `true`.
+
+**Direct ACL state** was checked **structurally**, never by string
+parsing: `pg_proc.proacl` expanded through `aclexplode()`, with
+`acldefault()` as the NULL fallback, comparing `grantee` against
+`::regrole` values and against OID `0` for `PUBLIC`. `proacl::text`
+substring matching was rejected at design time as fragile (§14.4) and was
+not used anywhere.
+
+**NULL `proacl` protection.** `aclexplode(NULL)` returns zero rows, so a
+naive "no row with `grantee = 0`" check would *pass* against a function
+still sitting on PostgreSQL's implicit defaults, even though those
+defaults mean `PUBLIC` does hold `EXECUTE`. Two guards, both part of the
+official pass condition:
+
+```
+aclexplode(coalesce(proacl, acldefault('f', proowner)))
+```
+
+so a NULL ACL materialises the real implicit default and the `PUBLIC`
+assertion correctly fails; plus a separate, independent
+
+```
+proacl IS NOT NULL
+```
+
+assertion, which directly proves this migration wrote an explicit ACL
+rather than the function still relying on platform provisioning. A
+function on implicit defaults could not have falsely passed.
+
+### service_role live execution
+
+All five `service_role` positive tests passed. Because all five RPCs are
+`SECURITY INVOKER` (§8), this empirically proved, for the tested remote
+environment and the tested path, that:
+
+1. `service_role` could directly invoke each RPC, so the `EXECUTE` grant
+   this migration established actually works;
+2. `service_role` held sufficient underlying table privilege for every
+   read and write each RPC body performed on `form_definitions`,
+   `form_versions`, `resources`, `requests`, and `submission_revisions`;
+3. `service_role`'s Supabase RLS-bypass posture allowed the expected
+   path beneath five tables that all have RLS enabled with zero policies.
+
+Points 2 and 3 are observed properties of the Supabase environment, not
+repository contracts. They were deliberately **not** converted into new
+repository grants: no table privilege change was required, none was made
+by this migration, and none was made by the harness (§13).
+
+### Transaction and residue evidence
+
+The successful main runtime run used **one outer transaction** and ended
+in **`ROLLBACK`**. No `COMMIT` occurred anywhere in the harness.
+
+After that run completed, a **completely separate** Dockerized `psql`
+connection manually executed
+`.runtime-tests/004_foundation_rpc_privilege_hardening_residue_check.sql`.
+Output was exactly `0`.
+
+**ZERO RESIDUE ROWS.**
+
+That qualification is deliberate and is not a hedge. `audit_log` carries
+a sequence-backed `audit_sequence` identity column (Migration 2), and
+PostgreSQL sequence increments are non-transactional, so a rollback-bound
+harness may permanently consume sequence values. That is expected, is
+unavoidable for any rollback-bound harness, and is not row residue. No
+claim is made that sequence state was restored, and no sequence was
+inspected, reset, or altered.
+
+**Residue coverage.** The independent checker covered deterministic
+fixture evidence across `auth.users`, `app_users`, `form_definitions`,
+`form_versions`, `requests`, `submission_revisions`, and `resources`,
+including rows whose ids are generated inside the RPCs rather than
+supplied by the caller. Those were reached through canary parent ids, the
+canary actor id, and the canary key prefix. `audit_log` was not separately
+required for row-residue detection: audit rows are transaction-coupled to
+the fixture writes that trigger them and cannot survive the rollback
+independently, so any surviving audit row would necessarily imply a
+surviving fixture row the checker already selects.
+
+### Principal reviews
+
+**Production migration.** Independently principal-reviewed for
+database/security correctness before dry-run. Final result: **P0 = 0,
+P1 = 0, SQL APPROVED, no SQL revision required.**
+
+**Runtime harness.** Independently principal-reviewed before execution.
+Result: **P0 = 0, P1 = 0.** The review identified three cheap P2
+harness-process improvements plus one P3 runner improvement, all
+implemented before the live run:
+
+1. Machine-gate `count(distinct test_no)` rather than only printing it, so
+   the gate cannot read green if one test number were recorded twice while
+   another vanished.
+2. Stop describing 20/20 as the fully closed gate before the residue-row
+   proof has run.
+3. Print the independent residue instructions after post-connection
+   failure paths too, not only after success.
+4. Require **exactly one** `MACHINE_SUMMARY` line and fail on ambiguous
+   output, rather than silently selecting one of several.
+
+None of these were production migration defects. All four were changes to
+disposable, git-ignored test infrastructure.
+
+### Final defect status
+
+| Scope | P0 | P1 | P2 |
+|---|---|---|---|
+| Production migration | **0** | **0** | **0** |
+| Runtime verification | **0** | **0** | all identified harness P2 process issues fixed before the successful run |
+
+No blocker remains for this hardening effort.
+
+### Future callable-RPC rule (unchanged, restated)
+
+The rule locked in §12 stands and is the operative convention going
+forward. Every future Nexus application/domain RPC must, inside the same
+migration that creates it, explicitly encode both:
+
+- `REVOKE EXECUTE` from `PUBLIC`, `anon`, and `authenticated`; and
+- `GRANT EXECUTE` to the intended trusted application role
+  (`service_role`).
+
+Neither may be assumed from Supabase environment defaults. Trigger-only
+functions remain a separate class: `REVOKE` as already practiced, and
+never a positive application `EXECUTE` grant merely for symmetry, since
+trigger invocation never checks the writing role's own `EXECUTE`
+privilege on the trigger function (§9).
+
+### What remains open
+
+This closeout ends the RPC privilege hardening effort and nothing more.
+The Foundation program as a whole is **not** complete. The next stage is
+the **Foundation 1-7 retrospective runtime regression and hardening**
+(§17):
+
+- **Migrations 1-3**: deep retrospective runtime verification; these
+  predate the mature runtime-gate standard.
+- **Migrations 4-6**: incremental modern regression verification, folding
+  in this hardening's own 20-test evidence for the five RPCs rather than
+  reproving it.
+- **Migration 7**: existing 40/40 evidence may be reused where genuinely
+  equivalent, rather than rerun.
+
+That Foundation 1-7 closeout must happen before Commercial Migration 9
+begins. **Commercial Migration 9 (Usage and Earned) remains BLOCKED**
+(§18).
