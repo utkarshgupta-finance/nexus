@@ -73,6 +73,42 @@ row, alongside the free-text `reason`. §7, §9, §15, §16, §17, and §18
 below are revised accordingly. No other table's design changes in this
 revision.
 
+## 0c. Revision note: quantity and rate provenance restored
+
+A source-trace against `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §10
+found a genuine gap, not present in the field names claimed in an
+earlier review pass (those exact names never appear anywhere in this
+repository's history), but real against the locked prose itself.
+`docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §10, part A, `[LOCKED]`,
+reads in full: "Reconciliation preserves an operational quantity or
+billing-basis difference wherever a quantity comparison is meaningful,
+and separately preserves the monetary difference, which is the actual
+Finance outcome. Sufficient effective-rate and commercial-period
+provenance is preserved to explain the monetary amount. Nexus never
+manufactures a fabricated quantity by dividing a monetary difference by
+a single rate when more than one rate was effective during the
+period... the monetary difference stands on its own, supported by
+rate/period provenance, without a forced quantity explanation."
+
+Before this revision, `reconciliation_adjustments` carried
+`earned_amount`/`billed_amount`/`monetary_difference` (the Finance
+outcome) and free-text `reason` (why the adjustment exists), but
+nothing captured the operational quantity/billing-basis difference
+when meaningful, nor the effective-rate/commercial-period provenance
+this locked passage requires to explain the monetary amount. `reason`
+alone is not that: a reason explains why an adjustment exists, not how
+its monetary figure can be reconstructed and audited. This revision
+adds two columns to `reconciliation_adjustments`: `quantity_explanation`
+(nullable `jsonb`, populated only when a quantity/billing-basis
+comparison is meaningful, matching the locked "without a forced
+quantity explanation" language exactly) and `rate_provenance` (`jsonb`,
+not null, since the locked text frames effective-rate/commercial-period
+provenance as unconditionally preserved, "the monetary difference
+stands on its own, supported by rate/period provenance"). §7, §15, and
+§16 below are revised accordingly. No other table's design changes in
+this revision; this is a narrow traceability correction against
+already-locked domain architecture, not a new business decision.
+
 ## 1. Purpose and M9/M10 boundary
 
 M10 answers exactly seven questions:
@@ -466,6 +502,30 @@ already used for `invoice_evidence`/`invoice_evidence_items`.
 `transaction_currency text not null`, captured fresh, matching every
 other financial table in this schema.
 
+**Quantity and rate provenance, restored against locked domain
+architecture (§0c).** `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §10 part
+A requires that Reconciliation "preserves an operational quantity or
+billing-basis difference wherever a quantity comparison is meaningful,"
+separately preserves the monetary difference, and preserves "sufficient
+effective-rate and commercial-period provenance... to explain the
+monetary amount," explicitly without ever fabricating a quantity when
+one would be meaningless. Two columns satisfy this exactly:
+`quantity_explanation jsonb`, nullable, populated only when a
+quantity/billing-basis comparison is genuinely meaningful for this
+adjustment, matching the locked "without a forced quantity explanation"
+language precisely; and `rate_provenance jsonb not null`, always
+populated, since the locked text frames effective-rate/commercial-period
+provenance as unconditionally preserved regardless of whether a
+quantity explanation applies. Neither column is a structural FK back to
+a specific Earned Result or Billing Calculation row (§0b still holds):
+both are self-describing evidence captured at adjustment-creation time,
+the same "captured fresh, not re-derived through a join" posture used
+for `transaction_currency` throughout this schema. No JSON Schema
+validation framework is introduced for either column's internal shape,
+matching the same minimal-structural-check posture already applied to
+`commercial_components.pricing_rule_parameters` (§16 lists the column,
+not a key-level contract).
+
 **No netting, unchanged and re-affirmed.** Multiple adjustment candidates
 may legitimately coexist for the same Component and window; nothing sums
 or merges them, by construction, exactly as already locked.
@@ -767,9 +827,11 @@ self-referencing, no composite-grain match, §7); `CHECK
 `finalized_at`/`finalized_by` to `status`, matching `earned_results`'
 identical shape check. No FK columns for source provenance (§0b, §7):
 `earned_amount`/`billed_amount` are plain nullable `numeric`, not FKs.
-Deliberately no unconditional `UNIQUE (commercial_component_id,
-window_start, window_end)`: multiple adjustment candidates coexist by
-design (§7).
+`quantity_explanation jsonb` (nullable) and `rate_provenance jsonb not
+null` (§0c, §7): neither is a structural FK either, both are
+self-describing evidence captured at creation time. Deliberately no
+unconditional `UNIQUE (commercial_component_id, window_start,
+window_end)`: multiple adjustment candidates coexist by design (§7).
 
 Every foreign key in this migration is `ON DELETE RESTRICT`, matching
 every table in M4-M9; no `CASCADE` anywhere.
@@ -843,6 +905,8 @@ every table in M4-M9; no `CASCADE` anywhere.
 | `monetary_difference` | `numeric not null` | `> 0`, magnitude only |
 | `transaction_currency` | `text not null` | captured fresh |
 | `reason` | `text not null` | free text, may name a specific triggering row descriptively |
+| `quantity_explanation` | `jsonb` | nullable, populated only when a quantity/billing-basis comparison is meaningful (§0c) |
+| `rate_provenance` | `jsonb not null` | effective-rate/commercial-period provenance explaining the monetary amount (§0c) |
 | `supersedes_adjustment_id` | `uuid` | nullable, self-FK, no composite-grain match |
 | `status` | `text not null default 'open'` | `open`/`final` |
 | `finalized_at` | `timestamptz` | nullable, conditional |
@@ -992,6 +1056,15 @@ decision to draft safely:**
   (§7): the correction may itself be fixing a wrong Component, window,
   or direction assignment on the original candidate, which a rigid
   composite-FK match would block.
+- `quantity_explanation`/`rate_provenance` are added to
+  `reconciliation_adjustments` (§0c): a genuine gap against
+  `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §10 part A, found by
+  source-trace, not the literal field names an earlier review pass
+  claimed were already locked (those names never appear anywhere in
+  this repository's history). `rate_provenance` is not null
+  (unconditionally preserved, per the locked text); `quantity_explanation`
+  is nullable (populated only when meaningful, per the locked
+  "without a forced quantity explanation" language).
 - Invoice-identity uniqueness is scoped per `source_system` (§5), not
   globally or per legal entity; Nexus has no "legal entity" concept
   anywhere in the schema today, and introducing one is out of scope for
@@ -1063,8 +1136,8 @@ named in the design brief resolves either from already-locked text or
 from a safe, explicitly-stated architectural default consistent with
 established M8/M9 precedent.
 
-**P1 = 0.** Two genuine architecture-correction findings across this
-document's revisions, both resolved, none remaining open:
+**P1 = 0.** Three genuine architecture-correction findings across this
+document's revisions, all resolved, none remaining open:
 
 - An earlier draft mirrored M9's Earned Result versioning onto
   `billing_calculations`, contradicting the locked distinction between
@@ -1083,6 +1156,13 @@ document's revisions, both resolved, none remaining open:
   `earned_amount`/`billed_amount`/`monetary_difference` carry the
   comparison instead, with `reason` available for descriptive,
   non-structural provenance (§0b, §7, §9, §15, §16, §17, §18).
+- A source-trace against `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §10
+  part A found `reconciliation_adjustments` was missing the quantity/
+  billing-basis difference and effective-rate/commercial-period
+  provenance that locked passage requires to explain the monetary
+  amount; free-text `reason` alone does not satisfy it. Corrected:
+  `quantity_explanation` (nullable) and `rate_provenance` (not null)
+  added (§0c, §7, §15, §16, §18).
 
 **P2 = 2**, both explicitly named as deferred, non-blocking, in §18:
 whether a reconciliation adjustment ever needs to span multiple
