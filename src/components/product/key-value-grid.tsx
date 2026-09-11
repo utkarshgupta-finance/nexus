@@ -1,9 +1,11 @@
 /**
  * Compact structured metadata display with strong label/value alignment,
  * matching the KeyValueGrid behavioural contract in docs/UI_SYSTEM.md
- * §19. Feature-local for now (only Commercial needs it); promote to
- * components/product/ if a second feature needs the same shape, per
- * CLAUDE.md's promotion rule.
+ * §19. Promoted here from src/features/commercial/ui/ once a second
+ * feature (Customers) needed the identical shape, per CLAUDE.md's
+ * promotion rule ("only move something into platform/ or
+ * components/product/ once it's actually needed by more than one
+ * feature").
  */
 
 type KeyValueItem = {

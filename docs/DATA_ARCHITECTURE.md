@@ -514,15 +514,32 @@ short-lived signed URL. A long-lived or public signed URL is never
 persisted as Customer Master or onboarding data.
 
 **Status.** No migration exists yet for this table, and no Supabase
-Storage bucket has been created. Customer Onboarding's Tax & Registration
-stage (`src/features/customer-onboarding/ui/tax-document-upload.tsx`)
-validates a real browser `File` immediately on selection (type,
-extension, size) and holds it only as local, in-session React state;
+Storage bucket has been created. Customer Onboarding's attachment stages
+(`src/features/customer-onboarding/ui/attachment-upload.tsx`, shared
+across Tax & Registration, Commercial Documents, and Agreement &
+Approval) validate a real browser `File` immediately on selection (type,
+extension, size) and hold it only as local, in-session React state;
 nothing is uploaded anywhere from that Client Component, and refreshing
 the browser loses the selection. This is the persistence capability the
 next backend stage needs to build: the metadata table above, a private
 `customer-onboarding-documents` bucket, and a server-side upload/signed-
 access path that a Client Component never talks to directly.
+
+**Demo documents are a deliberately separate, non-persisted pattern, not
+an early version of the table above.** The Customer Master demo build
+(`src/features/customers/domain/demo-documents.ts`,
+`src/features/customers/domain/generate-demo-document-pdf.ts`) generates
+a small, fixed set of synthetic PDFs on demand, server-side, using
+`pdf-lib` (MIT), and returns the bytes directly through
+`src/app/api/demo/customer-documents/[documentType]/route.ts`. Nothing is
+written to Supabase Storage and no row is written to the metadata table
+above: every request regenerates the same deterministic content from a
+fixed, in-repo definition. This pattern exists only for a handful of
+synthetic, clearly-labeled demo documents attached to one fictional demo
+customer; it is not a general document-storage mechanism, does not
+replace the table/bucket design above, and must not be extended to hold
+a real uploaded file. A real uploaded document still belongs in private
+Storage plus this table's metadata shape, exactly as designed above.
 
 ## 17. What this document does not cover
 

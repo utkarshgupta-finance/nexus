@@ -3,7 +3,7 @@ import { GaugeIcon, WalletIcon } from "lucide-react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import type { ComponentSummary } from "@/features/commercial"
-import { KeyValueGrid } from "./key-value-grid"
+import { KeyValueGrid } from "@/components/product/key-value-grid"
 import { CommercialComponentStateBadge, deriveComponentState } from "./commercial-state-badge"
 
 /**
