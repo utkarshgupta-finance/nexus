@@ -34,7 +34,14 @@ export default async function CustomersRoute() {
   let customerMasterUnavailable = false
   try {
     customerMasterEntries = await listCustomerMaster()
-  } catch {
+  } catch (error) {
+    // TEMPORARY diagnostic log, to be removed once the Preview backend
+    // read is confirmed working. Logs only the error's own message/name,
+    // never any credential value.
+    console.error(
+      "[customers] listCustomerMaster failed:",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    )
     customerMasterUnavailable = true
   }
 
