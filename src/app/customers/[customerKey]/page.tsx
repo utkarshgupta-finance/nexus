@@ -8,7 +8,17 @@ import { getCustomerMasterDetailByKey } from "@/features/customers/server"
  * comment): safe today because this table holds only synthetic demo
  * data, wrapped so a missing Supabase credential in this environment
  * shows an honest message instead of crashing the page.
+ *
+ * `dynamic = "force-dynamic"` explicitly, matching /customers/page.tsx's
+ * own reasoning: this route already rendered dynamically because a
+ * dynamic segment with no generateStaticParams cannot be prerendered,
+ * but that is an implicit consequence of the current file shape, not a
+ * guarantee. Declaring it explicitly means a future refactor (for
+ * example, adding generateStaticParams) cannot silently reintroduce the
+ * stale-static-read bug fixed on the list route.
  */
+export const dynamic = "force-dynamic"
+
 export default async function CustomerMasterDetailRoute({
   params,
 }: {
