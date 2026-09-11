@@ -199,6 +199,17 @@ existing GitHub integration) is the default team-review deployment target.
   `export const dynamic = "force-dynamic"`), Next.js may cache a
   build-time read forever, so a later data or config change silently
   never appears without a fresh deployment.
+- Linking Vercel's native Supabase integration does not by itself make
+  `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` available: the integration
+  is known to create Supabase environment variables under its own
+  names (for example a `POSTGRES_*` or `NEXT_PUBLIC_SUPABASE_*` set),
+  which do not automatically satisfy code written against this app's
+  own variable names. Verify empirically (a real request against the
+  deployed function, checked through Vercel runtime logs) rather than
+  assuming the integration's presence means the app can connect.
+  Linking the integration also does not rebuild anything already
+  deployed; a fresh Preview build is required after any environment
+  variable change before it can take effect.
 
 ## Frontend / UI
 
