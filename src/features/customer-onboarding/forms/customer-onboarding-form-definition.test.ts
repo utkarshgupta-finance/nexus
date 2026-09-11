@@ -49,16 +49,29 @@ const FAKE_OPTIONS: Record<ReferenceListKey, ReferenceOption[]> = {
     { value: "INR", label: "INR - Indian Rupee", active: true },
     { value: "USD", label: "USD - US Dollar", active: true },
   ],
+  // Commercial Rate lists: unused by this form definition (Commercial Rate
+  // is not a survey page, see ../ui/commercial-rate-section.tsx), present
+  // only to satisfy ReferenceListKey's full Record shape.
+  pricing_unit: [],
+  billing_cycle: [],
+  billing_timing: [],
+  payment_terms: [],
+  commercial_nature: [],
+  pricing_model: [],
 }
 
 describe("customer onboarding form definition structure", () => {
   it("keeps every survey-backed field from both stages present", () => {
     const form = buildCustomerOnboardingFormDefinition(FAKE_OPTIONS)
-    // Billing Currency is deliberately excluded: it now lives on Commercial
-    // Rate as a plain React field (../ui/customer-onboarding-page.tsx), not
-    // a survey question, since Commercial Rate is not a survey page.
+    // Billing Currency and the whole Commercial Rate draft are deliberately
+    // excluded: Commercial Rate is a plain React section
+    // (../ui/commercial-rate-section.tsx), not a survey page.
+    const NON_SURVEY_FIELD_KEYS: string[] = [
+      CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency,
+      CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate,
+    ]
     for (const fieldKey of Object.values(CUSTOMER_ONBOARDING_FIELD_KEYS)) {
-      if (fieldKey === CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency) continue
+      if (NON_SURVEY_FIELD_KEYS.includes(fieldKey)) continue
       expect(findQuestion(form.json, fieldKey), `missing field ${fieldKey}`).toBeDefined()
     }
   })

@@ -39,7 +39,22 @@ const REFERENCE_LISTS: { key: ReferenceListKey; label: string }[] = [
   { key: "business_unit", label: "Business Unit" },
   { key: "phone_country_code", label: "Phone Country Code" },
   { key: "currency", label: "Currency" },
+  { key: "pricing_unit", label: "Pricing Unit" },
+  { key: "billing_cycle", label: "Billing Cycle" },
+  { key: "billing_timing", label: "Billing Timing" },
+  { key: "payment_terms", label: "Payment Terms" },
+  { key: "commercial_nature", label: "Commercial Nature" },
+  { key: "pricing_model", label: "Pricing Model" },
 ]
+
+/**
+ * Pricing Model is system-supported calculation logic, not ordinary
+ * reference data (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22): a new value
+ * added here would have no corresponding Pricing Kernel calculation, so
+ * this list only allows Activate/Deactivate of the models Nexus already
+ * knows how to calculate, never adding a new one.
+ */
+const ADD_DISABLED_LISTS: ReferenceListKey[] = ["pricing_model"]
 
 type StatusFilter = "all" | "active" | "inactive"
 
@@ -246,40 +261,50 @@ function ReferenceMasterSettings() {
           </TableBody>
         </Table>
 
-        <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-3">
-          <span className="text-xs font-medium text-muted-foreground">Add value</span>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="new-option-value" className="text-[0.7rem] text-muted-foreground">
-                Value (key)
-              </label>
-              <Input
-                id="new-option-value"
-                value={newValue}
-                onChange={(event) => setNewValue(event.target.value)}
-                placeholder="e.g. logistics"
-                className="w-full sm:w-40"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="new-option-label" className="text-[0.7rem] text-muted-foreground">
-                Label
-              </label>
-              <Input
-                id="new-option-label"
-                value={newLabel}
-                onChange={(event) => setNewLabel(event.target.value)}
-                placeholder="e.g. Logistics"
-                className="w-full sm:w-48"
-              />
-            </div>
-            <Button variant="outline" size="sm" onClick={handleAdd} className="sm:w-auto">
-              <PlusIcon data-icon="inline-start" />
-              Add
-            </Button>
+        {ADD_DISABLED_LISTS.includes(selectedList) ? (
+          <div className="flex flex-col gap-1 rounded-md border border-dashed px-3 py-3">
+            <span className="text-xs font-medium text-muted-foreground">Adding is not available for this list</span>
+            <p className="text-[0.7rem] text-muted-foreground">
+              Pricing Model is system-supported calculation logic: a new value needs matching Pricing Kernel logic
+              before it means anything, so only Activate/Deactivate is available here.
+            </p>
           </div>
-          {addError ? <p className="text-[0.7rem] text-destructive">{addError}</p> : null}
-        </div>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-3">
+            <span className="text-xs font-medium text-muted-foreground">Add value</span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="new-option-value" className="text-[0.7rem] text-muted-foreground">
+                  Value (key)
+                </label>
+                <Input
+                  id="new-option-value"
+                  value={newValue}
+                  onChange={(event) => setNewValue(event.target.value)}
+                  placeholder="e.g. logistics"
+                  className="w-full sm:w-40"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="new-option-label" className="text-[0.7rem] text-muted-foreground">
+                  Label
+                </label>
+                <Input
+                  id="new-option-label"
+                  value={newLabel}
+                  onChange={(event) => setNewLabel(event.target.value)}
+                  placeholder="e.g. Logistics"
+                  className="w-full sm:w-48"
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={handleAdd} className="sm:w-auto">
+                <PlusIcon data-icon="inline-start" />
+                Add
+              </Button>
+            </div>
+            {addError ? <p className="text-[0.7rem] text-destructive">{addError}</p> : null}
+          </div>
+        )}
       </div>
     </div>
   )

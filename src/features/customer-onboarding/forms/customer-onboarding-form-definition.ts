@@ -35,6 +35,8 @@ const CUSTOMER_ONBOARDING_FIELD_KEYS = {
   companyDocumentType: "company_document_type",
   companyDocumentTypeOther: "company_document_type_other",
   billingCurrency: "billing_currency",
+  /** Holds the whole `CommercialRateDraft` object (../domain/commercial-rate.ts), not a single value: Commercial Rate V1 captures a header plus repeatable components, richer than a single field. */
+  commercialRate: "commercial_rate",
 } as const
 
 /** Stable identity for the default Country selection: an ISO code, never the display text "India" (task spec §9). */

@@ -732,7 +732,119 @@ constant-currency management FX and accounting FX are separate, derived,
 provenanced projections, never overwriting the original.
 ```
 
-## 22. What this document is not
+## 22. Customer Onboarding Commercial Rate V1 (DESIGN DRAFT)
+
+**[DESIGN DRAFT]** Customer Onboarding's Commercial Rate stage
+(`src/features/customer-onboarding/domain/commercial-rate.ts`) captures
+"what have we commercially agreed to charge this customer, on what basis,
+and under what billing/payment terms." It is a draft-capture layer inside
+one Customer Onboarding Case's revision data, exactly like Customer
+Details, Tax & Registration, and Commercial Documents before it: nothing
+here writes to `commercial_configurations`, `commercial_components`, or
+any other Commercial table. No usage calculation, invoicing, collections,
+revenue recognition, or actual billing happens anywhere in this stage. A
+real approved-case -> Commercial Configuration promotion path is future
+work; this section documents the mapping that promotion will need, and
+the exact gaps in today's schema that stand in its way.
+
+### Vocabulary mapping
+
+This stage deliberately reuses the locked Commercial vocabulary wherever
+the concept already exists, rather than inventing a parallel one:
+
+| Onboarding term | Commercial domain equivalent | Gap |
+|---|---|---|
+| Commercial Nature: Recurring | `isRecurring: true` | none |
+| Commercial Nature: Non-Recurring | `isRecurring: false` (already anticipated: §19 scenario 13's "one-time implementation component") | none |
+| Commercial Nature: On-Demand | no equivalent | **new concept**: not represented in `CommercialComponent`, `BillingCadence`, or `BillingTiming` today |
+| Pricing Model: Per Unit | `pricingRuleKind: "linear"` | none |
+| Pricing Model: Flat Fee | `pricingRuleKind: "flat"` | none |
+| Pricing Model: Slab | `pricingRuleKind: "volume"` (whole-quantity, "all-units", §6), never `"graduated"` (progressive/cumulative, a different, currently unbuilt model) | `commercial_components`' shape-check CHECK constraint only allows a bare `rate` key under `pricing_rule_kind = 'volume'` today (identical to `linear`), not the `tiers` array Slab needs; a follow-up migration must extend that shape before a Slab draft can be promoted |
+| Pricing Model: Designation Based | `pricingRuleKind: "dimension"` (§19 scenario 3 names this exact example) | none |
+| On-Demand Pricing Type: Fixed Fee | `pricingRuleKind: "flat"`, same kind as recurring Flat Fee, distinguished only by Commercial Nature | none |
+| MUG (Minimum Usage Guarantee) | `CommercialCommitment { kind: "spend" }`, scoped to exactly this one component | naming only, see below; no schema gap |
+| Billing Cycle: Monthly/Quarterly/Half-Yearly/Annual | `BillingCadence` | none |
+| Billing Cycle: One-Time, On-Demand | no equivalent | **new values**: `billing_cadence`'s CHECK constraint only accepts the four cadences above |
+| Billing Timing: Advance, Arrears | `BillingTiming` | none |
+| Billing Timing: On Completion, On Demand | no equivalent | **new values**: `billing_timing`'s CHECK constraint only accepts `advance`/`arrears` |
+| Payment Terms | no equivalent anywhere in the Commercial domain | **wholly new concept**; `billingTiming` (advance/arrears) governs when a Billing Calculation happens, not customer credit days |
+| Pricing Unit | new, lightweight Reference Master list | Deliberately not `MeasurementDefinition.unit`: Measurement Definition is a heavier, usage-tracking concept (business definition, counting rule, period basis, expected source) this stage does not need since it performs no usage calculation |
+
+### MUG is a monetary floor, not a quantity floor
+
+The business name "Minimum Usage Guarantee" sounds quantity-shaped, but
+this stage's own worked formula, `Final billable amount = MAX(calculated
+pricing amount, MUG amount)`, is unambiguously a floor on money, applied
+after pricing. §8 already separates this exactly: a minimum QUANTITY
+commitment floors the chargeable quantity before pricing and always
+resets monthly; a minimum SPEND commitment floors the resulting amount
+after pricing, on any cadence, and may already apply to exactly one
+Commercial Component (a single-entry `memberComponentIds` array is a
+valid spend commitment). Onboarding's MUG is the second one. Calling it
+"MUG" in the UI is a business-facing label choice, not a claim that it
+is the domain's quantity-commitment kind; a future promotion path maps
+it onto a spend commitment, never a quantity commitment.
+
+### Slab is whole-quantity, not progressive
+
+A Slab row prices the ENTIRE quantity at whichever single row's [from,
+to] range the total quantity falls into. A quantity of 101 against rows
+1-100 @100 and 101-250 @90 bills as `101 × 90`, never `100 × 100 + 1 ×
+90`. This is deliberately different from progressive/tiered pricing
+(each bracket priced separately and summed), which Nexus does not
+currently build. See the vocabulary table above for why this maps to
+`"volume"`, not `"graduated"`.
+
+### Flat Fee is recurring; Non-Recurring is a distinct, one-time shape
+
+A recurring Flat Fee (`pricingModel: "flat_fee"`) bills the same amount
+every billing cycle indefinitely. Non-Recurring (`nature:
+"non_recurring"`) is charged exactly once, has no pricing model, no MUG
+(a one-time charge has nothing to guarantee a minimum of), and its own
+Billing Cycle is always the fixed "one_time" value, never user-chosen.
+These are never the same field with two labels.
+
+### Settings governance: three different tiers, not one
+
+`src/features/reference-data` now governs six Commercial Rate lists,
+under three distinct rules (see that feature's own `types.ts` header and
+`ui/reference-master-settings.tsx`):
+
+- **Freely configurable** (`pricing_unit`, `billing_cycle`,
+  `billing_timing`, `payment_terms`): pure administrative data. A new
+  value needs no code change to work.
+- **Controlled business option** (`commercial_nature`): each value drives
+  real UI and validation branching in `commercial-rate.ts`. Settings
+  still allows adding a new value, but it has no effect on its own until
+  matching code exists to interpret it.
+- **System-supported logic** (`pricing_model`): a new value needs new
+  Pricing Kernel calculation logic to mean anything. Settings only
+  allows Activate/Deactivate for this list, never adding a new one.
+
+### Commercial Scope
+
+A free-text summary ("SFA + DMS", "Enterprise RTM Suite"), not a
+predefined module list: matches §21's existing "Commercial Scope
+(capability references, no fake global Plan)" principle by staying
+descriptive rather than becoming a second, competing scope taxonomy.
+Treated as required for Commercial Rate's own stage completion (a
+judgment call, not an existing-architecture answer): a priced customer
+with a blank scope would be an incomplete record for whoever reviews it
+later. No separate header-level "Commercial Effective From" field was
+added: each Commercial Component already carries its own
+`effectiveFrom`/`effectiveTo`, matching the real domain's locked,
+per-Component effective-dating mechanism (§17); a redundant header date
+would only risk drifting from the per-component dates it would summarize.
+
+### No live billing engine
+
+This stage never calculates a real bill. The "pricing summary" lines
+shown per component (`src/features/customer-onboarding/domain/commercial-rate-summary.ts`)
+are illustrative display strings built directly from what the user
+typed, never a usage-driven calculation, and never claim to be an
+invoice.
+
+## 23. What this document is not
 
 Not a database schema. Not an implementation. Not a decision on Flowable,
 approval workflow mechanics, Entitlement Ledger implementation,

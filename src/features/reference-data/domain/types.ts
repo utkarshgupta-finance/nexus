@@ -1,7 +1,9 @@
 /**
  * Reference Master: the controlled option lists Nexus forms select from
- * (Country, Industry, Segment, Business Unit, Phone Country Code, Currency
- * today).
+ * (Country, Industry, Segment, Business Unit, Phone Country Code, Currency,
+ * plus the Commercial Rate lists added for Customer Onboarding's Commercial
+ * Rate stage: Pricing Unit, Billing Cycle, Billing Timing, Payment Terms,
+ * Commercial Nature, Pricing Model).
  *
  * A Reference Master value is never physically removed once it has been
  * offered to a user: deactivating a value stops it appearing in new
@@ -18,9 +20,34 @@
  * this feature is a fixture/TypeScript-only stand-in that already honours
  * the same contract, so a future generic table is a drop-in replacement
  * behind ./service.ts without any calling code changing.
+ *
+ * Not every list here is governed identically (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md
+ * §22 documents the distinction in full):
+ * - **Freely configurable**: `pricing_unit`, `billing_cycle`, `billing_timing`,
+ *   `payment_terms`. Pure administrative data; a new value needs no code change.
+ * - **Controlled business option**: `commercial_nature`. Each value drives real
+ *   UI/validation branching, so a value added here without matching code has no
+ *   effect; Settings still allows adding one, but it does not become usable on
+ *   its own.
+ * - **System-supported logic**: `pricing_model`. A new value needs new
+ *   calculation logic in the Pricing Kernel; Settings only allows Activate/
+ *   Deactivate for this list, never adding a new one (see
+ *   ../ui/reference-master-settings.tsx).
  */
 
-type ReferenceListKey = "country" | "industry" | "segment" | "business_unit" | "phone_country_code" | "currency"
+type ReferenceListKey =
+  | "country"
+  | "industry"
+  | "segment"
+  | "business_unit"
+  | "phone_country_code"
+  | "currency"
+  | "pricing_unit"
+  | "billing_cycle"
+  | "billing_timing"
+  | "payment_terms"
+  | "commercial_nature"
+  | "pricing_model"
 
 /**
  * `dialCode` only applies to the `phone_country_code` list. Kept as an

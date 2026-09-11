@@ -1,4 +1,6 @@
 import { CUSTOMER_ONBOARDING_FIELD_KEYS, TAX_IDENTIFIER_TYPE_OTHER } from "../forms/customer-onboarding-form-definition"
+import { isCommercialRateDraftComplete, isCommercialRateDraftStarted } from "./commercial-rate"
+import type { CommercialRateDraft } from "./commercial-rate"
 
 /**
  * Stage completeness, derived purely from what has actually been entered,
@@ -129,13 +131,16 @@ function evaluateCommercialDocumentsStatus(): CustomerOnboardingStageStatus {
 }
 
 /**
- * Commercial Rate's business fields are intentionally not built yet (task
- * spec §13-14): this stage must never report "complete" in this build,
- * even once Billing Currency is chosen, since the rest of the stage's
- * requirements are still undefined. "Do not fake completion."
+ * Commercial Rate V1 (task spec §30): complete only once Billing Currency,
+ * Commercial Scope, and at least one fully-specified commercial component
+ * all exist. "Visited != complete" applies here exactly as everywhere else:
+ * opening the stage and picking a currency alone is "attention," not
+ * "complete," until an actual commercial component has been captured.
  */
-function evaluateCommercialRateStatus(billingCurrency: string | null): CustomerOnboardingStageStatus {
-  return billingCurrency ? "attention" : "not_started"
+function evaluateCommercialRateStatus(draft: CommercialRateDraft): CustomerOnboardingStageStatus {
+  if (isCommercialRateDraftComplete(draft)) return "complete"
+  if (isCommercialRateDraftStarted(draft)) return "attention"
+  return "not_started"
 }
 
 /**

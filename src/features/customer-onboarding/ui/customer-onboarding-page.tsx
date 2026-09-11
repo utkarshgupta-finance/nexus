@@ -12,13 +12,14 @@ import { PageHeader } from "@/components/product/page-header"
 import { ProcessJourney } from "@/components/product/process-journey"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { getActiveOptions, resolveOption } from "@/features/reference-data"
+import { getActiveOptions } from "@/features/reference-data"
 import type { ReferenceListKey, ReferenceOption } from "@/features/reference-data"
 import { CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages } from "../domain/process"
 import { COMMERCIAL_DOCUMENT_DEFINITIONS } from "../domain/commercial-documents"
+import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
+import type { CommercialRateDraft } from "../domain/commercial-rate"
 import { createCase, setCurrentStage, submitCase, updateRevisionData } from "../domain/case"
 import { isEligibleForCompletion } from "../domain/completion"
 import { fetchStatesForCountry } from "../domain/geography-client"
@@ -38,6 +39,7 @@ import {
 } from "../forms/customer-onboarding-form-definition"
 import { AttachmentUpload } from "./attachment-upload"
 import type { SelectedAttachmentFile } from "./attachment-upload"
+import { CommercialRateSection } from "./commercial-rate-section"
 
 const REFERENCE_LISTS: ReferenceListKey[] = [
   "country",
@@ -111,7 +113,7 @@ function CustomerOnboardingPage() {
     piCopy: SelectedAttachmentFile | null
   }>({ proposal: null, customerPo: null, piCopy: null })
   const [signedAgreement, setSignedAgreement] = useState<SelectedAttachmentFile | null>(null)
-  const [billingCurrency, setBillingCurrency] = useState<string | null>(null)
+  const [commercialRate, setCommercialRate] = useState<CommercialRateDraft>(() => createEmptyCommercialRateDraft())
   const [submitError, setSubmitError] = useState<string | null>(null)
   /**
    * Bumped on every SurveyJS `onValueChanged` event (see the effect below),
@@ -125,11 +127,6 @@ function CustomerOnboardingPage() {
 
   const isLocked = onboardingCase.currentRevision.status === "submitted"
   const mode: SurveyFormMode = isLocked ? "readonly" : "edit"
-
-  // Commercial Rate's own Billing Currency field (moved from Commercial
-  // Documents, task spec §12): a plain React select, not a survey
-  // question, since Commercial Rate is not a survey page.
-  const currencyOptions = useMemo(() => getActiveOptions("currency"), [])
 
   const formDefinition = useMemo(() => {
     const optionsByList = Object.fromEntries(
@@ -213,7 +210,7 @@ function CustomerOnboardingPage() {
     setOnboardingCase((current) =>
       updateRevisionData(
         current,
-        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency]: billingCurrency },
+        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate },
         new Date().toISOString(),
         null
       )
@@ -242,7 +239,7 @@ function CustomerOnboardingPage() {
     setOnboardingCase((current) => {
       const withLatestData = updateRevisionData(
         current,
-        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency]: billingCurrency },
+        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate },
         new Date().toISOString(),
         null
       )
@@ -294,7 +291,7 @@ function CustomerOnboardingPage() {
       companyRegistration: taxDocuments.companyRegistration !== null,
     }),
     commercial_documents: evaluateCommercialDocumentsStatus(),
-    commercial_rate: evaluateCommercialRateStatus(billingCurrency),
+    commercial_rate: evaluateCommercialRateStatus(commercialRate),
     agreement_approval: evaluateAgreementApprovalStatus(signedAgreement !== null, legalApprovalComplete, completionReady),
   }
 
@@ -427,40 +424,7 @@ function CustomerOnboardingPage() {
           ) : null}
 
           {activeStageKey === "commercial_rate" ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Rate</span>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-foreground">Billing Currency</span>
-                  <Select value={billingCurrency ?? undefined} onValueChange={(value) => setBillingCurrency(value as string)}>
-                    <SelectTrigger className="w-full max-w-xs">
-                      <SelectValue placeholder="Select...">
-                        {(value: string) => resolveOption("currency", value)?.label ?? value}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {currencyOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-start gap-2 rounded-md border border-dashed px-4 py-6">
-                <p className="text-xs font-medium text-foreground">Pending business definition</p>
-                <p className="max-w-prose text-xs text-muted-foreground">
-                  This stage will collect the commercial rate inputs that feed an approved Commercial Configuration
-                  (component, pricing rule, billing cadence and commitment, per the existing Commercial domain
-                  model). The exact editable fields for this stage have not been confirmed with the business yet, so
-                  no fields are shown here rather than guessing financial terms.
-                </p>
-              </div>
-            </div>
+            <CommercialRateSection value={commercialRate} onChange={setCommercialRate} />
           ) : null}
 
           {activeStageKey === "agreement_approval" ? (

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { CUSTOMER_ONBOARDING_FIELD_KEYS, TAX_IDENTIFIER_TYPE_OTHER } from "../forms/customer-onboarding-form-definition"
+import { createComponent, createEmptyCommercialRateDraft } from "./commercial-rate"
+import type { CommercialRateDraft } from "./commercial-rate"
 import {
   combineStatuses,
   documentGroupStatus,
@@ -174,13 +176,32 @@ describe("evaluateCommercialDocumentsStatus", () => {
   })
 })
 
-describe("evaluateCommercialRateStatus (never fakes completion)", () => {
-  it("is not_started with no Billing Currency chosen", () => {
-    expect(evaluateCommercialRateStatus(null)).toBe("not_started")
+describe("evaluateCommercialRateStatus (visited != complete)", () => {
+  it("is not_started with nothing entered", () => {
+    expect(evaluateCommercialRateStatus(createEmptyCommercialRateDraft())).toBe("not_started")
   })
 
-  it("is attention, never complete, once Billing Currency is chosen: the rest of the stage is intentionally undefined", () => {
-    expect(evaluateCommercialRateStatus("INR")).toBe("attention")
+  it("is attention once Billing Currency is chosen but no component exists yet", () => {
+    const draft: CommercialRateDraft = { ...createEmptyCommercialRateDraft(), billingCurrency: "INR" }
+    expect(evaluateCommercialRateStatus(draft)).toBe("attention")
+  })
+
+  it("is complete once currency, scope, and a fully specified component all exist", () => {
+    const component = createComponent("recurring", "per_unit")
+    const draft: CommercialRateDraft = {
+      commercialScope: "SFA",
+      billingCurrency: "INR",
+      components: [
+        {
+          ...component,
+          description: "SFA",
+          rate: 50,
+          pricingUnit: "USER",
+          billingTerms: { billingCycle: "monthly", billingTiming: "advance", paymentTerms: { paymentTermsCode: "due_on_receipt", customPaymentDays: null } },
+        },
+      ],
+    }
+    expect(evaluateCommercialRateStatus(draft)).toBe("complete")
   })
 })
 
