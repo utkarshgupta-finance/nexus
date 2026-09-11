@@ -1,9 +1,10 @@
 "use client"
 
-import { useId, useRef, useState } from "react"
-import { FileIcon, InfoIcon, UploadIcon, XIcon } from "lucide-react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { EyeIcon, FileIcon, InfoIcon, UploadIcon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { DocumentViewer } from "@/components/product/document-viewer"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ALLOWED_ATTACHMENT_HELP_TEXT,
@@ -41,7 +42,20 @@ function AttachmentUpload({
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
   const inputId = useId()
+
+  // Derived, not stored in state: recomputes only when the selected file
+  // itself changes. The cleanup-only effect below revokes the previous
+  // object URL once it stops being the current one (on Replace, Remove,
+  // or unmount), so nothing holds a browser resource open longer than the
+  // file it points to is actually selected.
+  const previewUrl = useMemo(() => (value ? URL.createObjectURL(value.file) : null), [value])
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -65,6 +79,7 @@ function AttachmentUpload({
 
   function handleRemove() {
     setError(null)
+    setViewerOpen(false)
     onChange(null)
   }
 
@@ -118,6 +133,10 @@ function AttachmentUpload({
             </span>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Button type="button" variant="outline" size="sm" onClick={() => setViewerOpen(true)}>
+              <EyeIcon data-icon="inline-start" className="size-3.5" />
+              View
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
               Replace
             </Button>
@@ -138,6 +157,16 @@ function AttachmentUpload({
         <p role="alert" className="text-[0.7rem] text-destructive">
           {error}
         </p>
+      ) : null}
+
+      {value ? (
+        <DocumentViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          documentName={value.metadata.fileName}
+          mimeType={value.metadata.mimeType}
+          url={previewUrl}
+        />
       ) : null}
     </div>
   )

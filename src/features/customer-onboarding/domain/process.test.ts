@@ -37,12 +37,36 @@ describe("Customer Onboarding stage order", () => {
 })
 
 describe("toProcessJourneyStages", () => {
-  it("marks stages before the current one completed and stages after it upcoming", () => {
-    const stages = toProcessJourneyStages("commercial_documents")
-    expect(stages.find((stage) => stage.id === "customer_details")?.state).toBe("completed")
-    expect(stages.find((stage) => stage.id === "tax_registration")?.state).toBe("completed")
-    expect(stages.find((stage) => stage.id === "commercial_documents")?.state).toBe("current")
-    expect(stages.find((stage) => stage.id === "commercial_rate")?.state).toBe("upcoming")
-    expect(stages.find((stage) => stage.id === "agreement_approval")?.state).toBe("upcoming")
+  const ALL_COMPLETE: Record<string, "not_started" | "attention" | "complete"> = {
+    customer_details: "complete",
+    tax_registration: "complete",
+    commercial_documents: "complete",
+    commercial_rate: "complete",
+    agreement_approval: "complete",
+  }
+
+  it("takes each stage's state from the supplied statuses map, never from stage order", () => {
+    const statuses = {
+      customer_details: "attention" as const,
+      tax_registration: "not_started" as const,
+      commercial_documents: "complete" as const,
+      commercial_rate: "not_started" as const,
+      agreement_approval: "not_started" as const,
+    }
+    const stages = toProcessJourneyStages("commercial_documents", statuses)
+    expect(stages.find((stage) => stage.id === "customer_details")?.state).toBe("attention")
+    expect(stages.find((stage) => stage.id === "tax_registration")?.state).toBe("not_started")
+    expect(stages.find((stage) => stage.id === "commercial_documents")?.state).toBe("complete")
+    expect(stages.find((stage) => stage.id === "commercial_rate")?.state).toBe("not_started")
+    expect(stages.find((stage) => stage.id === "agreement_approval")?.state).toBe("not_started")
+  })
+
+  it("marks only the current stage as current, independent of its completeness", () => {
+    const stages = toProcessJourneyStages("tax_registration", ALL_COMPLETE)
+    expect(stages.find((stage) => stage.id === "tax_registration")?.isCurrent).toBe(true)
+    expect(stages.find((stage) => stage.id === "customer_details")?.isCurrent).toBeFalsy()
+    expect(stages.find((stage) => stage.id === "commercial_rate")?.isCurrent).toBeFalsy()
+    // Completeness is unaffected by which stage is current (the bug this replaces).
+    expect(stages.find((stage) => stage.id === "tax_registration")?.state).toBe("complete")
   })
 })

@@ -189,6 +189,34 @@ always show current state, completion, what's missing, ownership, and next
 action. The user should never have to reconstruct workflow state from the
 form fields themselves.
 
+**Stage navigation is separate from stage completion. (LOCKED)** A
+multi-stage draft form (Customer Onboarding is the reference
+implementation: `src/features/customer-onboarding/domain/stage-status.ts`)
+must track two independent things per stage, never conflate them:
+
+- **Navigation state**: which stage the user is currently viewing. Purely
+  a display/UX concern. Moving between stages must always stay permissive
+  while a form is a draft: an incomplete stage never blocks navigation
+  away from it or into another one.
+- **Completion state**: whether every currently applicable mandatory
+  requirement for that stage has a value. Derived only from actual
+  field/document data, never from step order and never from whether the
+  user has simply opened/visited the stage. Visiting a stage is not the
+  same as completing it.
+
+Completion state renders as three visually distinct states: **Complete**
+(green, all applicable mandatory requirements met), **Incomplete /
+Attention Required** (a restrained red/warning indicator, some mandatory
+requirements still outstanding), and **Not Started** (neutral, nothing
+entered yet). "Applicable" matters: requirements can be conditional (for
+example, country-dependent tax fields), so completion must evaluate
+whichever requirement set currently applies, not one hardcoded list.
+
+A stage whose full business definition is intentionally not yet built
+(Commercial Rate before its rate model exists) must never report
+"Complete" merely because the one field it does have is filled in: report
+the honest partial/neutral state instead. Do not fake completion.
+
 ## 11. Buttons and actions
 
 One clear primary action per screen; secondary and tertiary/overflow actions
@@ -287,6 +315,7 @@ step**.
 | `AuditDrawer` | Secondary, deep inspection of change history, kept out of the primary screen. |
 | `ExceptionBanner` | High-salience but restrained; used only when the user genuinely needs to notice or act, so it never becomes ambient noise the user learns to ignore. |
 | `EmptyState` | Minimal contextual guidance plus one action, where relevant. |
+| `DocumentViewer` | **IMPLEMENTED** (`src/components/product/document-viewer.tsx`). Inline PDF/image preview inside a Sheet overlay, so inspecting a document never leaves the page it belongs to; a separate, explicit Download stays available alongside it. Accepts whatever authorized source the caller already has (a local object URL, an API route, a future short-lived signed Storage URL) and never assumes or constructs a public URL itself. Uses the browser's own native PDF/image rendering, not a bundled PDF library (see that file's header for the Library-First reasoning). Reused by both Customer Onboarding's attachment uploads and Customer Master's document list; intended for any future document surface (Agreements, POs, invoices, tax certificates) rather than being rebuilt per feature. |
 
 ## 20. Anti-patterns
 

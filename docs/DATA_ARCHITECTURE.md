@@ -513,6 +513,12 @@ resource the document is attached to, and only then issues a
 short-lived signed URL. A long-lived or public signed URL is never
 persisted as Customer Master or onboarding data.
 
+`src/components/product/document-viewer.tsx` (docs/UI_SYSTEM.md §19) is
+already built against this eventual flow: it renders whatever `url` it is
+given and never constructs, guesses, or assumes a public one itself, so
+wiring it to a real short-lived signed URL later is a caller-side change
+only, not a component change.
+
 **Status.** No migration exists yet for this table, and no Supabase
 Storage bucket has been created. Customer Onboarding's attachment stages
 (`src/features/customer-onboarding/ui/attachment-upload.tsx`, shared

@@ -1,8 +1,12 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
-import { ClockIcon, DownloadIcon, InfoIcon } from "lucide-react"
+import { ClockIcon, DownloadIcon, EyeIcon, InfoIcon } from "lucide-react"
 
 import { PageHeader } from "@/components/product/page-header"
 import { KeyValueGrid } from "@/components/product/key-value-grid"
+import { DocumentViewer } from "@/components/product/document-viewer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -16,10 +20,17 @@ import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-m
  * fixture data, never backend truth (../domain/demo-enrichment.ts's
  * header); every section built from them is visibly labeled Demo so a
  * reader never mistakes this screen for a fully persisted record.
+ *
+ * "use client": needed only for the Document Viewer's open/close state
+ * below (which document row, if any, View is currently showing). Every
+ * value rendered here still arrives as a plain prop from the server-side
+ * read (see ../../../app/customers/[customerKey]/page.tsx), nothing here
+ * performs its own data fetch.
  */
 function CustomerMasterDetail({ detail }: { detail: CustomerMasterDetailData }) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
+  const [viewingDocument, setViewingDocument] = useState<{ title: string; url: string; downloadUrl: string } | null>(null)
 
   const countryLabel = enrichment ? (resolveOption("country", enrichment.countryCode)?.label ?? enrichment.countryCode) : null
   const industryLabel = enrichment
@@ -176,10 +187,30 @@ function CustomerMasterDetail({ detail }: { detail: CustomerMasterDetailData }) 
                       <td className="py-2 pr-3 text-muted-foreground">v1</td>
                       <td className="py-2 pr-3 text-muted-foreground">DEMO</td>
                       <td className="py-2 pr-3 text-right">
-                        <Button variant="outline" size="sm" render={<Link href={`/api/demo/customer-documents/${document.documentType}`} target="_blank" />}>
-                          <DownloadIcon data-icon="inline-start" className="size-3.5" />
-                          View
-                        </Button>
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setViewingDocument({
+                                title: document.title,
+                                url: `/api/demo/customer-documents/${document.documentType}`,
+                                downloadUrl: `/api/demo/customer-documents/${document.documentType}?disposition=attachment`,
+                              })
+                            }
+                          >
+                            <EyeIcon data-icon="inline-start" className="size-3.5" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            render={<Link href={`/api/demo/customer-documents/${document.documentType}?disposition=attachment`} download />}
+                          >
+                            <DownloadIcon data-icon="inline-start" className="size-3.5" />
+                            Download
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -201,6 +232,17 @@ function CustomerMasterDetail({ detail }: { detail: CustomerMasterDetailData }) 
           </div>
         </section>
       </div>
+
+      <DocumentViewer
+        open={viewingDocument !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewingDocument(null)
+        }}
+        documentName={viewingDocument?.title ?? ""}
+        mimeType="application/pdf"
+        url={viewingDocument?.url ?? null}
+        downloadUrl={viewingDocument?.downloadUrl}
+      />
     </div>
   )
 }

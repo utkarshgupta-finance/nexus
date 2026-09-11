@@ -52,11 +52,26 @@ const FAKE_OPTIONS: Record<ReferenceListKey, ReferenceOption[]> = {
 }
 
 describe("customer onboarding form definition structure", () => {
-  it("keeps every field from both stages present", () => {
+  it("keeps every survey-backed field from both stages present", () => {
     const form = buildCustomerOnboardingFormDefinition(FAKE_OPTIONS)
+    // Billing Currency is deliberately excluded: it now lives on Commercial
+    // Rate as a plain React field (../ui/customer-onboarding-page.tsx), not
+    // a survey question, since Commercial Rate is not a survey page.
     for (const fieldKey of Object.values(CUSTOMER_ONBOARDING_FIELD_KEYS)) {
+      if (fieldKey === CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency) continue
       expect(findQuestion(form.json, fieldKey), `missing field ${fieldKey}`).toBeDefined()
     }
+  })
+
+  it("no longer declares a commercial_documents survey page: it collects only attachments now, handled as a plain React section", () => {
+    const form = buildCustomerOnboardingFormDefinition(FAKE_OPTIONS)
+    const pages = form.json.pages as { name: string }[]
+    expect(pages.map((page) => page.name)).toEqual(["customer_details", "tax_registration"])
+  })
+
+  it("does not declare Billing Currency as a survey question", () => {
+    const form = buildCustomerOnboardingFormDefinition(FAKE_OPTIONS)
+    expect(findQuestion(form.json, CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency)).toBeUndefined()
   })
 
   it("uses whatever segment/business unit/industry options it is given, not a hardcoded list", () => {
@@ -81,13 +96,6 @@ describe("customer onboarding form definition structure", () => {
     expect(countryQuestion?.defaultValue).toBe(DEFAULT_COUNTRY_CODE)
   })
 
-  it("uses Reference Master currency options for Billing Currency, stable code as value", () => {
-    const form = buildCustomerOnboardingFormDefinition(FAKE_OPTIONS)
-    expect(findQuestion(form.json, CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency)?.choices).toEqual([
-      { value: "INR", text: "INR - Indian Rupee" },
-      { value: "USD", text: "USD - US Dollar" },
-    ])
-  })
 })
 
 describe("customer onboarding form runtime behaviour", () => {
@@ -156,7 +164,6 @@ describe("customer onboarding form runtime behaviour", () => {
     survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.contactDesignation, "VP Sales")
     survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.gstNumber, "29AAAAA0000A1Z1")
     survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.pan, "AAAAA0000A")
-    survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency, "INR")
     expect(survey.validate()).toBe(true)
   })
 
@@ -290,7 +297,6 @@ describe("country-aware Tax & Registration branch", () => {
     survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.contactDesignation, "VP Sales")
     survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.taxIdentifierType, "vat_number")
     survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.taxRegistrationNumber, "SG123456789")
-    survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency, "USD")
     expect(survey.validate()).toBe(true)
   })
 })

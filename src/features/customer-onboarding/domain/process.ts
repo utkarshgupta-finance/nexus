@@ -1,5 +1,6 @@
 import type { ProcessStage } from "@/components/product/process-journey"
 import type { CustomerOnboardingStageKey } from "./types"
+import type { CustomerOnboardingStageStatus } from "./stage-status"
 
 /**
  * Customer Onboarding process identity and stage metadata. Stages are
@@ -27,18 +28,28 @@ const CUSTOMER_ONBOARDING_STAGES: CustomerOnboardingStageMeta[] = [
 ]
 
 /**
- * Maps the static stage metadata onto ProcessJourney's own generic
- * {completed, current, upcoming} vocabulary, reusing the shared component
- * rather than building a second stage indicator
- * (src/components/product/process-journey.tsx).
+ * Maps the static stage metadata plus a precomputed per-stage completeness
+ * map onto ProcessJourney's shared complete/attention/not_started
+ * vocabulary, reusing the shared component rather than building a second
+ * stage indicator (src/components/product/process-journey.tsx).
+ *
+ * Deliberately takes `statuses` as an argument rather than deriving it
+ * from `currentStageKey`/stage order: a stage's completeness comes only
+ * from ./stage-status.ts's evaluation of actual field/document data (task
+ * spec: "visiting a stage alone does not mark it complete"). Which stage
+ * is current is purely a display concern here (bold emphasis via
+ * `isCurrent`), never a gate on navigation and never a source of
+ * completeness.
  */
-function toProcessJourneyStages(currentStageKey: CustomerOnboardingStageKey): ProcessStage[] {
-  const currentOrder = CUSTOMER_ONBOARDING_STAGES.find((stage) => stage.key === currentStageKey)?.order ?? 0
-
+function toProcessJourneyStages(
+  currentStageKey: CustomerOnboardingStageKey,
+  statuses: Record<CustomerOnboardingStageKey, CustomerOnboardingStageStatus>
+): ProcessStage[] {
   return CUSTOMER_ONBOARDING_STAGES.map((stage) => ({
     id: stage.key,
     label: stage.label,
-    state: stage.order < currentOrder ? "completed" : stage.order === currentOrder ? "current" : "upcoming",
+    state: statuses[stage.key],
+    isCurrent: stage.key === currentStageKey,
     helperText: stage.available ? undefined : "Not yet available",
   }))
 }

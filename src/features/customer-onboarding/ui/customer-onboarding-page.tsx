@@ -12,14 +12,23 @@ import { PageHeader } from "@/components/product/page-header"
 import { ProcessJourney } from "@/components/product/process-journey"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { getActiveOptions } from "@/features/reference-data"
+import { getActiveOptions, resolveOption } from "@/features/reference-data"
 import type { ReferenceListKey, ReferenceOption } from "@/features/reference-data"
 import { CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages } from "../domain/process"
+import { COMMERCIAL_DOCUMENT_DEFINITIONS } from "../domain/commercial-documents"
 import { createCase, setCurrentStage, submitCase, updateRevisionData } from "../domain/case"
 import { isEligibleForCompletion } from "../domain/completion"
 import { fetchStatesForCountry } from "../domain/geography-client"
+import {
+  evaluateAgreementApprovalStatus,
+  evaluateCommercialDocumentsStatus,
+  evaluateCommercialRateStatus,
+  evaluateCustomerDetailsStatus,
+  evaluateTaxRegistrationStatus,
+} from "../domain/stage-status"
 import type { CustomerOnboardingStageKey } from "../domain/types"
 import {
   buildCustomerOnboardingFormDefinition,
@@ -40,12 +49,19 @@ const REFERENCE_LISTS: ReferenceListKey[] = [
 ]
 
 /**
- * The three SurveyJS-backed stages, in order: everything after these is a
- * plain React section (Commercial Rate, Agreement & Approval), not a
- * survey page. See ../forms/customer-onboarding-form-definition.ts's
- * header for why.
+ * The two SurveyJS-backed stages, in order: everything after these is a
+ * plain React section (Commercial Documents, Commercial Rate, Agreement &
+ * Approval), not a survey page. See
+ * ../forms/customer-onboarding-form-definition.ts's header for why.
  */
-const SURVEY_STAGE_ORDER_LIMIT = 3
+const SURVEY_STAGE_ORDER_LIMIT = 2
+
+/** Maps each Commercial Documents attachment to its local-state field. */
+const COMMERCIAL_DOCUMENT_STATE_KEYS = {
+  proposal_document: "proposal",
+  customer_po: "customerPo",
+  pi_copy: "piCopy",
+} as const
 
 /**
  * A deterministic six-digit id derived from React's own `useId()` value,
@@ -95,10 +111,25 @@ function CustomerOnboardingPage() {
     piCopy: SelectedAttachmentFile | null
   }>({ proposal: null, customerPo: null, piCopy: null })
   const [signedAgreement, setSignedAgreement] = useState<SelectedAttachmentFile | null>(null)
+  const [billingCurrency, setBillingCurrency] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  /**
+   * Bumped on every SurveyJS `onValueChanged` event (see the effect below),
+   * for no reason other than to make this component re-render: `survey`
+   * is an imperative Model instance, so a field edit inside it does not by
+   * itself trigger a React re-render here, but the stage-status indicator
+   * below reads `survey.data` fresh on every render and needs one to stay
+   * live while the user types.
+   */
+  const [, forceRerenderOnFieldChange] = useState(0)
 
   const isLocked = onboardingCase.currentRevision.status === "submitted"
   const mode: SurveyFormMode = isLocked ? "readonly" : "edit"
+
+  // Commercial Rate's own Billing Currency field (moved from Commercial
+  // Documents, task spec §12): a plain React select, not a survey
+  // question, since Commercial Rate is not a survey page.
+  const currencyOptions = useMemo(() => getActiveOptions("currency"), [])
 
   const formDefinition = useMemo(() => {
     const optionsByList = Object.fromEntries(
@@ -159,6 +190,7 @@ function CustomerOnboardingPage() {
       } else if (options.name === CUSTOMER_ONBOARDING_FIELD_KEYS.state) {
         survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.city, undefined)
       }
+      forceRerenderOnFieldChange((count) => count + 1)
     }
 
     function handleCurrentPageChanged() {
@@ -178,7 +210,14 @@ function CustomerOnboardingPage() {
   }, [survey])
 
   function handleSaveDraft() {
-    setOnboardingCase((current) => updateRevisionData(current, { ...survey.data }, new Date().toISOString(), null))
+    setOnboardingCase((current) =>
+      updateRevisionData(
+        current,
+        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency]: billingCurrency },
+        new Date().toISOString(),
+        null
+      )
+    )
     setDraftSaved(true)
   }
 
@@ -201,7 +240,12 @@ function CustomerOnboardingPage() {
     if (!fieldsValid || documentErrorMessages.length > 0) return
 
     setOnboardingCase((current) => {
-      const withLatestData = updateRevisionData(current, { ...survey.data }, new Date().toISOString(), null)
+      const withLatestData = updateRevisionData(
+        current,
+        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency]: billingCurrency },
+        new Date().toISOString(),
+        null
+      )
       return submitCase(withLatestData, new Date().toISOString(), null)
     })
   }
@@ -214,9 +258,10 @@ function CustomerOnboardingPage() {
       // eslint-disable-next-line react-hooks/immutability -- SurveyJS Model is an imperative instance; this is its documented API for changing the current page (see platform/forms/use-survey-model.ts for the same pattern with `survey.mode`).
       survey.currentPageNo = stage.order - 1
     } else {
-      // Commercial Rate and Agreement & Approval are not survey pages
-      // (see ../forms/customer-onboarding-form-definition.ts's header),
-      // so there is no survey page change to react to: this is the one
+      // Commercial Documents, Commercial Rate, and Agreement & Approval
+      // are not survey pages (see
+      // ../forms/customer-onboarding-form-definition.ts's header), so
+      // there is no survey page change to react to: this is the one
       // direct path that moves the active stage for them.
       setActiveStageKey(stage.key)
       setOnboardingCase((current) => setCurrentStage(current, stage.key))
@@ -235,6 +280,23 @@ function CustomerOnboardingPage() {
     hasSignedAgreement: signedAgreement !== null,
     legalApprovalComplete,
   })
+
+  // Read fresh on every render (see `forceRerenderOnFieldChange` above):
+  // completeness always comes from the data actually entered, never from
+  // which stage is current or which stages have been visited.
+  const stageStatuses = {
+    customer_details: evaluateCustomerDetailsStatus(survey.data),
+    tax_registration: evaluateTaxRegistrationStatus(survey.data, isIndia, {
+      gst: taxDocuments.gst !== null,
+      pan: taxDocuments.pan !== null,
+      tan: taxDocuments.tan !== null,
+      taxRegistration: taxDocuments.taxRegistration !== null,
+      companyRegistration: taxDocuments.companyRegistration !== null,
+    }),
+    commercial_documents: evaluateCommercialDocumentsStatus(),
+    commercial_rate: evaluateCommercialRateStatus(billingCurrency),
+    agreement_approval: evaluateAgreementApprovalStatus(signedAgreement !== null, legalApprovalComplete, completionReady),
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -266,7 +328,7 @@ function CustomerOnboardingPage() {
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Process</span>
             <div className="hidden sm:block">
-              <ProcessJourney stages={toProcessJourneyStages(activeStageKey)} />
+              <ProcessJourney stages={toProcessJourneyStages(activeStageKey, stageStatuses)} />
             </div>
             <div className="flex items-center gap-2 text-sm sm:hidden">
               <span className="inline-block size-1.5 shrink-0 rounded-full bg-foreground" />
@@ -343,35 +405,52 @@ function CustomerOnboardingPage() {
 
           {activeStageKey === "commercial_documents" ? (
             <div className="flex flex-col gap-3">
-              <Separator />
-              <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Attachments</span>
+              <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Documents</span>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <AttachmentUpload
-                  documentType="proposal_document"
-                  label="Proposal Sent to Customer"
-                  value={commercialDocuments.proposal}
-                  onChange={(next) => setCommercialDocuments((current) => ({ ...current, proposal: next }))}
-                />
-                <AttachmentUpload
-                  documentType="customer_po"
-                  label="Customer PO"
-                  helpText="Optional at this stage; the final requirement for this attachment is not yet confirmed."
-                  value={commercialDocuments.customerPo}
-                  onChange={(next) => setCommercialDocuments((current) => ({ ...current, customerPo: next }))}
-                />
-                <AttachmentUpload
-                  documentType="pi_copy"
-                  label="PI Copy"
-                  value={commercialDocuments.piCopy}
-                  onChange={(next) => setCommercialDocuments((current) => ({ ...current, piCopy: next }))}
-                />
+                {COMMERCIAL_DOCUMENT_DEFINITIONS.map((definition) => (
+                  <AttachmentUpload
+                    key={definition.documentType}
+                    documentType={definition.documentType}
+                    label={definition.label}
+                    helpText={definition.helpText}
+                    value={commercialDocuments[COMMERCIAL_DOCUMENT_STATE_KEYS[definition.documentType]]}
+                    onChange={(next) =>
+                      setCommercialDocuments((current) => ({
+                        ...current,
+                        [COMMERCIAL_DOCUMENT_STATE_KEYS[definition.documentType]]: next,
+                      }))
+                    }
+                  />
+                ))}
               </div>
             </div>
           ) : null}
 
           {activeStageKey === "commercial_rate" ? (
-            <div className="flex flex-col gap-3">
-              <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Rate</span>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Rate</span>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-foreground">Billing Currency</span>
+                  <Select value={billingCurrency ?? undefined} onValueChange={(value) => setBillingCurrency(value as string)}>
+                    <SelectTrigger className="w-full max-w-xs">
+                      <SelectValue placeholder="Select...">
+                        {(value: string) => resolveOption("currency", value)?.label ?? value}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {currencyOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="flex flex-col items-start gap-2 rounded-md border border-dashed px-4 py-6">
                 <p className="text-xs font-medium text-foreground">Pending business definition</p>
                 <p className="max-w-prose text-xs text-muted-foreground">

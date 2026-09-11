@@ -84,17 +84,17 @@ function toChoices(options: ReferenceOption[]) {
 }
 
 /**
- * Builds the SurveyJS-backed Customer Onboarding pages: Customer
- * Details, Tax & Registration, then Commercial Documents (Billing
- * Currency only; the stage's three attachments are a separate
- * local-file contract, same pattern as Tax & Registration's documents,
- * handled in ../ui/customer-onboarding-page.tsx). Commercial Rate and
- * Agreement & Approval are not SurveyJS pages: neither collects a
- * confirmed set of typed business fields yet (Commercial Rate is an
- * explicit shell pending business definition; Agreement & Approval is
- * an attachment plus a read-only approval status), so both render as
- * plain React sections instead of inventing survey questions for
- * fields that are not yet real. Reference Master option choices
+ * Builds the SurveyJS-backed Customer Onboarding pages: Customer Details
+ * and Tax & Registration only. Commercial Documents, Commercial Rate, and
+ * Agreement & Approval are all plain React sections instead of survey
+ * pages (see ../ui/customer-onboarding-page.tsx): Commercial Documents
+ * collects nothing but the three attachment uploads (a local-file
+ * contract, same pattern as Tax & Registration's documents) now that
+ * Billing Currency has moved to Commercial Rate; Commercial Rate is an
+ * explicit shell pending business definition, plus Billing Currency;
+ * Agreement & Approval is an attachment plus a read-only approval status.
+ * None of the three invents survey questions for fields that are not yet
+ * real. Reference Master option choices
  * (Country, Industry, Segment, Business Unit, Phone Country Code,
  * Currency) are a parameter, never hardcoded here, so Reference Master
  * stays the single source of truth for what a user may select. State
@@ -430,34 +430,6 @@ function buildCustomerOnboardingFormDefinition(
             },
           ],
         },
-        {
-          name: "commercial_documents",
-          elements: [
-            {
-              type: "panel",
-              name: "section_commercial_documents",
-              title: "Commercial Documents",
-              elements: [
-                {
-                  type: "html",
-                  name: "commercial_documents_notice",
-                  html: "<p>Proposal, Customer PO and PI Copy are uploaded below as attachments. Billing Currency governs the currency used for this customer's Commercial Configuration.</p>",
-                  startWithNewLine: true,
-                },
-                {
-                  type: "dropdown",
-                  name: CUSTOMER_ONBOARDING_FIELD_KEYS.billingCurrency,
-                  title: "Billing Currency",
-                  isRequired: true,
-                  choices: toChoices(optionsByList.currency),
-                  placeholder: "Select...",
-                  startWithNewLine: true,
-                  width: "50%",
-                },
-              ],
-            },
-          ],
-        },
       ],
     },
   }
@@ -497,6 +469,7 @@ function fieldKeysToClearOnCountryChange(newCountry: string | null): string[] {
 export {
   CUSTOMER_ONBOARDING_FIELD_KEYS,
   DEFAULT_COUNTRY_CODE,
+  TAX_IDENTIFIER_TYPE_OTHER,
   buildCustomerOnboardingFormDefinition,
   fieldKeysToClearOnCountryChange,
 }
