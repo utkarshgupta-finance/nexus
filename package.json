@@ -14,6 +14,8 @@
     "@supabase/supabase-js": "^2.116.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.5",
+    "countries-list": "^3.4.1",
+    "countries-states-cities": "^1.0.6",
     "lucide-react": "^1.41.0",
     "next": "16.3.4",
     "react": "19.2.8",

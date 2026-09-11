@@ -46,6 +46,47 @@ CEO, Documentation. Full framework in `docs/guide/NEXUS_PRINCIPLES.md`
 This is a thinking framework applied while working, not a separate
 approval step.
 
+## Never fake auth, approval, or persistence
+
+Never invent a working login, a clickable "Approve" action, a saved
+record, or an uploaded file where the real authorization, workflow, or
+storage layer does not exist yet. Show the honest state instead (a
+"Pending" badge, a documented future shape, a local-only save) rather
+than a control that looks real but does nothing real behind it. This
+applies to workflow/approval identity specifically: a role reference
+(e.g. `FINANCE_HEAD`, `BU_HEAD`) is never resolved to a hardcoded person
+or a fake "logged in as" user.
+
+## Structural changes must be documented in the same task
+
+A change is structural if it introduces or alters an architectural
+principle, a dependency-direction rule, a library-selection decision, a
+new platform primitive, an auth/authz shape, a workflow shape, a
+role/scope model, a Reference Master or forms-platform behavior, a
+submission/versioning model, an audit/history principle, a document-
+storage architecture, a layering convention, or a cross-feature service
+boundary. When a task makes a structural change, update the authoritative
+doc (`docs/ARCHITECTURE.md`, `docs/PLATFORM_ARCHITECTURE.md`,
+`docs/DATA_ARCHITECTURE.md`, `docs/UI_SYSTEM.md`, or a new file if none
+covers it) in the same task, not only in chat. Mark new/changed sections
+honestly as `DESIGN DRAFT`, `LOCKED`, `IMPLEMENTED`, or `CLOSED`, and
+never describe an unbuilt capability as if it already existed. A small,
+local UI copy change is not structural and does not need this.
+
+## Reporting progress on substantial tasks
+
+For a substantial multi-step task, start by choosing a total point count
+that reflects the actual scope (a small task might total 10, a large one
+40+; there is no fixed number), broken into phases. Report percentage
+only as completed points divided by that chosen total, never a separate
+guess. Give remaining-time estimates as a range ("~15-25 minutes"), not
+an exact figure. Progress can move backwards if testing surfaces a real
+defect. End a substantial task with a short plain-English summary (what
+changed, what was removed, what was fixed, what is still pending, what
+the user should look at first) before any technical delivery detail, and
+apply one focused review/test pass rather than repeatedly re-reviewing
+already-finished work without a real reason to.
+
 ## Stack
 
 Next.js (App Router) + React + TypeScript + Tailwind CSS + shadcn/ui +

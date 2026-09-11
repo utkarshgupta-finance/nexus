@@ -1,0 +1,19 @@
+/**
+ * SurveyJS field widths (`width`, `minWidth` in a form definition's JSON,
+ * e.g. features/customer-onboarding/forms/stage1-form-definition.ts) are
+ * static percentages, not their own media queries: a field authored at
+ * 50%/30%/70% for a natural desktop pairing stays that percentage at any
+ * viewport, which reads as cramped, truncated fields on a narrow screen
+ * rather than the single stacked column docs/UI_SYSTEM.md §17 calls for.
+ *
+ * This is a platform/forms-level fix so every current and future Nexus
+ * SurveyJS form gets single-column fields below the `sm` breakpoint
+ * without each form definition re-deriving its own responsive widths.
+ */
+@media (max-width: 639px) {
+  .sd-element-wrapper {
+    flex-basis: 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}

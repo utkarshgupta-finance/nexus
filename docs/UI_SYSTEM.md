@@ -149,6 +149,18 @@ content genuinely behaves as one unit. Shadows are reserved for true
 overlays (menus, dropdowns, modals, popovers), never used to make a static
 component "float."
 
+**Canvas vs. working surface (approved pattern).** `--background` (the
+app canvas, `bg-background`) and `--card` (a working surface, `bg-card`)
+are deliberately different near-white values, never the same value: a
+page's canvas must read as a distinct layer behind a form or record
+surface, per §4's "avoid pure white where it creates glare." A
+multi-section working surface (a multi-stage form, a record body) uses
+one `rounded-lg border bg-card shadow-sm` container per logical unit,
+restrained (thin border, subtle shadow, not a "giant floating card"),
+with one consistent internal padding and vertical rhythm for every
+section inside it, rather than several separately bordered boxes
+stacked on the bare canvas.
+
 ## 9. Tables
 
 Tables are a **first-class** Nexus interface, not a fallback. They are the

@@ -3,6 +3,7 @@ import type {
   BillingQuantityBasis,
   BillingQuantityBasisUsed,
   BillingTiming,
+  CommercialChangeCategory,
   CommercialComponent,
   MeasurementDefinition,
   PricingRuleKind,
@@ -55,6 +56,14 @@ const PRICING_RULE_KIND_LABELS: Record<PricingRuleKind, string> = {
   flat: "Flat fee",
 }
 
+const COMMERCIAL_CHANGE_CATEGORY_LABELS: Record<CommercialChangeCategory, string> = {
+  initial_setup: "Initial setup",
+  renewal: "Renewal",
+  amendment: "Amendment",
+  correction: "Correction",
+  other: "Other",
+}
+
 function billingCadenceLabel(cadence: BillingCadence): string {
   return BILLING_CADENCE_LABELS[cadence]
 }
@@ -73,6 +82,10 @@ function billingQuantityBasisUsedLabel(basisUsed: BillingQuantityBasisUsed): str
 
 function pricingRuleKindLabel(kind: PricingRuleKind): string {
   return PRICING_RULE_KIND_LABELS[kind]
+}
+
+function commercialChangeCategoryLabel(category: CommercialChangeCategory): string {
+  return COMMERCIAL_CHANGE_CATEGORY_LABELS[category]
 }
 
 /**
@@ -99,4 +112,5 @@ export {
   billingQuantityBasisUsedLabel,
   pricingRuleKindLabel,
   commercialComponentLabel,
+  commercialChangeCategoryLabel,
 }

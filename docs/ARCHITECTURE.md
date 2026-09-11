@@ -108,3 +108,30 @@ feature's `domain/` or `components/`, not into the page itself.
 This file does not cover: visual design system, database schema, specific
 business rules, or authentication. Those are addressed in separate,
 later-stage documents/steps.
+
+## 9. Library-first, with concrete examples
+
+`docs/guide/NEXUS_PRINCIPLES.md` Principle 1 and
+`docs/engineering/NEXUS_ENGINEERING_PRINCIPLES.md` §1 already state the
+Library-first principle itself; this section records how it plays out
+structurally in this codebase, so the pattern is recognizable the next
+time it applies.
+
+The recurring shape: an external library or engine owns generic
+**mechanics**; Nexus owns the **business contract** behind its own
+adapter, never exposing the library's own shape as Nexus's API
+(Principle 3, "Nexus-owned contracts").
+
+| Mechanics (library) | Nexus-owned business contract |
+|---|---|
+| SurveyJS: field rendering, validation, conditional visibility, form runtime | `src/features/customer-onboarding/forms/`, `src/platform/forms/`: Form Definition, Form Version, Submission Revision |
+| React Flow (MIT, not installed): a future visual workflow canvas | `src/platform/workflow/domain/`: `WorkflowDefinition`, `WorkflowRule`, `WorkflowRequirement` |
+| XState (MIT, not installed): generic state-transition mechanics, if adopted | The same `platform/workflow/` contracts; XState would never own what a transition *means* to Nexus |
+| Flowable (accepted boundary, `docs/PLATFORM_ARCHITECTURE.md` §13): human/business-process routing engine | `platform/workflow/` stays the Nexus-owned shape of what evidence/approvals/requirements a process needs; Flowable is one possible future executor of that shape, never the source of truth for it |
+
+A library is adopted for **mechanics it does well** (rendering a field,
+laying out a graph, running a state machine); it never becomes the
+record of **what a Nexus business rule means**. If a library were
+replaced tomorrow, the business contract it served must still make sense
+on its own, because nothing about the business rule was ever expressed
+only in the library's own terms.

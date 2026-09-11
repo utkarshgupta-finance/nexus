@@ -154,6 +154,21 @@ Registry and are not audited row-by-row the way business records are;
 their changes are still captured through the same audit mechanism (§9)
 because they are still writes to a database table.
 
+Deactivating a reference value must never remove its meaning: a record
+that already stored the value (a form submission, a Customer Master
+field) must still resolve it to its original display label, even after
+it stops being offered for new selections. This requires two distinct
+read modes wherever reference values are consumed: an active-only mode
+for new selections, and a resolve-by-code mode that works regardless of
+current active state. Customer Onboarding Stage 1 (`src/features/
+reference-data/`) is the first real consumer of this shape. No table
+implementing it exists yet (M7, `supabase/migrations/
+20260908013210_master_data_foundation.sql`, created two purpose-built
+tables, `customers` and `capabilities`, not this generic one), so that
+feature holds its option lists in a TypeScript fixture behind the exact
+contract above (`getActiveOptions` / `resolveOption`), so the eventual
+generic table replaces the fixture without any calling code changing.
+
 ## 7. Versioning and effective dating
 
 Two needs both get called "versioning" and are kept distinct:
@@ -407,7 +422,109 @@ covers without any change to the trigger itself, and which additionally
 means the grant/revoke history is directly queryable from the table
 itself, without reconstructing it from `audit_log`.
 
-## 14. What this document does not cover
+## 14. Stable identity and historical attribute resolution (future, not yet implemented)
+
+A Customer is one continuing business identity even when descriptive
+attributes change: legal entity name, brand name, GST, PAN, TAN, and
+similar identifiers can all be renamed or reissued without the
+underlying Customer ceasing to be the same Customer. The stable identity
+is a Nexus-owned id (§2's "reuse the id, do not mint a second one"
+principle applies here too), never a current attribute value.
+
+This locks a future business capability, not a mechanism: searching by a
+former attribute value (a prior legal entity name, a superseded GST
+number) must resolve to the same stable Customer identity, and the
+result must clearly distinguish the current value from the historical
+value that was actually matched. A search result must never present a
+historical value as if it were still current.
+
+The append-only amendment pattern (§7, §9) is the natural fit once a
+real Customer Master attribute-history table is designed: each change
+row already carries a previous value, a new value, who changed it, when,
+and why, and a historical search only has to look across that history
+for a matching row and report both the historical match and the current
+value. This document does not lock "an aliases table" or any other
+specific implementation, only the requirement that resolution and
+disclosure of historical values must remain possible once Customer
+Master attributes exist. Nothing described in this section is
+implemented; no such table exists yet.
+
+## 15. Customer Master Change Request (future, not yet implemented)
+
+Once Customer Master exists (§14), an edit to it is never a direct
+mutation of current truth. It is a **Customer Master Change Request**:
+a proposal carrying a current value and a proposed value per changed
+attribute, which Nexus Workflow (`docs/WORKFLOW_ENGINE_ARCHITECTURE.md`)
+evaluates for evidence and approval requirements before anything is
+allowed to update the Master row. This keeps the same current-truth-plus-
+history discipline §7 and §14 already establish: Customer Master itself
+is still never silently overwritten out from under a pending or rejected
+proposal.
+
+A single Change Request may change more than one attribute at once (a
+legal name, a segment, and a business unit, together). Workflow
+aggregates the evidence and approval requirements across every changed
+attribute into one set, deduplicating semantically identical
+requirements (the same document type requested twice becomes one
+requirement) while preserving legitimately distinct scoped approvals
+(an old Business Unit Head and a new Business Unit Head are never the
+same requirement merely because they share a role code). Only a
+Change Request that clears every required approval and evidence item
+updates Customer Master; the request itself, approved or not, remains
+readable history.
+
+Nothing in this section is implemented: no Change Request table, no
+Customer Master table, and no live evaluation exist yet. This section
+records the shape a future implementation must follow, matching how
+§14 and §15 already record future shapes without building them.
+
+## 16. Document/attachment storage (future, not yet implemented)
+
+Binary file content (a GST certificate, a PAN card scan, and similar
+evidence attached to a business record) belongs in private Supabase
+Storage, never in a PostgreSQL column and never in a public bucket.
+PostgreSQL holds metadata only:
+
+```
+document_id       uuid, primary key
+request_id        uuid, references requests(id)
+customer_id       uuid, nullable, references the eventual Customer Master row
+document_type     text, not null            -- e.g. "gst_certificate", "pan_card",
+                                             -- "tax_registration", "company_registration"
+original_filename text, not null
+mime_type         text, not null
+size_bytes        integer, not null
+storage_bucket    text, not null
+storage_path      text, not null
+uploaded_by       uuid, references app_users
+uploaded_at       timestamptz, not null
+is_current        boolean, not null default true
+```
+
+Storage path convention: `{requestId}/tax/{documentType}/{documentId}.
+{extension}`, opaque ids only. A customer's legal name, GST number, or
+PAN never appears in a bucket path or filename: the metadata row is
+already the authoritative link between a document and the record it
+belongs to, so the path itself carries no sensitive meaning.
+
+Access is never a permanent public URL. The intended flow is: a user
+requests a document, the Nexus server checks authorization against the
+resource the document is attached to, and only then issues a
+short-lived signed URL. A long-lived or public signed URL is never
+persisted as Customer Master or onboarding data.
+
+**Status.** No migration exists yet for this table, and no Supabase
+Storage bucket has been created. Customer Onboarding's Tax & Registration
+stage (`src/features/customer-onboarding/ui/tax-document-upload.tsx`)
+validates a real browser `File` immediately on selection (type,
+extension, size) and holds it only as local, in-session React state;
+nothing is uploaded anywhere from that Client Component, and refreshing
+the browser loses the selection. This is the persistence capability the
+next backend stage needs to build: the metadata table above, a private
+`customer-onboarding-documents` bucket, and a server-side upload/signed-
+access path that a Client Component never talks to directly.
+
+## 17. What this document does not cover
 
 No table here is a finalized schema. Column lists above are the standard
 shape every table follows, not the complete definition of any real Nexus
