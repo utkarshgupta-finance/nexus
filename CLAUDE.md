@@ -175,6 +175,31 @@ filename timestamp must match the version Supabase records remotely.
   in your own shell) and the project's database password. Never put these
   in Git, in `CLAUDE.md`, or in any committed file.
 
+## Deployment
+
+`team-preview` is the default code delivery branch for team review; Vercel
+Preview (triggered automatically by a push to `team-preview` through the
+existing GitHub integration) is the default team-review deployment target.
+
+- The Vercel MCP may be used to inspect deployment status, inspect whether
+  an environment variable is present (never its value), redeploy Preview,
+  retrieve the Preview URL, inspect build/runtime logs, and manage Preview
+  configuration where the connected tooling safely supports it.
+- Production always requires explicit user approval: never deploy to
+  Production, promote a Preview to Production, or change a production
+  domain/alias without being explicitly asked to.
+- Secret values (Supabase service role key, Vercel tokens, and similar)
+  must never be printed into chat, logs, or any committed file. If a
+  required Preview environment variable is missing and no securely
+  connected tool can set it, stop and tell the user exactly which
+  variable is missing and what manual action is required, rather than
+  inventing a value or working around the gap.
+- A page/route that reads live backend data must never be allowed to
+  statically prerender: without an explicit opt-out (for example
+  `export const dynamic = "force-dynamic"`), Next.js may cache a
+  build-time read forever, so a later data or config change silently
+  never appears without a fresh deployment.
+
 ## Frontend / UI
 
 All frontend implementation must comply with `docs/UI_SYSTEM.md`.
