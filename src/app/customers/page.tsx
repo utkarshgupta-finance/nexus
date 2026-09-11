@@ -34,7 +34,21 @@ export default async function CustomersRoute() {
   let customerMasterUnavailable = false
   try {
     customerMasterEntries = await listCustomerMaster()
-  } catch {
+    // TEMPORARY diagnostic log, to be removed once the live Preview page
+    // itself has been directly confirmed. Logs only business data already
+    // meant to be public on this page (customer names/keys), never a
+    // credential.
+    console.log(
+      "[customers] DIAG read ok. count=",
+      customerMasterEntries.length,
+      "entries=",
+      customerMasterEntries.map((entry) => `${entry.record.key}:${entry.record.name}`).join(" | ")
+    )
+  } catch (error) {
+    console.error(
+      "[customers] DIAG read failed:",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    )
     customerMasterUnavailable = true
   }
 
