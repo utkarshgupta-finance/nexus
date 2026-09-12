@@ -46,6 +46,7 @@ const REFERENCE_LISTS: ReferenceListKey[] = [
   "industry",
   "segment",
   "business_unit",
+  "tax_identifier_type",
   "phone_country_code",
   "currency",
 ]

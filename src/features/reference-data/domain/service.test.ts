@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { getActiveOptions, getAllOptions, getInrConversionRate, resolveOption } from "./service"
+import { getActiveOptions, getAllOptions, getInrConversionRate, getInvoiceFrequencyCadence, resolveOption } from "./service"
 
 describe("reference master option resolution", () => {
   it("returns only active values for new selections", () => {
@@ -106,6 +106,87 @@ describe("reference master option resolution", () => {
     it("is null for a currency code that is not a real option at all", () => {
       expect(getInrConversionRate("XYZ")).toBeNull()
     })
+  })
+})
+
+describe("Tax Identifier Type (Customer Onboarding Settings, Customer Setup, task correction §3-4, §28)", () => {
+  it("exposes exactly the values the Tax & Registration form already used, none invented", () => {
+    const values = getActiveOptions("tax_identifier_type").map((option) => option.value)
+    expect(values).toEqual(["vat_number", "tax_identification_number", "business_registration_number", "other"])
+  })
+
+  it("keeps the stable code distinct from the display label, same as every other Reference Master list", () => {
+    const resolved = resolveOption("tax_identifier_type", "vat_number")
+    expect(resolved?.value).toBe("vat_number")
+    expect(resolved?.label).toBe("VAT Number")
+  })
+
+  it("supports the same Add/Activate/Deactivate lifecycle as any other Customer Setup list", () => {
+    const added = [...getAllOptions("tax_identifier_type"), { value: "national_id", label: "National ID", active: true }]
+    expect(added.some((option) => option.value === "national_id")).toBe(true)
+
+    const deactivatedCopy = added.map((option) => (option.value === "national_id" ? { ...option, active: false } : option))
+    expect(deactivatedCopy.find((option) => option.value === "national_id")?.active).toBe(false)
+    expect(deactivatedCopy.filter((option) => option.active).some((option) => option.value === "national_id")).toBe(false)
+    // The shared fixture itself is untouched by these local copies.
+    expect(resolveOption("tax_identifier_type", "national_id")).toBeNull()
+  })
+})
+
+describe("getInvoiceFrequencyCadence (task correction §12-14: do not rely only on the display label to determine invoice cadence)", () => {
+  it("Monthly cadence is 1 month", () => {
+    expect(getInvoiceFrequencyCadence("monthly")).toBe(1)
+  })
+  it("Quarterly cadence is 3 months", () => {
+    expect(getInvoiceFrequencyCadence("quarterly")).toBe(3)
+  })
+  it("Half-Yearly cadence is 6 months", () => {
+    expect(getInvoiceFrequencyCadence("half_yearly")).toBe(6)
+  })
+  it("Annual cadence is 12 months", () => {
+    expect(getInvoiceFrequencyCadence("annual")).toBe(12)
+  })
+  it("One-Time is the reserved special cadence: null, never a number, and never re-derivable from the label alone", () => {
+    expect(getInvoiceFrequencyCadence("one_time")).toBeNull()
+  })
+  it("is null for an unrecognized or inactive code, never a guessed cadence", () => {
+    expect(getInvoiceFrequencyCadence("fortnightly")).toBeNull()
+  })
+})
+
+describe("System Rules lists (task correction §15-20): supported values only, no arbitrary Add expected at the domain level", () => {
+  it("Slab Methods are exactly Whole Quantity and Progressive", () => {
+    const values = getActiveOptions("slab_method").map((option) => option.value)
+    expect(values).toEqual(["whole_quantity", "progressive"])
+  })
+
+  it("Revenue Recognition Methods are exactly Full Recognition and Milestone Based", () => {
+    const values = getActiveOptions("revenue_recognition_method").map((option) => option.value)
+    expect(values).toEqual(["full_recognition", "milestone_based"])
+  })
+
+  it("Commercial Nature remains exactly Recurring, Non-Recurring, On-Demand (unchanged, re-confirmed as a System Rule)", () => {
+    const values = getActiveOptions("commercial_nature").map((option) => option.value)
+    expect(values).toEqual(["recurring", "non_recurring", "on_demand"])
+  })
+
+  it("Invoice Timing remains exactly Advance and Postpaid, never Arrears/On Completion/On Demand", () => {
+    const values = getActiveOptions("invoice_timing").map((option) => option.value)
+    expect(values).toEqual(["advance", "postpaid"])
+    expect(values).not.toContain("arrears")
+    expect(values).not.toContain("on_completion")
+    expect(values).not.toContain("on_demand")
+  })
+
+  it("Pricing Models remain exactly the four shared models (re-confirmed as a System Rule)", () => {
+    const values = getActiveOptions("pricing_model").map((option) => option.value)
+    expect(values).toEqual(["per_unit", "flat_fee", "slab", "designation_based"])
+  })
+
+  it("a System Rule value still supports Activate/Deactivate the same generic way as any other list", () => {
+    const deactivatedCopy = getAllOptions("slab_method").map((option) => (option.value === "progressive" ? { ...option, active: false } : option))
+    expect(deactivatedCopy.some((option) => option.value === "progressive" && option.active)).toBe(false)
+    expect(resolveOption("slab_method", "progressive")?.active).toBe(true)
   })
 })
 

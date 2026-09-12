@@ -169,6 +169,13 @@ feature holds its option lists in a TypeScript fixture behind the exact
 contract above (`getActiveOptions` / `resolveOption`), so the eventual
 generic table replaces the fixture without any calling code changing.
 
+`docs/SETTINGS_ARCHITECTURE.md` is the authoritative, feature-level
+elaboration of this section for Customer Onboarding: the Settings
+workspace's own structure, and the further distinction between plain
+reference data, a reference value that also carries a governed numeric
+parameter (an FX rate, a cadence), and a value that is fixed application
+logic rather than configurable data at all.
+
 ## 7. Versioning and effective dating
 
 Two needs both get called "versioning" and are kept distinct:

@@ -47,17 +47,13 @@ const DEFAULT_COUNTRY_CODE = "IN"
  * identifiers: different countries call their tax/registration number
  * different things, and this stage does not attempt to model every
  * country's scheme. "Other" plus a free-text name lets a submitter record
- * whatever their local identifier is actually called. This is a
- * temporary, local option contract, not Reference Master: it can move
- * there later without changing the shape of the data it produces.
+ * whatever their local identifier is actually called. Reference Master
+ * governed (Customer Onboarding Settings, "Customer Setup" ->
+ * `tax_identifier_type`, see `docs/SETTINGS_ARCHITECTURE.md`); only the
+ * "other" escape-hatch value's own identity stays a constant here, since
+ * `visibleIf`/`requiredIf` need to compare against it by value.
  */
 const TAX_IDENTIFIER_TYPE_OTHER = "other"
-const TAX_IDENTIFIER_TYPE_OPTIONS = [
-  { value: "vat_number", text: "VAT Number" },
-  { value: "tax_identification_number", text: "Tax Identification Number" },
-  { value: "business_registration_number", text: "Business Registration Number" },
-  { value: TAX_IDENTIFIER_TYPE_OTHER, text: "Other" },
-] as const
 
 /**
  * Same deliberately-incomplete-taxonomy approach for the label on the
@@ -97,9 +93,10 @@ function toChoices(options: ReferenceOption[]) {
  * Agreement & Approval is an attachment plus a read-only approval status.
  * None of the three invents survey questions for fields that are not yet
  * real. Reference Master option choices
- * (Country, Industry, Segment, Business Unit, Phone Country Code,
- * Currency) are a parameter, never hardcoded here, so Reference Master
- * stays the single source of truth for what a user may select. State
+ * (Country, Industry, Segment, Business Unit, Tax Identifier Type,
+ * Phone Country Code, Currency) are a parameter, never hardcoded here, so
+ * Reference Master stays the single source of truth for what a user may
+ * select. State
  * and City are intentionally NOT passed in here: they come from a
  * canonical geography catalogue, not Reference Master (task spec §17),
  * and are populated after mount from /api/geography/* (see
@@ -384,7 +381,7 @@ function buildCustomerOnboardingFormDefinition(
                   name: CUSTOMER_ONBOARDING_FIELD_KEYS.taxIdentifierType,
                   title: "Tax Identifier Type",
                   requiredIf: `{${CUSTOMER_ONBOARDING_FIELD_KEYS.country}} <> '${DEFAULT_COUNTRY_CODE}'`,
-                  choices: TAX_IDENTIFIER_TYPE_OPTIONS,
+                  choices: toChoices(optionsByList.tax_identifier_type),
                   placeholder: "Select...",
                   startWithNewLine: true,
                   width: "50%",

@@ -8,4 +8,5 @@
  */
 
 export type { ReferenceListKey, ReferenceOption } from "./domain/types"
-export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate } from "./domain/service"
+export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate, getInvoiceFrequencyCadence } from "./domain/service"
+export { isValidIsoCurrencyCode } from "./domain/currency-codes"

@@ -873,24 +873,38 @@ the agreed structure; it never creates a revenue journal entry or an
 actual recognition schedule, matching the "no live billing engine"
 principle below.
 
-### Settings governance: three different tiers, not one
+### Settings governance: three configuration levels, not one
 
-`src/features/reference-data` now governs five Commercial Rate lists,
-under three distinct rules (see that feature's own `types.ts` header and
-`ui/reference-master-settings.tsx`):
+`docs/SETTINGS_ARCHITECTURE.md` is now the authoritative document for
+this distinction across all of Customer Onboarding Settings, Customer
+Setup and Commercial Setup alike; this subsection only restates the
+Commercial-specific part of it. `src/features/reference-data` governs
+Commercial Rate's own lists under three configuration levels:
 
-- **Freely configurable** (`pricing_unit`, `invoice_frequency`,
-  `invoice_timing`): pure administrative data. A new value needs no code
-  change to work. Pricing Unit is universal: one shared list used by
-  every Pricing Model and every Commercial Nature that needs a unit,
-  never a separate Recurring/Non-Recurring/On-Demand unit list.
-- **Controlled business option** (`commercial_nature`): each value drives
-  real UI and validation branching in `commercial-rate.ts`. Settings
-  still allows adding a new value, but it has no effect on its own until
-  matching code exists to interpret it.
-- **System-supported logic** (`pricing_model`): a new value needs new
-  Pricing Kernel calculation logic to mean anything. Settings only
-  allows Activate/Deactivate for this list, never adding a new one.
+- **Level 1, Configurable Reference Data** (`pricing_unit`): pure
+  administrative data, View/Search/Add/Activate/Deactivate. Pricing Unit
+  is universal: one shared list used by every Pricing Model and every
+  Commercial Nature that needs a unit, never a separate Recurring/
+  Non-Recurring/On-Demand unit list.
+- **Level 2, Governed Business Parameters** (`currency`'s
+  `inrConversionRate`, `invoice_frequency`'s `cadenceMonths`): the value
+  list may still grow, but each value also carries a governed number with
+  real calculation meaning (1 unit of currency = X INR; a cadence in
+  months), edited within defined semantics, never free text, and
+  Commercial Rate only ever reads it.
+- **Level 3, System-Supported Logic** (`commercial_nature`,
+  `pricing_model`, `invoice_timing`, `slab_method`,
+  `revenue_recognition_method`): a new value needs new application/
+  calculation code before it means anything, so Settings never allows
+  adding one. Only `pricing_model` (via its own `OptionSelect`) and
+  `invoice_timing` today actually gate real Commercial Rate editor UI
+  from their active state; `commercial_nature` (the three fixed table
+  sections), `slab_method`, and `revenue_recognition_method` (both fixed
+  `ToggleGroup`s) are governed here for documentation and future-proofing,
+  not yet wired to hide themselves when deactivated. Settings still
+  allows Activate/Deactivate for all five, an honest gap rather than a
+  silently broken promise (`docs/SETTINGS_ARCHITECTURE.md` states this
+  plainly).
 
 Payment Terms is no longer a Reference Master list here: it was removed
 from Commercial Rate's scope entirely (see the vocabulary table above).

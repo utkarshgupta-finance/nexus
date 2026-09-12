@@ -44,6 +44,10 @@ const FAKE_OPTIONS: Record<ReferenceListKey, ReferenceOption[]> = {
   industry: [{ value: "widgets", label: "Widgets", active: true }],
   segment: [{ value: "alpha_segment", label: "Alpha Segment", active: true }],
   business_unit: [{ value: "alpha_bu", label: "Alpha Business Unit", active: true }],
+  tax_identifier_type: [
+    { value: "vat_number", label: "VAT Number", active: true },
+    { value: "other", label: "Other", active: true },
+  ],
   phone_country_code: [{ value: "IN", label: "India (+91)", dialCode: "+91", active: true }],
   currency: [
     { value: "INR", label: "INR - Indian Rupee", active: true },
@@ -57,6 +61,8 @@ const FAKE_OPTIONS: Record<ReferenceListKey, ReferenceOption[]> = {
   invoice_timing: [],
   commercial_nature: [],
   pricing_model: [],
+  slab_method: [],
+  revenue_recognition_method: [],
 }
 
 describe("customer onboarding form definition structure", () => {
@@ -93,6 +99,14 @@ describe("customer onboarding form definition structure", () => {
     ])
     expect(findQuestion(form.json, CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit)?.choices).toEqual([
       { value: "alpha_bu", text: "Alpha Business Unit" },
+    ])
+  })
+
+  it("uses whatever Tax Identifier Type options it is given, not a hardcoded list (Settings task correction §3-4)", () => {
+    const form = buildCustomerOnboardingFormDefinition(FAKE_OPTIONS)
+    expect(findQuestion(form.json, CUSTOMER_ONBOARDING_FIELD_KEYS.taxIdentifierType)?.choices).toEqual([
+      { value: "vat_number", text: "VAT Number" },
+      { value: "other", text: "Other" },
     ])
   })
 

@@ -55,4 +55,15 @@ function getInrConversionRate(currencyCode: string): number | null {
   return option?.inrConversionRate ?? null
 }
 
-export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate }
+/**
+ * The governed cadence, in months, for an active Invoice Frequency (Settings
+ * task correction §12: "do not rely only on the display label to determine
+ * invoice cadence"). `null` for the reserved "One-Time" row, and for any
+ * inactive or unrecognized code, never a guessed number.
+ */
+function getInvoiceFrequencyCadence(code: string): number | null {
+  const option = REFERENCE_MASTER_FIXTURES.invoice_frequency.find((entry) => entry.value === code && entry.active)
+  return option?.cadenceMonths ?? null
+}
+
+export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate, getInvoiceFrequencyCadence }

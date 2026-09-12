@@ -46,6 +46,18 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
     { value: "kam", label: "KAM", active: true },
     { value: "bat", label: "BAT", active: true },
   ],
+  // Moved from a hardcoded Tax & Registration form option list into
+  // Reference Master (Customer Onboarding Settings, "Customer Setup"):
+  // the exact same values the form already used, none invented. "other"
+  // stays the reserved escape hatch for a local tax scheme this taxonomy
+  // does not name (see `TAX_IDENTIFIER_TYPE_OTHER` in
+  // ../../customer-onboarding/forms/customer-onboarding-form-definition.ts).
+  tax_identifier_type: [
+    { value: "vat_number", label: "VAT Number", active: true },
+    { value: "tax_identification_number", label: "Tax Identification Number", active: true },
+    { value: "business_registration_number", label: "Business Registration Number", active: true },
+    { value: "other", label: "Other", active: true },
+  ],
   phone_country_code: toPhoneCountryCodeOptions(),
   // Stable identity is the currency code (task spec: "stable stored
   // identity = currency code"); the label pairs code with the full name
@@ -86,12 +98,18 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
   // a Recurring component's revenue is always monthly regardless of this
   // value (docs §22). No "On-Demand" value here: On-Demand components leave
   // this optional and pick from the same real cadences where applicable.
+  // `cadenceMonths` is the governed machine-readable cadence (Settings
+  // task correction: "do not rely only on the display label to determine
+  // invoice cadence"); "one_time" is the one reserved row with
+  // `cadenceMonths: null`, a special non-recurring cadence a Settings-added
+  // frequency can never carry, since adding one always requires a positive
+  // cadence (see reference-master-settings.tsx's Invoice Frequency Add flow).
   invoice_frequency: [
-    { value: "monthly", label: "Monthly", active: true },
-    { value: "quarterly", label: "Quarterly", active: true },
-    { value: "half_yearly", label: "Half-Yearly", active: true },
-    { value: "annual", label: "Annual", active: true },
-    { value: "one_time", label: "One-Time", active: true },
+    { value: "monthly", label: "Monthly", active: true, cadenceMonths: 1 },
+    { value: "quarterly", label: "Quarterly", active: true, cadenceMonths: 3 },
+    { value: "half_yearly", label: "Half-Yearly", active: true, cadenceMonths: 6 },
+    { value: "annual", label: "Annual", active: true, cadenceMonths: 12 },
+    { value: "one_time", label: "One-Time", active: true, cadenceMonths: null },
   ],
   // Whether an invoice is raised in advance of the period or after
   // (postpaid). "Postpaid" is the corrected business wording; "Arrears",
@@ -116,6 +134,26 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
     { value: "flat_fee", label: "Flat Fee", active: true },
     { value: "slab", label: "Slab", active: true },
     { value: "designation_based", label: "Designation Based", active: true },
+  ],
+  // System-supported logic (docs/SETTINGS_ARCHITECTURE.md, System Rules):
+  // mirrors the fixed `SlabMethod` union in
+  // ../../customer-onboarding/domain/commercial-rate.ts, purely so
+  // Settings has one governed place to document and Activate/Deactivate
+  // these as supported rules. Deactivating a row here does not yet hide
+  // it from the Commercial Rate editor's own Slab Method toggle, which
+  // still renders both values directly: the same honest, already-existing
+  // limitation as `commercial_nature` (see that field's own note above).
+  slab_method: [
+    { value: "whole_quantity", label: "Whole Quantity", active: true },
+    { value: "progressive", label: "Progressive", active: true },
+  ],
+  // System-supported logic, same pattern as `slab_method` above: mirrors
+  // the fixed `RevenueRecognitionMethod` union for Non-Recurring
+  // components, governed here for visibility, not yet wired to gate the
+  // Revenue Recognition Method toggle in the Commercial Rate editor.
+  revenue_recognition_method: [
+    { value: "full_recognition", label: "Full Recognition", active: true },
+    { value: "milestone_based", label: "Milestone Based", active: true },
   ],
 }
 
