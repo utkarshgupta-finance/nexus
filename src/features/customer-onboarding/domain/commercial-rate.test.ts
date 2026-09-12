@@ -17,9 +17,12 @@ import {
   isCommercialRateDraftComplete,
   isCommercialRateDraftStarted,
   isComponentComplete,
+  isComponentValid,
   isInvoiceTermsComplete,
   isMugComplete,
   isRevenueRecognitionComplete,
+  milestoneAllocationStatus,
+  milestoneAllocationTotal,
   nonRecurringMilestoneBasisAmount,
   recalculateSlabFroms,
   syncDesignationMinimums,
@@ -843,7 +846,7 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
     expect(messagesOf(component)).toContain("MUG Minimum Units required")
   })
 
-  it("surfaces the milestone total-percentage requirement", () => {
+  it("surfaces the milestone total-percentage requirement, with the current total in the message (task correction §1)", () => {
     const component = {
       ...withDescription(createComponent("non_recurring", "flat_fee"), "Implementation"),
       amount: 500000,
@@ -853,7 +856,7 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
         milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 60, invoiceTiming: "advance" }],
       },
     }
-    expect(messagesOf(component)).toContain("Milestone percentages must total 100%")
+    expect(messagesOf(component)).toContain("Milestone allocation must total 100% (currently 60%)")
   })
 
   it("surfaces multiple missing requirements at once, not only the first one found", () => {
@@ -920,5 +923,160 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
     const filledRows = rows.map((row) => (row.rate === null ? { ...row, rate: 90 } : row))
     expect(validateCommercialComponent({ ...wholeQuantity, slabRows: filledRows }).isComplete).toBe(true)
     expect(validateCommercialComponent({ ...progressive, slabRows: filledRows }).isComplete).toBe(true)
+  })
+})
+
+describe("milestoneAllocationTotal / milestoneAllocationStatus (task correction: the sum has three states)", () => {
+  function milestonesOf(...percents: (number | null)[]): ReturnType<typeof createMilestone>[] {
+    return percents.map((recognitionPercent) => ({ ...createMilestone(), recognitionPercent }))
+  }
+
+  it("sums every milestone's Recognition %, treating an unset percentage as 0", () => {
+    expect(milestoneAllocationTotal(milestonesOf(50, 25, null))).toBe(75)
+  })
+
+  it("is 'under' below 100, within floating-point tolerance", () => {
+    expect(milestoneAllocationStatus(75)).toBe("under")
+    expect(milestoneAllocationStatus(99.999)).toBe("exact")
+  })
+
+  it("is 'exact' at precisely 100", () => {
+    expect(milestoneAllocationStatus(100)).toBe("exact")
+  })
+
+  it("is 'over' above 100, within floating-point tolerance", () => {
+    expect(milestoneAllocationStatus(110)).toBe("over")
+    expect(milestoneAllocationStatus(100.001)).toBe("exact")
+    expect(milestoneAllocationStatus(100.01)).toBe("over")
+  })
+})
+
+describe("validateCommercialComponent: milestone allocation incomplete vs invalid (task correction §1-4, §15-16)", () => {
+  function milestoneComponent(milestones: { name: string; recognitionPercent: number | null; invoiceTiming: string | null }[]) {
+    return {
+      ...withDescription(createComponent("non_recurring", "flat_fee"), "Implementation"),
+      amount: 1000000,
+      invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: "advance" },
+      revenueRecognition: {
+        method: "milestone_based" as const,
+        milestones: milestones.map((milestone) => ({ ...createMilestone(), ...milestone })),
+      },
+    }
+  }
+
+  it("75% total: can still be saved (isValid), but is not Complete, with the exact reason and current total", () => {
+    const component = milestoneComponent([
+      { name: "Kickoff", recognitionPercent: 50, invoiceTiming: "advance" },
+      { name: "Go-Live", recognitionPercent: 25, invoiceTiming: "advance" },
+    ])
+    const result = validateCommercialComponent(component)
+    expect(result.isValid).toBe(true)
+    expect(result.isComplete).toBe(false)
+    expect(result.issues).toContainEqual({ field: "milestoneTotal", message: "Milestone allocation must total 100% (currently 75%)", severity: "incomplete" })
+    expect(isComponentValid(component)).toBe(true)
+  })
+
+  it("exactly 100% total: Complete, no milestoneTotal issue at all", () => {
+    const component = milestoneComponent([
+      { name: "Kickoff", recognitionPercent: 50, invoiceTiming: "advance" },
+      { name: "Go-Live", recognitionPercent: 25, invoiceTiming: "advance" },
+      { name: "Acceptance", recognitionPercent: 25, invoiceTiming: "postpaid" },
+    ])
+    const result = validateCommercialComponent(component)
+    expect(result.isComplete).toBe(true)
+    expect(result.isValid).toBe(true)
+    expect(result.issues.some((issue) => issue.field === "milestoneTotal")).toBe(false)
+  })
+
+  it("110% total: cannot be saved (isValid false), with the exact over-100 message and current total", () => {
+    const component = milestoneComponent([
+      { name: "Kickoff", recognitionPercent: 50, invoiceTiming: "advance" },
+      { name: "Go-Live", recognitionPercent: 30, invoiceTiming: "advance" },
+      { name: "Acceptance", recognitionPercent: 30, invoiceTiming: "postpaid" },
+    ])
+    const result = validateCommercialComponent(component)
+    expect(result.isValid).toBe(false)
+    expect(result.isComplete).toBe(false)
+    expect(result.issues).toContainEqual({ field: "milestoneTotal", message: "Milestone allocation cannot exceed 100% (currently 110%)", severity: "invalid" })
+    expect(isComponentValid(component)).toBe(false)
+  })
+
+  it("101% total (just barely over): still invalid, never treated as 'close enough'", () => {
+    const component = milestoneComponent([
+      { name: "Kickoff", recognitionPercent: 51, invoiceTiming: "advance" },
+      { name: "Go-Live", recognitionPercent: 50, invoiceTiming: "advance" },
+    ])
+    expect(isComponentValid(component)).toBe(false)
+    expect(validateCommercialComponent(component).issues).toContainEqual({
+      field: "milestoneTotal",
+      message: "Milestone allocation cannot exceed 100% (currently 101%)",
+      severity: "invalid",
+    })
+  })
+
+  it("an individual milestone percentage above 100 is rejected as invalid, distinct from the total check", () => {
+    const component = milestoneComponent([{ name: "Kickoff", recognitionPercent: 150, invoiceTiming: "advance" }])
+    const result = validateCommercialComponent(component)
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual({
+      field: "milestone-0",
+      message: "Kickoff percentage cannot exceed 100% (currently 150%)",
+      severity: "invalid",
+    })
+  })
+
+  it("a negative individual milestone percentage is rejected as invalid, never silently clamped to 0", () => {
+    const component = milestoneComponent([
+      { name: "Kickoff", recognitionPercent: -10, invoiceTiming: "advance" },
+      { name: "Go-Live", recognitionPercent: 100, invoiceTiming: "advance" },
+    ])
+    const result = validateCommercialComponent(component)
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual({
+      field: "milestone-0",
+      message: "Kickoff percentage cannot be negative (currently -10%)",
+      severity: "invalid",
+    })
+    // Never silently clamped: the raw -10 is preserved and reported, not coerced to 0 or dropped.
+    expect(milestoneAllocationTotal(component.revenueRecognition.milestones)).toBe(90)
+  })
+
+  it("an ordinary missing field (e.g. Component Name) is incomplete but does not make the component invalid", () => {
+    const component = { ...milestoneComponent([{ name: "Kickoff", recognitionPercent: 100, invoiceTiming: "advance" }]), description: "" }
+    const result = validateCommercialComponent(component)
+    expect(result.isComplete).toBe(false)
+    expect(result.isValid).toBe(true)
+    expect(isComponentValid(component)).toBe(true)
+  })
+})
+
+describe("validateCommercialComponent: overlapping slab is invalid, not merely incomplete (task correction §16)", () => {
+  it("an overlapping slab row is reported with severity 'invalid', so isComponentValid rejects it", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "USER",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100 },
+        { id: "2", from: 100, to: 200, rate: 90 },
+      ],
+    }
+    const result = validateCommercialComponent(component)
+    expect(result.isValid).toBe(false)
+    expect(result.issues.some((issue) => issue.field === "slab-1" && issue.severity === "invalid")).toBe(true)
+    expect(isComponentValid(component)).toBe(false)
+  })
+
+  it("a slab row missing only its Rate is incomplete, not invalid: still saveable as a Draft", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "USER",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: [{ id: "1", from: 1, to: null, rate: null }],
+    }
+    const result = validateCommercialComponent(component)
+    expect(result.isComplete).toBe(false)
+    expect(result.isValid).toBe(true)
+    expect(isComponentValid(component)).toBe(true)
   })
 })

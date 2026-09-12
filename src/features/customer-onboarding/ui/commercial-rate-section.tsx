@@ -25,6 +25,8 @@ import {
   createSlabRow,
   defaultPricingModelFor,
   designationMinimumUnitsFor,
+  milestoneAllocationStatus,
+  milestoneAllocationTotal,
   nonRecurringMilestoneBasisAmount,
   recalculateSlabFroms,
   syncDesignationMinimums,
@@ -490,8 +492,10 @@ function MilestoneRowsEditor({
   currencyCode: string | null
   onChangeMilestones: (milestones: Milestone[]) => void
 }) {
-  const total = milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
-  const totalIsValid = Math.abs(total - 100) < 0.001
+  const total = milestoneAllocationTotal(milestones)
+  const status = milestoneAllocationStatus(total)
+  const statusLabel = status === "over" ? "Exceeds 100%" : status === "exact" ? "Complete" : "Incomplete"
+  const statusClassName = status === "over" ? "text-destructive" : status === "exact" ? "text-success" : "text-muted-foreground"
 
   return (
     <div className="flex flex-col gap-2">
@@ -559,13 +563,18 @@ function MilestoneRowsEditor({
           )
         })}
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Button variant="outline" size="sm" className="w-fit" onClick={() => onChangeMilestones([...milestones, createMilestone()])}>
           <PlusIcon data-icon="inline-start" className="size-3.5" />
           Add Milestone
         </Button>
-        <span className={`text-[0.7rem] ${totalIsValid ? "text-muted-foreground" : "text-destructive"}`}>Total: {total}% (must equal 100%)</span>
+        <span className={`text-[0.7rem] ${statusClassName}`}>
+          Total Allocation: {total}% of 100% <span className="font-medium">{statusLabel}</span>
+        </span>
       </div>
+      {status === "over" ? (
+        <span className="text-[0.7rem] text-destructive">Milestone allocation cannot exceed 100% (currently {total}%).</span>
+      ) : null}
     </div>
   )
 }
@@ -645,6 +654,25 @@ function changePricingModel(component: CommercialComponentDraft, pricingModel: P
   }
 }
 
+/**
+ * Shown near the Save/Add action when the current draft is structurally
+ * invalid (task correction: "Draft must not contain structurally invalid
+ * components"), never for an ordinary incomplete draft, which Save still
+ * allows. Reuses `validateCommercialComponent`'s own messages rather than
+ * inventing separate UI wording, so this can never drift out of sync with
+ * the actual Save gate below.
+ */
+function InvalidIssuesNotice({ issues }: { issues: ComponentValidationIssue[] }) {
+  if (issues.length === 0) return null
+  return (
+    <div className="flex flex-col gap-0.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-[0.7rem] text-destructive">
+      {issues.map((issue, index) => (
+        <span key={index}>{issue.message}</span>
+      ))}
+    </div>
+  )
+}
+
 function ComponentEditor({
   component,
   currencyCode,
@@ -660,6 +688,8 @@ function ComponentEditor({
   onCancel?: () => void
   commitLabel: string
 }) {
+  const validation = validateCommercialComponent(component)
+  const invalidIssues = validation.issues.filter((issue) => issue.severity === "invalid")
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-1.5">
@@ -779,8 +809,10 @@ function ComponentEditor({
         <Input value={component.notes} onChange={(event) => onChange({ ...component, notes: event.target.value })} placeholder="Optional context for Finance" />
       </div>
 
+      <InvalidIssuesNotice issues={invalidIssues} />
+
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={onCommit}>
+        <Button size="sm" onClick={onCommit} disabled={invalidIssues.length > 0}>
           {commitLabel}
         </Button>
         {onCancel ? (
@@ -812,12 +844,13 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
 }
 
 /**
- * Rate, MUG, and Revenue Recognition are always one-or-more lines now
- * (task correction §7-9, §13-15: actual Slab/Designation rates, the full
- * milestone schedule, dual-currency amounts, all fully visible rather
- * than truncated), never a single collapsed string; every other column
- * stays a single value. Revenue Recognition's blank lines (the spacer
- * between milestones) render as an empty line for visual separation.
+ * Rate, MUG, Invoice Cycle, and Revenue Recognition are always one-or-more
+ * lines now (task correction §7-10, §13-15: actual Slab/Designation rates,
+ * the full milestone schedule, per-milestone invoice timing, dual-currency
+ * amounts, all fully visible rather than truncated), never a single
+ * collapsed string or a "+N more" line; every other column stays a single
+ * value. Revenue Recognition's blank lines (the spacer between milestones)
+ * render as an empty line for visual separation.
  */
 function ColumnValue({ column, cells }: { column: ColumnKey; cells: ComponentTableCells }) {
   if (column === "mug") {
@@ -834,10 +867,11 @@ function ColumnValue({ column, cells }: { column: ColumnKey; cells: ComponentTab
       </div>
     )
   }
-  if (column === "rate") {
+  if (column === "rate" || column === "invoiceCycle") {
+    const lines = column === "rate" ? cells.rateLines : cells.invoiceCycleLines
     return (
       <div className="flex flex-col gap-0.5">
-        {cells.rateLines.map((line, index) => (
+        {lines.map((line, index) => (
           <span key={index}>{line}</span>
         ))}
       </div>
@@ -974,7 +1008,10 @@ function ComponentsTable({
                     </div>
                   </TableCell>
                   {columns.map((column) => (
-                    <TableCell key={column} className={column === "mug" || column === "revenueRecognition" ? "whitespace-normal" : undefined}>
+                    <TableCell
+                      key={column}
+                      className={column === "mug" || column === "revenueRecognition" || column === "invoiceCycle" ? "whitespace-normal" : undefined}
+                    >
                       <ColumnValue column={column} cells={cells} />
                     </TableCell>
                   ))}

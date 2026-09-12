@@ -1020,21 +1020,105 @@ one NRR component can genuinely mix "50% Advance, 25% Postpaid, 25%
 Postpaid" across its own milestones, which a single component-wide Timing
 value cannot express. Once Milestone Based is chosen, the component-level
 Invoice Timing field no longer applies at all (`isComponentComplete`
-stops requiring it in that state, and the Commercial Components table's
-own Invoice Cycle column shows Invoice Frequency alone, "One-Time", for
-such a component); for Full Recognition, the component-level Invoice
-Timing continues to apply exactly as before. Each milestone's Recognition
-Amount is never a second, independently-typed number: it is calculated
-live as `Total Commercial Amount x Recognition % / 100`
-(`calculateMilestoneAmount`), so percentage and amount can never silently
-drift apart. "Total Commercial Amount" only has one unambiguous meaning
-today, a Flat Fee's own `amount` (`nonRecurringMilestoneBasisAmount`); Per
-Unit, Slab, and Designation Based have no single total captured anywhere
-for a one-time Non-Recurring charge, so the Recognition Amount honestly
-shows as not calculable for those, rather than inventing one, and only
-Recognition % remains the real allocation input. Milestone percentages
-must still total exactly 100 before the component is Complete, unchanged
-from the original Milestone Based design.
+stops requiring it in that state); for Full Recognition, the
+component-level Invoice Timing continues to apply exactly as before. Each
+milestone's Recognition Amount is never a second, independently-typed
+number: it is calculated live as `Total Commercial Amount x Recognition %
+/ 100` (`calculateMilestoneAmount`), so percentage and amount can never
+silently drift apart. "Total Commercial Amount" only has one unambiguous
+meaning today, a Flat Fee's own `amount`
+(`nonRecurringMilestoneBasisAmount`); Per Unit, Slab, and Designation
+Based have no single total captured anywhere for a one-time Non-Recurring
+charge, so the Recognition Amount honestly shows as not calculable for
+those, rather than inventing one, and only Recognition % remains the real
+allocation input.
+
+### Revenue Recognition and Invoice Cycle are separate table columns, never mixed (corrected)
+
+An earlier version of the Milestone Based detail block put each
+milestone's own Invoice Timing (Advance/Postpaid) inside the Revenue
+Recognition column, alongside Name/%/Amount. This conflated two different
+questions: Revenue Recognition answers "how much of the commercial amount
+does this milestone recognize," Invoice Cycle answers "when is each
+milestone actually invoiced." The Commercial Components table already has
+both as distinct columns for every other Nature/Pricing Model combination;
+Milestone Based Non-Recurring now uses them the same way.
+`recognitionColumnLines` (`commercial-rate-summary.ts`) shows only
+Name/Recognition %/Recognition Amount per milestone; a new
+`invoiceCycleColumnLines` shows one line per milestone in the Invoice
+Cycle column instead ("Contract Signing: Advance", "Go Live: Postpaid",
+"Acceptance: Postpaid"), every milestone shown, never collapsed behind a
+"+N more" line, matching the same full-visibility principle as the Rate
+column.
+
+Non-Recurring's Invoice Cycle column also no longer shows its own Invoice
+Frequency at all: `invoiceTerms.invoiceFrequency` is always the fixed
+`"one_time"` value for a Non-Recurring component (`createComponent`
+still sets it, since a real machine-readable value is still needed
+internally), and showing it in every row was redundant with the "Non-
+Recurring" Nature the section itself already communicates. Full
+Recognition's Invoice Cycle column therefore shows Invoice Timing alone
+("Advance"/"Postpaid"), never "One-Time Advance"; Milestone Based shows
+each milestone's own timing, never a bare "One-Time" fallback either.
+Recurring and On-Demand are unaffected: their Invoice Frequency is a real,
+variable choice (Monthly, Quarterly, ...), so it continues to show
+alongside Timing exactly as before.
+
+### Milestone allocation: incomplete under 100%, invalid over 100%, exact at 100% (corrected)
+
+The original Milestone Based design required percentages to total exactly
+100 before the component could be Complete, but never distinguished a
+Draft-safe "not yet 100" from a structurally broken "already past 100."
+Both used to reach `validateCommercialComponent` as the same kind of
+issue. This is now a three-state rule
+(`milestoneAllocationStatus` in `commercial-rate.ts`), matching Nexus's
+own Draft-permissive-but-never-structurally-broken principle (see
+"Structured Commercial Component validation" below, and the general
+platform rule that a Draft may be incomplete but never invalid):
+
+- **Under 100** (`under`): an ordinary incomplete-Draft reason ("Milestone
+  allocation must total 100% (currently 75%)"). The component may still
+  be saved; it simply is not yet Complete.
+- **Exactly 100** (`exact`, within floating-point tolerance): valid, no
+  issue at all.
+- **Over 100** (`over`): a structurally invalid allocation ("Milestone
+  allocation cannot exceed 100% (currently 110%)"). This is never merely
+  "incomplete": the component cannot be saved at all until corrected, the
+  same way an overlapping Slab row cannot be saved (see below).
+
+An individual milestone's own Recognition % is validated the same way,
+independent of the total: negative or over 100 is rejected as invalid
+("Kickoff percentage cannot exceed 100% (currently 150%)"), never
+silently clamped to a valid range. The live editor shows a running "Total
+Allocation: X% of 100%" indicator with the matching state label
+(Incomplete/Complete/Exceeds 100%), reading from the exact same
+`milestoneAllocationTotal`/`milestoneAllocationStatus` functions the
+domain validator uses, so the editor's live indicator and the actual Save
+gate can never drift into two different totals.
+
+### Incomplete versus Invalid: a Draft may be incomplete, never structurally invalid (new, durable distinction)
+
+`ComponentValidationIssue` now carries a `severity` of `"incomplete"` or
+`"invalid"`, and `ComponentValidationResult` carries both `isComplete`
+(zero issues of any kind, unchanged meaning) and a new `isValid` (true
+unless at least one issue is `invalid`). This is a durable distinction
+that applies beyond milestones, not a milestone-specific rule:
+
+- **Incomplete**: a required value is simply not entered yet (a missing
+  Rate, an unset Invoice Frequency, a milestone allocation still under
+  100%). A Draft may be saved in this state; the Commercial Components
+  table shows the specific reason so Finance never has to open Edit to
+  find out what is missing.
+- **Invalid**: the data present is structurally impossible (a milestone
+  allocation over 100%, an individual milestone percentage outside
+  0-100, an overlapping or open-ended-followed Slab row). This must never
+  be saved, Draft or otherwise; the editor's Save/Add action is disabled
+  and shows the exact reason until corrected.
+
+`isComponentValid` (a thin wrapper over `.isValid`, mirroring
+`isComponentComplete`'s existing wrapper over `.isComplete`) is what the
+editor's Save/Add button actually gates on, never `isComponentComplete`:
+an incomplete-but-valid component must remain saveable.
 
 ### Commercial table Rate columns show the actual contracted rate, never a method name or a row count alone
 
@@ -1083,16 +1167,20 @@ Milestone Based has a schedule worth expanding.
 A component being "Incomplete" used to be a bare boolean with no way to
 tell the user what was actually missing. `validateCommercialComponent` in
 `commercial-rate.ts` replaces the guesswork: it returns every unmet
-requirement as a `{ field, message }` issue ("Rate required", "Invoice
-Frequency required", "Slab 2 Rate required", "Milestone percentages must
-total 100%"), not only a pass/fail flag. `isComponentComplete` (and so
-`isCommercialRateDraftComplete`, stage completeness) is now a thin wrapper
-that reads `.isComplete` off this same function, and the Commercial
-Components table reads `.issues` off it to show exactly why a row is
-incomplete right there, without the user needing to open Edit first. One
-function is the single source of truth for what "complete" means; the
-table's wording and the stage's own gate can never quietly drift apart
-into two different definitions of "complete."
+requirement as a `{ field, message, severity }` issue ("Rate required",
+"Invoice Frequency required", "Slab 2 Rate required", "Milestone
+allocation must total 100% (currently 75%)"), not only a pass/fail flag.
+`severity` is either `"incomplete"` (see "Incomplete versus Invalid"
+above) or `"invalid"`. `isComponentComplete` (and so
+`isCommercialRateDraftComplete`, stage completeness) is a thin wrapper
+that reads `.isComplete` off this same function; `isComponentValid` is a
+second thin wrapper that reads `.isValid` off it, and is what the editor's
+Save/Add action actually gates on. The Commercial Components table reads
+`.issues` off it to show exactly why a row is incomplete right there,
+without the user needing to open Edit first. One function is the single
+source of truth for what "complete" and "valid" mean; the table's
+wording, the editor's Save gate, and the stage's own completeness gate
+can never quietly drift apart into different definitions of either.
 
 ### Slab Rate is mandatory for every row, and a row can never follow an open-ended one
 

@@ -303,26 +303,42 @@ describe("componentTableCells (Commercial Components table, task corrections §4
     expect(componentTableCells(REFERENCE_MASTER_FIXTURES, flatFee, "INR").mugQuantityLines).toEqual(["-"])
   })
 
-  it("Invoice Cycle combines frequency and timing into one readable value", () => {
+  it("Invoice Cycle combines frequency and timing into one readable value for Recurring/On-Demand", () => {
     const component = {
       ...createComponent("recurring", "flat_fee"),
       amount: 200000,
       invoiceTerms: { invoiceFrequency: "quarterly", invoiceTiming: "postpaid" },
     }
-    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycle).toBe("Quarterly Postpaid")
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycleLines).toEqual(["Quarterly Postpaid"])
   })
 
-  it("Invoice Cycle shows Frequency alone for a Milestone Based Non-Recurring component, since Timing lives per milestone instead (task correction §6)", () => {
+  it("Invoice Cycle for Non-Recurring Full Recognition shows Timing alone, never the fixed One-Time Frequency (task correction: NRR display polish)", () => {
+    const component = {
+      ...createComponent("non_recurring", "flat_fee"),
+      amount: 500000,
+      invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: "advance" },
+    }
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycleLines).toEqual(["Advance"])
+  })
+
+  it("Invoice Cycle for Milestone Based Non-Recurring shows one line per milestone (name: timing), every milestone, never '+N more' or 'One-Time' (task correction §6, §10)", () => {
     const component = {
       ...createComponent("non_recurring", "flat_fee"),
       amount: 500000,
       invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: null },
       revenueRecognition: {
         method: "milestone_based" as const,
-        milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 100, invoiceTiming: "advance" }],
+        milestones: [
+          { ...createMilestone(), name: "Contract Signing", recognitionPercent: 50, invoiceTiming: "advance" },
+          { ...createMilestone(), name: "Go Live", recognitionPercent: 25, invoiceTiming: "postpaid" },
+          { ...createMilestone(), name: "Acceptance", recognitionPercent: 25, invoiceTiming: "postpaid" },
+        ],
       },
     }
-    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycle).toBe("One-Time")
+    const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycleLines
+    expect(lines).toEqual(["Contract Signing: Advance", "Go Live: Postpaid", "Acceptance: Postpaid"])
+    expect(lines.some((line) => line.includes("more"))).toBe(false)
+    expect(lines.some((line) => line.includes("One-Time"))).toBe(false)
   })
 
   it("Revenue Recognition is Monthly for Recurring, Full Recognition for Non-Recurring (kept concise, task correction §10), and - for On-Demand", () => {
@@ -336,8 +352,8 @@ describe("componentTableCells (Commercial Components table, task corrections §4
     expect(componentTableCells(REFERENCE_MASTER_FIXTURES, onDemand, "INR").revenueRecognitionLines).toEqual(["-"])
   })
 
-  describe("Revenue Recognition Milestone table detail (task correction §8-9, §15): every milestone's Name/%/Amount/Timing, all visible, never collapsed", () => {
-    it("shows the spec's own worked example: 50% Advance, 25% Postpaid, 25% Postpaid against a 10,00,000 Flat Fee", () => {
+  describe("Revenue Recognition Milestone table detail (task correction §8-9, §15, and the Revenue Recognition / Invoice Cycle separation): every milestone's Name/%/Amount, all visible, never collapsed, never mixed with Invoice Timing", () => {
+    it("shows the spec's own worked example: 50%, 25%, 25% against a 10,00,000 Flat Fee, with Invoice Timing living in Invoice Cycle instead", () => {
       const component = {
         ...createComponent("non_recurring", "flat_fee"),
         amount: 1000000,
@@ -350,21 +366,24 @@ describe("componentTableCells (Commercial Components table, task corrections §4
           ],
         },
       }
-      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").revenueRecognitionLines
+      const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
+      const lines = cells.revenueRecognitionLines
       expect(lines).toContain("Contract Signing")
       expect(lines).toContain("50%")
       expect(lines).toContain("INR 5,00,000")
-      expect(lines).toContain("Advance")
       expect(lines).toContain("Go Live")
       expect(lines).toContain("25%")
       expect(lines).toContain("INR 2,50,000")
-      expect(lines).toContain("Postpaid")
       expect(lines).toContain("Acceptance")
       // Every milestone must appear, never collapsed behind a "+N more" line.
       expect(lines.some((line) => line.includes("more"))).toBe(false)
+      // Advance/Postpaid is an Invoice Cycle fact, never mixed into Revenue Recognition detail.
+      expect(lines).not.toContain("Advance")
+      expect(lines).not.toContain("Postpaid")
+      expect(cells.invoiceCycleLines).toEqual(["Contract Signing: Advance", "Go Live: Postpaid", "Acceptance: Postpaid"])
     })
 
-    it("shows both transaction currency and INR equivalent per milestone for a foreign Billing Currency", () => {
+    it("shows both transaction currency and INR equivalent per milestone for a foreign Billing Currency, Invoice Timing only in Invoice Cycle", () => {
       const component = {
         ...createComponent("non_recurring", "flat_fee"),
         amount: 10000,
@@ -373,10 +392,11 @@ describe("componentTableCells (Commercial Components table, task corrections §4
           milestones: [{ ...createMilestone(), name: "Go Live", recognitionPercent: 25, invoiceTiming: "postpaid" }],
         },
       }
-      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD").revenueRecognitionLines
-      expect(lines).toContain("USD 2,500")
-      expect(lines).toContain("INR 2,27,500")
-      expect(lines).toContain("Postpaid")
+      const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD")
+      expect(cells.revenueRecognitionLines).toContain("USD 2,500")
+      expect(cells.revenueRecognitionLines).toContain("INR 2,27,500")
+      expect(cells.revenueRecognitionLines).not.toContain("Postpaid")
+      expect(cells.invoiceCycleLines).toEqual(["Go Live: Postpaid"])
     })
 
     it("shows '-' for a milestone's Recognition Amount when the Pricing Model has no calculable basis, without hiding the milestone itself", () => {
@@ -389,11 +409,12 @@ describe("componentTableCells (Commercial Components table, task corrections §4
           milestones: [{ ...createMilestone(), name: "Go Live", recognitionPercent: 100, invoiceTiming: "advance" }],
         },
       }
-      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").revenueRecognitionLines
-      expect(lines).toContain("Go Live")
-      expect(lines).toContain("100%")
-      expect(lines).toContain("-")
-      expect(lines).toContain("Advance")
+      const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
+      expect(cells.revenueRecognitionLines).toContain("Go Live")
+      expect(cells.revenueRecognitionLines).toContain("100%")
+      expect(cells.revenueRecognitionLines).toContain("-")
+      expect(cells.revenueRecognitionLines).not.toContain("Advance")
+      expect(cells.invoiceCycleLines).toEqual(["Go Live: Advance"])
     })
 
     it("shows every milestone for a schedule with many milestones, never truncated", () => {

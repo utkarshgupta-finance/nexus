@@ -366,6 +366,34 @@ function calculateMilestoneAmount(basisAmount: number | null, percent: number | 
   return basisAmount * (percent / 100)
 }
 
+/**
+ * The sum of every milestone's own Recognition %, whatever that sum happens
+ * to be (never clamped): the single place both the domain validator and the
+ * live editor total indicator read from, so they can never drift into two
+ * different totals for the same milestones.
+ */
+function milestoneAllocationTotal(milestones: Milestone[]): number {
+  return milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
+}
+
+/**
+ * Milestone allocation has three states, not two (task correction: "the sum
+ * has three states"): `under` (may still be saved as an Incomplete draft),
+ * `exact` (valid, no issue), and `over` (structurally invalid, must never be
+ * saved). This is the single rule both `validateRevenueRecognitionIssues`
+ * (Save gating) and the editor's live total indicator derive from.
+ */
+function milestoneAllocationStatus(total: number): "under" | "exact" | "over" {
+  if (total > 100 + 0.001) return "over"
+  if (total < 100 - 0.001) return "under"
+  return "exact"
+}
+
+/** Rounds a percentage to at most two decimals for a validation message, without leaving float noise like `74.99999999999999`. */
+function formatPercentForMessage(value: number): string {
+  return String(Math.round(value * 100) / 100)
+}
+
 // =============================================================================
 // Commercial Component draft
 // =============================================================================
@@ -584,21 +612,44 @@ function isPositive(value: number | null): value is number {
 // invent their own separate wording or drift out of sync with each other.
 // =============================================================================
 
-/** One unmet requirement: `field` is a stable machine key (for de-duplication/keys), `message` is the exact user-facing reason. */
-type ComponentValidationIssue = { field: string; message: string }
+/**
+ * One unmet requirement: `field` is a stable machine key (for
+ * de-duplication/keys), `message` is the exact user-facing reason.
+ * `severity` distinguishes two structurally different situations (task
+ * correction: "do not conflate incomplete with invalid"): `incomplete`
+ * means a value is simply missing yet, which a Draft may still be saved
+ * with; `invalid` means the data present is structurally impossible (a
+ * milestone allocation over 100%, an out-of-range percentage, an
+ * overlapping slab), which must never be saved regardless of Draft status.
+ */
+type IssueSeverity = "incomplete" | "invalid"
 
-type ComponentValidationResult = { isComplete: boolean; issues: ComponentValidationIssue[] }
+type ComponentValidationIssue = { field: string; message: string; severity: IssueSeverity }
+
+/**
+ * `isComplete` is true only with zero issues of any kind (used for stage/
+ * component completeness, unchanged meaning). `isValid` is true as long as
+ * no issue is `invalid` (missing-but-fixable `incomplete` issues do not
+ * affect it): a component may be `!isComplete && isValid` (an ordinary
+ * incomplete Draft, saveable) or `!isValid` (structurally broken, must
+ * never be saved), but never both `isComplete` and `!isValid` at once.
+ */
+type ComponentValidationResult = { isComplete: boolean; isValid: boolean; issues: ComponentValidationIssue[] }
 
 function validateMugIssues(mug: MugOverlay, designationRows: DesignationRow[] | undefined, issues: ComponentValidationIssue[]): void {
   if (!mug.enabled) return
   if (designationRows) {
     const missing = designationRows.filter((row) => !isPositive(designationMinimumUnitsFor(mug, row.id)))
     if (missing.length > 0) {
-      issues.push({ field: "mug", message: `MUG Minimum Units required for ${missing.length} designation${missing.length === 1 ? "" : "s"}` })
+      issues.push({
+        field: "mug",
+        message: `MUG Minimum Units required for ${missing.length} designation${missing.length === 1 ? "" : "s"}`,
+        severity: "incomplete",
+      })
     }
     return
   }
-  if (!isPositive(mug.minimumUnits)) issues.push({ field: "mug", message: "MUG Minimum Units required" })
+  if (!isPositive(mug.minimumUnits)) issues.push({ field: "mug", message: "MUG Minimum Units required", severity: "incomplete" })
 }
 
 /**
@@ -615,18 +666,22 @@ function validateMugIssues(mug: MugOverlay, designationRows: DesignationRow[] | 
  */
 function validateSlabRowIssues(rows: SlabRow[], issues: ComponentValidationIssue[]): void {
   if (rows.length === 0) {
-    issues.push({ field: "slabRows", message: "At least one slab row required" })
+    issues.push({ field: "slabRows", message: "At least one slab row required", severity: "incomplete" })
     return
   }
   rows.forEach((row, index) => {
     const label = `Slab ${index + 1}`
-    if (index === 0 && row.from !== 1) issues.push({ field: `slab-${index}`, message: `${label} must start From 1` })
-    if (!isPositive(row.rate)) issues.push({ field: `slab-${index}`, message: `${label} Rate required` })
-    if (row.to !== null && row.from !== null && row.from > row.to) issues.push({ field: `slab-${index}`, message: `${label} range is invalid (From after To)` })
+    // Structural violations (a row shape that should be impossible by construction, task correction §16's "invalid overlapping slab"
+    // behavior): these are `invalid`, never merely `incomplete`, since the data present is wrong, not just missing.
+    if (index === 0 && row.from !== 1) issues.push({ field: `slab-${index}`, message: `${label} must start From 1`, severity: "invalid" })
+    if (!isPositive(row.rate)) issues.push({ field: `slab-${index}`, message: `${label} Rate required`, severity: "incomplete" })
+    if (row.to !== null && row.from !== null && row.from > row.to) {
+      issues.push({ field: `slab-${index}`, message: `${label} range is invalid (From after To)`, severity: "invalid" })
+    }
     const previous = rows[index - 1]
     if (previous) {
-      if (previous.to === null) issues.push({ field: `slab-${index}`, message: `${label} cannot follow an open-ended slab` })
-      else if (row.from !== null && row.from <= previous.to) issues.push({ field: `slab-${index}`, message: `${label} overlaps the previous slab` })
+      if (previous.to === null) issues.push({ field: `slab-${index}`, message: `${label} cannot follow an open-ended slab`, severity: "invalid" })
+      else if (row.from !== null && row.from <= previous.to) issues.push({ field: `slab-${index}`, message: `${label} overlaps the previous slab`, severity: "invalid" })
     }
   })
 }
@@ -634,32 +689,62 @@ function validateSlabRowIssues(rows: SlabRow[], issues: ComponentValidationIssue
 /** Every designation row needs its own name, Rate, and Unit (task correction §7's same "every rate required" principle applied to Designation Based). */
 function validateDesignationRowIssues(rows: DesignationRow[], issues: ComponentValidationIssue[]): void {
   if (rows.length === 0) {
-    issues.push({ field: "designationRows", message: "At least one designation row required" })
+    issues.push({ field: "designationRows", message: "At least one designation row required", severity: "incomplete" })
     return
   }
   rows.forEach((row, index) => {
     const label = row.designation.trim() || `Designation ${index + 1}`
-    if (row.designation.trim().length === 0) issues.push({ field: `designation-${index}`, message: `Designation ${index + 1} name required` })
-    if (!isPositive(row.rate)) issues.push({ field: `designation-${index}`, message: `${label} Rate required` })
-    if (row.per === null) issues.push({ field: `designation-${index}`, message: `${label} Unit required` })
+    if (row.designation.trim().length === 0) issues.push({ field: `designation-${index}`, message: `Designation ${index + 1} name required`, severity: "incomplete" })
+    if (!isPositive(row.rate)) issues.push({ field: `designation-${index}`, message: `${label} Rate required`, severity: "incomplete" })
+    if (row.per === null) issues.push({ field: `designation-${index}`, message: `${label} Unit required`, severity: "incomplete" })
   })
 }
 
-/** Every milestone needs its own name, percentage, and Invoice Timing, and the percentages must total 100. */
+/**
+ * Every milestone needs its own name, percentage, and Invoice Timing, and
+ * the total allocation has three states (task correction §1-4): under 100
+ * is `incomplete` (an ordinary saveable Draft reason), over 100 is
+ * `invalid` (must never be saved), exactly 100 raises no issue at all. An
+ * individual milestone's own percentage is separately rejected as
+ * `invalid` when negative or over 100, distinct from simply missing.
+ */
 function validateRevenueRecognitionIssues(recognition: RevenueRecognition, issues: ComponentValidationIssue[]): void {
   if (recognition.method === "full_recognition") return
   if (recognition.milestones.length === 0) {
-    issues.push({ field: "milestones", message: "At least one milestone required" })
+    issues.push({ field: "milestones", message: "At least one milestone required", severity: "incomplete" })
     return
   }
   recognition.milestones.forEach((milestone, index) => {
     const label = milestone.name.trim() || `Milestone ${index + 1}`
-    if (milestone.name.trim().length === 0) issues.push({ field: `milestone-${index}`, message: `Milestone ${index + 1} name required` })
-    if (!isPositive(milestone.recognitionPercent)) issues.push({ field: `milestone-${index}`, message: `${label} percentage required` })
-    if (milestone.invoiceTiming === null) issues.push({ field: `milestone-${index}`, message: `${label} Invoice Timing required` })
+    if (milestone.name.trim().length === 0) issues.push({ field: `milestone-${index}`, message: `Milestone ${index + 1} name required`, severity: "incomplete" })
+
+    const percent = milestone.recognitionPercent
+    if (percent === null) {
+      issues.push({ field: `milestone-${index}`, message: `${label} percentage required`, severity: "incomplete" })
+    } else if (percent < 0) {
+      issues.push({
+        field: `milestone-${index}`,
+        message: `${label} percentage cannot be negative (currently ${formatPercentForMessage(percent)}%)`,
+        severity: "invalid",
+      })
+    } else if (percent > 100) {
+      issues.push({
+        field: `milestone-${index}`,
+        message: `${label} percentage cannot exceed 100% (currently ${formatPercentForMessage(percent)}%)`,
+        severity: "invalid",
+      })
+    }
+
+    if (milestone.invoiceTiming === null) issues.push({ field: `milestone-${index}`, message: `${label} Invoice Timing required`, severity: "incomplete" })
   })
-  const total = recognition.milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
-  if (Math.abs(total - 100) >= 0.001) issues.push({ field: "milestoneTotal", message: "Milestone percentages must total 100%" })
+
+  const total = milestoneAllocationTotal(recognition.milestones)
+  const status = milestoneAllocationStatus(total)
+  if (status === "over") {
+    issues.push({ field: "milestoneTotal", message: `Milestone allocation cannot exceed 100% (currently ${formatPercentForMessage(total)}%)`, severity: "invalid" })
+  } else if (status === "under") {
+    issues.push({ field: "milestoneTotal", message: `Milestone allocation must total 100% (currently ${formatPercentForMessage(total)}%)`, severity: "incomplete" })
+  }
 }
 
 /**
@@ -674,27 +759,27 @@ function validateRevenueRecognitionIssues(recognition: RevenueRecognition, issue
 function validateCommercialComponent(component: CommercialComponentDraft): ComponentValidationResult {
   const issues: ComponentValidationIssue[] = []
 
-  if (component.description.trim().length === 0) issues.push({ field: "description", message: "Component Name required" })
+  if (component.description.trim().length === 0) issues.push({ field: "description", message: "Component Name required", severity: "incomplete" })
 
   if (component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based") {
-    if (component.invoiceTerms.invoiceFrequency === null) issues.push({ field: "invoiceFrequency", message: "Invoice Frequency required" })
+    if (component.invoiceTerms.invoiceFrequency === null) issues.push({ field: "invoiceFrequency", message: "Invoice Frequency required", severity: "incomplete" })
   } else {
     if (component.nature !== "on_demand" && component.invoiceTerms.invoiceFrequency === null) {
-      issues.push({ field: "invoiceFrequency", message: "Invoice Frequency required" })
+      issues.push({ field: "invoiceFrequency", message: "Invoice Frequency required", severity: "incomplete" })
     }
-    if (component.invoiceTerms.invoiceTiming === null) issues.push({ field: "invoiceTiming", message: "Invoice Timing required" })
+    if (component.invoiceTerms.invoiceTiming === null) issues.push({ field: "invoiceTiming", message: "Invoice Timing required", severity: "incomplete" })
   }
 
   if (component.nature === "non_recurring") validateRevenueRecognitionIssues(component.revenueRecognition, issues)
 
   if (component.pricingModel === "per_unit") {
-    if (!isPositive(component.rate)) issues.push({ field: "rate", message: "Rate required" })
-    if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required" })
+    if (!isPositive(component.rate)) issues.push({ field: "rate", message: "Rate required", severity: "incomplete" })
+    if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required", severity: "incomplete" })
     if (component.nature !== "non_recurring") validateMugIssues(component.mug, undefined, issues)
   } else if (component.pricingModel === "flat_fee") {
-    if (!isPositive(component.amount)) issues.push({ field: "amount", message: "Amount required" })
+    if (!isPositive(component.amount)) issues.push({ field: "amount", message: "Amount required", severity: "incomplete" })
   } else if (component.pricingModel === "slab") {
-    if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required" })
+    if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required", severity: "incomplete" })
     validateSlabRowIssues(component.slabRows, issues)
     if (component.nature !== "non_recurring") validateMugIssues(component.mug, undefined, issues)
   } else {
@@ -702,7 +787,8 @@ function validateCommercialComponent(component: CommercialComponentDraft): Compo
     if (component.nature !== "non_recurring") validateMugIssues(component.mug, component.designationRows, issues)
   }
 
-  return { isComplete: issues.length === 0, issues }
+  const isValid = !issues.some((issue) => issue.severity === "invalid")
+  return { isComplete: issues.length === 0, isValid, issues }
 }
 
 /**
@@ -721,6 +807,19 @@ function validateCommercialComponent(component: CommercialComponentDraft): Compo
  */
 function isComponentComplete(component: CommercialComponentDraft): boolean {
   return validateCommercialComponent(component).isComplete
+}
+
+/**
+ * Whether a component may be saved at all (task correction: "Draft must not
+ * contain structurally invalid components"). An ordinary incomplete
+ * component (a missing field, an under-100 milestone allocation) is still
+ * valid and saveable; only a structural violation (over-100 milestone
+ * allocation, an out-of-range individual percentage, an overlapping slab)
+ * makes this `false`. The editor's Save/Add action gates on this, never on
+ * `isComponentComplete`.
+ */
+function isComponentValid(component: CommercialComponentDraft): boolean {
+  return validateCommercialComponent(component).isValid
 }
 
 /**
@@ -763,6 +862,8 @@ export {
   isRevenueRecognitionComplete,
   nonRecurringMilestoneBasisAmount,
   calculateMilestoneAmount,
+  milestoneAllocationTotal,
+  milestoneAllocationStatus,
   createComponent,
   calculateMugValue,
   calculateDesignationMugSummary,
@@ -771,6 +872,7 @@ export {
   isPositive,
   validateCommercialComponent,
   isComponentComplete,
+  isComponentValid,
   isCommercialRateDraftComplete,
   isCommercialRateDraftStarted,
 }
@@ -791,6 +893,7 @@ export type {
   NonRecurringComponent,
   CommercialComponentDraft,
   CommercialRateDraft,
+  IssueSeverity,
   ComponentValidationIssue,
   ComponentValidationResult,
 }

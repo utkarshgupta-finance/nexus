@@ -293,26 +293,49 @@ function formatEffectiveDate(value: string | null): string {
 }
 
 /**
- * "Monthly Advance", "Quarterly Postpaid", or "-" once neither half is
- * chosen yet. A Non-Recurring component whose Revenue Recognition Method is
- * Milestone Based shows Invoice Frequency alone ("One-Time"): Invoice
- * Timing lives per milestone in that case (task correction §6), so the
- * component-level Timing no longer applies and would be misleading here.
+ * "Monthly Advance", "Quarterly Postpaid" for Recurring/On-Demand. A
+ * Non-Recurring component never shows its own Invoice Frequency here (task
+ * correction, NRR display polish §11): Non-Recurring's Invoice Frequency is
+ * always the fixed "One-Time" value, which "Non-Recurring" as a Nature
+ * already implies, so showing it in every row would be redundant, never a
+ * real choice worth reading. Full Recognition therefore shows Timing alone
+ * ("Advance"/"Postpaid"); Milestone Based shows one line per milestone
+ * ("Contract Signing: Advance", "Go Live: Postpaid", ...), every milestone,
+ * never collapsed behind a "+N more" line (task correction §10), since
+ * Invoice Timing lives per milestone once that method is chosen (task
+ * correction §6) and answers a different question than Revenue Recognition
+ * ("when is each milestone invoiced", not "how much of the amount does it
+ * recognize").
  */
-function invoiceCycleColumnSummary(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft): string {
-  const usesMilestoneTiming = component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based"
+function invoiceCycleColumnLines(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft): string[] {
+  if (component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based") {
+    const milestones = component.revenueRecognition.milestones
+    if (milestones.length === 0) return ["-"]
+    return milestones.map((milestone) => {
+      const label = milestone.name || "Milestone"
+      const timing = milestone.invoiceTiming ? invoiceTimingLabel(snapshot, milestone.invoiceTiming) : "-"
+      return `${label}: ${timing}`
+    })
+  }
+
+  if (component.nature === "non_recurring") {
+    return [component.invoiceTerms.invoiceTiming ? invoiceTimingLabel(snapshot, component.invoiceTerms.invoiceTiming) : "-"]
+  }
+
   const parts = [
     component.invoiceTerms.invoiceFrequency ? invoiceFrequencyLabel(snapshot, component.invoiceTerms.invoiceFrequency) : null,
-    !usesMilestoneTiming && component.invoiceTerms.invoiceTiming ? invoiceTimingLabel(snapshot, component.invoiceTerms.invoiceTiming) : null,
+    component.invoiceTerms.invoiceTiming ? invoiceTimingLabel(snapshot, component.invoiceTerms.invoiceTiming) : null,
   ].filter((part): part is string => part !== null)
-  return parts.length > 0 ? parts.join(" ") : "-"
+  return [parts.length > 0 ? parts.join(" ") : "-"]
 }
 
 /**
- * One milestone's own detail block: Name, Recognition %, Recognition
- * Amount (dual currency for a foreign Billing Currency), Invoice Timing
- * (task correction §8-9: "do not show only Milestone Based... show each
- * milestone with Name/%/Amount/Timing"). Returns 4-5 lines depending on
+ * One milestone's own Revenue Recognition detail block: Name, Recognition
+ * %, Recognition Amount (dual currency for a foreign Billing Currency).
+ * Invoice Timing deliberately does NOT appear here (task correction,
+ * Revenue Recognition / Invoice Cycle separation): Advance/Postpaid is an
+ * invoice-cycle fact, shown instead by `invoiceCycleColumnLines`, never
+ * mixed into the recognition detail. Returns 3-4 lines depending on
  * whether an INR equivalent applies.
  */
 function milestoneDetailLines(snapshot: ReferenceMasterSnapshot, milestone: Milestone, basisAmount: number | null, currencyCode: string | null): string[] {
@@ -322,7 +345,6 @@ function milestoneDetailLines(snapshot: ReferenceMasterSnapshot, milestone: Mile
     milestone.name || "Milestone",
     milestone.recognitionPercent !== null ? `${milestone.recognitionPercent}%` : "-",
     ...(amountLines.length > 0 ? amountLines : ["-"]),
-    milestone.invoiceTiming ? invoiceTimingLabel(snapshot, milestone.invoiceTiming) : "-",
   ]
 }
 
@@ -332,9 +354,11 @@ function milestoneDetailLines(snapshot: ReferenceMasterSnapshot, milestone: Mile
  * shows "-" rather than inventing one. Non-Recurring Full Recognition
  * stays a single concise line (task correction §10). Non-Recurring
  * Milestone Based shows the ENTIRE milestone schedule (task correction
- * §8-9, §15): every milestone's own Name/%/Amount/Timing, never a bare
- * "Milestone Based" label and never collapsed behind a "+N more" line, so
- * Finance can read the whole revenue structure straight from the table.
+ * §8-9, §15): every milestone's own Name/%/Amount, never a bare "Milestone
+ * Based" label and never collapsed behind a "+N more" line, so Finance can
+ * read the whole revenue structure straight from the table. Invoice Timing
+ * deliberately does not appear here (Revenue Recognition / Invoice Cycle
+ * separation, task correction): see `invoiceCycleColumnLines` instead.
  */
 function recognitionColumnLines(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft, currencyCode: string | null): string[] {
   if (component.nature !== "non_recurring") return component.nature === "recurring" ? ["Monthly"] : ["-"]
@@ -392,7 +416,7 @@ type ComponentTableCells = {
   rateLines: string[]
   mugQuantityLines: string[]
   mugCalculatedLines: string[]
-  invoiceCycle: string
+  invoiceCycleLines: string[]
   revenueRecognitionLines: string[]
   effectiveFrom: string
 }
@@ -413,7 +437,7 @@ function componentTableCells(snapshot: ReferenceMasterSnapshot, component: Comme
     rateLines: rateColumnLines(snapshot, component, currencyCode),
     mugQuantityLines: mugQuantityLines(snapshot, component),
     mugCalculatedLines: mugCalculatedLines(snapshot, component, currencyCode),
-    invoiceCycle: invoiceCycleColumnSummary(snapshot, component),
+    invoiceCycleLines: invoiceCycleColumnLines(snapshot, component),
     revenueRecognitionLines: recognitionColumnLines(snapshot, component, currencyCode),
     effectiveFrom: formatEffectiveDate(component.effectiveFrom),
   }
@@ -438,7 +462,7 @@ export {
   rateColumnLines,
   mugQuantityLines,
   mugCalculatedLines,
-  invoiceCycleColumnSummary,
+  invoiceCycleColumnLines,
   recognitionColumnLines,
   formatEffectiveDate,
   componentTableCells,
