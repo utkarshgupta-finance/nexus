@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { PlusIcon, XIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { getActiveOptions, resolveOption } from "@/features/reference-data"
 import { componentTableCells, formatAmount, mugUnitCode, unitLabel } from "../domain/commercial-rate-summary"
+import type { ComponentTableCells } from "../domain/commercial-rate-summary"
 import {
   calculateMugValue,
   createComponent,
@@ -426,16 +427,12 @@ function RevenueRecognitionFields({
 }
 
 /**
- * Rebuilds a component for a new Nature, resetting Pricing Model to that
- * Nature's own default (Recurring -> Per Unit, Non-Recurring/On-Demand ->
- * Flat Fee), matching "the user can change the model after defaulting."
- * Preserves name/notes/effective dates; Invoice Terms reset since
- * Non-Recurring's own frequency is fixed automatically.
+ * A component's Commercial Nature is fixed by the section it was created in
+ * (Recurring / Non-Recurring / On-Demand) and never changes afterward (task
+ * correction: "editing a row from a section preserves its Commercial
+ * Nature... nature conversion should be an explicit business action, not
+ * a silent Edit-time switch"). Only the Pricing Model remains editable.
  */
-function changeNature(component: CommercialComponentDraft, nature: CommercialNature): CommercialComponentDraft {
-  const fresh = createComponent(nature, defaultPricingModelFor(nature))
-  return { ...fresh, id: component.id, description: component.description, notes: component.notes, effectiveFrom: component.effectiveFrom, effectiveTo: component.effectiveTo }
-}
 
 /** Rebuilds a component for a new Pricing Model, preserving name/notes/effective dates/invoice terms (Nature is unchanged). */
 function changePricingModel(component: CommercialComponentDraft, pricingModel: PricingModel): CommercialComponentDraft {
@@ -473,11 +470,7 @@ function ComponentEditor({
         <Input value={component.description} onChange={(event) => onChange({ ...component, description: event.target.value })} placeholder="e.g. SFA" />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel>Commercial Nature</FieldLabel>
-          <OptionSelect listKey="commercial_nature" value={component.nature} onChange={(value) => onChange(changeNature(component, value as CommercialNature))} />
-        </div>
+      <div className="sm:max-w-xs">
         <div className="flex flex-col gap-1.5">
           <FieldLabel>Pricing Model</FieldLabel>
           <OptionSelect listKey="pricing_model" value={component.pricingModel} onChange={(value) => onChange(changePricingModel(component, value as PricingModel))} />
@@ -585,7 +578,35 @@ function ComponentEditor({
   )
 }
 
-const TABLE_COLUMNS = ["Component", "Nature", "Pricing", "Rate", "MUG", "Invoice Cycle", "Revenue Recognition", "Actions"]
+/**
+ * A Commercial Nature section (Recurring / Non-Recurring / On-Demand) shows
+ * only the columns that mean something for it: MUG never applies to
+ * Non-Recurring, Revenue Recognition is never captured for On-Demand, and
+ * Nature itself is never its own column anywhere, since the section a
+ * table lives in already says what Nature it is (task correction §1).
+ */
+type ColumnKey = "pricing" | "rate" | "mug" | "invoiceCycle" | "revenueRecognition" | "effectiveFrom"
+
+const COLUMN_LABELS: Record<ColumnKey, string> = {
+  pricing: "Pricing",
+  rate: "Rate",
+  mug: "MUG",
+  invoiceCycle: "Invoice Cycle",
+  revenueRecognition: "Revenue Recognition",
+  effectiveFrom: "Effective From",
+}
+
+function ColumnValue({ column, cells }: { column: ColumnKey; cells: ComponentTableCells }) {
+  if (column === "mug") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span>{cells.mugQuantity}</span>
+        {cells.mugCalculated ? <span className="text-muted-foreground">{cells.mugCalculated}</span> : null}
+      </div>
+    )
+  }
+  return <>{cells[column]}</>
+}
 
 /**
  * Edit / Delete, shared identically by the desktop table row and the mobile
@@ -634,6 +655,7 @@ function ComponentActions({
 }
 
 function ComponentsTable({
+  columns,
   components,
   currencyCode,
   confirmingDeleteId,
@@ -643,6 +665,7 @@ function ComponentsTable({
   onCancelDelete,
   disabled,
 }: {
+  columns: ColumnKey[]
   components: CommercialComponentDraft[]
   currencyCode: string | null
   confirmingDeleteId: string | null
@@ -658,9 +681,11 @@ function ComponentsTable({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              {TABLE_COLUMNS.map((column) => (
-                <TableHead key={column}>{column}</TableHead>
+              <TableHead>Component</TableHead>
+              {columns.map((column) => (
+                <TableHead key={column}>{COLUMN_LABELS[column]}</TableHead>
               ))}
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -679,17 +704,11 @@ function ComponentsTable({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell>{cells.nature}</TableCell>
-                  <TableCell>{cells.pricing}</TableCell>
-                  <TableCell>{cells.rate}</TableCell>
-                  <TableCell className="whitespace-normal">
-                    <div className="flex flex-col gap-0.5">
-                      <span>{cells.mugQuantity}</span>
-                      {cells.mugCalculated ? <span className="text-muted-foreground">{cells.mugCalculated}</span> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>{cells.invoiceCycle}</TableCell>
-                  <TableCell>{cells.revenueRecognition}</TableCell>
+                  {columns.map((column) => (
+                    <TableCell key={column} className={column === "mug" ? "whitespace-normal" : undefined}>
+                      <ColumnValue column={column} cells={cells} />
+                    </TableCell>
+                  ))}
                   <TableCell>
                     <ComponentActions
                       onEdit={() => onEdit(component.id)}
@@ -716,33 +735,22 @@ function ComponentsTable({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-sm font-medium text-foreground">{cells.name}</span>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="ghost" className="bg-muted text-muted-foreground">
-                      {cells.nature}
+                  {!complete ? (
+                    <Badge variant="ghost" className="w-fit bg-warning/10 text-warning">
+                      Incomplete
                     </Badge>
-                    <Badge variant="ghost" className="bg-muted text-muted-foreground">
-                      {cells.pricing}
-                    </Badge>
-                    {!complete ? (
-                      <Badge variant="ghost" className="bg-warning/10 text-warning">
-                        Incomplete
-                      </Badge>
-                    ) : null}
-                  </div>
+                  ) : null}
                 </div>
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-                <dt className="text-muted-foreground">Rate</dt>
-                <dd className="text-foreground">{cells.rate}</dd>
-                <dt className="text-muted-foreground">MUG</dt>
-                <dd className="text-foreground">
-                  {cells.mugQuantity}
-                  {cells.mugCalculated ? <span className="block text-muted-foreground">{cells.mugCalculated}</span> : null}
-                </dd>
-                <dt className="text-muted-foreground">Invoice Cycle</dt>
-                <dd className="text-foreground">{cells.invoiceCycle}</dd>
-                <dt className="text-muted-foreground">Revenue Recognition</dt>
-                <dd className="text-foreground">{cells.revenueRecognition}</dd>
+                {columns.map((column) => (
+                  <Fragment key={column}>
+                    <dt className="text-muted-foreground">{COLUMN_LABELS[column]}</dt>
+                    <dd className="text-foreground">
+                      <ColumnValue column={column} cells={cells} />
+                    </dd>
+                  </Fragment>
+                ))}
               </dl>
               <ComponentActions
                 onEdit={() => onEdit(component.id)}
@@ -761,6 +769,129 @@ function ComponentsTable({
 }
 
 type OpenEditor = { mode: "add"; draft: CommercialComponentDraft } | { mode: "edit"; id: string } | null
+
+const RECURRING_COLUMNS: ColumnKey[] = ["pricing", "rate", "mug", "invoiceCycle", "effectiveFrom"]
+const NON_RECURRING_COLUMNS: ColumnKey[] = ["pricing", "rate", "revenueRecognition", "invoiceCycle", "effectiveFrom"]
+const ON_DEMAND_COLUMNS: ColumnKey[] = ["pricing", "rate", "mug", "invoiceCycle", "effectiveFrom"]
+
+/**
+ * Three separate sections, one per Commercial Nature (task correction §1):
+ * each section's own Add action creates a component with that Nature
+ * already fixed, so the editor never asks the user to choose Nature again,
+ * and each section's table only shows the columns that mean something for
+ * it (Revenue Recognition never for On-Demand, MUG never for Non-Recurring).
+ */
+const NATURE_SECTIONS: {
+  nature: CommercialNature
+  title: string
+  addLabel: string
+  emptyMessage: string
+  columns: ColumnKey[]
+}[] = [
+  {
+    nature: "recurring",
+    title: "Recurring Commercials",
+    addLabel: "Add Recurring Component",
+    emptyMessage: "No recurring commercials added yet.",
+    columns: RECURRING_COLUMNS,
+  },
+  {
+    nature: "non_recurring",
+    title: "Non-Recurring Commercials",
+    addLabel: "Add Non-Recurring Component",
+    emptyMessage: "No non-recurring commercials added yet.",
+    columns: NON_RECURRING_COLUMNS,
+  },
+  {
+    nature: "on_demand",
+    title: "On-Demand Commercials",
+    addLabel: "Add On-Demand Component",
+    emptyMessage: "No on-demand commercials added yet.",
+    columns: ON_DEMAND_COLUMNS,
+  },
+]
+
+function NatureSection({
+  nature,
+  title,
+  addLabel,
+  emptyMessage,
+  columns,
+  components,
+  currencyCode,
+  openEditor,
+  onStartAdd,
+  onEditorChange,
+  onCommitAdd,
+  onCancelAdd,
+  onCommitEdit,
+  onEditComponent,
+  confirmingDeleteId,
+  onDeleteClick,
+  onConfirmDelete,
+  onCancelDelete,
+}: {
+  nature: CommercialNature
+  title: string
+  addLabel: string
+  emptyMessage: string
+  columns: ColumnKey[]
+  /** Every saved component of this Nature, unfiltered by editing state (this section derives that itself). */
+  components: CommercialComponentDraft[]
+  currencyCode: string | null
+  openEditor: OpenEditor
+  onStartAdd: (nature: CommercialNature) => void
+  onEditorChange: (next: CommercialComponentDraft) => void
+  onCommitAdd: () => void
+  onCancelAdd: () => void
+  onCommitEdit: () => void
+  onEditComponent: (id: string) => void
+  confirmingDeleteId: string | null
+  onDeleteClick: (id: string) => void
+  onConfirmDelete: (id: string) => void
+  onCancelDelete: () => void
+}) {
+  const editingComponent = openEditor?.mode === "edit" ? (components.find((component) => component.id === openEditor.id) ?? null) : null
+  const isAddingHere = openEditor?.mode === "add" && openEditor.draft.nature === nature
+  const tableComponents = editingComponent ? components.filter((component) => component.id !== editingComponent.id) : components
+
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-sm font-semibold text-foreground">{title}</span>
+
+      {tableComponents.length === 0 && !editingComponent && !isAddingHere ? <p className="text-xs text-muted-foreground">{emptyMessage}</p> : null}
+
+      {editingComponent ? (
+        <ComponentEditor component={editingComponent} currencyCode={currencyCode} onChange={onEditorChange} onCommit={onCommitEdit} commitLabel="Save Component" />
+      ) : null}
+
+      {tableComponents.length > 0 ? (
+        <ComponentsTable
+          columns={columns}
+          components={tableComponents}
+          currencyCode={currencyCode}
+          confirmingDeleteId={confirmingDeleteId}
+          onEdit={onEditComponent}
+          onDeleteClick={onDeleteClick}
+          onConfirmDelete={onConfirmDelete}
+          onCancelDelete={onCancelDelete}
+          disabled={openEditor !== null}
+        />
+      ) : null}
+
+      {isAddingHere && openEditor?.mode === "add" ? (
+        <ComponentEditor component={openEditor.draft} currencyCode={currencyCode} onChange={onEditorChange} onCommit={onCommitAdd} onCancel={onCancelAdd} commitLabel={addLabel} />
+      ) : null}
+
+      {openEditor === null ? (
+        <Button variant="outline" size="sm" className="w-fit" onClick={() => onStartAdd(nature)}>
+          <PlusIcon data-icon="inline-start" className="size-3.5" />
+          {addLabel}
+        </Button>
+      ) : null}
+    </div>
+  )
+}
 
 function CommercialRateSection({
   value,
@@ -788,8 +919,8 @@ function CommercialRateSection({
     setConfirmingDeleteId(null)
   }
 
-  function startAdding() {
-    setOpenEditor({ mode: "add", draft: createComponent("recurring", "per_unit") })
+  function startAdding(nature: CommercialNature) {
+    setOpenEditor({ mode: "add", draft: createComponent(nature, defaultPricingModelFor(nature)) })
   }
 
   function commitAdd() {
@@ -798,9 +929,10 @@ function CommercialRateSection({
     setOpenEditor(null)
   }
 
-  const editingComponent =
-    openEditor?.mode === "edit" ? (value.components.find((component) => component.id === openEditor.id) ?? null) : null
-  const tableComponents = editingComponent ? value.components.filter((component) => component.id !== editingComponent.id) : value.components
+  function handleEditorChange(next: CommercialComponentDraft) {
+    if (openEditor?.mode === "add") setOpenEditor({ mode: "add", draft: next })
+    else if (openEditor?.mode === "edit") updateComponent(openEditor.id, next)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -814,54 +946,31 @@ function CommercialRateSection({
         </div>
       </div>
 
-      <Separator />
-
-      <div className="flex flex-col gap-3">
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Components</span>
-
-        {value.components.length === 0 && openEditor === null ? <p className="text-xs text-muted-foreground">No commercial components yet. Add one below.</p> : null}
-
-        {editingComponent ? (
-          <ComponentEditor
-            component={editingComponent}
+      {NATURE_SECTIONS.map((section) => (
+        <div key={section.nature} className="contents">
+          <Separator />
+          <NatureSection
+            nature={section.nature}
+            title={section.title}
+            addLabel={section.addLabel}
+            emptyMessage={section.emptyMessage}
+            columns={section.columns}
+            components={value.components.filter((component) => component.nature === section.nature)}
             currencyCode={value.billingCurrency}
-            onChange={(next) => updateComponent(editingComponent.id, next)}
-            onCommit={() => setOpenEditor(null)}
-            commitLabel="Save Component"
-          />
-        ) : null}
-
-        {tableComponents.length > 0 ? (
-          <ComponentsTable
-            components={tableComponents}
-            currencyCode={value.billingCurrency}
+            openEditor={openEditor}
+            onStartAdd={startAdding}
+            onEditorChange={handleEditorChange}
+            onCommitAdd={commitAdd}
+            onCancelAdd={() => setOpenEditor(null)}
+            onCommitEdit={() => setOpenEditor(null)}
+            onEditComponent={(id) => setOpenEditor({ mode: "edit", id })}
             confirmingDeleteId={confirmingDeleteId}
-            onEdit={(id) => setOpenEditor({ mode: "edit", id })}
             onDeleteClick={(id) => setConfirmingDeleteId(id)}
             onConfirmDelete={deleteComponent}
             onCancelDelete={() => setConfirmingDeleteId(null)}
-            disabled={openEditor !== null}
           />
-        ) : null}
-
-        {openEditor?.mode === "add" ? (
-          <ComponentEditor
-            component={openEditor.draft}
-            currencyCode={value.billingCurrency}
-            onChange={(next) => setOpenEditor({ mode: "add", draft: next })}
-            onCommit={commitAdd}
-            onCancel={() => setOpenEditor(null)}
-            commitLabel="Add Component"
-          />
-        ) : null}
-
-        {openEditor === null ? (
-          <Button variant="outline" size="sm" className="w-fit" onClick={startAdding}>
-            <PlusIcon data-icon="inline-start" className="size-3.5" />
-            {value.components.length === 0 ? "Add Component" : "Add Another Component"}
-          </Button>
-        ) : null}
-      </div>
+        </div>
+      ))}
 
       <Separator />
 

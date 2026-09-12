@@ -148,10 +148,25 @@ describe("componentTableCells (Commercial Components table, task correction §4-
     expect(cells.rate).toBe("INR 5,00,000")
   })
 
-  it("Slab: Rate summarizes the method and unit", () => {
-    const component = { ...createComponent("recurring", "slab"), description: "DMS", pricingUnit: "DISTRIBUTOR", slabMethod: "whole_quantity" as const }
+  it("Slab: Pricing names the Method, Rate counts the rows and unit", () => {
+    const component = {
+      ...createComponent("recurring", "slab"),
+      description: "DMS",
+      pricingUnit: "DISTRIBUTOR",
+      slabMethod: "whole_quantity" as const,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100 },
+        { id: "2", from: 101, to: null, rate: 90 },
+      ],
+    }
     const cells = componentTableCells(component, "INR")
-    expect(cells.rate).toBe("Whole Quantity / Distributor")
+    expect(cells.pricing).toBe("Slab - Whole Quantity")
+    expect(cells.rate).toBe("2 Slabs / Distributor")
+  })
+
+  it("Slab: Pricing names Progressive when that Method is chosen", () => {
+    const component = { ...createComponent("recurring", "slab"), description: "DMS", pricingUnit: "USER", slabMethod: "progressive" as const }
+    expect(componentTableCells(component, "INR").pricing).toBe("Slab - Progressive")
   })
 
   it("Designation Based: Rate counts the rows, never listing raw codes", () => {
@@ -212,6 +227,14 @@ describe("componentTableCells (Commercial Components table, task correction §4-
 
     const onDemand = { ...createComponent("on_demand", "flat_fee"), amount: 50000 }
     expect(componentTableCells(onDemand, "INR").revenueRecognition).toBe("-")
+  })
+
+  it("Effective From is formatted for the table, or - when not set", () => {
+    const withDate = { ...createComponent("recurring", "flat_fee"), amount: 200000, effectiveFrom: "2026-10-01" }
+    expect(componentTableCells(withDate, "INR").effectiveFrom).toBe("01-Oct-2026")
+
+    const withoutDate = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
+    expect(componentTableCells(withoutDate, "INR").effectiveFrom).toBe("-")
   })
 
   it("falls back to a placeholder name for a still-blank component", () => {

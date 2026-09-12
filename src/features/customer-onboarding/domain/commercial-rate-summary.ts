@@ -158,8 +158,22 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
 }
 
 /**
+ * Concise Pricing column label ("Per Unit", "Flat Fee", "Slab - Whole
+ * Quantity", "Slab - Progressive", "Designation Based"). Slab's own Method
+ * lives here, in the Pricing column, not in Rate: Rate is reserved for the
+ * row count once a component is Slab-priced (see `rateColumnSummary`).
+ */
+function pricingColumnSummary(component: CommercialComponentDraft): string {
+  if (component.pricingModel === "slab") {
+    const methodLabel = component.slabMethod === "progressive" ? "Progressive" : "Whole Quantity"
+    return `Slab - ${methodLabel}`
+  }
+  return modelLabel(component.pricingModel)
+}
+
+/**
  * Concise, single-value rate summary for the Commercial Components table's
- * own Rate column ("₹50 / User", "₹2,00,000", "Whole Quantity / User", "3
+ * own Rate column ("₹50 / User", "₹2,00,000", "3 Slabs / User", "4
  * Designation Rates"). Deliberately not the full multi-line
  * `summarizeComponent`, which stays for the open editor's own preview: a
  * table row has one line to work with per column.
@@ -168,11 +182,21 @@ function rateColumnSummary(component: CommercialComponentDraft, currencyCode: st
   if (component.pricingModel === "flat_fee") return formatAmount(component.amount, currencyCode)
   if (component.pricingModel === "per_unit") return `${formatAmount(component.rate, currencyCode)} / ${unitLabel(component.pricingUnit)}`
   if (component.pricingModel === "slab") {
-    const methodLabel = component.slabMethod === "progressive" ? "Progressive" : "Whole Quantity"
-    return `${methodLabel} / ${unitLabel(component.pricingUnit)}`
+    const count = component.slabRows.length
+    return `${count} Slab${count === 1 ? "" : "s"} / ${unitLabel(component.pricingUnit)}`
   }
   const count = component.designationRows.length
   return `${count} Designation Rate${count === 1 ? "" : "s"}`
+}
+
+/** "01-Oct-2026", or "-" once no Effective From has been chosen yet. Never a raw ISO date string in a table cell. */
+function formatEffectiveDate(value: string | null): string {
+  if (!value) return "-"
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return "-"
+  const day = String(date.getDate()).padStart(2, "0")
+  const month = date.toLocaleString("en-US", { month: "short" })
+  return `${day}-${month}-${date.getFullYear()}`
 }
 
 /** "Monthly Advance", "Quarterly Postpaid", or "-" once neither half is chosen yet. */
@@ -205,22 +229,26 @@ type ComponentTableCells = {
   mugCalculated: string | null
   invoiceCycle: string
   revenueRecognition: string
+  effectiveFrom: string
 }
 
 /**
- * Every value the Commercial Components table (and its mobile card
+ * Every value a Commercial Nature section's table (and its mobile card
  * fallback) needs for one row, computed once so both layouts render
- * identically from the same source (task correction §10: "the underlying
- * information and actions must remain identical").
+ * identically from the same source. Nature itself is still computed here
+ * for callers that need it (tests, a future cross-section view), even
+ * though no table currently renders it as its own column: the section a
+ * component's table lives in already communicates its Nature.
  */
 function componentTableCells(component: CommercialComponentDraft, currencyCode: string | null): ComponentTableCells {
   const base = {
     name: component.description || "Untitled component",
     nature: natureLabel(component.nature),
-    pricing: modelLabel(component.pricingModel),
+    pricing: pricingColumnSummary(component),
     rate: rateColumnSummary(component, currencyCode),
     invoiceCycle: invoiceCycleColumnSummary(component.invoiceTerms),
     revenueRecognition: recognitionColumnSummary(component),
+    effectiveFrom: formatEffectiveDate(component.effectiveFrom),
   }
 
   if (!("mug" in component) || !component.mug.enabled) {
@@ -250,9 +278,11 @@ export {
   modelLabel,
   recognitionSummaryLine,
   summarizeComponent,
+  pricingColumnSummary,
   rateColumnSummary,
   invoiceCycleColumnSummary,
   recognitionColumnSummary,
+  formatEffectiveDate,
   componentTableCells,
 }
 export type { ComponentTableCells }

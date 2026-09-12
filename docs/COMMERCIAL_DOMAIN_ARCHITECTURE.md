@@ -943,18 +943,36 @@ the fact, and it means a slab row can never be added after one that is
 still open-ended (no upper limit to continue from), which the UI
 enforces by disabling Add Row in that state.
 
-### Commercial Components render as a table, not stacked cards
+### Commercial Components render as three Nature-scoped tables, not one shared table
 
-Once saved, Commercial Components are shown in a table (Component,
-Nature, Pricing, Rate, MUG, Invoice Cycle, Revenue Recognition, Actions)
-on desktop, and as an equivalent compact card per component on mobile,
-both rendered from the same computed cell values
-(`componentTableCells` in `commercial-rate-summary.ts`) so neither
-information nor the Edit/Delete actions differ between the two layouts.
-Editing a component pulls it out of the table into the full component
-editor above the table (rather than expanding awkwardly inside a table
-row); saving or cancelling returns it to the table. Delete requires an
-explicit second confirmation click before anything is removed.
+Saved Commercial Components are grouped into three separate sections and
+tables, one per Commercial Nature (Recurring Commercials, Non-Recurring
+Commercials, On-Demand Commercials), never a single shared table with a
+Nature column: the section a component's row lives in already says what
+Nature it is. Each section's own Add action (`+ Add Recurring Component`,
+`+ Add Non-Recurring Component`, `+ Add On-Demand Component`) creates a
+component with that Nature already fixed, so the editor never asks the
+user to choose Nature at all, and a saved component's Nature can never be
+changed via Edit: converting a component's Nature, if ever needed, is
+left as a deliberate future business action, not a silent Edit-time
+switch (this is a stronger version of the effective-dating principle in
+§17: Nature itself, not just its terms, is treated as fixed history once
+a component is created).
+
+Each section's table shows only the columns that mean something for its
+Nature: Recurring and On-Demand both show MUG (never Revenue
+Recognition); Non-Recurring shows Revenue Recognition (never MUG, since
+MUG never applies to a one-time charge); all three show Component,
+Pricing, Rate, Invoice Cycle, and Effective From. Every section renders
+identically as a table on desktop and an equivalent compact card per
+component on mobile (never merging the three sections together on
+mobile), both from the same computed cell values (`componentTableCells`
+in `commercial-rate-summary.ts`) so neither the information nor the
+Edit/Delete actions differ between the two layouts. Editing a component
+pulls it out of its table into the full component editor above that
+table (rather than expanding awkwardly inside a table row); saving or
+cancelling returns it to the table. Delete requires an explicit second
+confirmation click before anything is removed.
 
 ## 23. What this document is not
 
