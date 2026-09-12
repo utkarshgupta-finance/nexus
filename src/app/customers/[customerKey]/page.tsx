@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
 import { getCustomerMasterDetailByKey } from "@/features/customers/server"
+import { commercialConfigurationService } from "@/features/commercial/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
@@ -59,5 +60,13 @@ export default async function CustomerMasterDetailRoute({
     snapshot = emptySnapshot()
   }
 
-  return <CustomerMasterDetail detail={detail} snapshot={snapshot} />
+  let commercialConfigurationId: string | null = null
+  try {
+    const configurations = await commercialConfigurationService.listCommercialConfigurationsByCustomer(detail.record.id)
+    commercialConfigurationId = configurations[0]?.id ?? null
+  } catch {
+    commercialConfigurationId = null
+  }
+
+  return <CustomerMasterDetail detail={detail} snapshot={snapshot} commercialConfigurationId={commercialConfigurationId} />
 }

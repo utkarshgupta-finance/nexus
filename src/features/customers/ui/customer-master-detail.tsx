@@ -28,7 +28,16 @@ import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-m
  * read (see ../../../app/customers/[customerKey]/page.tsx), nothing here
  * performs its own data fetch.
  */
-function CustomerMasterDetail({ detail, snapshot }: { detail: CustomerMasterDetailData; snapshot: ReferenceMasterSnapshot }) {
+function CustomerMasterDetail({
+  detail,
+  snapshot,
+  commercialConfigurationId,
+}: {
+  detail: CustomerMasterDetailData
+  snapshot: ReferenceMasterSnapshot
+  /** The customer's real, persisted Commercial Configuration id, resolved server-side by stable Customer Master id (never legal name/brand/GST/PAN). Null when this customer has none yet. */
+  commercialConfigurationId: string | null
+}) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
   const [viewingDocument, setViewingDocument] = useState<{ title: string; url: string; downloadUrl: string } | null>(null)
@@ -61,6 +70,11 @@ function CustomerMasterDetail({ detail, snapshot }: { detail: CustomerMasterDeta
               <Badge variant="ghost" className="gap-1 bg-warning/10 text-warning">
                 DEMO
               </Badge>
+            ) : null}
+            {commercialConfigurationId ? (
+              <Button variant="outline" size="sm" render={<Link href={`/commercials/${commercialConfigurationId}`} />}>
+                Commercials
+              </Button>
             ) : null}
             <Tooltip>
               <TooltipTrigger render={<Button variant="outline" size="sm" disabled />}>

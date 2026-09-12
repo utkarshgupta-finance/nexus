@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import {
   ListChecksIcon,
   Building2Icon,
-  HandshakeIcon,
   RocketIcon,
   BookOpenIcon,
   PauseCircleIcon,
@@ -66,7 +65,6 @@ const OPERATIONS_SECTION: NavSection = {
   items: [
     { label: "Customer Onboarding", href: "/forms/customer-onboarding", icon: UserPlusIcon },
     { label: "Customers", href: "/customers", icon: Building2Icon },
-    { label: "Commercials", href: "/commercials", icon: HandshakeIcon },
     { label: "Go-Live", href: "/go-live", icon: RocketIcon },
     { label: "Ledger", href: "/ledger", icon: BookOpenIcon },
     { label: "Suspensions", href: "/suspensions", icon: PauseCircleIcon },

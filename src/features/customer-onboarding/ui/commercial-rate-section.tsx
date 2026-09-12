@@ -1334,4 +1334,5 @@ function CommercialRateSection({
   )
 }
 
-export { CommercialRateSection }
+export { CommercialRateSection, ColumnValue, COLUMN_LABELS, RECURRING_COLUMNS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS }
+export type { ColumnKey }

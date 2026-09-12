@@ -18,6 +18,14 @@ async function getCustomerByKey(key: string): Promise<CustomerRow | null> {
   return data
 }
 
+/** By stable Customer Master id, the only identifier a Commercial Configuration is allowed to link through (never legal name/brand name/GST/PAN). */
+async function getCustomerById(id: string): Promise<CustomerRow | null> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("customers").select("*").eq("id", id).maybeSingle()
+  if (error) throw new CustomerOperationError(parseCustomerError(error))
+  return data
+}
+
 async function listCustomers(): Promise<CustomerRow[]> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.from("customers").select("*").order("created_at", { ascending: true })
@@ -50,5 +58,5 @@ async function insertCustomer(input: InsertCustomerInput): Promise<CustomerRow> 
   return data
 }
 
-export { getCustomerByKey, listCustomers, insertCustomer }
+export { getCustomerByKey, getCustomerById, listCustomers, insertCustomer }
 export type { InsertCustomerInput }

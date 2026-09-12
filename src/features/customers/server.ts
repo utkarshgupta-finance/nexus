@@ -25,5 +25,5 @@ import "server-only"
 
 export { listCustomerMaster, getCustomerMasterDetailByKey } from "./read-models/customer-master"
 export type { CustomerMasterListEntry, CustomerMasterDetail } from "./read-models/customer-master"
-export { insertCustomer, getCustomerByKey } from "./data/customers.data"
+export { insertCustomer, getCustomerByKey, getCustomerById } from "./data/customers.data"
 export type { InsertCustomerInput } from "./data/customers.data"

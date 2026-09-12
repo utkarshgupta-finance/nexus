@@ -23,6 +23,8 @@ export type {
   ChangeSummary,
   VersionSummary,
 } from "./read-models/configuration-overview"
+/** Pure grouping helper (no I/O): imported from its own helpers module, not ./read-models/configuration-overview, which transitively touches Supabase. */
+export { toVersionSummaries } from "./read-models/configuration-overview-helpers"
 
 export type {
   CommercialComponentDetail,
