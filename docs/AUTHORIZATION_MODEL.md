@@ -323,7 +323,41 @@ is retained only for genuinely system-originated writes (none exist for
 Reference Master today; every current write is a real authenticated
 Settings action).
 
-## 15. Current limitations, honestly stated
+## 16. [IMPLEMENTED] Commercial Configuration permissions and enforcement
+
+Two permissions exist (`supabase/migrations/
+20260912210000_commercial_configuration_persistence.sql`):
+`commercial_configuration` `read` and `commercial_configuration` `write`,
+seeded the same way §14 seeded Reference Master's. Two roles grant them:
+`commercial_configuration_viewer` (read only) and
+`commercial_configuration_admin` (read and write), same naming
+convention as §14's roles, not real organizational titles.
+
+`/commercials/[configId]` requires `commercial_configuration.read` to
+view at all (`AuthGate`, same mechanism as §14). Every promotion write
+(`src/features/customer-onboarding/actions.ts`) independently requires
+`commercial_configuration.write` before performing any write, deriving
+the actor from the resolved session, and passes that real `appUserId`
+into every write RPC as the audit actor, matching §14's own
+`set_config('app.current_user_id', ...)`-then-mutate pattern exactly. See
+docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22a for the full promotion/
+versioning architecture this enforces.
+
+## 17. Root cause: a missing Settings nav link is a provisioning gap, not a permission bug
+
+Diagnosed 2026-09-12, when a user reported the Settings link had
+disappeared on Vercel Preview. `src/app/layout.tsx` computes
+`canReadSettings` from `sessionHasPermission(session, "reference_master",
+"read")` (§14), which is correctly `false` for any session that is not
+`active` (§12). A direct query confirmed zero rows in `auth.users` in
+this project: no Supabase Auth account, therefore no `app_users` row, has
+ever existed. The Settings link was never actually broken by a code
+change; nobody with a real, provisioned identity had ever visited the
+Preview deployment since authentication was introduced. The fix is
+provisioning one real admin identity (§11's "no self-service provisioning
+UI" limitation, below), never relaxing `canReadSettings`'s own check.
+
+## 18. Current limitations, honestly stated
 
 - **Global permissions only.** `user_roles.scope_resource_id` is never
   populated by this round; every grant is global, matching §5's own
@@ -335,16 +369,20 @@ Settings action).
   catalog-level roles/permissions, a data insert for a specific user's
   grant), not a Settings screen. Building that UI is future work, not
   a security gap: the underlying tables and enforcement are real either
-  way.
-- **Only Reference Master is protected today.** `requirePermission` is
-  feature-agnostic and ready for reuse (§13), but only `src/features/
-  reference-data/actions.ts` and `/settings/customer-onboarding` actually
-  call it yet. Every other route/action in Nexus remains unauthenticated-
-  reachable, an explicitly disclosed gap, not a silently broken
-  promise, to be closed feature by feature as each is built out.
+  way. This is also the direct cause of §17: with no such UI, and no
+  automated way to create a Supabase Auth user without the public signup
+  API (which this project's own email-confirmation setting gates),
+  provisioning the first real Preview admin is a manual, one-time step.
+- **Reference Master and Commercial Configuration are protected today.**
+  `requirePermission` is feature-agnostic and ready for reuse (§13), and
+  as of 2026-09-12 both `src/features/reference-data/actions.ts` and
+  `src/features/customer-onboarding/actions.ts` (Commercial Configuration
+  promotion) call it. Every other route/action in Nexus remains
+  unauthenticated-reachable, an explicitly disclosed gap, not a silently
+  broken promise, to be closed feature by feature as each is built out.
 - **RLS remains deny-by-default, not user-aware.** No user-session RLS
   policy was introduced this round; Platform Core tables remain denied
   to `anon`/`authenticated` entirely, and the service-role client
   (bypassing RLS) is still the only path that reaches them, gated by the
-  application-service checks in §13-14, exactly the layering §6 already
-  specified.
+  application-service checks in §13-14/§16, exactly the layering §6
+  already specified.

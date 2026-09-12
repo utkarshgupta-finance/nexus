@@ -65,11 +65,13 @@ type CommercialComponentRow = {
   is_recurring: boolean
   pricing_rule_kind: "linear" | "graduated" | "volume" | "dimension" | "flat"
   pricing_rule_parameters: Record<string, unknown>
-  billing_cadence: "monthly" | "quarterly" | "half_yearly" | "annual"
+  billing_cadence: "monthly" | "quarterly" | "half_yearly" | "annual" | "one_time"
   billing_timing: "advance" | "arrears"
   billing_quantity_basis: "mug" | "previous_period_actual" | "fixed" | null
-  reconciliation_cadence: "monthly" | "quarterly" | "half_yearly" | "annual"
+  reconciliation_cadence: "monthly" | "quarterly" | "half_yearly" | "annual" | "one_time"
   transaction_currency: string
+  /** Null only when transaction_currency = 'INR'. See chk_commercial_components_fx_snapshot_shape. */
+  fx_snapshot_rate: number | null
   effective_from: string
   effective_to: string | null
 }

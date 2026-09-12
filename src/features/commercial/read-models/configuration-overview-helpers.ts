@@ -1,5 +1,5 @@
 import { billingCadenceLabel } from "../domain/labels"
-import type { CommercialCommitment } from "../domain/types"
+import type { CommercialChange, CommercialCommitment, CommercialComponent } from "../domain/types"
 
 /**
  * Pure composition helpers for the Configuration Overview read model,
@@ -92,5 +92,59 @@ function groupCommitmentSummaries(commitments: CommercialCommitment[]): {
   return { summaries, byComponentId }
 }
 
-export { toCommitmentSummary, groupCommitmentSummaries }
-export type { CommitmentSummary }
+/**
+ * One "version" in the plain-English sense the Commercial Configuration
+ * UI shows (task correction): every Component created together by the
+ * same Commercial Change, numbered in effective-date order (a display
+ * convenience, never a stored column, see this migration's own comment:
+ * supabase/migrations/20260912210000_commercial_configuration_persistence.sql).
+ * `status` is derived, never stored: 'active' means every Component this
+ * Change created is still open (`effectiveTo` null); a new Change always
+ * closes the entire prior open set in one transaction
+ * (`create_commercial_change_for_configuration`), so a version can only
+ * ever be fully open or fully closed, never a mix. `billingCurrency`/
+ * `fxSnapshotRate` are read straight from this version's own Components,
+ * never the current Reference Master rate: an already-created version's
+ * FX snapshot is frozen, by construction, at the moment its Components
+ * were inserted.
+ */
+type VersionSummary = {
+  versionNumber: number
+  changeId: string
+  category: CommercialChange["category"]
+  effectiveDate: string
+  effectiveTo: string | null
+  status: "active" | "superseded"
+  billingCurrency: string | null
+  fxSnapshotRate: number | null
+  reason: string | null
+  createdAt: string
+  createdBy: string | null
+  componentIds: string[]
+}
+
+/** Groups components by their originating Change into version summaries, ordered oldest first. */
+function toVersionSummaries(changes: CommercialChange[], components: CommercialComponent[]): VersionSummary[] {
+  const orderedChanges = [...changes].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
+  return orderedChanges.map((change, index) => {
+    const versionComponents = components.filter((component) => component.commercialChangeId === change.id)
+    const effectiveTo = versionComponents.length > 0 ? versionComponents[0].effectiveTo : null
+    return {
+      versionNumber: index + 1,
+      changeId: change.id,
+      category: change.category,
+      effectiveDate: change.effectiveDate,
+      effectiveTo,
+      status: effectiveTo === null ? "active" : "superseded",
+      billingCurrency: versionComponents[0]?.transactionCurrency ?? null,
+      fxSnapshotRate: versionComponents[0]?.fxSnapshotRate ?? null,
+      reason: change.reason,
+      createdAt: change.createdAt,
+      createdBy: change.createdBy,
+      componentIds: versionComponents.map((component) => component.id),
+    }
+  })
+}
+
+export { toCommitmentSummary, groupCommitmentSummaries, toVersionSummaries }
+export type { CommitmentSummary, VersionSummary }

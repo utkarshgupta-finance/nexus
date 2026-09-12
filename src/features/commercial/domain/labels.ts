@@ -5,6 +5,7 @@ import type {
   BillingTiming,
   CommercialChangeCategory,
   CommercialComponent,
+  ComponentBillingCadence,
   MeasurementDefinition,
   PricingRuleKind,
 } from "./types"
@@ -16,11 +17,12 @@ import type {
  * components/UI code, using src/lib/format.ts and friends).
  */
 
-const BILLING_CADENCE_LABELS: Record<BillingCadence, string> = {
+const BILLING_CADENCE_LABELS: Record<ComponentBillingCadence, string> = {
   monthly: "Monthly",
   quarterly: "Quarterly",
   half_yearly: "Half-yearly",
   annual: "Annual",
+  one_time: "One-time",
 }
 
 const BILLING_TIMING_LABELS: Record<BillingTiming, string> = {
@@ -64,7 +66,7 @@ const COMMERCIAL_CHANGE_CATEGORY_LABELS: Record<CommercialChangeCategory, string
   other: "Other",
 }
 
-function billingCadenceLabel(cadence: BillingCadence): string {
+function billingCadenceLabel(cadence: ComponentBillingCadence | BillingCadence): string {
   return BILLING_CADENCE_LABELS[cadence]
 }
 

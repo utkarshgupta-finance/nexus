@@ -1228,14 +1228,12 @@ INR Conversion Rate can change over time; once a Commercial
 Configuration/version built against a particular rate is approved, that
 rate must be frozen as part of that version's own snapshot, so a later
 Settings change never silently redefines what an already-approved
-historical version meant. No live Commercial Configuration write path
-exists yet for this stage to persist that snapshot into (unchanged from
-this section's own "no live billing engine" principle), so this is
-documented as a future persistence requirement, not built: `CommercialRateFxSnapshot`
-and `currentFxSnapshot` in `commercial-rate-fx.ts` define and prove out the
-exact shape (`currencyCode`, `inrConversionRate`) a real promotion step
-would need to capture and freeze at approval time, ahead of that write
-path existing.
+historical version meant. `CommercialRateFxSnapshot` and
+`currentFxSnapshot` in `commercial-rate-fx.ts` define the exact shape
+(`currencyCode`, `inrConversionRate`) this stage always computed; as of
+2026-09-12 a real promotion path now exists and does capture and freeze
+it (`commercial_components.fx_snapshot_rate`, §22a below), closing the
+gap this paragraph used to describe as future work.
 
 ### Three Commercial tables remain the UI contract, unchanged
 
@@ -1244,6 +1242,100 @@ above: Recurring Commercials, Non-Recurring Commercials, and On-Demand
 Commercials remain three separate sections/tables with no Nature column,
 exactly as already documented. The Rate column correction above applies
 identically inside all three.
+
+## 22a. Commercial Configuration persistence and versioning [IMPLEMENTED, 2026-09-12]
+
+The onboarding promotion path §22 always anticipated is now built,
+reusing the locked M8 schema (`supabase/migrations/
+20260908210000_commercial_configuration_foundation.sql`) rather than
+inventing a second Commercial architecture. Three small migrations
+extend that schema (`supabase/migrations/
+20260912210000_commercial_configuration_persistence.sql`,
+`20260912211500_commercial_components_one_time_cadence.sql`,
+`20260912212000_commercial_components_volume_tiers_shape.sql`); no
+existing table was duplicated.
+
+**"Version" reuses Commercial Change, it is not a new table.** The
+locked schema already models versioning as Component-level effective
+dating grouped by the Commercial Change that created the Components
+(§16, §17): this section's "Version 1", "Version 2" language is a
+display convenience over that existing model, numbered in effective-date
+order, never a stored column. A version's status (Active/Superseded) is
+derived, never stored: `create_commercial_change_for_configuration`
+closes every currently-open Component under a Configuration in the same
+transaction that creates the next Change, so a version is always either
+fully open or fully closed, never a mix. This is a deliberate,
+whole-configuration-versioning policy layered on top of the locked
+schema's own, more general allowance for simultaneous Components (§4);
+it does not reopen or narrow that general rule.
+
+**FX snapshot is real now.** `commercial_components.fx_snapshot_rate`
+(new column) freezes the Reference Master INR conversion rate in effect
+at the moment a Component is created; null only when the transaction
+currency is INR itself. A later Settings change to the governed rate
+never touches an already-created Component's own `fx_snapshot_rate`.
+
+**Draft still means "not yet in these tables."** The locked schema has no
+draft/status column on `commercial_components` at all: every row is
+final and immutable from the moment it is inserted (§4). This section's
+own "no live billing engine" principle is unchanged: an onboarding
+Commercial Rate draft remains local, editable, and non-final for as long
+as it lives only in the onboarding case's own revision data. "Promotion"
+is the one deliberate, one-way transition from that local draft into a
+real, immutable Commercial Change plus its Components; there is no
+"draft Commercial Component" persisted anywhere, by design.
+
+**Promotion needs a real Request; a system Form Version stands in for a
+future Commercial Change Request business form.** `commercial_changes.
+request_id` is a locked, hard foreign key into the generic Request
+identity model (§16), which itself requires a currently published Form
+Version. Customer Onboarding has no live approval workflow yet, and
+building one is out of scope here (task correction: "do not invent an
+overly complex approval workflow yet"). `create_system_commercial_request`
+self-bootstraps one minimal, honestly-labeled system Form Definition
+(`system_commercial_change`) and its published Form Version the first
+time it is called, then mints a real, permanent `requests` row against
+it. This is a genuine, audited database write, not a faked approval: the
+Request is real and queryable exactly like any other Request, only the
+richer future task/comment/approval UI around it does not exist yet.
+
+**On-Demand's schema gap is closed, honestly, not silently.** §22's own
+vocabulary table already named this gap: `is_recurring` is a boolean and
+cannot distinguish On-Demand from Non-Recurring. Rather than collapsing
+On-Demand into Non-Recurring, every promoted Component's
+`pricing_rule_parameters` JSON carries an explicit `commercialNature`
+key (`"recurring" | "non_recurring" | "on_demand"`), so the real business
+nature survives even though the typed column cannot express it yet. A
+future Commercial Database Design pass may decide On-Demand deserves its
+own column; nothing here forecloses that.
+
+**Two structural shape gaps §22 already predicted are now closed.**
+`pricing_rule_kind = 'volume'` (Slab - Whole Quantity) now accepts a
+`tiers` array, not only a bare `rate`, matching the multi-band schedule
+Whole Quantity actually needs (§22's own vocabulary table named this
+exact gap). `billing_cadence`/`reconciliation_cadence` now also accept
+`one_time`, for a Non-Recurring component or an On-Demand component with
+no chosen Invoice Frequency, neither of which has a genuine recurring
+cadence.
+
+**MUG persists as one aggregate quantity commitment.** A Designation
+Based component's MUG is several per-designation minimums in the
+onboarding UI (§22 above), but the locked `commercial_commitments`
+schema's own `kind = 'quantity'` shape is one threshold per Component
+(§8, corrected). Promotion sums every designation's own Minimum Units
+into that one threshold (the Component's real, combined monthly floor,
+which is what a quantity commitment actually means); the full
+per-designation breakdown remains readable in the Component's own
+`pricing_rule_parameters.mug.designationMinimums`, so no information is
+lost, only aggregated into the one commitment record the schema expects.
+
+**Authorization.** Two new permissions, `commercial_configuration`/`read`
+and `commercial_configuration`/`write`, seeded the same way
+`reference_master`'s were (docs/AUTHORIZATION_MODEL.md §13-14). Every
+promotion write derives the authenticated user server-side, requires
+`commercial_configuration.write`, and passes the resolved `appUserId`
+into every RPC as the real audit actor; see
+`src/features/customer-onboarding/actions.ts`.
 
 ## 23. What this document is not
 

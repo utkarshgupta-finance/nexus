@@ -2,6 +2,7 @@ import { CustomerOnboardingPage } from "@/features/customer-onboarding/ui/custom
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+import { hasPermission } from "@/platform/permissions/server"
 
 /**
  * Customer Onboarding reads the real, persistent Reference Master
@@ -31,9 +32,11 @@ export default async function CustomerOnboardingRoute() {
     snapshot = emptySnapshot()
   }
 
+  const canPromoteCommercial = await hasPermission("commercial_configuration", "write")
+
   return (
     <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-      <CustomerOnboardingPage snapshotUnavailable={snapshotUnavailable} />
+      <CustomerOnboardingPage snapshotUnavailable={snapshotUnavailable} canPromoteCommercial={canPromoteCommercial} />
     </ReferenceMasterSnapshotProvider>
   )
 }

@@ -1,7 +1,7 @@
 import "server-only"
 
 /**
- * TRUSTED, UNAUTHENTICATED, SERVER-ONLY Commercial entry point.
+ * TRUSTED, SERVER-ONLY Commercial entry point.
  *
  * The `server-only` import above makes it a build error for any of this
  * to be pulled into a Client Component bundle, in addition to (not
@@ -23,35 +23,29 @@ import "server-only"
  *
  * That means this module enforces WHERE code may run (server-only,
  * verified above) but NOT WHO may call it or WHICH records they may
- * access. As of this commit, Nexus has no authentication, session, or
- * permission primitive anywhere in src/ to check that against:
- * docs/AUTHORIZATION_MODEL.md and docs/PLATFORM_ARCHITECTURE.md are
- * both explicitly locked design, "not implemented yet," and a direct
- * search of this repository found zero session helpers, zero auth
- * guards, zero permission checks, and zero middleware.ts. This is a
- * confirmed, known gap, not an oversight this comment is papering over.
+ * access. Nexus now has a real authentication/authorization platform
+ * capability (`src/platform/auth/`, `src/platform/permissions/`,
+ * `commercial_configuration`/read+write permissions, see
+ * docs/AUTHORIZATION_MODEL.md): every call site that reaches a write
+ * function here (createCommercialConfiguration, addCommercialComponent,
+ * addCommercialCommitment, createSystemCommercialRequest,
+ * createCommercialChangeForConfiguration) must call
+ * `requirePermission("commercial_configuration", "write")`
+ * (`src/platform/permissions/server.ts`) first, and pass the resolved
+ * session's real `appUserId` as `actorUserId`, never a client-supplied
+ * value (see `src/features/customer-onboarding/actions.ts` for the
+ * concrete pattern). This module itself does not call requirePermission:
+ * that check belongs at the Server Action/route call site, matching the
+ * same layering already established for Reference Master
+ * (`src/features/reference-data/actions.ts`), so this module stays
+ * reusable from any future authorized call site without a parallel
+ * check baked in here.
  *
- * Concretely, this means:
- *   - Fine to call from a script, a trusted internal tool, or a Server
- *     Component/Server Action that has ALREADY independently established
- *     (by whatever means, even manually reviewed for now) that the
- *     current caller may see this data.
- *   - NOT fine to wire directly to a route/Server Action that trusts a
- *     browser-supplied id (a URL param, a form field) as the scope of
- *     what to return or mutate, for an arbitrary logged-in user, without
- *     an authorization check in between. No such check exists to insert
- *     yet; building the UI shell against fixture/mock data does not
- *     require one, but connecting it to live Commercial data for
- *     multiple real users does, and should not happen until Nexus's
- *     permission platform capability exists. Add that check at the
- *     Server Component/Server Action call site once it does, or promote
- *     it into a thin wrapper here; do not invent a parallel one.
- *
- * Actor identity for writes (createCommercialConfiguration, etc.) has
- * the same caveat: `actorUserId` is taken as given, not derived from a
- * session, because there is no session to derive it from yet. See each
- * service file's own write functions for the parameter shape this
- * implies.
+ * `actorUserId` on every write function is taken as given: this module
+ * trusts its caller to have already derived it from a real session. Do
+ * not add a second, parallel authorization check inside this module; add
+ * it at the call site, or promote it into platform/ if more than one
+ * call site needs the identical check.
  */
 
 export * as commercialConfigurationService from "./services/configuration.service"

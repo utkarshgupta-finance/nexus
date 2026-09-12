@@ -95,6 +95,7 @@ function toCommercialComponent(row: CommercialComponentRow): CommercialComponent
     billingQuantityBasis: row.billing_quantity_basis,
     reconciliationCadence: row.reconciliation_cadence,
     transactionCurrency: row.transaction_currency,
+    fxSnapshotRate: row.fx_snapshot_rate,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
   }

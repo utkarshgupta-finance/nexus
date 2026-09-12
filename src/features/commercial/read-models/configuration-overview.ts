@@ -1,8 +1,8 @@
 import * as configurationService from "../services/configuration.service"
 import { billingCadenceLabel, billingQuantityBasisLabel, billingTimingLabel, commercialComponentLabel, pricingRuleKindLabel } from "../domain/labels"
 import type { CommercialChange, CommercialComponent } from "../domain/types"
-import { groupCommitmentSummaries, toCommitmentSummary } from "./configuration-overview-helpers"
-import type { CommitmentSummary } from "./configuration-overview-helpers"
+import { groupCommitmentSummaries, toCommitmentSummary, toVersionSummaries } from "./configuration-overview-helpers"
+import type { CommitmentSummary, VersionSummary } from "./configuration-overview-helpers"
 
 /**
  * Read model for the first Commercial screen: one Configuration, its
@@ -61,6 +61,8 @@ type CommercialConfigurationOverview = {
   /** Every Commitment relevant to this Configuration's Components, deduplicated by id: the "all commitments" view. */
   commitments: CommitmentSummary[]
   changes: ChangeSummary[]
+  /** Every Change grouped into a "version" (see VersionSummary), ordered oldest first (versionNumber 1 = the initial_setup Change). */
+  versions: VersionSummary[]
 }
 
 function toComponentSummary(
@@ -140,8 +142,9 @@ async function getCommercialConfigurationOverview(
       effectiveDate: change.effectiveDate,
       reason: change.reason,
     })),
+    versions: toVersionSummaries(changes, components),
   }
 }
 
-export { getCommercialConfigurationOverview, toCommitmentSummary }
-export type { CommercialConfigurationOverview, ComponentSummary, CommitmentSummary, ChangeSummary }
+export { getCommercialConfigurationOverview, toCommitmentSummary, toVersionSummaries }
+export type { CommercialConfigurationOverview, ComponentSummary, CommitmentSummary, ChangeSummary, VersionSummary }

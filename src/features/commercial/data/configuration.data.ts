@@ -1,7 +1,7 @@
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/server-client"
 
 import { CommercialOperationError, parseCommercialError } from "../domain/errors"
-import { callTableRpc } from "./rpc"
+import { callSingleRowRpc, callTableRpc } from "./rpc"
 import type {
   CommercialChangeRow,
   CommercialCommitmentComponentRow,
@@ -10,6 +10,14 @@ import type {
   CommercialConfigurationRow,
   MeasurementDefinitionRow,
 } from "./row-types"
+
+type RequestRow = {
+  id: string
+  pinned_form_version_id: string
+  is_active: boolean
+  created_at: string
+  created_by: string | null
+}
 
 /**
  * Repository for Commercial Configuration, Commercial Change, Commercial
@@ -61,6 +69,107 @@ async function createCommercialConfigurationWithChange(
   return { commercialChange: row.commercial_change, commercialConfiguration: row.commercial_configuration }
 }
 
+/**
+ * Mints a real `requests` row for a Commercial Change to extend
+ * (supabase/migrations/20260912210000_commercial_configuration_persistence.sql).
+ * Called once before either `createCommercialConfigurationWithChange`
+ * (the first, initial_setup change) or `createCommercialChangeForConfiguration`
+ * (every later change).
+ */
+async function createSystemCommercialRequest(input: { newRequestId: string; actorUserId: string }): Promise<RequestRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  return callSingleRowRpc<RequestRow>(supabase, "create_system_commercial_request", {
+    p_new_request_id: input.newRequestId,
+    p_actor_user_id: input.actorUserId,
+  })
+}
+
+type CreateCommercialChangeInput = {
+  commercialConfigurationId: string
+  requestId: string
+  changeCategory: "renewal" | "amendment" | "correction" | "other"
+  effectiveDate: string
+  actorUserId: string
+  reason?: string | null
+}
+
+/** The renewal/amendment/correction/other sibling of createCommercialConfigurationWithChange: creates a new Commercial Change against an EXISTING configuration, closing every currently-open component under it. */
+async function createCommercialChangeForConfiguration(input: CreateCommercialChangeInput): Promise<CommercialChangeRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  return callSingleRowRpc<CommercialChangeRow>(supabase, "create_commercial_change_for_configuration", {
+    p_commercial_configuration_id: input.commercialConfigurationId,
+    p_request_id: input.requestId,
+    p_change_category: input.changeCategory,
+    p_effective_date: input.effectiveDate,
+    p_actor_user_id: input.actorUserId,
+    p_reason: input.reason ?? null,
+  })
+}
+
+type AddCommercialComponentInput = {
+  newCommercialComponentId: string
+  commercialConfigurationId: string
+  commercialChangeId: string
+  isRecurring: boolean
+  pricingRuleKind: string
+  pricingRuleParameters: Record<string, unknown>
+  billingCadence: string
+  billingTiming: string
+  reconciliationCadence: string
+  transactionCurrency: string
+  fxSnapshotRate: number | null
+  effectiveFrom: string
+  actorUserId: string
+  billingQuantityBasis?: string | null
+  measurementDefinitionId?: string | null
+  supersedesComponentId?: string | null
+}
+
+/** The first and only INSERT path into commercial_components. */
+async function addCommercialComponent(input: AddCommercialComponentInput): Promise<CommercialComponentRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  return callSingleRowRpc<CommercialComponentRow>(supabase, "add_commercial_component", {
+    p_new_commercial_component_id: input.newCommercialComponentId,
+    p_commercial_configuration_id: input.commercialConfigurationId,
+    p_commercial_change_id: input.commercialChangeId,
+    p_is_recurring: input.isRecurring,
+    p_pricing_rule_kind: input.pricingRuleKind,
+    p_pricing_rule_parameters: input.pricingRuleParameters,
+    p_billing_cadence: input.billingCadence,
+    p_billing_timing: input.billingTiming,
+    p_reconciliation_cadence: input.reconciliationCadence,
+    p_transaction_currency: input.transactionCurrency,
+    p_fx_snapshot_rate: input.fxSnapshotRate,
+    p_effective_from: input.effectiveFrom,
+    p_actor_user_id: input.actorUserId,
+    p_billing_quantity_basis: input.billingQuantityBasis ?? null,
+    p_measurement_definition_id: input.measurementDefinitionId ?? null,
+    p_supersedes_component_id: input.supersedesComponentId ?? null,
+  })
+}
+
+type AddCommercialCommitmentInput = {
+  newCommercialCommitmentId: string
+  commercialChangeId: string
+  commercialComponentId: string
+  thresholdValue: number
+  effectiveFrom: string
+  actorUserId: string
+}
+
+/** Quantity (MUG) commitments only; see the migration's own comment for why spend commitments are out of scope here. */
+async function addCommercialCommitment(input: AddCommercialCommitmentInput): Promise<CommercialCommitmentRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  return callSingleRowRpc<CommercialCommitmentRow>(supabase, "add_commercial_commitment", {
+    p_new_commercial_commitment_id: input.newCommercialCommitmentId,
+    p_commercial_change_id: input.commercialChangeId,
+    p_commercial_component_id: input.commercialComponentId,
+    p_threshold_value: input.thresholdValue,
+    p_effective_from: input.effectiveFrom,
+    p_actor_user_id: input.actorUserId,
+  })
+}
+
 async function getCommercialConfigurationById(id: string): Promise<CommercialConfigurationRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase
@@ -103,6 +212,18 @@ async function getCommercialComponentById(id: string): Promise<CommercialCompone
   const { data, error } = await supabase.from("commercial_components").select("*").eq("id", id).maybeSingle()
   if (error) throw new CommercialOperationError(parseCommercialError(error))
   return data
+}
+
+/** One Commercial Configuration per customer is the common case; a customer may have more than one (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §3), so this returns every one, not just the first. */
+async function listCommercialConfigurationsByCustomerId(customerId: string): Promise<CommercialConfigurationRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("commercial_configurations")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: true })
+  if (error) throw new CommercialOperationError(parseCommercialError(error))
+  return data ?? []
 }
 
 async function listCommercialCommitmentsByChangeIds(
@@ -211,7 +332,12 @@ async function listMeasurementDefinitionsByIds(ids: string[]): Promise<Measureme
 
 export {
   createCommercialConfigurationWithChange,
+  createSystemCommercialRequest,
+  createCommercialChangeForConfiguration,
+  addCommercialComponent,
+  addCommercialCommitment,
   getCommercialConfigurationById,
+  listCommercialConfigurationsByCustomerId,
   listCommercialChangesByConfigurationId,
   listCommercialComponentsByConfigurationId,
   getCommercialComponentById,
@@ -223,4 +349,11 @@ export {
   listCommitmentComponentMembershipsByCommitmentIds,
   listMeasurementDefinitionsByIds,
 }
-export type { CreateCommercialConfigurationInput, CreateCommercialConfigurationResult }
+export type {
+  CreateCommercialConfigurationInput,
+  CreateCommercialConfigurationResult,
+  RequestRow,
+  CreateCommercialChangeInput,
+  AddCommercialComponentInput,
+  AddCommercialCommitmentInput,
+}

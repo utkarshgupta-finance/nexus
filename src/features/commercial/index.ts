@@ -21,6 +21,7 @@ export type {
   ComponentSummary,
   CommitmentSummary,
   ChangeSummary,
+  VersionSummary,
 } from "./read-models/configuration-overview"
 
 export type {

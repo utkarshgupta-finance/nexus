@@ -1039,6 +1039,25 @@ exactly one member); the one-Earned-row-per-Component-per-period decision
 is strengthened, not changed. Table count remains fifteen; no table
 added or removed this revision.
 
+**Revision 3 (2026-09-12, additive, first live write path)**: the
+onboarding Commercial Rate promotion path this design always anticipated
+(§14, §22 of `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md`) is now built. Three
+small, additive migrations extend this locked schema; no table is added,
+removed, or duplicated: `commercial_components` gains a nullable
+`fx_snapshot_rate numeric` column (null only when `transaction_currency =
+'INR'`, see docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22a); `billing_cadence`/
+`reconciliation_cadence` now also accept `one_time`, and
+`pricing_rule_kind = 'volume'` now also accepts a `tiers` array (both gaps
+§22 of the domain document already named); four new RPCs
+(`create_system_commercial_request`, `create_commercial_change_for_configuration`,
+`add_commercial_component`, `add_commercial_commitment`) follow the exact
+`set_config` actor-audit pattern every existing Commercial RPC already
+uses. See `supabase/migrations/20260912210000_commercial_configuration_persistence.sql`,
+`20260912211500_commercial_components_one_time_cadence.sql`, and
+`20260912212000_commercial_components_volume_tiers_shape.sql` for the
+exact SQL, and docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22a for the full
+versioning/FX-snapshot/promotion architecture this revision enables.
+
 **Status: LOCKED.** `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` and
 `docs/COMMERCIAL_TECH_EVALUATION.md` remain locked and unchanged; no
 contradiction between either of them and this design was found.

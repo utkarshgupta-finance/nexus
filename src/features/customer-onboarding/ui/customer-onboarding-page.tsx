@@ -41,6 +41,7 @@ import {
 import { AttachmentUpload } from "./attachment-upload"
 import type { SelectedAttachmentFile } from "./attachment-upload"
 import { CommercialRateSection } from "./commercial-rate-section"
+import { CommercialConfigurationPromotionPanel } from "./commercial-configuration-promotion-panel"
 
 const REFERENCE_LISTS: ReferenceListKey[] = [
   "country",
@@ -95,7 +96,14 @@ function makeRequestId(reactId: string) {
  * displays as Pending: there is no authenticated approval identity yet,
  * so this page never fabricates an "Approve" action (task spec §26).
  */
-function CustomerOnboardingPage({ snapshotUnavailable = false }: { snapshotUnavailable?: boolean }) {
+function CustomerOnboardingPage({
+  snapshotUnavailable = false,
+  canPromoteCommercial = false,
+}: {
+  snapshotUnavailable?: boolean
+  /** Server-derived: whether the current session holds commercial_configuration.write (see ../actions.ts). Rendering is convenience only; the write itself is independently re-checked server-side. */
+  canPromoteCommercial?: boolean
+}) {
   const snapshot = useReferenceMasterSnapshot()
   const reactId = useId()
   const [requestId] = useState(() => makeRequestId(reactId))
@@ -434,13 +442,16 @@ function CustomerOnboardingPage({ snapshotUnavailable = false }: { snapshotUnava
           ) : null}
 
           {activeStageKey === "commercial_rate" ? (
-            <CommercialRateSection
-              value={commercialRate}
-              onChange={setCommercialRate}
-              onPrevious={() => handleStageTabChange(["commercial_documents"])}
-              onSaveDraft={handleSaveDraft}
-              onNext={() => handleStageTabChange(["agreement_approval"])}
-            />
+            <div className="flex flex-col gap-4">
+              <CommercialRateSection
+                value={commercialRate}
+                onChange={setCommercialRate}
+                onPrevious={() => handleStageTabChange(["commercial_documents"])}
+                onSaveDraft={handleSaveDraft}
+                onNext={() => handleStageTabChange(["agreement_approval"])}
+              />
+              {canPromoteCommercial ? <CommercialConfigurationPromotionPanel draft={commercialRate} /> : null}
+            </div>
           ) : null}
 
           {activeStageKey === "agreement_approval" ? (

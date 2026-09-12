@@ -94,6 +94,7 @@ describe("toCommercialComponent", () => {
       billing_quantity_basis: null,
       reconciliation_cadence: "monthly",
       transaction_currency: "USD",
+      fx_snapshot_rate: 91,
       effective_from: "2026-01-01",
       effective_to: null,
     })
@@ -101,6 +102,7 @@ describe("toCommercialComponent", () => {
     expect(result.billingTiming).toBe("arrears")
     expect(result.billingQuantityBasis).toBeNull()
     expect(result.measurementDefinitionId).toBe("md-1")
+    expect(result.fxSnapshotRate).toBe(91)
   })
 })
 

@@ -7,13 +7,22 @@ import {
   toMeasurementDefinition,
 } from "../data/mappers"
 import type {
+  BillingQuantityBasis,
+  BillingTiming,
   CommercialChange,
   CommercialCommitment,
   CommercialComponent,
   CommercialConfiguration,
+  ComponentBillingCadence,
   MeasurementDefinition,
+  PricingRuleKind,
 } from "../domain/types"
-import type { CreateCommercialConfigurationInput } from "../data/configuration.data"
+import type {
+  AddCommercialCommitmentInput,
+  CreateCommercialChangeInput,
+  CreateCommercialConfigurationInput,
+  RequestRow,
+} from "../data/configuration.data"
 
 /**
  * Application service for Commercial Configuration setup. Thin
@@ -54,6 +63,54 @@ async function createCommercialConfiguration(
 async function getCommercialConfiguration(id: string): Promise<CommercialConfiguration | null> {
   const row = await configurationData.getCommercialConfigurationById(id)
   return row ? toCommercialConfiguration(row) : null
+}
+
+/** One Commercial Configuration per customer is the common case; a customer may have more than one (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §3). */
+async function listCommercialConfigurationsByCustomer(customerId: string): Promise<CommercialConfiguration[]> {
+  const rows = await configurationData.listCommercialConfigurationsByCustomerId(customerId)
+  return rows.map(toCommercialConfiguration)
+}
+
+/** Mints a real requests row for a Commercial Change to extend. See create_system_commercial_request's own migration comment. */
+async function createSystemCommercialRequest(input: { newRequestId: string; actorUserId: string }): Promise<RequestRow> {
+  return configurationData.createSystemCommercialRequest(input)
+}
+
+/** The renewal/amendment/correction/other sibling of createCommercialConfiguration: a new Commercial Change against an EXISTING configuration. */
+async function createCommercialChangeForConfiguration(input: CreateCommercialChangeInput): Promise<CommercialChange> {
+  const row = await configurationData.createCommercialChangeForConfiguration(input)
+  return toCommercialChange(row)
+}
+
+type AddCommercialComponentServiceInput = {
+  newCommercialComponentId: string
+  commercialConfigurationId: string
+  commercialChangeId: string
+  isRecurring: boolean
+  pricingRuleKind: PricingRuleKind
+  pricingRuleParameters: Record<string, unknown>
+  billingCadence: ComponentBillingCadence
+  billingTiming: BillingTiming
+  billingQuantityBasis: BillingQuantityBasis | null
+  reconciliationCadence: ComponentBillingCadence
+  transactionCurrency: string
+  fxSnapshotRate: number | null
+  effectiveFrom: string
+  actorUserId: string
+  measurementDefinitionId?: string | null
+  supersedesComponentId?: string | null
+}
+
+/** The first and only INSERT path into commercial_components. */
+async function addCommercialComponent(input: AddCommercialComponentServiceInput): Promise<CommercialComponent> {
+  const row = await configurationData.addCommercialComponent(input)
+  return toCommercialComponent(row)
+}
+
+/** Quantity (MUG) commitments only; see add_commercial_commitment's own migration comment. */
+async function addCommercialCommitment(input: AddCommercialCommitmentInput): Promise<CommercialCommitment> {
+  const row = await configurationData.addCommercialCommitment(input)
+  return toCommercialCommitment(row)
 }
 
 async function getCommercialComponent(id: string): Promise<CommercialComponent | null> {
@@ -122,6 +179,11 @@ async function listMeasurementDefinitions(ids: string[]): Promise<MeasurementDef
 
 export {
   createCommercialConfiguration,
+  listCommercialConfigurationsByCustomer,
+  createSystemCommercialRequest,
+  createCommercialChangeForConfiguration,
+  addCommercialComponent,
+  addCommercialCommitment,
   getCommercialConfiguration,
   getCommercialComponent,
   listCommercialChanges,
@@ -130,4 +192,4 @@ export {
   listCommitmentsForComponents,
   listMeasurementDefinitions,
 }
-export type { CreateCommercialConfigurationResult }
+export type { CreateCommercialConfigurationResult, AddCommercialComponentServiceInput }

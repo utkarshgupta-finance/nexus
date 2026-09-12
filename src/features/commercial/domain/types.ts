@@ -47,8 +47,18 @@ type AppUserId = string
 // Shared enums
 // =============================================================================
 
-/** Both billing_cadence and reconciliation_cadence use this same shape. */
+/** Both billing_cadence and reconciliation_cadence use this same shape (commercial_commitments.period, billing_calculations, etc). */
 type BillingCadence = "monthly" | "quarterly" | "half_yearly" | "annual"
+
+/**
+ * commercial_components.billing_cadence/reconciliation_cadence only
+ * (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22): widens BillingCadence
+ * with 'one_time' for a Non-Recurring component, or an On-Demand
+ * component with no chosen Invoice Frequency, neither of which has a
+ * genuine recurring cadence. Never used for CommercialCommitment.period,
+ * which stays plain BillingCadence: a commitment is never one_time.
+ */
+type ComponentBillingCadence = BillingCadence | "one_time"
 
 type BillingTiming = "advance" | "arrears"
 
@@ -152,12 +162,20 @@ type CommercialComponent = {
   isRecurring: boolean
   pricingRuleKind: PricingRuleKind
   pricingRuleParameters: Record<string, unknown>
-  billingCadence: BillingCadence
+  billingCadence: ComponentBillingCadence
   billingTiming: BillingTiming
   /** Null for an arrears Component; required for an advance one. */
   billingQuantityBasis: BillingQuantityBasis | null
-  reconciliationCadence: BillingCadence
+  reconciliationCadence: ComponentBillingCadence
   transactionCurrency: string
+  /**
+   * The Reference Master INR conversion rate for transactionCurrency,
+   * frozen at the moment this Component was created (docs/
+   * COMMERCIAL_DOMAIN_ARCHITECTURE.md, FX snapshot principle). Null only
+   * when transactionCurrency is 'INR' itself. Never re-derived from the
+   * current Settings rate when rendering a historical Component.
+   */
+  fxSnapshotRate: number | null
   effectiveFrom: string
   /** Null while the Component remains open-ended. */
   effectiveTo: string | null
@@ -395,6 +413,7 @@ export type {
   CustomerId,
   AppUserId,
   BillingCadence,
+  ComponentBillingCadence,
   BillingTiming,
   BillingQuantityBasis,
   BillingQuantityBasisUsed,
