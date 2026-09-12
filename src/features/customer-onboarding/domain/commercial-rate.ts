@@ -1,12 +1,12 @@
 import type { PricingRuleKind } from "@/features/commercial"
 
 /**
- * Onboarding Commercial Rate draft domain (task spec: Customer Onboarding
- * Commercial Rate V1).
+ * Onboarding Commercial Rate draft domain (Customer Onboarding Commercial
+ * Rate V1, corrected business model).
  *
  * This captures "what have we commercially agreed to charge this customer,
- * on what basis, and under what billing/payment terms," nothing more: no
- * usage calculation, invoicing, collections, revenue recognition, or actual
+ * on what basis, and under what invoice cycle," nothing more: no usage
+ * calculation, invoicing, collections, revenue recognition, or actual
  * billing happens anywhere in this module. It is a DRAFT capture layer, not
  * a live write path into Commercial Configuration: exactly like Customer
  * Details, Tax & Registration, and Commercial Documents before it, this
@@ -15,141 +15,163 @@ import type { PricingRuleKind } from "@/features/commercial"
  * (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22 documents the mapping and the
  * exact gaps that promotion will need to close).
  *
+ * This file corrects an earlier, wrong reading of the business model. The
+ * corrections that matter most for anyone reading this file fresh:
+ *
+ * - There is no "Commercial Scope / Package Name" concept. A customer's
+ *   commercials are the sum of its individual Commercial Components; there
+ *   is no separate customer-level package/scope field above them.
+ * - Per Unit, Flat Fee, Slab, and Designation Based are ONE shared set of
+ *   Pricing Models, available under every Commercial Nature (Recurring,
+ *   Non-Recurring, On-Demand) alike. Nature no longer implies a different
+ *   pricing engine; it only changes which model defaults in and a few
+ *   nature-specific fields (see `defaultPricingModelFor`).
+ * - MUG (Minimum Usage Guarantee) is a UNIT quantity floor, never money: it
+ *   floors the billable quantity of whatever Pricing Unit the component
+ *   already uses, always assessed monthly, and it never asks for a second
+ *   unit selection or a frequency choice.
+ * - A Recurring component's revenue is monthly, always, regardless of how
+ *   often the customer is actually invoiced; Invoice Frequency and Invoice
+ *   Timing describe the invoice cycle, not revenue recognition.
+ * - Slab pricing has two distinct methods, Whole Quantity and Progressive,
+ *   both real and selectable, not one implicit interpretation.
+ * - Payment Terms is out of scope entirely; it belongs to a future
+ *   Invoice/Collections configuration, not Commercial Rate.
+ *
  * Vocabulary is deliberately reused from the locked Commercial domain
  * (src/features/commercial/domain/types.ts) wherever the concept already
- * exists there: `pricingRuleKind` (via `toPricingRuleKind` below),
- * `transactionCurrency`, `effectiveFrom`/`effectiveTo`. Where this stage
- * needs a value the real domain does not yet support, the gap is called
- * out explicitly in a comment at the exact point of divergence, never
- * silently forced into the existing field. See docs for the full gap list.
+ * exists there: `pricingRuleKind` (via `toPricingRuleKind` below). Where
+ * this stage needs a value the real domain does not yet support, the gap
+ * is called out explicitly at the exact point of divergence. See docs for
+ * the full gap list.
  */
 
 // =============================================================================
-// Commercial Nature, Pricing Model / Pricing Type
+// Commercial Nature, Pricing Model, Slab Method
 // =============================================================================
 
 /**
- * A "controlled business option" (docs §22): each value drives real UI and
- * validation branching below, so it is not ordinary inert reference data
- * even though it is Reference Master governed (`commercial_nature`).
+ * A "controlled business option" (docs §22): drives real UI/validation
+ * branching below (default Pricing Model, MUG applicability on Non-Recurring,
+ * Revenue Recognition), so it is not ordinary inert reference data even
+ * though it is Reference Master governed (`commercial_nature`).
  */
 type CommercialNature = "recurring" | "non_recurring" | "on_demand"
 
-/** Recurring's four supported calculation models (task spec §5). */
-type RecurringPricingModel = "per_unit" | "flat_fee" | "slab" | "designation_based"
-
-/** On-Demand's two supported calculation models (task spec §14). */
-type OnDemandPricingType = "per_unit" | "fixed_fee"
+/**
+ * ONE shared set of Pricing Models across every Commercial Nature. Do not
+ * build a separate pricing engine per nature; conditional UI may differ,
+ * the calculation vocabulary does not.
+ */
+type PricingModel = "per_unit" | "flat_fee" | "slab" | "designation_based"
 
 /**
- * Maps this stage's plain-English pricing vocabulary onto the real, locked
- * `PricingRuleKind` (task spec §25: "map onboarding concepts to existing
- * domain language where appropriate"). No gap here: every value below is
- * already one of the five locked kinds.
- *
- * Slab maps to `"volume"`, deliberately not `"graduated"`: graduated is
- * progressive/cumulative tiered pricing (each unit within a bracket priced
- * at that bracket's own rate, summed); this stage's Slab is whole-quantity
- * pricing (the single tier reached by the total quantity prices every
- * unit), which is what the locked domain doc names "volume (all-units)"
- * (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §6). Labeling Slab as `graduated`
- * would be a wrong signal to a future reader who assumes progressive
- * calculation. See docs §22 for the one real gap this mapping has: the
- * `commercial_components` table's shape-check CHECK constraint currently
- * only allows a bare `rate` key under `pricing_rule_kind = 'volume'`
- * (identical to `linear`), not the `tiers` array Slab needs; promoting a
- * Slab draft into a real Commercial Component needs a follow-up migration
- * first.
+ * Whole Quantity: the entire quantity is priced at the single band it falls
+ * into. Progressive: each band is priced separately and summed (the real
+ * domain's own "graduated" primitive, see `toPricingRuleKind`). These are
+ * two distinct, equally real slab methods, not one method with a footnote.
  */
-function toPricingRuleKind(model: RecurringPricingModel | OnDemandPricingType): PricingRuleKind {
-  switch (model) {
+type SlabMethod = "whole_quantity" | "progressive"
+
+/**
+ * Recurring defaults to Per Unit; Non-Recurring and On-Demand both default
+ * to Flat Fee (On-Demand deliberately mirrors Non-Recurring's default for
+ * V1). The user may change the model after defaulting.
+ */
+function defaultPricingModelFor(nature: CommercialNature): PricingModel {
+  return nature === "recurring" ? "per_unit" : "flat_fee"
+}
+
+/**
+ * Maps this stage's Pricing Model onto the real, locked `PricingRuleKind`.
+ * Slab is the one model whose real-domain mapping depends on a second
+ * input, `slabMethod`: Whole Quantity maps to `"volume"` (the locked
+ * domain's own "all-units" primitive), Progressive maps to `"graduated"`
+ * (the locked domain's own progressive/cumulative-tiered primitive,
+ * `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §6 and its scenario 1). Both
+ * already exist in the locked domain; this stage does not invent either
+ * one, it only chooses which of the two a Slab component means.
+ */
+function toPricingRuleKind(pricingModel: PricingModel, slabMethod?: SlabMethod | null): PricingRuleKind {
+  switch (pricingModel) {
     case "per_unit":
       return "linear"
     case "flat_fee":
-    case "fixed_fee":
       return "flat"
-    case "slab":
-      return "volume"
     case "designation_based":
       return "dimension"
+    case "slab":
+      return slabMethod === "progressive" ? "graduated" : "volume"
   }
 }
 
 // =============================================================================
-// Billing terms (per component/row, task spec §16-18)
+// Invoice terms (per component, corrected: no Payment Terms)
 // =============================================================================
 
 /**
- * `billingCycle`/`billingTiming` are Reference Master `billing_cycle`/
- * `billing_timing` values (freely configurable, docs §22), not TypeScript
- * enums: unlike the real, locked `BillingCadence`/`BillingTiming` (4 and 2
- * values respectively), this stage needs "One-Time" and "On-Demand" cycle
- * values and "On Completion"/"On Demand" timing values that the real
- * Commercial domain does not accept yet. Storing them as plain Reference
- * Master codes, resolved through ../../reference-data rather than a
- * TypeScript union, keeps that wider range honest without redeclaring the
- * real `BillingCadence`/`BillingTiming` types with extra members they do
- * not actually support.
+ * Invoice Frequency (how often the customer is invoiced) and Invoice Timing
+ * (Advance or Postpaid) describe the invoice cycle only. They never drive
+ * revenue recognition: a Recurring component's revenue is monthly
+ * regardless of these values (docs §22). Both are Reference Master
+ * `invoice_frequency`/`invoice_timing` values (freely configurable), not
+ * TypeScript enums, so Settings can extend them without a code change.
+ * Payment Terms is deliberately absent: out of scope for Commercial Rate.
  */
-type PaymentTermsSelection = {
-  /** Reference Master `payment_terms` value, e.g. "due_on_receipt", "days_30", "custom". */
-  paymentTermsCode: string | null
-  /** Required, positive integer, only when `paymentTermsCode === "custom"` (task spec §18). */
-  customPaymentDays: number | null
+type InvoiceTerms = {
+  invoiceFrequency: string | null
+  invoiceTiming: string | null
 }
 
-type BillingTerms = {
-  billingCycle: string | null
-  billingTiming: string | null
-  paymentTerms: PaymentTermsSelection
+function emptyInvoiceTerms(): InvoiceTerms {
+  return { invoiceFrequency: null, invoiceTiming: null }
 }
 
-function emptyBillingTerms(): BillingTerms {
-  return { billingCycle: null, billingTiming: null, paymentTerms: { paymentTermsCode: null, customPaymentDays: null } }
+/**
+ * Invoice Frequency is required for Recurring and Non-Recurring (Non-
+ * Recurring's own value is fixed to "one_time" automatically, never
+ * user-chosen), and optional for On-Demand: an on-demand charge is billed
+ * only when triggered, so a fixed cadence does not always apply. Invoice
+ * Timing is always required.
+ */
+function isInvoiceTermsComplete(nature: CommercialNature, terms: InvoiceTerms): boolean {
+  if (nature === "on_demand") return terms.invoiceTiming !== null
+  return terms.invoiceFrequency !== null && terms.invoiceTiming !== null
 }
 
 // =============================================================================
-// MUG (Minimum Usage Guarantee), task spec §12
+// MUG (Minimum Usage Guarantee): a UNIT quantity floor, corrected from money
 // =============================================================================
 
 /**
- * MUG here is a monetary floor ("Final billable amount = MAX(calculated
- * pricing amount, MUG amount)"), never a quantity floor. This is a
- * deliberate naming note for docs, not a design choice made lightly: the
- * locked Commercial domain (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §8)
- * separates a minimum QUANTITY commitment (a floor on chargeable quantity,
- * applied before pricing, always monthly) from a minimum SPEND commitment
- * (a floor on the resulting money amount, applied after pricing, any
- * cadence). This task's "MUG" is unambiguously the second one, a spend
- * commitment scoped to exactly this one component (`memberComponentIds`
- * with a single entry, which the locked spend-commitment shape already
- * allows), even though the business name "Minimum Usage Guarantee" sounds
- * quantity-shaped. `frequency` reuses the `billing_cycle` Reference Master
- * list rather than a parallel list, matching spend commitment's own
- * `period: BillingCadence` field.
+ * MUG floors the billable quantity of whichever Pricing Unit the component
+ * already uses (`revenue quantity = MAX(actual quantity, MUG units)`),
+ * always monthly, never a second unit choice, never a frequency choice,
+ * never money. Available only where a unit quantity logically exists (Per
+ * Unit, Slab, Designation Based); Flat Fee has no unit basis at all, so it
+ * never gets a `mug` field; Non-Recurring is a one-time charge with no
+ * monthly cadence to floor against, so it never gets one either, regardless
+ * of pricing model (see `PricingFieldsNoMug` below).
  */
-type MugOverlay =
-  | { enabled: false }
-  | { enabled: true; amount: number | null; frequency: string | null }
+type MugOverlay = { enabled: false } | { enabled: true; minimumUnits: number | null }
 
 function emptyMug(): MugOverlay {
   return { enabled: false }
 }
 
+function isMugComplete(mug: MugOverlay): boolean {
+  if (!mug.enabled) return true
+  return isPositive(mug.minimumUnits)
+}
+
 // =============================================================================
-// Slab rows (task spec §9-10) and Designation rows (task spec §11)
+// Slab rows and Designation rows
 // =============================================================================
 
-/**
- * Whole-quantity slab pricing: the row whose [from, to] range contains the
- * total quantity prices every unit at that row's rate. This is NOT
- * progressive/tiered pricing (see `toPricingRuleKind`'s header). `to: null`
- * means open-ended (task spec: "Last row may have blank/open-ended To
- * value").
- */
+/** One band of a Slab component. `to: null` means open-ended (the last row). */
 type SlabRow = { id: string; from: number | null; to: number | null; rate: number | null }
 
-/** `per` defaults to the Pricing Unit "USER" (task spec §11: "For V1: Per should default to User"). */
+/** `per` defaults to the Pricing Unit "USER" ("Unit should normally be User"). */
 type DesignationRow = { id: string; designation: string; rate: number | null; per: string | null }
 
 function newId(): string {
@@ -164,205 +186,13 @@ function createDesignationRow(): DesignationRow {
   return { id: newId(), designation: "", rate: null, per: "USER" }
 }
 
-// =============================================================================
-// Commercial Component draft (task spec §6, 8, 9, 11, 13, 14)
-// =============================================================================
-
-type CommercialComponentBase = {
-  id: string
-  /** "Component / Description". Free text, matching Commercial Scope's own precedent. */
-  description: string
-  billingTerms: BillingTerms
-  notes: string
-}
-
-/**
- * Effective dating applies to every ongoing (recurring/on-demand) component,
- * matching the real Commercial Component's own effectiveFrom/effectiveTo
- * (docs §17). Non-Recurring deliberately does NOT get this pair: task spec
- * §13 lists exactly one date field for it, "Effective / Charge Date"
- * (`chargeDate` below), not a separate from/to range on top of it.
- */
-type EffectiveDated = {
-  effectiveFrom: string | null
-  effectiveTo: string | null
-}
-
-type RecurringPerUnitComponent = CommercialComponentBase &
-  EffectiveDated & {
-    nature: "recurring"
-    pricingModel: "per_unit"
-    rate: number | null
-    /** Reference Master `pricing_unit` value. */
-    pricingUnit: string | null
-    mug: MugOverlay
-  }
-
-type RecurringFlatFeeComponent = CommercialComponentBase &
-  EffectiveDated & {
-    nature: "recurring"
-    pricingModel: "flat_fee"
-    recurringAmount: number | null
-    mug: MugOverlay
-  }
-
-type RecurringSlabComponent = CommercialComponentBase &
-  EffectiveDated & {
-    nature: "recurring"
-    pricingModel: "slab"
-    pricingUnit: string | null
-    slabRows: SlabRow[]
-    mug: MugOverlay
-  }
-
-type RecurringDesignationComponent = CommercialComponentBase &
-  EffectiveDated & {
-    nature: "recurring"
-    pricingModel: "designation_based"
-    designationRows: DesignationRow[]
-    mug: MugOverlay
-  }
-
-/**
- * Distinct from a recurring Flat Fee: Non-Recurring is a one-time charge
- * (task spec §8/§13's explicit business rule: "Flat Fee means RECURRING
- * fixed commercial... Do NOT use Flat Fee for one-time/NON-RECURRING
- * charges"). No pricing model, no MUG (a one-time charge has nothing to
- * guarantee a minimum of); `billingTerms.billingCycle` is always the fixed
- * "one_time" Reference Master value, never user-chosen.
- */
-type NonRecurringComponent = CommercialComponentBase & {
-  nature: "non_recurring"
-  amount: number | null
-  /** "Effective / Charge Date": the one date field this shape has (see `EffectiveDated`'s header for why it has no separate from/to pair). */
-  chargeDate: string | null
-}
-
-type OnDemandPerUnitComponent = CommercialComponentBase &
-  EffectiveDated & {
-    nature: "on_demand"
-    pricingType: "per_unit"
-    rate: number | null
-    pricingUnit: string | null
-    mug: MugOverlay
-  }
-
-type OnDemandFixedFeeComponent = CommercialComponentBase &
-  EffectiveDated & {
-    nature: "on_demand"
-    pricingType: "fixed_fee"
-    amount: number | null
-    mug: MugOverlay
-  }
-
-type CommercialComponentDraft =
-  | RecurringPerUnitComponent
-  | RecurringFlatFeeComponent
-  | RecurringSlabComponent
-  | RecurringDesignationComponent
-  | NonRecurringComponent
-  | OnDemandPerUnitComponent
-  | OnDemandFixedFeeComponent
-
-function createComponent(nature: "recurring", model: "per_unit"): RecurringPerUnitComponent
-function createComponent(nature: "recurring", model: "flat_fee"): RecurringFlatFeeComponent
-function createComponent(nature: "recurring", model: "slab"): RecurringSlabComponent
-function createComponent(nature: "recurring", model: "designation_based"): RecurringDesignationComponent
-/** Fallback for a dynamically-chosen model (e.g. a Select's current value), where the literal is not known statically. */
-function createComponent(
-  nature: "recurring",
-  model: RecurringPricingModel
-): RecurringPerUnitComponent | RecurringFlatFeeComponent | RecurringSlabComponent | RecurringDesignationComponent
-function createComponent(nature: "non_recurring"): NonRecurringComponent
-function createComponent(nature: "on_demand", model: "per_unit"): OnDemandPerUnitComponent
-function createComponent(nature: "on_demand", model: "fixed_fee"): OnDemandFixedFeeComponent
-function createComponent(nature: "on_demand", model: OnDemandPricingType): OnDemandPerUnitComponent | OnDemandFixedFeeComponent
-function createComponent(
-  nature: CommercialNature,
-  model?: RecurringPricingModel | OnDemandPricingType
-): CommercialComponentDraft {
-  const base: CommercialComponentBase = {
-    id: newId(),
-    description: "",
-    billingTerms:
-      nature === "non_recurring"
-        ? { ...emptyBillingTerms(), billingCycle: "one_time" }
-        : nature === "on_demand"
-          ? { ...emptyBillingTerms(), billingCycle: "on_demand" }
-          : emptyBillingTerms(),
-    notes: "",
-  }
-
-  if (nature === "non_recurring") {
-    return { ...base, nature, amount: null, chargeDate: null }
-  }
-
-  const effectiveDated: EffectiveDated = { effectiveFrom: null, effectiveTo: null }
-
-  if (nature === "on_demand") {
-    const pricingType = (model as OnDemandPricingType) ?? "per_unit"
-    if (pricingType === "fixed_fee") {
-      return { ...base, ...effectiveDated, nature, pricingType, amount: null, mug: emptyMug() }
-    }
-    return { ...base, ...effectiveDated, nature, pricingType: "per_unit", rate: null, pricingUnit: null, mug: emptyMug() }
-  }
-
-  const pricingModel = (model as RecurringPricingModel) ?? "per_unit"
-  if (pricingModel === "flat_fee") {
-    return { ...base, ...effectiveDated, nature: "recurring", pricingModel, recurringAmount: null, mug: emptyMug() }
-  }
-  if (pricingModel === "slab") {
-    return { ...base, ...effectiveDated, nature: "recurring", pricingModel, pricingUnit: null, slabRows: [createSlabRow()], mug: emptyMug() }
-  }
-  if (pricingModel === "designation_based") {
-    return { ...base, ...effectiveDated, nature: "recurring", pricingModel, designationRows: [createDesignationRow()], mug: emptyMug() }
-  }
-  return { ...base, ...effectiveDated, nature: "recurring", pricingModel: "per_unit", rate: null, pricingUnit: null, mug: emptyMug() }
-}
-
-// =============================================================================
-// Commercial Rate draft (header + components), task spec §3, §28, §30
-// =============================================================================
-
-type CommercialRateDraft = {
-  /** "Commercial Scope / Package Name", free text, never restricted to a fixed module list (task spec §3). */
-  commercialScope: string
-  /** Reference Master `currency` value; applies to every component (task spec §28: not repeated per row in V1). */
-  billingCurrency: string | null
-  components: CommercialComponentDraft[]
-}
-
-function createEmptyCommercialRateDraft(): CommercialRateDraft {
-  return { commercialScope: "", billingCurrency: null, components: [] }
-}
-
-// =============================================================================
-// Validation (task spec §29-30): Draft stays permissive, Stage Complete does not
-// =============================================================================
-
-function isPositive(value: number | null): boolean {
-  return value !== null && Number.isFinite(value) && value > 0
-}
-
-function isBillingTermsComplete(terms: BillingTerms): boolean {
-  if (!terms.billingCycle || !terms.billingTiming || !terms.paymentTerms.paymentTermsCode) return false
-  if (terms.paymentTerms.paymentTermsCode === "custom") {
-    return terms.paymentTerms.customPaymentDays !== null && terms.paymentTerms.customPaymentDays > 0
-  }
-  return true
-}
-
-function isMugComplete(mug: MugOverlay): boolean {
-  if (!mug.enabled) return true
-  return isPositive(mug.amount) && mug.frequency !== null
-}
-
 /**
  * A row is "obviously overlapping" the previous one when its own `from` is
- * not strictly after the previous row's `to` (task spec §10: "no obviously
- * overlapping slab ranges... do not over-engineer advanced pricing
- * validation yet"). Rows are compared in the order given, not re-sorted:
- * V1 does not second-guess the order the user entered them in.
+ * not strictly after the previous row's `to`. Applies identically to both
+ * Slab Methods: Progressive bands are just as non-overlapping/contiguous as
+ * Whole Quantity bands, the methods differ only in how the total is
+ * calculated, never in row shape or validation. Rows are compared in the
+ * order given, not re-sorted.
  */
 function areSlabRowsValid(rows: SlabRow[]): boolean {
   if (rows.length === 0) return false
@@ -382,102 +212,235 @@ function areDesignationRowsValid(rows: DesignationRow[]): boolean {
   return rows.every((row) => row.designation.trim().length > 0 && isPositive(row.rate) && row.per !== null)
 }
 
+// =============================================================================
+// Non-Recurring revenue recognition (task correction §26-28)
+// =============================================================================
+
+type RevenueRecognitionMethod = "full_recognition" | "milestone_based"
+
+type Milestone = { id: string; name: string; recognitionPercent: number | null }
+
+function createMilestone(): Milestone {
+  return { id: newId(), name: "", recognitionPercent: null }
+}
+
+type RevenueRecognition =
+  | { method: "full_recognition" }
+  | { method: "milestone_based"; milestones: Milestone[] }
+
+function emptyRevenueRecognition(): RevenueRecognition {
+  return { method: "full_recognition" }
+}
+
+/** Milestone percentages must total 100, within floating-point tolerance. */
+function isRevenueRecognitionComplete(recognition: RevenueRecognition): boolean {
+  if (recognition.method === "full_recognition") return true
+  if (recognition.milestones.length === 0) return false
+  const allNamed = recognition.milestones.every(
+    (milestone) => milestone.name.trim().length > 0 && isPositive(milestone.recognitionPercent)
+  )
+  if (!allNamed) return false
+  const total = recognition.milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
+  return Math.abs(total - 100) < 0.001
+}
+
+// =============================================================================
+// Commercial Component draft
+// =============================================================================
+
+type CommercialComponentBase = {
+  id: string
+  /** Free text component name, e.g. "SFA", "Implementation", "WhatsApp". Never restricted to a fixed product list. */
+  description: string
+  invoiceTerms: InvoiceTerms
+  effectiveFrom: string | null
+  effectiveTo: string | null
+  notes: string
+}
+
+type PerUnitPricing = { pricingModel: "per_unit"; rate: number | null; pricingUnit: string | null }
+type FlatFeePricing = { pricingModel: "flat_fee"; amount: number | null }
+type SlabPricing = { pricingModel: "slab"; pricingUnit: string | null; slabMethod: SlabMethod; slabRows: SlabRow[] }
+type DesignationPricing = { pricingModel: "designation_based"; designationRows: DesignationRow[] }
+
+/** Non-Recurring: no unit basis to guarantee a minimum monthly quantity of (see MUG's own header). */
+type PricingFieldsNoMug = PerUnitPricing | FlatFeePricing | SlabPricing | DesignationPricing
+
+/** Recurring/On-Demand: MUG is offered wherever a unit quantity exists (never on Flat Fee). */
+type PricingFieldsWithMug =
+  | (PerUnitPricing & { mug: MugOverlay })
+  | FlatFeePricing
+  | (SlabPricing & { mug: MugOverlay })
+  | (DesignationPricing & { mug: MugOverlay })
+
 /**
- * Per-component required fields, matching task spec §29's worked examples
- * exactly: Recurring+Per Unit needs Component/Rate/Per/Billing Cycle/
- * Billing Timing/Payment Terms; Recurring+Slab needs Component/Per/at least
- * one valid slab/billing terms; Designation Based needs Component/at least
- * one designation row/billing terms; Non-Recurring needs Description/
- * Amount/Billing Timing/Payment Terms; On-Demand+Per Unit needs Component/
- * Rate/Per/billing terms. Notes are never required; MUG fields are required
- * only once MUG is enabled (`isMugComplete`); Custom Payment Days is
- * required only when Payment Terms is Custom (`isBillingTermsComplete`).
+ * Recurring and On-Demand share one shape: both are "ongoing" natures where
+ * a MUG can meaningfully apply. They remain distinct business concepts
+ * (task correction: "preserve Commercial Nature as distinct... because
+ * downstream revenue/billing semantics may differ later"), only their V1
+ * data shape happens to coincide.
  */
-function isComponentComplete(component: CommercialComponentDraft): boolean {
-  if (component.description.trim().length === 0) return false
+type OngoingComponent = CommercialComponentBase & PricingFieldsWithMug & { nature: "recurring" | "on_demand" }
 
-  if (component.nature === "non_recurring") {
-    return isPositive(component.amount) && isBillingTermsComplete(component.billingTerms)
+/** Non-Recurring additionally carries its own Revenue Recognition Method, never a pricing model concern. */
+type NonRecurringComponent = CommercialComponentBase &
+  PricingFieldsNoMug & { nature: "non_recurring"; revenueRecognition: RevenueRecognition }
+
+type CommercialComponentDraft = OngoingComponent | NonRecurringComponent
+
+function createPricingFields(pricingModel: PricingModel): PricingFieldsNoMug {
+  switch (pricingModel) {
+    case "per_unit":
+      return { pricingModel, rate: null, pricingUnit: null }
+    case "flat_fee":
+      return { pricingModel, amount: null }
+    case "slab":
+      return { pricingModel, pricingUnit: null, slabMethod: "whole_quantity", slabRows: [createSlabRow()] }
+    case "designation_based":
+      return { pricingModel, designationRows: [createDesignationRow()] }
+  }
+}
+
+function createComponent(nature: "recurring" | "on_demand", pricingModel: "per_unit"): Extract<OngoingComponent, { pricingModel: "per_unit" }>
+function createComponent(nature: "recurring" | "on_demand", pricingModel: "flat_fee"): Extract<OngoingComponent, { pricingModel: "flat_fee" }>
+function createComponent(nature: "recurring" | "on_demand", pricingModel: "slab"): Extract<OngoingComponent, { pricingModel: "slab" }>
+function createComponent(
+  nature: "recurring" | "on_demand",
+  pricingModel: "designation_based"
+): Extract<OngoingComponent, { pricingModel: "designation_based" }>
+function createComponent(nature: "non_recurring", pricingModel: "per_unit"): Extract<NonRecurringComponent, { pricingModel: "per_unit" }>
+function createComponent(nature: "non_recurring", pricingModel: "flat_fee"): Extract<NonRecurringComponent, { pricingModel: "flat_fee" }>
+function createComponent(nature: "non_recurring", pricingModel: "slab"): Extract<NonRecurringComponent, { pricingModel: "slab" }>
+function createComponent(
+  nature: "non_recurring",
+  pricingModel: "designation_based"
+): Extract<NonRecurringComponent, { pricingModel: "designation_based" }>
+/** Fallback for a dynamically-chosen nature/model (e.g. a Select's current value), where the literal is not known statically. */
+function createComponent(nature: CommercialNature, pricingModel?: PricingModel): CommercialComponentDraft
+function createComponent(nature: CommercialNature, pricingModel?: PricingModel): CommercialComponentDraft {
+  const model = pricingModel ?? defaultPricingModelFor(nature)
+  const base: CommercialComponentBase = {
+    id: newId(),
+    description: "",
+    invoiceTerms: nature === "non_recurring" ? { ...emptyInvoiceTerms(), invoiceFrequency: "one_time" } : emptyInvoiceTerms(),
+    effectiveFrom: null,
+    effectiveTo: null,
+    notes: "",
+  }
+  const pricing = createPricingFields(model)
+
+  if (nature === "non_recurring") {
+    return { ...base, ...pricing, nature, revenueRecognition: emptyRevenueRecognition() } as CommercialComponentDraft
   }
 
-  if (!isBillingTermsComplete(component.billingTerms)) return false
+  const withMug =
+    pricing.pricingModel === "flat_fee" ? pricing : { ...pricing, mug: emptyMug() }
+  return { ...base, ...withMug, nature } as CommercialComponentDraft
+}
 
-  if (component.nature === "on_demand" && component.pricingType === "fixed_fee") {
-    return isPositive(component.amount) && isMugComplete(component.mug)
-  }
-  if (component.nature === "on_demand") {
-    return isPositive(component.rate) && component.pricingUnit !== null && isMugComplete(component.mug)
-  }
+// =============================================================================
+// Commercial Rate draft (header + components)
+// =============================================================================
 
-  // Recurring.
-  if (component.pricingModel === "flat_fee") {
-    return isPositive(component.recurringAmount) && isMugComplete(component.mug)
-  }
-  if (component.pricingModel === "slab") {
-    return component.pricingUnit !== null && areSlabRowsValid(component.slabRows) && isMugComplete(component.mug)
-  }
-  if (component.pricingModel === "designation_based") {
-    return areDesignationRowsValid(component.designationRows) && isMugComplete(component.mug)
-  }
-  return isPositive(component.rate) && component.pricingUnit !== null && isMugComplete(component.mug)
+type CommercialRateDraft = {
+  /** Reference Master `currency` value. Customer-level for this Commercial Configuration; not repeated per component. */
+  billingCurrency: string | null
+  components: CommercialComponentDraft[]
+}
+
+function createEmptyCommercialRateDraft(): CommercialRateDraft {
+  return { billingCurrency: null, components: [] }
+}
+
+// =============================================================================
+// Validation: Draft stays permissive, Stage Complete does not
+// =============================================================================
+
+function isPositive(value: number | null): boolean {
+  return value !== null && Number.isFinite(value) && value > 0
 }
 
 /**
- * Stage Complete requires Billing Currency, Commercial Scope, at least one
- * component, and every component individually complete (task spec §30).
- * Commercial Scope is treated as required: it is the one human-readable
- * summary of what was commercially agreed, and a priced customer with a
- * blank scope would be an incomplete record for whoever reviews this later.
- * This is a judgment call flagged for review, not an existing-architecture
- * answer (task spec §30 invited exactly this kind of reported choice).
+ * Per-component required fields. Description, Invoice Timing (and Invoice
+ * Frequency unless On-Demand) are required for every component; MUG is
+ * required only once enabled, and only ever offered on Recurring/On-Demand
+ * (never Non-Recurring, never Flat Fee); milestone percentages must total
+ * 100 only once Non-Recurring's Revenue Recognition Method is Milestone
+ * Based. Notes are never required.
+ */
+function isComponentComplete(component: CommercialComponentDraft): boolean {
+  if (component.description.trim().length === 0) return false
+  if (!isInvoiceTermsComplete(component.nature, component.invoiceTerms)) return false
+  if (component.nature === "non_recurring" && !isRevenueRecognitionComplete(component.revenueRecognition)) return false
+
+  if (component.pricingModel === "per_unit") {
+    if (!isPositive(component.rate) || component.pricingUnit === null) return false
+    return component.nature === "non_recurring" ? true : isMugComplete(component.mug)
+  }
+  if (component.pricingModel === "flat_fee") {
+    return isPositive(component.amount)
+  }
+  if (component.pricingModel === "slab") {
+    if (component.pricingUnit === null || !areSlabRowsValid(component.slabRows)) return false
+    return component.nature === "non_recurring" ? true : isMugComplete(component.mug)
+  }
+  // designation_based
+  if (!areDesignationRowsValid(component.designationRows)) return false
+  return component.nature === "non_recurring" ? true : isMugComplete(component.mug)
+}
+
+/**
+ * Stage Complete requires Billing Currency, at least one component, and
+ * every component individually complete. There is no Commercial Scope to
+ * additionally require: it does not exist in the corrected model.
  */
 function isCommercialRateDraftComplete(draft: CommercialRateDraft): boolean {
   if (!draft.billingCurrency) return false
-  if (draft.commercialScope.trim().length === 0) return false
   if (draft.components.length === 0) return false
   return draft.components.every(isComponentComplete)
 }
 
 /** Whether any field in the draft has been touched, for the Not Started / Attention distinction (see ./stage-status.ts). */
 function isCommercialRateDraftStarted(draft: CommercialRateDraft): boolean {
-  return draft.billingCurrency !== null || draft.commercialScope.trim().length > 0 || draft.components.length > 0
+  return draft.billingCurrency !== null || draft.components.length > 0
 }
 
 export {
+  defaultPricingModelFor,
   toPricingRuleKind,
-  emptyBillingTerms,
+  emptyInvoiceTerms,
+  isInvoiceTermsComplete,
   emptyMug,
+  isMugComplete,
   newId,
   createSlabRow,
   createDesignationRow,
+  areSlabRowsValid,
+  areDesignationRowsValid,
+  createMilestone,
+  emptyRevenueRecognition,
+  isRevenueRecognitionComplete,
   createComponent,
   createEmptyCommercialRateDraft,
   isPositive,
-  isBillingTermsComplete,
-  isMugComplete,
-  areSlabRowsValid,
-  areDesignationRowsValid,
   isComponentComplete,
   isCommercialRateDraftComplete,
   isCommercialRateDraftStarted,
 }
 export type {
   CommercialNature,
-  RecurringPricingModel,
-  OnDemandPricingType,
-  PaymentTermsSelection,
-  BillingTerms,
+  PricingModel,
+  SlabMethod,
+  InvoiceTerms,
   MugOverlay,
   SlabRow,
   DesignationRow,
+  RevenueRecognitionMethod,
+  Milestone,
+  RevenueRecognition,
   CommercialComponentBase,
-  RecurringPerUnitComponent,
-  RecurringFlatFeeComponent,
-  RecurringSlabComponent,
-  RecurringDesignationComponent,
+  OngoingComponent,
   NonRecurringComponent,
-  OnDemandPerUnitComponent,
-  OnDemandFixedFeeComponent,
   CommercialComponentDraft,
   CommercialRateDraft,
 }

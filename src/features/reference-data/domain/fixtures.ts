@@ -60,8 +60,9 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
     { value: "SGD", label: "SGD - Singapore Dollar", active: true },
     { value: "IDR", label: "IDR - Indonesian Rupiah", active: true },
   ],
-  // Commercial Rate lists (task spec: Customer Onboarding Commercial Rate
-  // V1). Stable codes, never the display label, matching every list above.
+  // Commercial Rate lists (Customer Onboarding Commercial Rate V1, corrected
+  // business model, docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22). Stable
+  // codes, never the display label, matching every list above.
   pricing_unit: [
     { value: "USER", label: "User", active: true },
     { value: "MESSAGE", label: "Message", active: true },
@@ -71,30 +72,27 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
     { value: "REQUEST", label: "Request", active: true },
     { value: "MAN_DAY", label: "Man-day", active: true },
     { value: "DAY", label: "Day", active: true },
+    { value: "IMAGE", label: "Image", active: true },
+    { value: "REPORT", label: "Report", active: true },
+    { value: "DASHBOARD", label: "Dashboard", active: true },
   ],
-  billing_cycle: [
+  // How often the customer is invoiced. Distinct from revenue recognition:
+  // a Recurring component's revenue is always monthly regardless of this
+  // value (docs §22). No "On-Demand" value here: On-Demand components leave
+  // this optional and pick from the same real cadences where applicable.
+  invoice_frequency: [
     { value: "monthly", label: "Monthly", active: true },
     { value: "quarterly", label: "Quarterly", active: true },
     { value: "half_yearly", label: "Half-Yearly", active: true },
     { value: "annual", label: "Annual", active: true },
     { value: "one_time", label: "One-Time", active: true },
-    { value: "on_demand", label: "On-Demand", active: true },
   ],
-  billing_timing: [
+  // Whether an invoice is raised in advance of the period or after
+  // (postpaid). "Postpaid" is the corrected business wording; "Arrears",
+  // "On Completion", and "On Demand" were removed as separate timing values.
+  invoice_timing: [
     { value: "advance", label: "Advance", active: true },
-    { value: "arrears", label: "Arrears", active: true },
-    { value: "on_completion", label: "On Completion", active: true },
-    { value: "on_demand", label: "On Demand", active: true },
-  ],
-  payment_terms: [
-    { value: "due_on_receipt", label: "Due on Receipt", active: true },
-    { value: "days_7", label: "7 Days", active: true },
-    { value: "days_15", label: "15 Days", active: true },
-    { value: "days_30", label: "30 Days", active: true },
-    { value: "days_45", label: "45 Days", active: true },
-    { value: "days_60", label: "60 Days", active: true },
-    { value: "days_90", label: "90 Days", active: true },
-    { value: "custom", label: "Custom", active: true },
+    { value: "postpaid", label: "Postpaid", active: true },
   ],
   commercial_nature: [
     { value: "recurring", label: "Recurring", active: true },
@@ -102,14 +100,16 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
     { value: "on_demand", label: "On-Demand", active: true },
   ],
   // System-supported calculation models (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md
-  // §23): Settings may Activate/Deactivate these, never add a new one, since a
-  // new value here needs new Pricing Kernel calculation logic to mean anything.
+  // §22): Settings may Activate/Deactivate these, never add a new one, since a
+  // new value here needs new Pricing Kernel calculation logic to mean
+  // anything. Shared across all three Commercial Natures (Recurring,
+  // Non-Recurring, On-Demand); no separate "Fixed Fee" value is needed since
+  // Flat Fee already covers a fixed, non-usage-based amount for every nature.
   pricing_model: [
     { value: "per_unit", label: "Per Unit", active: true },
     { value: "flat_fee", label: "Flat Fee", active: true },
     { value: "slab", label: "Slab", active: true },
     { value: "designation_based", label: "Designation Based", active: true },
-    { value: "fixed_fee", label: "Fixed Fee", active: true },
   ],
 }
 

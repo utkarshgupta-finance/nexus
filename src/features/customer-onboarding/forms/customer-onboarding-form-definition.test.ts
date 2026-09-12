@@ -53,9 +53,8 @@ const FAKE_OPTIONS: Record<ReferenceListKey, ReferenceOption[]> = {
   // is not a survey page, see ../ui/commercial-rate-section.tsx), present
   // only to satisfy ReferenceListKey's full Record shape.
   pricing_unit: [],
-  billing_cycle: [],
-  billing_timing: [],
-  payment_terms: [],
+  invoice_frequency: [],
+  invoice_timing: [],
   commercial_nature: [],
   pricing_model: [],
 }

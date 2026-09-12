@@ -40,9 +40,8 @@ const REFERENCE_LISTS: { key: ReferenceListKey; label: string }[] = [
   { key: "phone_country_code", label: "Phone Country Code" },
   { key: "currency", label: "Currency" },
   { key: "pricing_unit", label: "Pricing Unit" },
-  { key: "billing_cycle", label: "Billing Cycle" },
-  { key: "billing_timing", label: "Billing Timing" },
-  { key: "payment_terms", label: "Payment Terms" },
+  { key: "invoice_frequency", label: "Invoice Frequency" },
+  { key: "invoice_timing", label: "Invoice Timing" },
   { key: "commercial_nature", label: "Commercial Nature" },
   { key: "pricing_model", label: "Pricing Model" },
 ]

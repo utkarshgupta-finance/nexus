@@ -2,8 +2,8 @@
  * Reference Master: the controlled option lists Nexus forms select from
  * (Country, Industry, Segment, Business Unit, Phone Country Code, Currency,
  * plus the Commercial Rate lists added for Customer Onboarding's Commercial
- * Rate stage: Pricing Unit, Billing Cycle, Billing Timing, Payment Terms,
- * Commercial Nature, Pricing Model).
+ * Rate stage: Pricing Unit, Invoice Frequency, Invoice Timing, Commercial
+ * Nature, Pricing Model).
  *
  * A Reference Master value is never physically removed once it has been
  * offered to a user: deactivating a value stops it appearing in new
@@ -23,8 +23,8 @@
  *
  * Not every list here is governed identically (docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md
  * §22 documents the distinction in full):
- * - **Freely configurable**: `pricing_unit`, `billing_cycle`, `billing_timing`,
- *   `payment_terms`. Pure administrative data; a new value needs no code change.
+ * - **Freely configurable**: `pricing_unit`, `invoice_frequency`,
+ *   `invoice_timing`. Pure administrative data; a new value needs no code change.
  * - **Controlled business option**: `commercial_nature`. Each value drives real
  *   UI/validation branching, so a value added here without matching code has no
  *   effect; Settings still allows adding one, but it does not become usable on
@@ -33,6 +33,10 @@
  *   calculation logic in the Pricing Kernel; Settings only allows Activate/
  *   Deactivate for this list, never adding a new one (see
  *   ../ui/reference-master-settings.tsx).
+ *
+ * Payment Terms is deliberately not a Reference Master list here: Commercial
+ * Rate V1 was corrected to exclude payment terms entirely from this stage
+ * (they belong to a later Invoice/Collections configuration, see docs §22).
  */
 
 type ReferenceListKey =
@@ -43,9 +47,8 @@ type ReferenceListKey =
   | "phone_country_code"
   | "currency"
   | "pricing_unit"
-  | "billing_cycle"
-  | "billing_timing"
-  | "payment_terms"
+  | "invoice_frequency"
+  | "invoice_timing"
   | "commercial_nature"
   | "pricing_model"
 

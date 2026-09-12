@@ -6,44 +6,52 @@ import {
   createComponent,
   createDesignationRow,
   createEmptyCommercialRateDraft,
+  createMilestone,
   createSlabRow,
-  isBillingTermsComplete,
+  defaultPricingModelFor,
   isCommercialRateDraftComplete,
   isCommercialRateDraftStarted,
   isComponentComplete,
+  isInvoiceTermsComplete,
   isMugComplete,
+  isRevenueRecognitionComplete,
   toPricingRuleKind,
 } from "./commercial-rate"
-import type {
-  BillingTerms,
-  CommercialComponentDraft,
-  CommercialRateDraft,
-  RecurringPerUnitComponent,
-} from "./commercial-rate"
+import type { CommercialComponentDraft, CommercialRateDraft, InvoiceTerms, OngoingComponent } from "./commercial-rate"
 
-const COMPLETE_TERMS: BillingTerms = {
-  billingCycle: "monthly",
-  billingTiming: "advance",
-  paymentTerms: { paymentTermsCode: "due_on_receipt", customPaymentDays: null },
-}
+const COMPLETE_TERMS: InvoiceTerms = { invoiceFrequency: "monthly", invoiceTiming: "advance" }
 
 function withDescription<T extends CommercialComponentDraft>(component: T, description: string): T {
   return { ...component, description }
 }
 
+describe("defaultPricingModelFor", () => {
+  it("Recurring defaults to Per Unit", () => {
+    expect(defaultPricingModelFor("recurring")).toBe("per_unit")
+  })
+  it("Non-Recurring defaults to Flat Fee", () => {
+    expect(defaultPricingModelFor("non_recurring")).toBe("flat_fee")
+  })
+  it("On-Demand mirrors Non-Recurring and defaults to Flat Fee", () => {
+    expect(defaultPricingModelFor("on_demand")).toBe("flat_fee")
+  })
+})
+
 describe("toPricingRuleKind", () => {
   it("maps Per Unit to linear", () => {
     expect(toPricingRuleKind("per_unit")).toBe("linear")
   })
-  it("maps Flat Fee and Fixed Fee to flat", () => {
+  it("maps Flat Fee to flat", () => {
     expect(toPricingRuleKind("flat_fee")).toBe("flat")
-    expect(toPricingRuleKind("fixed_fee")).toBe("flat")
-  })
-  it("maps Slab to volume, never graduated (whole-quantity, not progressive)", () => {
-    expect(toPricingRuleKind("slab")).toBe("volume")
   })
   it("maps Designation Based to dimension", () => {
     expect(toPricingRuleKind("designation_based")).toBe("dimension")
+  })
+  it("maps Whole Quantity Slab to volume", () => {
+    expect(toPricingRuleKind("slab", "whole_quantity")).toBe("volume")
+  })
+  it("maps Progressive Slab to graduated, never volume", () => {
+    expect(toPricingRuleKind("slab", "progressive")).toBe("graduated")
   })
 })
 
@@ -55,18 +63,20 @@ describe("createComponent", () => {
     expect(component.rate).toBeNull()
     expect(component.pricingUnit).toBeNull()
     expect(component.mug).toEqual({ enabled: false })
-    expect(component.billingTerms.billingCycle).toBeNull()
+    expect(component.invoiceTerms.invoiceFrequency).toBeNull()
   })
 
-  it("creates a Recurring Flat Fee component", () => {
+  it("creates a Recurring Flat Fee component with no MUG field at all (no unit basis)", () => {
     const component = createComponent("recurring", "flat_fee")
     expect(component.pricingModel).toBe("flat_fee")
-    expect(component.recurringAmount).toBeNull()
+    expect(component.amount).toBeNull()
+    expect("mug" in component).toBe(false)
   })
 
-  it("creates a Recurring Slab component with one starter slab row", () => {
+  it("creates a Recurring Slab component with one starter row, default method Whole Quantity", () => {
     const component = createComponent("recurring", "slab")
     expect(component.pricingModel).toBe("slab")
+    expect(component.slabMethod).toBe("whole_quantity")
     expect(component.slabRows).toHaveLength(1)
   })
 
@@ -77,24 +87,23 @@ describe("createComponent", () => {
     expect(component.designationRows[0].per).toBe("USER")
   })
 
-  it("creates a Non-Recurring component with billing cycle fixed to one_time and no MUG field", () => {
-    const component = createComponent("non_recurring")
-    expect(component.nature).toBe("non_recurring")
-    expect(component.billingTerms.billingCycle).toBe("one_time")
-    expect("mug" in component).toBe(false)
-    expect("pricingModel" in component).toBe(false)
+  it("creates a Non-Recurring component with invoice frequency fixed to one_time, no MUG on any pricing model, and a Revenue Recognition field", () => {
+    const flatFee = createComponent("non_recurring", "flat_fee")
+    expect(flatFee.nature).toBe("non_recurring")
+    expect(flatFee.invoiceTerms.invoiceFrequency).toBe("one_time")
+    expect(flatFee.revenueRecognition).toEqual({ method: "full_recognition" })
+
+    const perUnit = createComponent("non_recurring", "per_unit")
+    expect("mug" in perUnit).toBe(false)
+    const slab = createComponent("non_recurring", "slab")
+    expect("mug" in slab).toBe(false)
   })
 
-  it("creates an On-Demand Per Unit component with billing cycle fixed to on_demand", () => {
+  it("creates an On-Demand Per Unit component with invoice frequency left optional (null)", () => {
     const component = createComponent("on_demand", "per_unit")
-    expect(component.pricingType).toBe("per_unit")
-    expect(component.billingTerms.billingCycle).toBe("on_demand")
-  })
-
-  it("creates an On-Demand Fixed Fee component", () => {
-    const component = createComponent("on_demand", "fixed_fee")
-    expect(component.pricingType).toBe("fixed_fee")
-    expect(component.amount).toBeNull()
+    expect(component.nature).toBe("on_demand")
+    expect(component.invoiceTerms.invoiceFrequency).toBeNull()
+    expect(component.mug).toEqual({ enabled: false })
   })
 
   it("gives every created component its own id", () => {
@@ -104,33 +113,37 @@ describe("createComponent", () => {
   })
 })
 
-describe("isBillingTermsComplete", () => {
-  it("is false with nothing set", () => {
-    expect(isBillingTermsComplete({ billingCycle: null, billingTiming: null, paymentTerms: { paymentTermsCode: null, customPaymentDays: null } })).toBe(false)
+describe("isInvoiceTermsComplete", () => {
+  it("Recurring requires both frequency and timing", () => {
+    expect(isInvoiceTermsComplete("recurring", { invoiceFrequency: null, invoiceTiming: null })).toBe(false)
+    expect(isInvoiceTermsComplete("recurring", { invoiceFrequency: "monthly", invoiceTiming: null })).toBe(false)
+    expect(isInvoiceTermsComplete("recurring", COMPLETE_TERMS)).toBe(true)
   })
-  it("is true once cycle, timing, and a non-custom payment term are set", () => {
-    expect(isBillingTermsComplete(COMPLETE_TERMS)).toBe(true)
+
+  it("Non-Recurring requires both, frequency is normally already fixed by createComponent", () => {
+    expect(isInvoiceTermsComplete("non_recurring", { invoiceFrequency: "one_time", invoiceTiming: null })).toBe(false)
+    expect(isInvoiceTermsComplete("non_recurring", { invoiceFrequency: "one_time", invoiceTiming: "advance" })).toBe(true)
   })
-  it("requires Payment Days only when Payment Terms is Custom", () => {
-    const custom: BillingTerms = { ...COMPLETE_TERMS, paymentTerms: { paymentTermsCode: "custom", customPaymentDays: null } }
-    expect(isBillingTermsComplete(custom)).toBe(false)
-    expect(isBillingTermsComplete({ ...custom, paymentTerms: { paymentTermsCode: "custom", customPaymentDays: 21 } })).toBe(true)
+
+  it("On-Demand only requires timing, frequency is optional", () => {
+    expect(isInvoiceTermsComplete("on_demand", { invoiceFrequency: null, invoiceTiming: null })).toBe(false)
+    expect(isInvoiceTermsComplete("on_demand", { invoiceFrequency: null, invoiceTiming: "advance" })).toBe(true)
   })
 })
 
-describe("isMugComplete", () => {
-  it("is true when disabled, regardless of amount/frequency", () => {
+describe("isMugComplete (unit quantity, never money)", () => {
+  it("is true when disabled, regardless of minimumUnits", () => {
     expect(isMugComplete({ enabled: false })).toBe(true)
   })
-  it("is false when enabled with no amount or frequency", () => {
-    expect(isMugComplete({ enabled: true, amount: null, frequency: null })).toBe(false)
+  it("is false when enabled with no minimum units", () => {
+    expect(isMugComplete({ enabled: true, minimumUnits: null })).toBe(false)
   })
-  it("is true only once both amount and frequency are set", () => {
-    expect(isMugComplete({ enabled: true, amount: 200000, frequency: "monthly" })).toBe(true)
+  it("is true once a positive minimum unit quantity is set", () => {
+    expect(isMugComplete({ enabled: true, minimumUnits: 5000 })).toBe(true)
   })
 })
 
-describe("areSlabRowsValid (whole-quantity slab semantics, task spec: not progressive)", () => {
+describe("areSlabRowsValid (row shape shared by both Slab Methods)", () => {
   it("is false with zero rows", () => {
     expect(areSlabRowsValid([])).toBe(false)
   })
@@ -139,7 +152,7 @@ describe("areSlabRowsValid (whole-quantity slab semantics, task spec: not progre
     expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: 100 }])).toBe(true)
   })
 
-  it("is true for the task's own worked example: 1-100 @100, 101-250 @90, 251+ @80", () => {
+  it("is true for the spec's own worked example: 1-100 @100, 101-250 @90, 251+ @80", () => {
     const rows = [
       { id: "1", from: 1, to: 100, rate: 100 },
       { id: "2", from: 101, to: 250, rate: 90 },
@@ -168,14 +181,6 @@ describe("areSlabRowsValid (whole-quantity slab semantics, task spec: not progre
     ]
     expect(areSlabRowsValid(rows)).toBe(false)
   })
-
-  it("allows a blank/open-ended To only on the last row's own value, still valid mid-list logic aside", () => {
-    const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: null, rate: 80 },
-    ]
-    expect(areSlabRowsValid(rows)).toBe(true)
-  })
 })
 
 describe("areDesignationRowsValid", () => {
@@ -198,67 +203,112 @@ describe("areDesignationRowsValid", () => {
   })
 })
 
+describe("isRevenueRecognitionComplete", () => {
+  it("Full Recognition is always complete", () => {
+    expect(isRevenueRecognitionComplete({ method: "full_recognition" })).toBe(true)
+  })
+
+  it("Milestone Based is incomplete with zero milestones", () => {
+    expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones: [] })).toBe(false)
+  })
+
+  it("Milestone Based is incomplete when percentages do not total 100", () => {
+    const milestones = [
+      { ...createMilestone(), name: "Kickoff", recognitionPercent: 40 },
+      { ...createMilestone(), name: "Go-Live", recognitionPercent: 40 },
+    ]
+    expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(false)
+  })
+
+  it("Milestone Based is complete once every milestone is named, positive, and percentages total exactly 100", () => {
+    const milestones = [
+      { ...createMilestone(), name: "Kickoff", recognitionPercent: 40 },
+      { ...createMilestone(), name: "Go-Live", recognitionPercent: 60 },
+    ]
+    expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(true)
+  })
+
+  it("is incomplete if any milestone is missing a name", () => {
+    const milestones = [{ ...createMilestone(), name: "", recognitionPercent: 100 }]
+    expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(false)
+  })
+})
+
 describe("isComponentComplete", () => {
-  it("Recurring + Per Unit: requires component, rate, unit, and full billing terms", () => {
+  it("Recurring + Per Unit: requires name, rate, unit, and full invoice terms", () => {
     const base = withDescription(createComponent("recurring", "per_unit"), "SFA")
     expect(isComponentComplete(base)).toBe(false)
-    const filled: RecurringPerUnitComponent = { ...base, rate: 50, pricingUnit: "USER", billingTerms: COMPLETE_TERMS }
+    const filled: OngoingComponent = { ...base, rate: 50, pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS }
     expect(isComponentComplete(filled)).toBe(true)
   })
 
   it("Recurring + Per Unit: MUG optional, but required once enabled", () => {
-    const base = { ...withDescription(createComponent("recurring", "per_unit"), "SFA"), rate: 50, pricingUnit: "USER", billingTerms: COMPLETE_TERMS }
+    const base = { ...withDescription(createComponent("recurring", "per_unit"), "SFA"), rate: 50, pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS }
     expect(isComponentComplete(base)).toBe(true)
-    const withMugOn = { ...base, mug: { enabled: true, amount: null, frequency: null } }
+    const withMugOn = { ...base, mug: { enabled: true, minimumUnits: null } }
     expect(isComponentComplete(withMugOn)).toBe(false)
-    const withMugComplete = { ...base, mug: { enabled: true, amount: 200000, frequency: "monthly" } }
+    const withMugComplete = { ...base, mug: { enabled: true, minimumUnits: 5000 } }
     expect(isComponentComplete(withMugComplete)).toBe(true)
   })
 
-  it("Recurring + Flat Fee: requires only a positive recurring amount plus billing terms, never confused with Non-Recurring", () => {
-    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), billingTerms: COMPLETE_TERMS }
-    expect(isComponentComplete(component)).toBe(false)
-    expect(isComponentComplete({ ...component, recurringAmount: 200000 })).toBe(true)
-    expect(component.nature).toBe("recurring")
+  it("Flat Fee never offers MUG, for any nature", () => {
+    const recurring = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
+    expect(isComponentComplete(recurring)).toBe(true)
+    expect("mug" in recurring).toBe(false)
   })
 
-  it("Recurring + Slab: requires unit and at least one valid slab row", () => {
-    const component = { ...withDescription(createComponent("recurring", "slab"), "DMS"), billingTerms: COMPLETE_TERMS }
+  it("Recurring + Slab: requires unit and at least one valid slab row, either Slab Method", () => {
+    const component = { ...withDescription(createComponent("recurring", "slab"), "DMS"), invoiceTerms: COMPLETE_TERMS }
     expect(isComponentComplete(component)).toBe(false)
     const withUnit = { ...component, pricingUnit: "DISTRIBUTOR" }
     expect(isComponentComplete(withUnit)).toBe(false)
     const withRow = { ...withUnit, slabRows: [{ id: "1", from: 1, to: null, rate: 90 }] }
     expect(isComponentComplete(withRow)).toBe(true)
+    const progressive = { ...withRow, slabMethod: "progressive" as const }
+    expect(isComponentComplete(progressive)).toBe(true)
   })
 
   it("Designation Based: requires at least one complete designation row", () => {
-    const component = { ...withDescription(createComponent("recurring", "designation_based"), "Field Team"), billingTerms: COMPLETE_TERMS }
+    const component = { ...withDescription(createComponent("recurring", "designation_based"), "Field Team"), invoiceTerms: COMPLETE_TERMS }
     expect(isComponentComplete(component)).toBe(false)
     const withRow = { ...component, designationRows: [{ id: "1", designation: "Sales Rep", rate: 50, per: "USER" }] }
     expect(isComponentComplete(withRow)).toBe(true)
   })
 
-  it("Non-Recurring: requires description, amount, and billing terms, never a pricing model", () => {
-    const component = withDescription(createComponent("non_recurring"), "Implementation")
+  it("Non-Recurring: requires name, pricing fields, invoice terms, and a complete Revenue Recognition", () => {
+    const component = withDescription(createComponent("non_recurring", "flat_fee"), "Implementation")
     expect(isComponentComplete(component)).toBe(false)
     const withAmount = { ...component, amount: 500000 }
     expect(isComponentComplete(withAmount)).toBe(false)
-    const complete = { ...withAmount, billingTerms: { ...COMPLETE_TERMS, billingCycle: "one_time" } }
-    expect(isComponentComplete(complete)).toBe(true)
+    const withTerms = { ...withAmount, invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: "advance" } }
+    expect(isComponentComplete(withTerms)).toBe(true)
+
+    const milestoneBased = {
+      ...withTerms,
+      revenueRecognition: { method: "milestone_based" as const, milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 50 }] },
+    }
+    expect(isComponentComplete(milestoneBased)).toBe(false)
+    const milestoneComplete = {
+      ...withTerms,
+      revenueRecognition: { method: "milestone_based" as const, milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 100 }] },
+    }
+    expect(isComponentComplete(milestoneComplete)).toBe(true)
   })
 
-  it("On-Demand + Per Unit: requires rate and unit, unit not required for Fixed Fee", () => {
-    const perUnit = { ...withDescription(createComponent("on_demand", "per_unit"), "WhatsApp"), billingTerms: { ...COMPLETE_TERMS, billingCycle: "on_demand" } }
+  it("On-Demand + Per Unit: requires rate and unit; invoice frequency stays optional", () => {
+    const perUnit = { ...withDescription(createComponent("on_demand", "per_unit"), "WhatsApp"), invoiceTerms: { invoiceFrequency: null, invoiceTiming: "advance" } }
     expect(isComponentComplete(perUnit)).toBe(false)
     expect(isComponentComplete({ ...perUnit, rate: 0.15, pricingUnit: "MESSAGE" })).toBe(true)
+  })
 
-    const fixedFee = { ...withDescription(createComponent("on_demand", "fixed_fee"), "Custom Report"), billingTerms: { ...COMPLETE_TERMS, billingCycle: "on_demand" } }
+  it("On-Demand + Flat Fee: requires amount and invoice timing only, frequency stays optional", () => {
+    const fixedFee = { ...withDescription(createComponent("on_demand", "flat_fee"), "Custom Report"), invoiceTerms: { invoiceFrequency: null, invoiceTiming: "advance" } }
     expect(isComponentComplete(fixedFee)).toBe(false)
     expect(isComponentComplete({ ...fixedFee, amount: 50000 })).toBe(true)
   })
 
   it("Notes are never required for completeness", () => {
-    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), billingTerms: COMPLETE_TERMS, recurringAmount: 200000 }
+    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
     expect(component.notes).toBe("")
     expect(isComponentComplete(component)).toBe(true)
   })
@@ -277,22 +327,16 @@ describe("isCommercialRateDraftComplete / isCommercialRateDraftStarted (visited 
     expect(isCommercialRateDraftComplete(draft)).toBe(false)
   })
 
-  it("requires Commercial Scope even with currency and a complete component", () => {
-    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), billingTerms: COMPLETE_TERMS, recurringAmount: 200000 }
-    const draft: CommercialRateDraft = { commercialScope: "", billingCurrency: "INR", components: [component] }
-    expect(isCommercialRateDraftComplete(draft)).toBe(false)
-  })
-
-  it("is complete with scope, currency, and every component complete", () => {
-    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), billingTerms: COMPLETE_TERMS, recurringAmount: 200000 }
-    const draft: CommercialRateDraft = { commercialScope: "SFA", billingCurrency: "INR", components: [component] }
+  it("has no Commercial Scope concept: currency plus one complete component is enough", () => {
+    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
+    const draft: CommercialRateDraft = { billingCurrency: "INR", components: [component] }
     expect(isCommercialRateDraftComplete(draft)).toBe(true)
   })
 
   it("supports multiple components, incomplete if any one of them is incomplete", () => {
-    const complete = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), billingTerms: COMPLETE_TERMS, recurringAmount: 200000 }
-    const incomplete = withDescription(createComponent("non_recurring"), "Implementation")
-    const draft: CommercialRateDraft = { commercialScope: "SFA + Implementation", billingCurrency: "INR", components: [complete, incomplete] }
+    const complete = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
+    const incomplete = withDescription(createComponent("non_recurring", "flat_fee"), "Implementation")
+    const draft: CommercialRateDraft = { billingCurrency: "INR", components: [complete, incomplete] }
     expect(isCommercialRateDraftComplete(draft)).toBe(false)
   })
 })
@@ -301,23 +345,24 @@ describe("Add / Delete component (plain array operations, exercised at domain le
   it("adding appends a new component with a unique id", () => {
     const draft = createEmptyCommercialRateDraft()
     const withOne: CommercialRateDraft = { ...draft, components: [...draft.components, createComponent("recurring", "per_unit")] }
-    const withTwo: CommercialRateDraft = { ...withOne, components: [...withOne.components, createComponent("non_recurring")] }
+    const withTwo: CommercialRateDraft = { ...withOne, components: [...withOne.components, createComponent("non_recurring", "flat_fee")] }
     expect(withTwo.components).toHaveLength(2)
     expect(withTwo.components[0].id).not.toBe(withTwo.components[1].id)
   })
 
   it("deleting removes only the targeted component", () => {
     const a = createComponent("recurring", "per_unit")
-    const b = createComponent("non_recurring")
+    const b = createComponent("non_recurring", "flat_fee")
     const draft: CommercialRateDraft = { ...createEmptyCommercialRateDraft(), components: [a, b] }
     const afterDelete: CommercialRateDraft = { ...draft, components: draft.components.filter((component) => component.id !== a.id) }
     expect(afterDelete.components).toEqual([b])
   })
 })
 
-describe("createSlabRow / createDesignationRow", () => {
+describe("createSlabRow / createDesignationRow / createMilestone", () => {
   it("each call produces a fresh id", () => {
     expect(createSlabRow().id).not.toBe(createSlabRow().id)
     expect(createDesignationRow().id).not.toBe(createDesignationRow().id)
+    expect(createMilestone().id).not.toBe(createMilestone().id)
   })
 })

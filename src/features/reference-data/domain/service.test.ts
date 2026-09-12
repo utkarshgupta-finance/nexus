@@ -87,26 +87,33 @@ describe("reference master option resolution", () => {
   })
 })
 
-describe("Commercial Rate reference lists (task spec: Pricing Unit, Billing Cycle, Billing Timing, Payment Terms, Commercial Nature, Pricing Model)", () => {
-  it("Pricing Unit exposes the eight initial values with stable codes distinct from their labels", () => {
+describe("Commercial Rate reference lists (Pricing Unit, Invoice Frequency, Invoice Timing, Commercial Nature, Pricing Model)", () => {
+  it("Pricing Unit exposes the eleven initial values with stable codes distinct from their labels", () => {
     const values = getActiveOptions("pricing_unit").map((option) => option.value).sort()
-    expect(values).toEqual(["DAY", "DISTRIBUTOR", "MAN_DAY", "MESSAGE", "OUTLET", "REQUEST", "SESSION", "USER"])
+    expect(values).toEqual([
+      "DASHBOARD",
+      "DAY",
+      "DISTRIBUTOR",
+      "IMAGE",
+      "MAN_DAY",
+      "MESSAGE",
+      "OUTLET",
+      "REPORT",
+      "REQUEST",
+      "SESSION",
+      "USER",
+    ])
     expect(resolveOption("pricing_unit", "MAN_DAY")?.label).toBe("Man-day")
   })
 
-  it("Billing Cycle includes One-Time and On-Demand alongside the four real cadences", () => {
-    const values = getActiveOptions("billing_cycle").map((option) => option.value)
-    expect(values).toEqual(["monthly", "quarterly", "half_yearly", "annual", "one_time", "on_demand"])
+  it("Invoice Frequency has the four real cadences plus One-Time, no On-Demand value", () => {
+    const values = getActiveOptions("invoice_frequency").map((option) => option.value)
+    expect(values).toEqual(["monthly", "quarterly", "half_yearly", "annual", "one_time"])
   })
 
-  it("Billing Timing includes On Completion and On Demand alongside Advance and Arrears", () => {
-    const values = getActiveOptions("billing_timing").map((option) => option.value)
-    expect(values).toEqual(["advance", "arrears", "on_completion", "on_demand"])
-  })
-
-  it("Payment Terms includes Due on Receipt through 90 Days plus Custom", () => {
-    const values = getActiveOptions("payment_terms").map((option) => option.value)
-    expect(values).toEqual(["due_on_receipt", "days_7", "days_15", "days_30", "days_45", "days_60", "days_90", "custom"])
+  it("Invoice Timing is exactly Advance and Postpaid", () => {
+    const values = getActiveOptions("invoice_timing").map((option) => option.value)
+    expect(values).toEqual(["advance", "postpaid"])
   })
 
   it("Commercial Nature has exactly Recurring, Non-Recurring, On-Demand", () => {
@@ -114,17 +121,17 @@ describe("Commercial Rate reference lists (task spec: Pricing Unit, Billing Cycl
     expect(values).toEqual(["recurring", "non_recurring", "on_demand"])
   })
 
-  it("Pricing Model has the four Recurring models plus Fixed Fee for On-Demand", () => {
+  it("Pricing Model has exactly the four shared models, no separate Fixed Fee", () => {
     const values = getActiveOptions("pricing_model").map((option) => option.value)
-    expect(values).toEqual(["per_unit", "flat_fee", "slab", "designation_based", "fixed_fee"])
+    expect(values).toEqual(["per_unit", "flat_fee", "slab", "designation_based"])
   })
 
   it("a deactivated Commercial Rate list value disappears from new selections but still resolves historically, same as every other list", () => {
-    const deactivatedCopy = getAllOptions("payment_terms").map((option) =>
-      option.value === "custom" ? { ...option, active: false } : option
+    const deactivatedCopy = getAllOptions("pricing_model").map((option) =>
+      option.value === "slab" ? { ...option, active: false } : option
     )
-    expect(deactivatedCopy.some((option) => option.value === "custom" && option.active)).toBe(false)
-    expect(resolveOption("payment_terms", "custom")?.active).toBe(true)
-    expect(resolveOption("payment_terms", "custom")?.label).toBe("Custom")
+    expect(deactivatedCopy.some((option) => option.value === "slab" && option.active)).toBe(false)
+    expect(resolveOption("pricing_model", "slab")?.active).toBe(true)
+    expect(resolveOption("pricing_model", "slab")?.label).toBe("Slab")
   })
 })

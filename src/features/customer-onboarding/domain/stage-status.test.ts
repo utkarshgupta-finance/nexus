@@ -186,10 +186,9 @@ describe("evaluateCommercialRateStatus (visited != complete)", () => {
     expect(evaluateCommercialRateStatus(draft)).toBe("attention")
   })
 
-  it("is complete once currency, scope, and a fully specified component all exist", () => {
+  it("is complete once currency and a fully specified component both exist", () => {
     const component = createComponent("recurring", "per_unit")
     const draft: CommercialRateDraft = {
-      commercialScope: "SFA",
       billingCurrency: "INR",
       components: [
         {
@@ -197,7 +196,7 @@ describe("evaluateCommercialRateStatus (visited != complete)", () => {
           description: "SFA",
           rate: 50,
           pricingUnit: "USER",
-          billingTerms: { billingCycle: "monthly", billingTiming: "advance", paymentTerms: { paymentTermsCode: "due_on_receipt", customPaymentDays: null } },
+          invoiceTerms: { invoiceFrequency: "monthly", invoiceTiming: "advance" },
         },
       ],
     }

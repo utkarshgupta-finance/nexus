@@ -732,20 +732,32 @@ constant-currency management FX and accounting FX are separate, derived,
 provenanced projections, never overwriting the original.
 ```
 
-## 22. Customer Onboarding Commercial Rate V1 (DESIGN DRAFT)
+## 22. Customer Onboarding Commercial Rate V1 (DESIGN DRAFT, corrected)
 
 **[DESIGN DRAFT]** Customer Onboarding's Commercial Rate stage
 (`src/features/customer-onboarding/domain/commercial-rate.ts`) captures
 "what have we commercially agreed to charge this customer, on what basis,
-and under what billing/payment terms." It is a draft-capture layer inside
-one Customer Onboarding Case's revision data, exactly like Customer
-Details, Tax & Registration, and Commercial Documents before it: nothing
-here writes to `commercial_configurations`, `commercial_components`, or
-any other Commercial table. No usage calculation, invoicing, collections,
+and under what invoice cycle." It is a draft-capture layer inside one
+Customer Onboarding Case's revision data, exactly like Customer Details,
+Tax & Registration, and Commercial Documents before it: nothing here
+writes to `commercial_configurations`, `commercial_components`, or any
+other Commercial table. No usage calculation, invoicing, collections,
 revenue recognition, or actual billing happens anywhere in this stage. A
 real approved-case -> Commercial Configuration promotion path is future
 work; this section documents the mapping that promotion will need, and
 the exact gaps in today's schema that stand in its way.
+
+**This section corrects an earlier, wrong reading of the business
+model.** The earlier draft: invented a customer-level "Commercial Scope /
+Package Name" field that does not exist as a business concept; modeled
+MUG as a money floor when it is actually a unit-quantity floor; treated
+Slab as always whole-quantity when Nexus needs both Whole Quantity and
+Progressive; gave On-Demand a narrower, separate pricing vocabulary
+instead of sharing the same four Pricing Models as every other nature;
+and captured Payment Terms, which is out of scope for this stage
+entirely. Everything below reflects the corrected model; nothing from
+the earlier draft should be assumed to still hold merely because it was
+implemented first.
 
 ### Vocabulary mapping
 
@@ -759,60 +771,119 @@ the concept already exists, rather than inventing a parallel one:
 | Commercial Nature: On-Demand | no equivalent | **new concept**: not represented in `CommercialComponent`, `BillingCadence`, or `BillingTiming` today |
 | Pricing Model: Per Unit | `pricingRuleKind: "linear"` | none |
 | Pricing Model: Flat Fee | `pricingRuleKind: "flat"` | none |
-| Pricing Model: Slab | `pricingRuleKind: "volume"` (whole-quantity, "all-units", §6), never `"graduated"` (progressive/cumulative, a different, currently unbuilt model) | `commercial_components`' shape-check CHECK constraint only allows a bare `rate` key under `pricing_rule_kind = 'volume'` today (identical to `linear`), not the `tiers` array Slab needs; a follow-up migration must extend that shape before a Slab draft can be promoted |
+| Pricing Model: Slab, Whole Quantity method | `pricingRuleKind: "volume"` ("all-units", §6) | `commercial_components`' shape-check CHECK constraint only allows a bare `rate` key under `pricing_rule_kind = 'volume'` today (identical to `linear`), not the `tiers` array Slab needs; a follow-up migration must extend that shape before a Slab draft can be promoted |
+| Pricing Model: Slab, Progressive method | `pricingRuleKind: "graduated"` (progressive/cumulative tiered, §6 and §19 scenario 1) | same `tiers` shape gap as Whole Quantity above |
 | Pricing Model: Designation Based | `pricingRuleKind: "dimension"` (§19 scenario 3 names this exact example) | none |
-| On-Demand Pricing Type: Fixed Fee | `pricingRuleKind: "flat"`, same kind as recurring Flat Fee, distinguished only by Commercial Nature | none |
-| MUG (Minimum Usage Guarantee) | `CommercialCommitment { kind: "spend" }`, scoped to exactly this one component | naming only, see below; no schema gap |
-| Billing Cycle: Monthly/Quarterly/Half-Yearly/Annual | `BillingCadence` | none |
-| Billing Cycle: One-Time, On-Demand | no equivalent | **new values**: `billing_cadence`'s CHECK constraint only accepts the four cadences above |
-| Billing Timing: Advance, Arrears | `BillingTiming` | none |
-| Billing Timing: On Completion, On Demand | no equivalent | **new values**: `billing_timing`'s CHECK constraint only accepts `advance`/`arrears` |
-| Payment Terms | no equivalent anywhere in the Commercial domain | **wholly new concept**; `billingTiming` (advance/arrears) governs when a Billing Calculation happens, not customer credit days |
-| Pricing Unit | new, lightweight Reference Master list | Deliberately not `MeasurementDefinition.unit`: Measurement Definition is a heavier, usage-tracking concept (business definition, counting rule, period basis, expected source) this stage does not need since it performs no usage calculation |
+| MUG (Minimum Usage Guarantee) | `CommercialCommitment { kind: "quantity" }`, scoped to exactly this one component | naming only, see below; no schema gap. This corrects the earlier draft, which wrongly mapped MUG onto the money-floor `{ kind: "spend" }` commitment |
+| Invoice Frequency: Monthly/Quarterly/Half-Yearly/Annual/One-Time | `BillingCadence` plus a `one_time` value it does not yet have | **new value**: `billing_cadence`'s CHECK constraint only accepts the four real cadences |
+| Invoice Timing: Advance/Postpaid | `BillingTiming`'s `advance`/`arrears`, "Postpaid" is this stage's corrected business wording for `arrears` | label only, no schema gap |
+| Payment Terms | removed from this stage entirely | out of scope; belongs to a future Invoice/Collections configuration, never Commercial Rate |
+| Pricing Unit | new, lightweight, universal Reference Master list | Deliberately not `MeasurementDefinition.unit`: Measurement Definition is a heavier, usage-tracking concept (business definition, counting rule, period basis, expected source) this stage does not need since it performs no usage calculation |
+| Non-Recurring Revenue Recognition (Full Recognition / Milestone Based) | no equivalent | **new concept**: the locked domain's Earned/Billed machinery (§13-14) has no notion of a contracted recognition schedule; this stage only captures the agreed structure, never posts a journal entry |
 
-### MUG is a monetary floor, not a quantity floor
+### MUG is a UNIT quantity floor, corrected from money
 
-The business name "Minimum Usage Guarantee" sounds quantity-shaped, but
-this stage's own worked formula, `Final billable amount = MAX(calculated
-pricing amount, MUG amount)`, is unambiguously a floor on money, applied
-after pricing. §8 already separates this exactly: a minimum QUANTITY
-commitment floors the chargeable quantity before pricing and always
-resets monthly; a minimum SPEND commitment floors the resulting amount
-after pricing, on any cadence, and may already apply to exactly one
-Commercial Component (a single-entry `memberComponentIds` array is a
-valid spend commitment). Onboarding's MUG is the second one. Calling it
-"MUG" in the UI is a business-facing label choice, not a claim that it
-is the domain's quantity-commitment kind; a future promotion path maps
-it onto a spend commitment, never a quantity commitment.
+The earlier draft read MUG's formula as `MAX(calculated pricing amount,
+MUG amount)`, a money floor. That was wrong. MUG floors a QUANTITY:
+`revenue quantity = MAX(actual quantity, MUG units)`, expressed in
+whichever Pricing Unit the component already uses, always assessed
+monthly, exactly the locked domain's own quantity commitment (§8). It
+never asks for a second unit selection, never asks for a frequency
+(frequency is always monthly, not a field), and never captures a money
+amount. MUG is offered only where a unit quantity exists at the
+component (Per Unit, Slab, Designation Based); Flat Fee has no unit
+basis at all, so it never gets a MUG field, on any Commercial Nature.
+Non-Recurring never gets a MUG field either, on any Pricing Model: a
+one-time charge has no monthly cadence for a monthly floor to apply
+against.
 
-### Slab is whole-quantity, not progressive
+### Slab has two real methods: Whole Quantity and Progressive
 
-A Slab row prices the ENTIRE quantity at whichever single row's [from,
-to] range the total quantity falls into. A quantity of 101 against rows
-1-100 @100 and 101-250 @90 bills as `101 × 90`, never `100 × 100 + 1 ×
-90`. This is deliberately different from progressive/tiered pricing
-(each bracket priced separately and summed), which Nexus does not
-currently build. See the vocabulary table above for why this maps to
-`"volume"`, not `"graduated"`.
+The earlier draft built only one, undocumented Slab interpretation.
+Nexus needs both, and they are different calculations, not two labels
+for the same one:
 
-### Flat Fee is recurring; Non-Recurring is a distinct, one-time shape
+- **Whole Quantity**: the entire quantity is priced at the single band
+  it falls into. A quantity of 101 against rows 1-100 @100 and 101-250
+  @90 bills as `101 × 90`. Maps to `pricingRuleKind: "volume"`.
+- **Progressive**: each band is priced separately and summed. The same
+  101 against the same rows bills as `100 × 100 + 1 × 90`. Maps to
+  `pricingRuleKind: "graduated"`, the locked domain's own progressive
+  primitive (§19 scenario 1 is this exact shape).
 
-A recurring Flat Fee (`pricingModel: "flat_fee"`) bills the same amount
-every billing cycle indefinitely. Non-Recurring (`nature:
-"non_recurring"`) is charged exactly once, has no pricing model, no MUG
-(a one-time charge has nothing to guarantee a minimum of), and its own
-Billing Cycle is always the fixed "one_time" value, never user-chosen.
-These are never the same field with two labels.
+Both are real, user-selectable Slab Methods (`SlabMethod` in
+`commercial-rate.ts`); row shape and row-overlap validation are identical
+for both, only the resulting calculation differs, and this stage does
+not attempt that calculation at all (no live billing engine, below).
+
+### Pricing Models are shared across every Commercial Nature
+
+The earlier draft gave Recurring four models, Non-Recurring an implicit
+Flat-Fee-only shape, and On-Demand a separate, narrower two-model
+vocabulary (Per Unit / Fixed Fee). This was wrong: Per Unit, Flat Fee,
+Slab, and Designation Based are ONE shared set of Pricing Models,
+available under Recurring, Non-Recurring, and On-Demand alike (Nature
+never implies a different pricing engine). Recurring defaults to Per
+Unit; Non-Recurring and On-Demand both default to Flat Fee, matching the
+most common shape for each (a monthly rate for ongoing work, a lump sum
+for a one-off or triggered charge), and the user may change the default
+afterward. On-Demand and Non-Recurring remain distinct Commercial Nature
+values even though their V1 pricing mechanics happen to coincide, since
+downstream revenue/billing semantics may diverge later (§30 of the task
+correction that produced this section).
+
+### Recurring revenue is monthly; Invoice Frequency is a separate cycle
+
+A Recurring component's revenue is always monthly (`Rate: INR 50 / User
+/ Month`), independent of Invoice Frequency (how often the customer is
+actually invoiced: Monthly, Quarterly, Half-Yearly, Annual, One-Time) and
+Invoice Timing (Advance or Postpaid). A customer invoiced Half-Yearly in
+Advance for a per-user rate still has monthly revenue underneath; the
+invoice cycle only changes when and how often that revenue gets billed,
+never what the revenue itself is. This is exactly the locked domain's own
+Billing Policy/Earned separation (§9, §13); Invoice Frequency and Invoice
+Timing here are this stage's names for that same idea, corrected from the
+earlier draft's conflated "Billing Cycle."
+
+### NRR Charge Basis: not a separate field
+
+The correction that produced this section describes Non-Recurring as
+additionally having a "Charge Basis" (Flat Fee or Per Month), described
+as distinct from Pricing Model. Once Non-Recurring shares the full four
+Pricing Models like every other Nature, a separate Charge Basis selector
+would be fully redundant with Pricing Model: Non-Recurring's own Pricing
+Model choice already says exactly how its one-time amount is calculated
+(a flat lump sum, a per-unit rate applied once, and so on). Adding a
+second "Flat Fee"-shaped selector next to it would show the user two
+identical-looking choices for the same underlying fact. This stage does
+not implement NRR Charge Basis as its own field for that reason: Non-
+Recurring's Pricing Model IS its charge basis. No "Per Month" charge
+basis exists separately either, since a component that recurs monthly is
+by definition Recurring, not Non-Recurring; Non-Recurring is always a
+one-time occurrence regardless of how its one-time amount was priced.
+
+### Non-Recurring Revenue Recognition
+
+Non-Recurring additionally captures a Revenue Recognition Method: Full
+Recognition (the whole amount recognized at the applicable recognition
+point, no further detail captured) or Milestone Based (a repeatable list
+of milestone name/description plus a recognition percentage, which must
+total exactly 100 before the stage is complete). This stage only records
+the agreed structure; it never creates a revenue journal entry or an
+actual recognition schedule, matching the "no live billing engine"
+principle below.
 
 ### Settings governance: three different tiers, not one
 
-`src/features/reference-data` now governs six Commercial Rate lists,
+`src/features/reference-data` now governs five Commercial Rate lists,
 under three distinct rules (see that feature's own `types.ts` header and
 `ui/reference-master-settings.tsx`):
 
-- **Freely configurable** (`pricing_unit`, `billing_cycle`,
-  `billing_timing`, `payment_terms`): pure administrative data. A new
-  value needs no code change to work.
+- **Freely configurable** (`pricing_unit`, `invoice_frequency`,
+  `invoice_timing`): pure administrative data. A new value needs no code
+  change to work. Pricing Unit is universal: one shared list used by
+  every Pricing Model and every Commercial Nature that needs a unit,
+  never a separate Recurring/Non-Recurring/On-Demand unit list.
 - **Controlled business option** (`commercial_nature`): each value drives
   real UI and validation branching in `commercial-rate.ts`. Settings
   still allows adding a new value, but it has no effect on its own until
@@ -821,20 +892,21 @@ under three distinct rules (see that feature's own `types.ts` header and
   Pricing Kernel calculation logic to mean anything. Settings only
   allows Activate/Deactivate for this list, never adding a new one.
 
-### Commercial Scope
+Payment Terms is no longer a Reference Master list here: it was removed
+from Commercial Rate's scope entirely (see the vocabulary table above).
 
-A free-text summary ("SFA + DMS", "Enterprise RTM Suite"), not a
-predefined module list: matches §21's existing "Commercial Scope
-(capability references, no fake global Plan)" principle by staying
-descriptive rather than becoming a second, competing scope taxonomy.
-Treated as required for Commercial Rate's own stage completion (a
-judgment call, not an existing-architecture answer): a priced customer
-with a blank scope would be an incomplete record for whoever reviews it
-later. No separate header-level "Commercial Effective From" field was
-added: each Commercial Component already carries its own
+### No Commercial Scope / Package field
+
+The earlier draft added a customer-level "Commercial Scope / Package
+Name" free-text field above the components. There is no such business
+concept: a customer's commercials are the sum of its individual
+Commercial Components, with no separate scope/package summary field
+above them. This stage removed it rather than replacing it with another
+customer-level field. Each Commercial Component still carries its own
 `effectiveFrom`/`effectiveTo`, matching the real domain's locked,
-per-Component effective-dating mechanism (§17); a redundant header date
-would only risk drifting from the per-component dates it would summarize.
+per-Component effective-dating mechanism (§17); no header-level
+effective date was added either, for the same reason as before: it would
+only risk drifting from the per-component dates it would summarize.
 
 ### No live billing engine
 

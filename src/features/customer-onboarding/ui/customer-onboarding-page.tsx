@@ -424,7 +424,13 @@ function CustomerOnboardingPage() {
           ) : null}
 
           {activeStageKey === "commercial_rate" ? (
-            <CommercialRateSection value={commercialRate} onChange={setCommercialRate} />
+            <CommercialRateSection
+              value={commercialRate}
+              onChange={setCommercialRate}
+              onPrevious={() => handleStageTabChange(["commercial_documents"])}
+              onSaveDraft={handleSaveDraft}
+              onNext={() => handleStageTabChange(["agreement_approval"])}
+            />
           ) : null}
 
           {activeStageKey === "agreement_approval" ? (

@@ -8,34 +8,39 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { getActiveOptions, resolveOption } from "@/features/reference-data"
-import { summarizeComponent } from "../domain/commercial-rate-summary"
-import { createComponent, createDesignationRow, createSlabRow, isComponentComplete } from "../domain/commercial-rate"
+import { mugUnitCode, summarizeComponent, unitLabel } from "../domain/commercial-rate-summary"
+import {
+  createComponent,
+  createDesignationRow,
+  createMilestone,
+  createSlabRow,
+  defaultPricingModelFor,
+  isComponentComplete,
+} from "../domain/commercial-rate"
 import type {
-  BillingTerms,
   CommercialComponentDraft,
   CommercialNature,
   CommercialRateDraft,
   DesignationRow,
+  Milestone,
   MugOverlay,
-  OnDemandPricingType,
-  RecurringPricingModel,
+  PricingModel,
+  RevenueRecognition,
+  SlabMethod,
   SlabRow,
 } from "../domain/commercial-rate"
 
 /**
- * Commercial Rate stage UI (task spec §26): progressive disclosure over
- * Commercial Scope + Billing Currency, then repeatable Commercial
- * Components, each showing only the pricing fields its own Nature/Pricing
- * Model actually needs. A pure display/edit surface: nothing here
- * calculates a real bill (task spec §31 - the pricing summary lines are
- * illustrative only), and nothing here writes to Commercial Configuration;
- * see ../domain/commercial-rate.ts's header for the draft-capture design.
+ * Commercial Rate stage UI: Billing Currency at the header, then repeatable
+ * Commercial Components. Each component is authored through an explicit
+ * Add/Edit -> Save flow (never a permanently-open flat form): a saved
+ * component collapses to a summary card until Edit is clicked again. A
+ * pure display/edit surface: nothing here calculates a real bill, and
+ * nothing here writes to Commercial Configuration; see
+ * ../domain/commercial-rate.ts's header for the draft-capture design.
  */
-
-/** The `pricing_model` Reference Master list holds both Recurring's four models and On-Demand's two, since they are the same system-supported concept; each context only offers its own subset. */
-const RECURRING_PRICING_MODEL_VALUES = ["per_unit", "flat_fee", "slab", "designation_based"]
-const ON_DEMAND_PRICING_TYPE_VALUES = ["per_unit", "fixed_fee"]
 
 function selectLabel(listKey: Parameters<typeof getActiveOptions>[0], value: string | null): string {
   if (!value) return "Select..."
@@ -47,30 +52,19 @@ function OptionSelect({
   value,
   onChange,
   className,
-  filterValues,
 }: {
   listKey: Parameters<typeof getActiveOptions>[0]
   value: string | null
   onChange: (value: string) => void
   className?: string
-  /** Restricts the offered choices to this subset (e.g. Pricing Model differs for Recurring vs On-Demand), without needing a second Reference Master list. */
-  filterValues?: string[]
 }) {
-  const filterKey = filterValues?.join(",")
-  const options = useMemo(() => {
-    const all = getActiveOptions(listKey)
-    return filterValues ? all.filter((option) => filterValues.includes(option.value)) : all
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depends on filterKey (a stable string), not the filterValues array identity, which is a fresh literal on every render at call sites.
-  }, [listKey, filterKey])
+  const options = useMemo(() => getActiveOptions(listKey), [listKey])
   return (
     // `value` is passed straight through, including `null`: base-ui's Select
     // treats an explicit `null` as "controlled, nothing selected" but treats
-    // `undefined` as "uncontrolled", so `value ?? undefined` here would have
-    // silently flipped this Select from uncontrolled to controlled the
-    // moment a user made a first selection (null -> a real string), which
-    // React (and base-ui) both warn against and do not support switching
-    // mid-lifetime; every OptionSelect must be controlled from its very
-    // first render.
+    // `undefined` as "uncontrolled", so `value ?? undefined` here would
+    // silently flip this Select from uncontrolled to controlled the moment
+    // a user made a first selection, which base-ui does not support.
     <Select value={value} onValueChange={(next) => onChange(next as string)}>
       <SelectTrigger className={className ?? "w-full"}>
         <SelectValue placeholder="Select...">{() => selectLabel(listKey, value)}</SelectValue>
@@ -92,62 +86,51 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-xs font-medium text-foreground">{children}</span>
 }
 
-function BillingTermsFields({
-  terms,
+function InvoiceTermsFields({
+  component,
   onChange,
-  editableBillingCycle,
 }: {
-  terms: BillingTerms
-  onChange: (next: BillingTerms) => void
-  /** Non-Recurring and On-Demand fix their own Billing Cycle automatically (task spec §13/§14): shown read-only there, never user-editable. */
-  editableBillingCycle: boolean
+  component: CommercialComponentDraft
+  onChange: (next: CommercialComponentDraft) => void
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="flex flex-col gap-1.5">
-        <FieldLabel>Billing Cycle</FieldLabel>
-        {editableBillingCycle ? (
-          <OptionSelect listKey="billing_cycle" value={terms.billingCycle} onChange={(value) => onChange({ ...terms, billingCycle: value })} />
-        ) : (
+        <FieldLabel>Invoice Frequency{component.nature === "on_demand" ? " (optional)" : ""}</FieldLabel>
+        {component.nature === "non_recurring" ? (
           <Badge variant="ghost" className="w-fit bg-muted text-muted-foreground">
-            {selectLabel("billing_cycle", terms.billingCycle)}
+            {selectLabel("invoice_frequency", component.invoiceTerms.invoiceFrequency)}
           </Badge>
+        ) : (
+          <OptionSelect
+            listKey="invoice_frequency"
+            value={component.invoiceTerms.invoiceFrequency}
+            onChange={(value) => onChange({ ...component, invoiceTerms: { ...component.invoiceTerms, invoiceFrequency: value } })}
+          />
         )}
       </div>
       <div className="flex flex-col gap-1.5">
-        <FieldLabel>Billing Timing</FieldLabel>
-        <OptionSelect listKey="billing_timing" value={terms.billingTiming} onChange={(value) => onChange({ ...terms, billingTiming: value })} />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel>Payment Terms</FieldLabel>
+        <FieldLabel>Invoice Timing</FieldLabel>
         <OptionSelect
-          listKey="payment_terms"
-          value={terms.paymentTerms.paymentTermsCode}
-          onChange={(value) => onChange({ ...terms, paymentTerms: { paymentTermsCode: value, customPaymentDays: terms.paymentTerms.customPaymentDays } })}
+          listKey="invoice_timing"
+          value={component.invoiceTerms.invoiceTiming}
+          onChange={(value) => onChange({ ...component, invoiceTerms: { ...component.invoiceTerms, invoiceTiming: value } })}
         />
       </div>
-      {terms.paymentTerms.paymentTermsCode === "custom" ? (
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel>Payment Days</FieldLabel>
-          <Input
-            type="number"
-            min={1}
-            value={terms.paymentTerms.customPaymentDays ?? ""}
-            onChange={(event) =>
-              onChange({
-                ...terms,
-                paymentTerms: { ...terms.paymentTerms, customPaymentDays: event.target.value ? Number(event.target.value) : null },
-              })
-            }
-            placeholder="e.g. 21"
-          />
-        </div>
-      ) : null}
     </div>
   )
 }
 
-function MugFields({ mug, onChange }: { mug: MugOverlay; onChange: (next: MugOverlay) => void }) {
+function MugFields({
+  mug,
+  pricingUnitCode,
+  onChange,
+}: {
+  mug: MugOverlay
+  pricingUnitCode: string | null
+  onChange: (next: MugOverlay) => void
+}) {
+  const unitWord = `${unitLabel(pricingUnitCode)}s`
   return (
     <div className="flex flex-col gap-2">
       <label className="flex items-center gap-2 text-xs text-foreground">
@@ -155,207 +138,21 @@ function MugFields({ mug, onChange }: { mug: MugOverlay; onChange: (next: MugOve
           type="checkbox"
           className="size-3.5 accent-foreground"
           checked={mug.enabled}
-          onChange={(event) =>
-            onChange(event.target.checked ? { enabled: true, amount: null, frequency: null } : { enabled: false })
-          }
+          onChange={(event) => onChange(event.target.checked ? { enabled: true, minimumUnits: null } : { enabled: false })}
         />
         Minimum Usage Guarantee (MUG)
       </label>
       {mug.enabled ? (
-        <div className="grid grid-cols-1 gap-3 pl-5.5 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>MUG Amount</FieldLabel>
-            <Input
-              type="number"
-              min={0}
-              value={mug.amount ?? ""}
-              onChange={(event) => onChange({ ...mug, amount: event.target.value ? Number(event.target.value) : null })}
-              placeholder="e.g. 200000"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>MUG Frequency</FieldLabel>
-            <OptionSelect listKey="billing_cycle" value={mug.frequency} onChange={(value) => onChange({ ...mug, frequency: value })} />
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function componentNatureLabel(nature: CommercialNature): string {
-  return resolveOption("commercial_nature", nature)?.label ?? nature
-}
-
-function componentModelLabel(component: CommercialComponentDraft): string {
-  if (component.nature === "non_recurring") return "One-time charge"
-  const code = component.nature === "on_demand" ? component.pricingType : component.pricingModel
-  return resolveOption("pricing_model", code)?.label ?? code
-}
-
-function ComponentCard({
-  component,
-  currencyCode,
-  onChange,
-  onDelete,
-}: {
-  component: CommercialComponentDraft
-  currencyCode: string | null
-  onChange: (next: CommercialComponentDraft) => void
-  onDelete: () => void
-}) {
-  const complete = isComponentComplete(component)
-  const summaryLines = summarizeComponent(component, currencyCode)
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-1 flex-col gap-1.5">
-          <FieldLabel>Component / Description</FieldLabel>
+        <div className="flex flex-col gap-1.5 pl-5.5 sm:max-w-xs">
+          <FieldLabel>Minimum {unitWord}</FieldLabel>
           <Input
-            value={component.description}
-            onChange={(event) => onChange({ ...component, description: event.target.value })}
-            placeholder="e.g. SFA"
+            type="number"
+            min={0}
+            value={mug.minimumUnits ?? ""}
+            onChange={(event) => onChange({ ...mug, minimumUnits: event.target.value ? Number(event.target.value) : null })}
+            placeholder="e.g. 5000"
           />
-        </div>
-        <Button variant="ghost" size="icon-sm" aria-label="Delete component" onClick={onDelete} className="mt-5">
-          <XIcon className="size-3.5" />
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge variant="ghost" className="bg-muted text-muted-foreground">
-          {componentNatureLabel(component.nature)}
-        </Badge>
-        <Badge variant="ghost" className="bg-muted text-muted-foreground">
-          {componentModelLabel(component)}
-        </Badge>
-        {!complete ? (
-          <Badge variant="ghost" className="bg-warning/10 text-warning">
-            Incomplete
-          </Badge>
-        ) : null}
-      </div>
-
-      {component.nature === "recurring" && component.pricingModel === "per_unit" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Rate</FieldLabel>
-            <Input type="number" min={0} value={component.rate ?? ""} onChange={(event) => onChange({ ...component, rate: event.target.value ? Number(event.target.value) : null })} placeholder="e.g. 50" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Per / Unit</FieldLabel>
-            <OptionSelect listKey="pricing_unit" value={component.pricingUnit} onChange={(value) => onChange({ ...component, pricingUnit: value })} />
-          </div>
-        </div>
-      ) : null}
-
-      {component.nature === "recurring" && component.pricingModel === "flat_fee" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Recurring Amount</FieldLabel>
-            <Input
-              type="number"
-              min={0}
-              value={component.recurringAmount ?? ""}
-              onChange={(event) => onChange({ ...component, recurringAmount: event.target.value ? Number(event.target.value) : null })}
-              placeholder="e.g. 200000"
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {component.nature === "recurring" && component.pricingModel === "slab" ? (
-        <SlabRowsEditor
-          pricingUnit={component.pricingUnit}
-          rows={component.slabRows}
-          onChangeUnit={(value) => onChange({ ...component, pricingUnit: value })}
-          onChangeRows={(rows) => onChange({ ...component, slabRows: rows })}
-        />
-      ) : null}
-
-      {component.nature === "recurring" && component.pricingModel === "designation_based" ? (
-        <DesignationRowsEditor rows={component.designationRows} onChangeRows={(rows) => onChange({ ...component, designationRows: rows })} />
-      ) : null}
-
-      {component.nature === "non_recurring" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Amount</FieldLabel>
-            <Input type="number" min={0} value={component.amount ?? ""} onChange={(event) => onChange({ ...component, amount: event.target.value ? Number(event.target.value) : null })} placeholder="e.g. 500000" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Effective / Charge Date</FieldLabel>
-            <Input type="date" value={component.chargeDate ?? ""} onChange={(event) => onChange({ ...component, chargeDate: event.target.value || null })} />
-          </div>
-        </div>
-      ) : null}
-
-      {component.nature === "on_demand" && component.pricingType === "per_unit" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Rate</FieldLabel>
-            <Input type="number" min={0} value={component.rate ?? ""} onChange={(event) => onChange({ ...component, rate: event.target.value ? Number(event.target.value) : null })} placeholder="e.g. 0.15" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Per / Unit</FieldLabel>
-            <OptionSelect listKey="pricing_unit" value={component.pricingUnit} onChange={(value) => onChange({ ...component, pricingUnit: value })} />
-          </div>
-        </div>
-      ) : null}
-
-      {component.nature === "on_demand" && component.pricingType === "fixed_fee" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Amount</FieldLabel>
-            <Input type="number" min={0} value={component.amount ?? ""} onChange={(event) => onChange({ ...component, amount: event.target.value ? Number(event.target.value) : null })} placeholder="e.g. 100000" />
-          </div>
-        </div>
-      ) : null}
-
-      <Separator />
-
-      <BillingTermsFields
-        terms={component.billingTerms}
-        onChange={(terms) => onChange({ ...component, billingTerms: terms })}
-        editableBillingCycle={component.nature === "recurring"}
-      />
-
-      {"mug" in component ? (
-        <>
-          <Separator />
-          <MugFields mug={component.mug} onChange={(mug) => onChange({ ...component, mug })} />
-        </>
-      ) : null}
-
-      {component.nature !== "non_recurring" ? (
-        <>
-          <Separator />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel>Effective From</FieldLabel>
-              <Input type="date" value={component.effectiveFrom ?? ""} onChange={(event) => onChange({ ...component, effectiveFrom: event.target.value || null })} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel>Effective To (optional)</FieldLabel>
-              <Input type="date" value={component.effectiveTo ?? ""} onChange={(event) => onChange({ ...component, effectiveTo: event.target.value || null })} />
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel>Notes (optional)</FieldLabel>
-        <Input value={component.notes} onChange={(event) => onChange({ ...component, notes: event.target.value })} placeholder="Optional context for Finance" />
-      </div>
-
-      {summaryLines.length > 0 ? (
-        <div className="flex flex-col gap-0.5 rounded-md border border-dashed px-3 py-2">
-          {summaryLines.map((line, index) => (
-            <span key={index} className="text-[0.7rem] text-muted-foreground">
-              {line}
-            </span>
-          ))}
+          <span className="text-[0.7rem] text-muted-foreground">Assessed monthly, applied before pricing.</span>
         </div>
       ) : null}
     </div>
@@ -364,39 +161,84 @@ function ComponentCard({
 
 function SlabRowsEditor({
   pricingUnit,
+  slabMethod,
   rows,
   onChangeUnit,
+  onChangeMethod,
   onChangeRows,
 }: {
   pricingUnit: string | null
+  slabMethod: SlabMethod
   rows: SlabRow[]
   onChangeUnit: (value: string) => void
+  onChangeMethod: (value: SlabMethod) => void
   onChangeRows: (rows: SlabRow[]) => void
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1.5 sm:max-w-xs">
-        <FieldLabel>Per / Unit</FieldLabel>
-        <OptionSelect listKey="pricing_unit" value={pricingUnit} onChange={onChangeUnit} />
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Unit</FieldLabel>
+          <OptionSelect listKey="pricing_unit" value={pricingUnit} onChange={onChangeUnit} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Slab Method</FieldLabel>
+          <ToggleGroup
+            value={[slabMethod]}
+            onValueChange={(value) => {
+              if (value[0]) onChangeMethod(value[0] as SlabMethod)
+            }}
+            variant="outline"
+            size="sm"
+            className="w-fit"
+          >
+            <ToggleGroupItem value="whole_quantity">Whole Quantity</ToggleGroupItem>
+            <ToggleGroupItem value="progressive">Progressive</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </div>
 
-      <span className="text-xs font-medium text-foreground">
-        Slab rows (the whole quantity is priced at the one slab it falls into, not progressively)
+      <span className="text-[0.7rem] text-muted-foreground">
+        {slabMethod === "progressive"
+          ? "Progressive: each band is priced separately and summed (e.g. first 100 at this band's rate, the next band at its own rate)."
+          : "Whole Quantity: the entire quantity is priced at the single band it falls into, not band by band."}
       </span>
+
       <div className="flex flex-col gap-2">
         {rows.map((row, index) => (
           <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">From</span>
-              <Input type="number" min={0} value={row.from ?? ""} onChange={(event) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, from: event.target.value ? Number(event.target.value) : null } : entry)))} />
+              <Input
+                type="number"
+                min={0}
+                value={row.from ?? ""}
+                onChange={(event) =>
+                  onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, from: event.target.value ? Number(event.target.value) : null } : entry)))
+                }
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">To {index === rows.length - 1 ? "(optional, open-ended)" : ""}</span>
-              <Input type="number" min={0} value={row.to ?? ""} onChange={(event) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, to: event.target.value ? Number(event.target.value) : null } : entry)))} />
+              <Input
+                type="number"
+                min={0}
+                value={row.to ?? ""}
+                onChange={(event) =>
+                  onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, to: event.target.value ? Number(event.target.value) : null } : entry)))
+                }
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">Rate</span>
-              <Input type="number" min={0} value={row.rate ?? ""} onChange={(event) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, rate: event.target.value ? Number(event.target.value) : null } : entry)))} />
+              <Input
+                type="number"
+                min={0}
+                value={row.rate ?? ""}
+                onChange={(event) =>
+                  onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, rate: event.target.value ? Number(event.target.value) : null } : entry)))
+                }
+              />
             </div>
             <Button
               variant="ghost"
@@ -418,13 +260,7 @@ function SlabRowsEditor({
   )
 }
 
-function DesignationRowsEditor({
-  rows,
-  onChangeRows,
-}: {
-  rows: DesignationRow[]
-  onChangeRows: (rows: DesignationRow[]) => void
-}) {
+function DesignationRowsEditor({ rows, onChangeRows }: { rows: DesignationRow[]; onChangeRows: (rows: DesignationRow[]) => void }) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-xs font-medium text-foreground">Designation rows</span>
@@ -433,15 +269,31 @@ function DesignationRowsEditor({
           <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">Designation</span>
-              <Input value={row.designation} onChange={(event) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, designation: event.target.value } : entry)))} placeholder="e.g. Sales Rep" />
+              <Input
+                value={row.designation}
+                onChange={(event) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, designation: event.target.value } : entry)))}
+                placeholder="e.g. Sales Rep"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">Rate</span>
-              <Input type="number" min={0} value={row.rate ?? ""} onChange={(event) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, rate: event.target.value ? Number(event.target.value) : null } : entry)))} />
+              <Input
+                type="number"
+                min={0}
+                value={row.rate ?? ""}
+                onChange={(event) =>
+                  onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, rate: event.target.value ? Number(event.target.value) : null } : entry)))
+                }
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">Per</span>
-              <OptionSelect listKey="pricing_unit" value={row.per} onChange={(value) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, per: value } : entry)))} className="w-full" />
+              <OptionSelect
+                listKey="pricing_unit"
+                value={row.per}
+                onChange={(value) => onChangeRows(rows.map((entry) => (entry.id === row.id ? { ...entry, per: value } : entry)))}
+                className="w-full"
+              />
             </div>
             <Button
               variant="ghost"
@@ -463,105 +315,336 @@ function DesignationRowsEditor({
   )
 }
 
-function AddComponentForm({ onAdd }: { onAdd: (nature: CommercialNature, model?: RecurringPricingModel | OnDemandPricingType) => void }) {
-  const [nature, setNature] = useState<CommercialNature>("recurring")
-  const [recurringModel, setRecurringModel] = useState<RecurringPricingModel>("per_unit")
-  const [onDemandType, setOnDemandType] = useState<OnDemandPricingType>("per_unit")
+function MilestoneRowsEditor({ milestones, onChangeMilestones }: { milestones: Milestone[]; onChangeMilestones: (milestones: Milestone[]) => void }) {
+  const total = milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
+  const totalIsValid = Math.abs(total - 100) < 0.001
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-3">
-      <span className="text-xs font-medium text-muted-foreground">Add Commercial Component</span>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="flex flex-col gap-1">
-          <span className="text-[0.7rem] text-muted-foreground">Commercial Nature</span>
-          <OptionSelect listKey="commercial_nature" value={nature} onChange={(value) => setNature(value as CommercialNature)} className="w-full sm:w-40" />
-        </div>
-        {nature === "recurring" ? (
-          <div className="flex flex-col gap-1">
-            <span className="text-[0.7rem] text-muted-foreground">Pricing Model</span>
-            <OptionSelect
-              listKey="pricing_model"
-              value={recurringModel}
-              onChange={(value) => setRecurringModel(value as RecurringPricingModel)}
-              className="w-full sm:w-44"
-              filterValues={RECURRING_PRICING_MODEL_VALUES}
-            />
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium text-foreground">Milestones</span>
+      <div className="flex flex-col gap-2">
+        {milestones.map((milestone) => (
+          <div key={milestone.id} className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-[0.7rem] text-muted-foreground">Milestone Name / Description</span>
+              <Input
+                value={milestone.name}
+                onChange={(event) =>
+                  onChangeMilestones(milestones.map((entry) => (entry.id === milestone.id ? { ...entry, name: event.target.value } : entry)))
+                }
+                placeholder="e.g. Go-Live"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[0.7rem] text-muted-foreground">Recognition %</span>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                className="w-24"
+                value={milestone.recognitionPercent ?? ""}
+                onChange={(event) =>
+                  onChangeMilestones(
+                    milestones.map((entry) =>
+                      entry.id === milestone.id ? { ...entry, recognitionPercent: event.target.value ? Number(event.target.value) : null } : entry
+                    )
+                  )
+                }
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Delete milestone"
+              disabled={milestones.length <= 1}
+              onClick={() => onChangeMilestones(milestones.filter((entry) => entry.id !== milestone.id))}
+            >
+              <XIcon className="size-3.5" />
+            </Button>
           </div>
-        ) : null}
-        {nature === "on_demand" ? (
-          <div className="flex flex-col gap-1">
-            <span className="text-[0.7rem] text-muted-foreground">Pricing Type</span>
-            <OptionSelect
-              listKey="pricing_model"
-              value={onDemandType}
-              onChange={(value) => setOnDemandType(value as OnDemandPricingType)}
-              className="w-full sm:w-44"
-              filterValues={ON_DEMAND_PRICING_TYPE_VALUES}
-            />
-          </div>
-        ) : null}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onAdd(nature, nature === "recurring" ? recurringModel : nature === "on_demand" ? onDemandType : undefined)}
-        >
-          <PlusIcon data-icon="inline-start" className="size-3.5" />
-          Add Component
-        </Button>
+        ))}
       </div>
-    </div>
-  )
-}
-
-function ApplyTermsToAllBar({ onApply, onClose }: { onApply: (terms: Partial<BillingTerms>) => void; onClose: () => void }) {
-  const [billingCycle, setBillingCycle] = useState<string | null>(null)
-  const [billingTiming, setBillingTiming] = useState<string | null>(null)
-  const [paymentTerms, setPaymentTerms] = useState<string | null>(null)
-
-  return (
-    <div className="flex flex-col gap-2 rounded-md border border-dashed px-3 py-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">
-          Apply Billing Terms to All (convenience only, applies once, each component still stores its own value)
-        </span>
-        <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={onClose}>
-          <XIcon className="size-3.5" />
+        <Button variant="outline" size="sm" className="w-fit" onClick={() => onChangeMilestones([...milestones, createMilestone()])}>
+          <PlusIcon data-icon="inline-start" className="size-3.5" />
+          Add Milestone
         </Button>
-      </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="flex flex-col gap-1">
-          <span className="text-[0.7rem] text-muted-foreground">Billing Cycle</span>
-          <OptionSelect listKey="billing_cycle" value={billingCycle} onChange={setBillingCycle} className="w-full sm:w-40" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-[0.7rem] text-muted-foreground">Billing Timing</span>
-          <OptionSelect listKey="billing_timing" value={billingTiming} onChange={setBillingTiming} className="w-full sm:w-40" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-[0.7rem] text-muted-foreground">Payment Terms</span>
-          <OptionSelect listKey="payment_terms" value={paymentTerms} onChange={setPaymentTerms} className="w-full sm:w-40" />
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const patch: Partial<BillingTerms> = {}
-            if (billingCycle) patch.billingCycle = billingCycle
-            if (billingTiming) patch.billingTiming = billingTiming
-            if (paymentTerms) patch.paymentTerms = { paymentTermsCode: paymentTerms, customPaymentDays: null }
-            onApply(patch)
-            onClose()
-          }}
-        >
-          Apply to All
-        </Button>
+        <span className={`text-[0.7rem] ${totalIsValid ? "text-muted-foreground" : "text-destructive"}`}>Total: {total}% (must equal 100%)</span>
       </div>
     </div>
   )
 }
 
-function CommercialRateSection({ value, onChange }: { value: CommercialRateDraft; onChange: (next: CommercialRateDraft) => void }) {
-  const [applyToAllOpen, setApplyToAllOpen] = useState(false)
+function RevenueRecognitionFields({
+  recognition,
+  onChange,
+}: {
+  recognition: RevenueRecognition
+  onChange: (next: RevenueRecognition) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <FieldLabel>Revenue Recognition Method</FieldLabel>
+      <ToggleGroup
+        value={[recognition.method]}
+        onValueChange={(value) => {
+          if (!value[0]) return
+          if (value[0] === "milestone_based") {
+            onChange({ method: "milestone_based", milestones: [createMilestone()] })
+          } else {
+            onChange({ method: "full_recognition" })
+          }
+        }}
+        variant="outline"
+        size="sm"
+        className="w-fit"
+      >
+        <ToggleGroupItem value="full_recognition">Full Recognition</ToggleGroupItem>
+        <ToggleGroupItem value="milestone_based">Milestone Based</ToggleGroupItem>
+      </ToggleGroup>
+      {recognition.method === "milestone_based" ? (
+        <MilestoneRowsEditor milestones={recognition.milestones} onChangeMilestones={(milestones) => onChange({ method: "milestone_based", milestones })} />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Rebuilds a component for a new Nature, resetting Pricing Model to that
+ * Nature's own default (Recurring -> Per Unit, Non-Recurring/On-Demand ->
+ * Flat Fee), matching "the user can change the model after defaulting."
+ * Preserves name/notes/effective dates; Invoice Terms reset since
+ * Non-Recurring's own frequency is fixed automatically.
+ */
+function changeNature(component: CommercialComponentDraft, nature: CommercialNature): CommercialComponentDraft {
+  const fresh = createComponent(nature, defaultPricingModelFor(nature))
+  return { ...fresh, id: component.id, description: component.description, notes: component.notes, effectiveFrom: component.effectiveFrom, effectiveTo: component.effectiveTo }
+}
+
+/** Rebuilds a component for a new Pricing Model, preserving name/notes/effective dates/invoice terms (Nature is unchanged). */
+function changePricingModel(component: CommercialComponentDraft, pricingModel: PricingModel): CommercialComponentDraft {
+  const fresh = createComponent(component.nature, pricingModel)
+  return {
+    ...fresh,
+    id: component.id,
+    description: component.description,
+    notes: component.notes,
+    effectiveFrom: component.effectiveFrom,
+    effectiveTo: component.effectiveTo,
+    invoiceTerms: component.invoiceTerms,
+  }
+}
+
+function ComponentEditor({
+  component,
+  onChange,
+  onCommit,
+  onCancel,
+  commitLabel,
+}: {
+  component: CommercialComponentDraft
+  onChange: (next: CommercialComponentDraft) => void
+  onCommit: () => void
+  onCancel?: () => void
+  commitLabel: string
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel>Component Name</FieldLabel>
+        <Input value={component.description} onChange={(event) => onChange({ ...component, description: event.target.value })} placeholder="e.g. SFA" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Commercial Nature</FieldLabel>
+          <OptionSelect listKey="commercial_nature" value={component.nature} onChange={(value) => onChange(changeNature(component, value as CommercialNature))} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Pricing Model</FieldLabel>
+          <OptionSelect listKey="pricing_model" value={component.pricingModel} onChange={(value) => onChange(changePricingModel(component, value as PricingModel))} />
+        </div>
+      </div>
+
+      <Separator />
+
+      {component.pricingModel === "per_unit" ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel>Rate</FieldLabel>
+            <Input type="number" min={0} value={component.rate ?? ""} onChange={(event) => onChange({ ...component, rate: event.target.value ? Number(event.target.value) : null })} placeholder="e.g. 50" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel>Per</FieldLabel>
+            <OptionSelect listKey="pricing_unit" value={component.pricingUnit} onChange={(value) => onChange({ ...component, pricingUnit: value })} />
+          </div>
+        </div>
+      ) : null}
+
+      {component.pricingModel === "flat_fee" ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel>{component.nature === "recurring" ? "Recurring Amount (monthly)" : "Amount"}</FieldLabel>
+            <Input
+              type="number"
+              min={0}
+              value={component.amount ?? ""}
+              onChange={(event) => onChange({ ...component, amount: event.target.value ? Number(event.target.value) : null })}
+              placeholder="e.g. 200000"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {component.pricingModel === "slab" ? (
+        <SlabRowsEditor
+          pricingUnit={component.pricingUnit}
+          slabMethod={component.slabMethod}
+          rows={component.slabRows}
+          onChangeUnit={(value) => onChange({ ...component, pricingUnit: value })}
+          onChangeMethod={(value) => onChange({ ...component, slabMethod: value })}
+          onChangeRows={(rows) => onChange({ ...component, slabRows: rows })}
+        />
+      ) : null}
+
+      {component.pricingModel === "designation_based" ? (
+        <DesignationRowsEditor rows={component.designationRows} onChangeRows={(rows) => onChange({ ...component, designationRows: rows })} />
+      ) : null}
+
+      <Separator />
+
+      <InvoiceTermsFields component={component} onChange={onChange} />
+
+      {"mug" in component ? (
+        <>
+          <Separator />
+          <MugFields
+            mug={component.mug}
+            pricingUnitCode={mugUnitCode(component)}
+            onChange={(mug) => onChange({ ...component, mug } as CommercialComponentDraft)}
+          />
+        </>
+      ) : null}
+
+      {component.nature === "non_recurring" ? (
+        <>
+          <Separator />
+          <RevenueRecognitionFields recognition={component.revenueRecognition} onChange={(revenueRecognition) => onChange({ ...component, revenueRecognition })} />
+        </>
+      ) : null}
+
+      <Separator />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Effective From</FieldLabel>
+          <Input type="date" value={component.effectiveFrom ?? ""} onChange={(event) => onChange({ ...component, effectiveFrom: event.target.value || null })} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel>Effective To (optional)</FieldLabel>
+          <Input type="date" value={component.effectiveTo ?? ""} onChange={(event) => onChange({ ...component, effectiveTo: event.target.value || null })} />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel>Notes (optional)</FieldLabel>
+        <Input value={component.notes} onChange={(event) => onChange({ ...component, notes: event.target.value })} placeholder="Optional context for Finance" />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={onCommit}>
+          {commitLabel}
+        </Button>
+        {onCancel ? (
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function natureLabel(nature: CommercialNature): string {
+  return resolveOption("commercial_nature", nature)?.label ?? nature
+}
+
+function modelLabel(pricingModel: PricingModel): string {
+  return resolveOption("pricing_model", pricingModel)?.label ?? pricingModel
+}
+
+function ComponentSummaryCard({
+  component,
+  currencyCode,
+  onEdit,
+  onDelete,
+  disabled,
+}: {
+  component: CommercialComponentDraft
+  currencyCode: string | null
+  onEdit: () => void
+  onDelete: () => void
+  disabled?: boolean
+}) {
+  const complete = isComponentComplete(component)
+  const summaryLines = summarizeComponent(component, currencyCode)
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-foreground">{component.description || "Untitled component"}</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="ghost" className="bg-muted text-muted-foreground">
+              {natureLabel(component.nature)}
+            </Badge>
+            <Badge variant="ghost" className="bg-muted text-muted-foreground">
+              {modelLabel(component.pricingModel)}
+            </Badge>
+            {!complete ? (
+              <Badge variant="ghost" className="bg-warning/10 text-warning">
+                Incomplete
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={onEdit} disabled={disabled}>
+            Edit
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Delete component" onClick={onDelete} disabled={disabled}>
+            <XIcon className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        {summaryLines.map((line, index) => (
+          <span key={index} className="text-xs text-muted-foreground">
+            {line}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+type OpenEditor = { mode: "add"; draft: CommercialComponentDraft } | { mode: "edit"; id: string } | null
+
+function CommercialRateSection({
+  value,
+  onChange,
+  onPrevious,
+  onSaveDraft,
+  onNext,
+}: {
+  value: CommercialRateDraft
+  onChange: (next: CommercialRateDraft) => void
+  onPrevious: () => void
+  onSaveDraft: () => void
+  onNext: () => void
+}) {
+  const [openEditor, setOpenEditor] = useState<OpenEditor>(null)
 
   function updateComponent(id: string, next: CommercialComponentDraft) {
     onChange({ ...value, components: value.components.map((component) => (component.id === id ? next : component)) })
@@ -569,46 +652,24 @@ function CommercialRateSection({ value, onChange }: { value: CommercialRateDraft
 
   function deleteComponent(id: string) {
     onChange({ ...value, components: value.components.filter((component) => component.id !== id) })
+    if (openEditor?.mode === "edit" && openEditor.id === id) setOpenEditor(null)
   }
 
-  function addComponent(nature: CommercialNature, model?: RecurringPricingModel | OnDemandPricingType) {
-    const next =
-      nature === "recurring"
-        ? createComponent("recurring", (model as RecurringPricingModel) ?? "per_unit")
-        : nature === "on_demand"
-          ? createComponent("on_demand", (model as OnDemandPricingType) ?? "per_unit")
-          : createComponent("non_recurring")
-    onChange({ ...value, components: [...value.components, next] })
+  function startAdding() {
+    setOpenEditor({ mode: "add", draft: createComponent("recurring", "per_unit") })
   }
 
-  function applyTermsToAll(patch: Partial<BillingTerms>) {
-    onChange({
-      ...value,
-      components: value.components.map((component) => ({
-        ...component,
-        billingTerms: {
-          ...component.billingTerms,
-          ...(patch.billingCycle && component.nature === "recurring" ? { billingCycle: patch.billingCycle } : {}),
-          ...(patch.billingTiming ? { billingTiming: patch.billingTiming } : {}),
-          ...(patch.paymentTerms ? { paymentTerms: patch.paymentTerms } : {}),
-        },
-      })),
-    })
+  function commitAdd() {
+    if (openEditor?.mode !== "add") return
+    onChange({ ...value, components: [...value.components, openEditor.draft] })
+    setOpenEditor(null)
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Rate</span>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Commercial Scope / Package Name</FieldLabel>
-            <Input
-              value={value.commercialScope}
-              onChange={(event) => onChange({ ...value, commercialScope: event.target.value })}
-              placeholder="e.g. SFA + DMS"
-            />
-          </div>
+        <div className="sm:max-w-xs">
           <div className="flex flex-col gap-1.5">
             <FieldLabel>Billing Currency</FieldLabel>
             <OptionSelect listKey="currency" value={value.billingCurrency} onChange={(billingCurrency) => onChange({ ...value, billingCurrency })} className="w-full" />
@@ -619,34 +680,73 @@ function CommercialRateSection({ value, onChange }: { value: CommercialRateDraft
       <Separator />
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Components</span>
-          {value.components.length > 1 ? (
-            <Button variant="outline" size="sm" onClick={() => setApplyToAllOpen((open) => !open)}>
-              Apply Billing Terms to All
-            </Button>
-          ) : null}
-        </div>
+        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Components</span>
 
-        {applyToAllOpen ? <ApplyTermsToAllBar onApply={applyTermsToAll} onClose={() => setApplyToAllOpen(false)} /> : null}
+        {value.components.length === 0 && openEditor === null ? <p className="text-xs text-muted-foreground">No commercial components yet. Add one below.</p> : null}
 
-        {value.components.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No commercial components yet. Add one below.</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {value.components.map((component) => (
-              <ComponentCard
+        <div className="flex flex-col gap-3">
+          {value.components.map((component) =>
+            openEditor?.mode === "edit" && openEditor.id === component.id ? (
+              <ComponentEditor
+                key={component.id}
+                component={component}
+                onChange={(next) => updateComponent(component.id, next)}
+                onCommit={() => setOpenEditor(null)}
+                commitLabel="Save Component"
+              />
+            ) : openEditor === null ? (
+              <ComponentSummaryCard
                 key={component.id}
                 component={component}
                 currencyCode={value.billingCurrency}
-                onChange={(next) => updateComponent(component.id, next)}
+                onEdit={() => setOpenEditor({ mode: "edit", id: component.id })}
                 onDelete={() => deleteComponent(component.id)}
               />
-            ))}
-          </div>
-        )}
+            ) : (
+              <ComponentSummaryCard
+                key={component.id}
+                component={component}
+                currencyCode={value.billingCurrency}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                disabled
+              />
+            )
+          )}
+        </div>
 
-        <AddComponentForm onAdd={addComponent} />
+        {openEditor?.mode === "add" ? (
+          <ComponentEditor
+            component={openEditor.draft}
+            onChange={(next) => setOpenEditor({ mode: "add", draft: next })}
+            onCommit={commitAdd}
+            onCancel={() => setOpenEditor(null)}
+            commitLabel="Add Component"
+          />
+        ) : null}
+
+        {openEditor === null ? (
+          <Button variant="outline" size="sm" className="w-fit" onClick={startAdding}>
+            <PlusIcon data-icon="inline-start" className="size-3.5" />
+            {value.components.length === 0 ? "Add Component" : "Add Another Component"}
+          </Button>
+        ) : null}
+      </div>
+
+      <Separator />
+
+      <div className="flex items-center justify-between gap-2">
+        <Button variant="outline" size="sm" onClick={onPrevious}>
+          Previous
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onSaveDraft}>
+            Save Draft
+          </Button>
+          <Button size="sm" onClick={onNext}>
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   )
