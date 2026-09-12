@@ -268,11 +268,19 @@ function recalculateSlabFroms(rows: SlabRow[]): SlabRow[] {
  * Slab Methods: Progressive bands are just as non-overlapping/contiguous as
  * Whole Quantity bands, the methods differ only in how the total is
  * calculated, never in row shape or validation. Rows are compared in the
- * order given, not re-sorted. In practice this can no longer happen once
- * rows have passed through `recalculateSlabFroms`, since From is no longer a
- * value a user can mistype; this check remains as a general-purpose,
- * UI-independent validator (for example, for data arriving from a future
- * promotion path that does not go through this exact editor).
+ * order given, not re-sorted. A row can also never validly follow a row
+ * that is still open-ended (`to: null`): the UI's Add Row already prevents
+ * creating that state from scratch, but an existing middle row's own To
+ * can still be cleared back to open-ended by hand after later rows
+ * already exist, so this is checked here regardless of how the rows
+ * arrived (task correction: "no additional row after open-ended slab").
+ * In practice the overlap/From-derivation part of this can no longer
+ * happen once rows have passed through `recalculateSlabFroms`, since From
+ * is no longer a value a user can mistype; this check remains as a
+ * general-purpose, UI-independent validator (for example, for data
+ * arriving from a future promotion path that does not go through this
+ * exact editor). Every row's own Rate is mandatory here too, for both
+ * Slab Methods (task correction: "Slab rates are mandatory").
  */
 function areSlabRowsValid(rows: SlabRow[]): boolean {
   if (rows.length === 0) return false
@@ -282,6 +290,7 @@ function areSlabRowsValid(rows: SlabRow[]): boolean {
     if (row.from === null) return false
     if (row.to !== null && row.from > row.to) return false
     const previous = rows[index - 1]
+    if (previous && previous.to === null) return false
     if (previous && previous.to !== null && row.from <= previous.to) return false
   }
   return true
@@ -564,25 +573,144 @@ function isPositive(value: number | null): value is number {
   return value !== null && Number.isFinite(value) && value > 0
 }
 
-/**
- * Whether this component's invoice terms are complete. Ordinarily this is
- * just `isInvoiceTermsComplete`; the one exception is a Non-Recurring
- * component whose Revenue Recognition Method is Milestone Based (task
- * correction §6): once Invoice Timing lives per milestone instead, the
- * component-level Invoice Timing no longer applies at all, so only
- * Invoice Frequency (fixed to "one_time" automatically) is checked here.
- */
-function isComponentInvoiceTermsComplete(component: CommercialComponentDraft): boolean {
-  if (component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based") {
-    return component.invoiceTerms.invoiceFrequency !== null
+// =============================================================================
+// Structured component validation (task correction: "Incomplete state must
+// explain what is missing"): one function returning WHICH requirements are
+// unmet, not only whether the component as a whole passes. This is the
+// single source of truth `isComponentComplete` (stage completeness), the
+// Commercial Components table (incomplete-reason display), and a future
+// editor-level validation surface all read from, so the three never
+// invent their own separate wording or drift out of sync with each other.
+// =============================================================================
+
+/** One unmet requirement: `field` is a stable machine key (for de-duplication/keys), `message` is the exact user-facing reason. */
+type ComponentValidationIssue = { field: string; message: string }
+
+type ComponentValidationResult = { isComplete: boolean; issues: ComponentValidationIssue[] }
+
+function validateMugIssues(mug: MugOverlay, designationRows: DesignationRow[] | undefined, issues: ComponentValidationIssue[]): void {
+  if (!mug.enabled) return
+  if (designationRows) {
+    const missing = designationRows.filter((row) => !isPositive(designationMinimumUnitsFor(mug, row.id)))
+    if (missing.length > 0) {
+      issues.push({ field: "mug", message: `MUG Minimum Units required for ${missing.length} designation${missing.length === 1 ? "" : "s"}` })
+    }
+    return
   }
-  return isInvoiceTermsComplete(component.nature, component.invoiceTerms)
+  if (!isPositive(mug.minimumUnits)) issues.push({ field: "mug", message: "MUG Minimum Units required" })
 }
 
 /**
- * Per-component required fields. Description and Invoice Terms (see
- * `isComponentInvoiceTermsComplete` for the Milestone Based exception) are
- * required for every component; MUG is required only once enabled, and
+ * Every slab row's own Rate is mandatory, for both Slab Methods (task
+ * correction §6-7): a row with From/To but no Rate is incomplete, and the
+ * specific row is named ("Slab 2 Rate required"), never a generic "Slab
+ * incomplete". Also validates the structural rules a slab must always
+ * satisfy: From starting at 1 (system-derived, checked defensively here
+ * too), no gap/overlap between consecutive rows, and no row following one
+ * that is still open-ended (the UI's Add Row already prevents creating
+ * this state, but an existing row's own To can still be cleared back to
+ * open-ended after later rows already exist, so this is checked here
+ * regardless of how the data arrived).
+ */
+function validateSlabRowIssues(rows: SlabRow[], issues: ComponentValidationIssue[]): void {
+  if (rows.length === 0) {
+    issues.push({ field: "slabRows", message: "At least one slab row required" })
+    return
+  }
+  rows.forEach((row, index) => {
+    const label = `Slab ${index + 1}`
+    if (index === 0 && row.from !== 1) issues.push({ field: `slab-${index}`, message: `${label} must start From 1` })
+    if (!isPositive(row.rate)) issues.push({ field: `slab-${index}`, message: `${label} Rate required` })
+    if (row.to !== null && row.from !== null && row.from > row.to) issues.push({ field: `slab-${index}`, message: `${label} range is invalid (From after To)` })
+    const previous = rows[index - 1]
+    if (previous) {
+      if (previous.to === null) issues.push({ field: `slab-${index}`, message: `${label} cannot follow an open-ended slab` })
+      else if (row.from !== null && row.from <= previous.to) issues.push({ field: `slab-${index}`, message: `${label} overlaps the previous slab` })
+    }
+  })
+}
+
+/** Every designation row needs its own name, Rate, and Unit (task correction §7's same "every rate required" principle applied to Designation Based). */
+function validateDesignationRowIssues(rows: DesignationRow[], issues: ComponentValidationIssue[]): void {
+  if (rows.length === 0) {
+    issues.push({ field: "designationRows", message: "At least one designation row required" })
+    return
+  }
+  rows.forEach((row, index) => {
+    const label = row.designation.trim() || `Designation ${index + 1}`
+    if (row.designation.trim().length === 0) issues.push({ field: `designation-${index}`, message: `Designation ${index + 1} name required` })
+    if (!isPositive(row.rate)) issues.push({ field: `designation-${index}`, message: `${label} Rate required` })
+    if (row.per === null) issues.push({ field: `designation-${index}`, message: `${label} Unit required` })
+  })
+}
+
+/** Every milestone needs its own name, percentage, and Invoice Timing, and the percentages must total 100. */
+function validateRevenueRecognitionIssues(recognition: RevenueRecognition, issues: ComponentValidationIssue[]): void {
+  if (recognition.method === "full_recognition") return
+  if (recognition.milestones.length === 0) {
+    issues.push({ field: "milestones", message: "At least one milestone required" })
+    return
+  }
+  recognition.milestones.forEach((milestone, index) => {
+    const label = milestone.name.trim() || `Milestone ${index + 1}`
+    if (milestone.name.trim().length === 0) issues.push({ field: `milestone-${index}`, message: `Milestone ${index + 1} name required` })
+    if (!isPositive(milestone.recognitionPercent)) issues.push({ field: `milestone-${index}`, message: `${label} percentage required` })
+    if (milestone.invoiceTiming === null) issues.push({ field: `milestone-${index}`, message: `${label} Invoice Timing required` })
+  })
+  const total = recognition.milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
+  if (Math.abs(total - 100) >= 0.001) issues.push({ field: "milestoneTotal", message: "Milestone percentages must total 100%" })
+}
+
+/**
+ * The structured validation result for one component: every unmet
+ * requirement, not only a pass/fail boolean (task correction: "Incomplete
+ * state must explain what is missing"). `isComponentComplete` below is a
+ * thin wrapper over this, so stage completeness and the Commercial
+ * Components table's incomplete-reason display both read from the exact
+ * same rules and the exact same wording, never two independently
+ * maintained copies.
+ */
+function validateCommercialComponent(component: CommercialComponentDraft): ComponentValidationResult {
+  const issues: ComponentValidationIssue[] = []
+
+  if (component.description.trim().length === 0) issues.push({ field: "description", message: "Component Name required" })
+
+  if (component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based") {
+    if (component.invoiceTerms.invoiceFrequency === null) issues.push({ field: "invoiceFrequency", message: "Invoice Frequency required" })
+  } else {
+    if (component.nature !== "on_demand" && component.invoiceTerms.invoiceFrequency === null) {
+      issues.push({ field: "invoiceFrequency", message: "Invoice Frequency required" })
+    }
+    if (component.invoiceTerms.invoiceTiming === null) issues.push({ field: "invoiceTiming", message: "Invoice Timing required" })
+  }
+
+  if (component.nature === "non_recurring") validateRevenueRecognitionIssues(component.revenueRecognition, issues)
+
+  if (component.pricingModel === "per_unit") {
+    if (!isPositive(component.rate)) issues.push({ field: "rate", message: "Rate required" })
+    if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required" })
+    if (component.nature !== "non_recurring") validateMugIssues(component.mug, undefined, issues)
+  } else if (component.pricingModel === "flat_fee") {
+    if (!isPositive(component.amount)) issues.push({ field: "amount", message: "Amount required" })
+  } else if (component.pricingModel === "slab") {
+    if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required" })
+    validateSlabRowIssues(component.slabRows, issues)
+    if (component.nature !== "non_recurring") validateMugIssues(component.mug, undefined, issues)
+  } else {
+    validateDesignationRowIssues(component.designationRows, issues)
+    if (component.nature !== "non_recurring") validateMugIssues(component.mug, component.designationRows, issues)
+  }
+
+  return { isComplete: issues.length === 0, issues }
+}
+
+/**
+ * Per-component required fields, as a single true/false (see
+ * `validateCommercialComponent` for the structured, per-field version this
+ * derives from). Description and Invoice Terms (Invoice Timing lives per
+ * milestone instead once Milestone Based is chosen, see
+ * `validateCommercialComponent`) are required for every component; MUG is
+ * required only once enabled, and
  * only ever offered on Recurring/On-Demand (never Non-Recurring, never
  * Flat Fee); a Designation Based MUG additionally requires a Minimum Units
  * entry per CURRENT designation row (task correction §2); milestone rows
@@ -591,24 +719,7 @@ function isComponentInvoiceTermsComplete(component: CommercialComponentDraft): b
  * never required.
  */
 function isComponentComplete(component: CommercialComponentDraft): boolean {
-  if (component.description.trim().length === 0) return false
-  if (!isComponentInvoiceTermsComplete(component)) return false
-  if (component.nature === "non_recurring" && !isRevenueRecognitionComplete(component.revenueRecognition)) return false
-
-  if (component.pricingModel === "per_unit") {
-    if (!isPositive(component.rate) || component.pricingUnit === null) return false
-    return component.nature === "non_recurring" ? true : isMugComplete(component.mug)
-  }
-  if (component.pricingModel === "flat_fee") {
-    return isPositive(component.amount)
-  }
-  if (component.pricingModel === "slab") {
-    if (component.pricingUnit === null || !areSlabRowsValid(component.slabRows)) return false
-    return component.nature === "non_recurring" ? true : isMugComplete(component.mug)
-  }
-  // designation_based
-  if (!areDesignationRowsValid(component.designationRows)) return false
-  return component.nature === "non_recurring" ? true : isMugComplete(component.mug, component.designationRows)
+  return validateCommercialComponent(component).isComplete
 }
 
 /**
@@ -657,6 +768,7 @@ export {
   calculateSlabAmountForQuantity,
   createEmptyCommercialRateDraft,
   isPositive,
+  validateCommercialComponent,
   isComponentComplete,
   isCommercialRateDraftComplete,
   isCommercialRateDraftStarted,
@@ -678,4 +790,6 @@ export type {
   NonRecurringComponent,
   CommercialComponentDraft,
   CommercialRateDraft,
+  ComponentValidationIssue,
+  ComponentValidationResult,
 }

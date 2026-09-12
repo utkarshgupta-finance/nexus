@@ -245,15 +245,16 @@ describe("componentTableCells (Commercial Components table, task corrections §4
     expect(cells.rateLines).toEqual(["Sales Rep: GBP 10 / User (INR 1,210 / User)", "Manager: GBP 15 / User (INR 1,815 / User)"])
   })
 
-  it("Designation Based: collapses beyond 4 rows into a restrained '+N more' line", () => {
+  it("Designation Based: shows every row, never collapsed behind a '+N more' line (task correction §13)", () => {
     const component = {
       ...createComponent("recurring", "designation_based"),
       description: "Field Team",
       designationRows: [1, 2, 3, 4, 5, 6].map((n) => ({ id: String(n), designation: `Role ${n}`, rate: n * 10, per: "USER" })),
     }
     const cells = componentTableCells(component, "INR")
-    expect(cells.rateLines).toHaveLength(5)
-    expect(cells.rateLines[4]).toBe("+2 more")
+    expect(cells.rateLines).toHaveLength(6)
+    expect(cells.rateLines.some((line) => line.includes("more"))).toBe(false)
+    expect(cells.rateLines[5]).toBe("Role 6: INR 60 / User")
   })
 
   it("MUG column shows the unit quantity plus a calculated value when calculable, dual currency for a foreign Billing Currency", () => {
@@ -323,15 +324,95 @@ describe("componentTableCells (Commercial Components table, task corrections §4
     expect(componentTableCells(component, "INR").invoiceCycle).toBe("One-Time")
   })
 
-  it("Revenue Recognition is Monthly for Recurring, the chosen method for Non-Recurring, and - for On-Demand", () => {
+  it("Revenue Recognition is Monthly for Recurring, Full Recognition for Non-Recurring (kept concise, task correction §10), and - for On-Demand", () => {
     const recurring = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
-    expect(componentTableCells(recurring, "INR").revenueRecognition).toBe("Monthly")
+    expect(componentTableCells(recurring, "INR").revenueRecognitionLines).toEqual(["Monthly"])
 
     const nonRecurring = { ...createComponent("non_recurring", "flat_fee"), amount: 500000 }
-    expect(componentTableCells(nonRecurring, "INR").revenueRecognition).toBe("Full Recognition")
+    expect(componentTableCells(nonRecurring, "INR").revenueRecognitionLines).toEqual(["Full Recognition"])
 
     const onDemand = { ...createComponent("on_demand", "flat_fee"), amount: 50000 }
-    expect(componentTableCells(onDemand, "INR").revenueRecognition).toBe("-")
+    expect(componentTableCells(onDemand, "INR").revenueRecognitionLines).toEqual(["-"])
+  })
+
+  describe("Revenue Recognition Milestone table detail (task correction §8-9, §15): every milestone's Name/%/Amount/Timing, all visible, never collapsed", () => {
+    it("shows the spec's own worked example: 50% Advance, 25% Postpaid, 25% Postpaid against a 10,00,000 Flat Fee", () => {
+      const component = {
+        ...createComponent("non_recurring", "flat_fee"),
+        amount: 1000000,
+        revenueRecognition: {
+          method: "milestone_based" as const,
+          milestones: [
+            { ...createMilestone(), name: "Contract Signing", recognitionPercent: 50, invoiceTiming: "advance" },
+            { ...createMilestone(), name: "Go Live", recognitionPercent: 25, invoiceTiming: "postpaid" },
+            { ...createMilestone(), name: "Acceptance", recognitionPercent: 25, invoiceTiming: "postpaid" },
+          ],
+        },
+      }
+      const lines = componentTableCells(component, "INR").revenueRecognitionLines
+      expect(lines).toContain("Contract Signing")
+      expect(lines).toContain("50%")
+      expect(lines).toContain("INR 5,00,000")
+      expect(lines).toContain("Advance")
+      expect(lines).toContain("Go Live")
+      expect(lines).toContain("25%")
+      expect(lines).toContain("INR 2,50,000")
+      expect(lines).toContain("Postpaid")
+      expect(lines).toContain("Acceptance")
+      // Every milestone must appear, never collapsed behind a "+N more" line.
+      expect(lines.some((line) => line.includes("more"))).toBe(false)
+    })
+
+    it("shows both transaction currency and INR equivalent per milestone for a foreign Billing Currency", () => {
+      const component = {
+        ...createComponent("non_recurring", "flat_fee"),
+        amount: 10000,
+        revenueRecognition: {
+          method: "milestone_based" as const,
+          milestones: [{ ...createMilestone(), name: "Go Live", recognitionPercent: 25, invoiceTiming: "postpaid" }],
+        },
+      }
+      const lines = componentTableCells(component, "USD").revenueRecognitionLines
+      expect(lines).toContain("USD 2,500")
+      expect(lines).toContain("INR 2,27,500")
+      expect(lines).toContain("Postpaid")
+    })
+
+    it("shows '-' for a milestone's Recognition Amount when the Pricing Model has no calculable basis, without hiding the milestone itself", () => {
+      const component = {
+        ...createComponent("non_recurring", "per_unit"),
+        rate: 50,
+        pricingUnit: "USER",
+        revenueRecognition: {
+          method: "milestone_based" as const,
+          milestones: [{ ...createMilestone(), name: "Go Live", recognitionPercent: 100, invoiceTiming: "advance" }],
+        },
+      }
+      const lines = componentTableCells(component, "INR").revenueRecognitionLines
+      expect(lines).toContain("Go Live")
+      expect(lines).toContain("100%")
+      expect(lines).toContain("-")
+      expect(lines).toContain("Advance")
+    })
+
+    it("shows every milestone for a schedule with many milestones, never truncated", () => {
+      const milestones = Array.from({ length: 6 }, (_, index) => ({
+        ...createMilestone(),
+        name: `Milestone ${index + 1}`,
+        recognitionPercent: index === 5 ? 50 : 10,
+        invoiceTiming: "advance" as const,
+      }))
+      const component = {
+        ...createComponent("non_recurring", "flat_fee"),
+        amount: 1000000,
+        revenueRecognition: { method: "milestone_based" as const, milestones },
+      }
+      const lines = componentTableCells(component, "INR").revenueRecognitionLines
+      for (let index = 1; index <= 6; index += 1) {
+        expect(lines).toContain(`Milestone ${index}`)
+      }
+      expect(lines.some((line) => line.includes("more"))).toBe(false)
+    })
   })
 
   it("Effective From is formatted for the table, or - when not set", () => {

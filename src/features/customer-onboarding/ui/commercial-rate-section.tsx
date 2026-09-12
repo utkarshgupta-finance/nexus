@@ -24,15 +24,16 @@ import {
   createSlabRow,
   defaultPricingModelFor,
   designationMinimumUnitsFor,
-  isComponentComplete,
   nonRecurringMilestoneBasisAmount,
   recalculateSlabFroms,
   syncDesignationMinimums,
+  validateCommercialComponent,
 } from "../domain/commercial-rate"
 import type {
   CommercialComponentDraft,
   CommercialNature,
   CommercialRateDraft,
+  ComponentValidationIssue,
   DesignationRow,
   Milestone,
   MugOverlay,
@@ -771,9 +772,12 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
 }
 
 /**
- * Rate and MUG are always one-or-more lines now (task correction §7-11:
- * actual Slab/Designation rates, dual-currency amounts), never a single
- * collapsed string; every other column stays a single value.
+ * Rate, MUG, and Revenue Recognition are always one-or-more lines now
+ * (task correction §7-9, §13-15: actual Slab/Designation rates, the full
+ * milestone schedule, dual-currency amounts, all fully visible rather
+ * than truncated), never a single collapsed string; every other column
+ * stays a single value. Revenue Recognition's blank lines (the spacer
+ * between milestones) render as an empty line for visual separation.
  */
 function ColumnValue({ column, cells }: { column: ColumnKey; cells: ComponentTableCells }) {
   if (column === "mug") {
@@ -799,7 +803,40 @@ function ColumnValue({ column, cells }: { column: ColumnKey; cells: ComponentTab
       </div>
     )
   }
+  if (column === "revenueRecognition") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {cells.revenueRecognitionLines.map((line, index) => (
+          <span key={index} className={line === "" ? "h-1.5" : undefined}>
+            {line}
+          </span>
+        ))}
+      </div>
+    )
+  }
   return <>{cells[column]}</>
+}
+
+/**
+ * Explains WHY a component is incomplete, not only that it is (task
+ * correction: "Incomplete state must explain what is missing"): every
+ * unmet requirement from `validateCommercialComponent`, shown compactly
+ * right in the table so the user never has to click Edit just to
+ * discover what is missing.
+ */
+function IncompleteDetail({ issues }: { issues: ComponentValidationIssue[] }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Badge variant="ghost" className="w-fit bg-warning/10 text-warning">
+        Incomplete
+      </Badge>
+      <ul className="flex flex-col gap-0.5 text-[0.7rem] text-warning">
+        {issues.map((issue, index) => (
+          <li key={index}>{issue.message}</li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 /**
@@ -885,21 +922,17 @@ function ComponentsTable({
           <TableBody>
             {components.map((component) => {
               const cells = componentTableCells(component, currencyCode)
-              const complete = isComponentComplete(component)
+              const validation = validateCommercialComponent(component)
               return (
                 <TableRow key={component.id}>
                   <TableCell className="font-medium text-foreground">
                     <div className="flex flex-col gap-0.5">
                       <span>{cells.name}</span>
-                      {!complete ? (
-                        <Badge variant="ghost" className="w-fit bg-warning/10 text-warning">
-                          Incomplete
-                        </Badge>
-                      ) : null}
+                      {!validation.isComplete ? <IncompleteDetail issues={validation.issues} /> : null}
                     </div>
                   </TableCell>
                   {columns.map((column) => (
-                    <TableCell key={column} className={column === "mug" ? "whitespace-normal" : undefined}>
+                    <TableCell key={column} className={column === "mug" || column === "revenueRecognition" ? "whitespace-normal" : undefined}>
                       <ColumnValue column={column} cells={cells} />
                     </TableCell>
                   ))}
@@ -923,17 +956,13 @@ function ComponentsTable({
       <div className="flex flex-col gap-3 sm:hidden">
         {components.map((component) => {
           const cells = componentTableCells(component, currencyCode)
-          const complete = isComponentComplete(component)
+          const validation = validateCommercialComponent(component)
           return (
             <div key={component.id} className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-sm font-medium text-foreground">{cells.name}</span>
-                  {!complete ? (
-                    <Badge variant="ghost" className="w-fit bg-warning/10 text-warning">
-                      Incomplete
-                    </Badge>
-                  ) : null}
+                  {!validation.isComplete ? <IncompleteDetail issues={validation.issues} /> : null}
                 </div>
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">

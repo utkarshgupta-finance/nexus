@@ -24,6 +24,7 @@ import {
   recalculateSlabFroms,
   syncDesignationMinimums,
   toPricingRuleKind,
+  validateCommercialComponent,
 } from "./commercial-rate"
 import type { CommercialComponentDraft, CommercialRateDraft, InvoiceTerms, OngoingComponent } from "./commercial-rate"
 
@@ -266,6 +267,36 @@ describe("areSlabRowsValid (row shape shared by both Slab Methods)", () => {
       { id: "2", from: 100, to: 200, rate: 90 },
     ]
     expect(areSlabRowsValid(rows)).toBe(false)
+  })
+
+  it("is false when a row follows one that is still open-ended (task correction §7)", () => {
+    const rows = [
+      { id: "1", from: 1, to: 100, rate: 100 },
+      { id: "2", from: 101, to: null, rate: 90 },
+      { id: "3", from: 101, to: null, rate: 80 },
+    ]
+    expect(areSlabRowsValid(rows)).toBe(false)
+  })
+
+  it("Slab rates are mandatory for every row, Whole Quantity and Progressive alike (task correction §6)", () => {
+    const missingFirstRate = [
+      { id: "1", from: 1, to: 100, rate: null },
+      { id: "2", from: 101, to: null, rate: 90 },
+    ]
+    expect(areSlabRowsValid(missingFirstRate)).toBe(false)
+
+    const missingMiddleRate = [
+      { id: "1", from: 1, to: 100, rate: 100 },
+      { id: "2", from: 101, to: 200, rate: null },
+      { id: "3", from: 201, to: null, rate: 80 },
+    ]
+    expect(areSlabRowsValid(missingMiddleRate)).toBe(false)
+
+    const missingLastRate = [
+      { id: "1", from: 1, to: 100, rate: 100 },
+      { id: "2", from: 101, to: null, rate: null },
+    ]
+    expect(areSlabRowsValid(missingLastRate)).toBe(false)
   })
 })
 
@@ -743,5 +774,150 @@ describe("calculateDesignationMugSummary / calculateMugValue for Designation Bas
     const withMug = { ...component, mug: { enabled: true as const, minimumUnits: null, designationMinimums: [] } }
     expect(calculateDesignationMugSummary(withMug)).toBeNull()
     expect(calculateMugValue(withMug)).toBeNull()
+  })
+})
+
+describe("Person Pricing Unit (task correction §11-12): usable anywhere a Pricing Unit is usable, no special-case path", () => {
+  it("Per Unit accepts PERSON exactly like any other unit code", () => {
+    const component = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "PERSON", invoiceTerms: COMPLETE_TERMS }
+    expect(isComponentComplete(withDescription(component, "Field Staff"))).toBe(true)
+  })
+
+  it("Slab accepts PERSON exactly like any other unit code", () => {
+    const component = {
+      ...createComponent("recurring", "slab"),
+      pricingUnit: "PERSON",
+      slabRows: [{ id: "1", from: 1, to: null, rate: 90 }],
+      invoiceTerms: COMPLETE_TERMS,
+    }
+    expect(isComponentComplete(withDescription(component, "Field Staff"))).toBe(true)
+  })
+
+  it("Designation Based's per-row Unit accepts PERSON exactly like any other unit code", () => {
+    const component = {
+      ...createComponent("recurring", "designation_based"),
+      designationRows: [{ id: "1", designation: "Field Officer", rate: 100, per: "PERSON" }],
+      invoiceTerms: COMPLETE_TERMS,
+    }
+    expect(isComponentComplete(withDescription(component, "Field Staff"))).toBe(true)
+  })
+})
+
+describe("validateCommercialComponent (task correction: incomplete state must explain what is missing)", () => {
+  function messagesOf(component: CommercialComponentDraft): string[] {
+    return validateCommercialComponent(component).issues.map((issue) => issue.message)
+  }
+
+  it("is complete with zero issues once every requirement is met, same as isComponentComplete", () => {
+    const component = { ...withDescription(createComponent("recurring", "per_unit"), "SFA"), rate: 50, pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS }
+    const result = validateCommercialComponent(component)
+    expect(result.isComplete).toBe(true)
+    expect(result.issues).toEqual([])
+    expect(isComponentComplete(component)).toBe(true)
+  })
+
+  it("surfaces missing Invoice Frequency", () => {
+    const component = withDescription(createComponent("recurring", "flat_fee"), "Platform Fee")
+    expect(messagesOf({ ...component, amount: 200000, invoiceTerms: { invoiceFrequency: null, invoiceTiming: "advance" } })).toContain("Invoice Frequency required")
+  })
+
+  it("surfaces missing Invoice Timing", () => {
+    const component = withDescription(createComponent("recurring", "flat_fee"), "Platform Fee")
+    expect(messagesOf({ ...component, amount: 200000, invoiceTerms: { invoiceFrequency: "monthly", invoiceTiming: null } })).toContain("Invoice Timing required")
+  })
+
+  it("surfaces missing Rate for Per Unit", () => {
+    const component = { ...withDescription(createComponent("recurring", "per_unit"), "SFA"), pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS }
+    expect(messagesOf(component)).toContain("Rate required")
+  })
+
+  it("surfaces missing MUG Minimum Units", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "per_unit"), "SFA"),
+      rate: 50,
+      pricingUnit: "USER",
+      invoiceTerms: COMPLETE_TERMS,
+      mug: { enabled: true as const, minimumUnits: null, designationMinimums: [] },
+    }
+    expect(messagesOf(component)).toContain("MUG Minimum Units required")
+  })
+
+  it("surfaces the milestone total-percentage requirement", () => {
+    const component = {
+      ...withDescription(createComponent("non_recurring", "flat_fee"), "Implementation"),
+      amount: 500000,
+      invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: "advance" },
+      revenueRecognition: {
+        method: "milestone_based" as const,
+        milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 60, invoiceTiming: "advance" }],
+      },
+    }
+    expect(messagesOf(component)).toContain("Milestone percentages must total 100%")
+  })
+
+  it("surfaces multiple missing requirements at once, not only the first one found", () => {
+    const component = createComponent("recurring", "per_unit")
+    const messages = messagesOf(component)
+    expect(messages).toContain("Component Name required")
+    expect(messages).toContain("Invoice Frequency required")
+    expect(messages).toContain("Invoice Timing required")
+    expect(messages).toContain("Rate required")
+    expect(messages).toContain("Unit required")
+    expect(messages.length).toBeGreaterThan(1)
+  })
+
+  it("names the specific slab row missing its Rate, not a generic 'Slab incomplete'", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "DISTRIBUTOR",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100 },
+        { id: "2", from: 101, to: 200, rate: null },
+        { id: "3", from: 201, to: null, rate: 80 },
+      ],
+    }
+    const messages = messagesOf(component)
+    expect(messages).toContain("Slab 2 Rate required")
+    expect(messages).not.toContain("Slab 1 Rate required")
+    expect(messages).not.toContain("Slab 3 Rate required")
+  })
+
+  it("names the first slab row when it is the one missing a Rate", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "USER",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: [{ id: "1", from: 1, to: null, rate: null }],
+    }
+    expect(messagesOf(component)).toContain("Slab 1 Rate required")
+  })
+
+  it("names the final slab row when it is the one missing a Rate", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "USER",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100 },
+        { id: "2", from: 101, to: null, rate: null },
+      ],
+    }
+    expect(messagesOf(component)).toContain("Slab 2 Rate required")
+  })
+
+  it("stays incomplete until every slab row has a valid Rate, for Whole Quantity and Progressive alike", () => {
+    const rows = [
+      { id: "1", from: 1, to: 100, rate: 100 },
+      { id: "2", from: 101, to: null, rate: null },
+    ]
+    const wholeQuantity = { ...withDescription(createComponent("recurring", "slab"), "DMS"), pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS, slabRows: rows }
+    expect(validateCommercialComponent(wholeQuantity).isComplete).toBe(false)
+    const progressive = { ...wholeQuantity, slabMethod: "progressive" as const }
+    expect(validateCommercialComponent(progressive).isComplete).toBe(false)
+
+    const filledRows = rows.map((row) => (row.rate === null ? { ...row, rate: 90 } : row))
+    expect(validateCommercialComponent({ ...wholeQuantity, slabRows: filledRows }).isComplete).toBe(true)
+    expect(validateCommercialComponent({ ...progressive, slabRows: filledRows }).isComplete).toBe(true)
   })
 })

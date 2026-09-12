@@ -1,6 +1,12 @@
 import { resolveOption } from "@/features/reference-data"
-import { calculateDesignationMugSummary, calculateMugValue, designationMinimumUnitsFor } from "./commercial-rate"
-import type { CommercialComponentDraft, CommercialNature, InvoiceTerms, MugOverlay, PricingModel, RevenueRecognition } from "./commercial-rate"
+import {
+  calculateDesignationMugSummary,
+  calculateMilestoneAmount,
+  calculateMugValue,
+  designationMinimumUnitsFor,
+  nonRecurringMilestoneBasisAmount,
+} from "./commercial-rate"
+import type { CommercialComponentDraft, CommercialNature, InvoiceTerms, Milestone, MugOverlay, PricingModel, RevenueRecognition } from "./commercial-rate"
 import { isForeignCurrency, toInr } from "./commercial-rate-fx"
 
 /**
@@ -196,9 +202,6 @@ function pricingColumnSummary(component: CommercialComponentDraft): string {
   return modelLabel(component.pricingModel)
 }
 
-/** How many designation rows the Rate column shows before collapsing the rest into "+N more" (task correction §8). */
-const DESIGNATION_ROWS_SHOWN_IN_TABLE = 4
-
 /**
  * One line per Slab band, the component's actual contracted rate, never a
  * generic "Whole Quantity / User" placeholder (task correction §7, §19):
@@ -222,16 +225,14 @@ function slabRateLines(component: Extract<CommercialComponentDraft, { pricingMod
 
 /**
  * One line per designation, the component's actual contracted rate, never
- * a generic "N Designation Rates" placeholder (task correction §8, §20):
- * "Sales Rep: INR 100 / User", or with an INR equivalent in parentheses for
- * a foreign Billing Currency. Caps at `DESIGNATION_ROWS_SHOWN_IN_TABLE`
- * rows, appending a final "+N more" line rather than growing the cell
- * without bound (a restrained interaction, per the task correction, rather
- * than a full expandable control for V1).
+ * a generic "N Designation Rates" placeholder (task correction §8, §20).
+ * Every row is shown, never collapsed behind a "+N more" line (task
+ * correction: "the user explicitly wants all visible"): "Sales Rep: INR
+ * 100 / User", or with an INR equivalent in parentheses for a foreign
+ * Billing Currency.
  */
 function designationRateLines(component: Extract<CommercialComponentDraft, { pricingModel: "designation_based" }>, currencyCode: string | null): string[] {
-  const rows = component.designationRows
-  const shown = rows.slice(0, DESIGNATION_ROWS_SHOWN_IN_TABLE).map((row) => {
+  return component.designationRows.map((row) => {
     const unit = unitLabel(row.per)
     const primary = `${formatAmount(row.rate, currencyCode)} / ${unit}`
     const label = row.designation || "Designation"
@@ -239,8 +240,6 @@ function designationRateLines(component: Extract<CommercialComponentDraft, { pri
     const inrAmount = toInr(row.rate, currencyCode)
     return inrAmount === null ? `${label}: ${primary}` : `${label}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})`
   })
-  const remaining = rows.length - DESIGNATION_ROWS_SHOWN_IN_TABLE
-  return remaining > 0 ? [...shown, `+${remaining} more`] : shown
 }
 
 /**
@@ -285,16 +284,44 @@ function invoiceCycleColumnSummary(component: CommercialComponentDraft): string 
 }
 
 /**
- * Recurring is always Monthly revenue (docs §22); Non-Recurring shows its
- * own chosen method; On-Demand has no recognition concept captured in this
- * model at all, so this honestly shows "-" rather than inventing one.
+ * One milestone's own detail block: Name, Recognition %, Recognition
+ * Amount (dual currency for a foreign Billing Currency), Invoice Timing
+ * (task correction §8-9: "do not show only Milestone Based... show each
+ * milestone with Name/%/Amount/Timing"). Returns 4-5 lines depending on
+ * whether an INR equivalent applies.
  */
-function recognitionColumnSummary(component: CommercialComponentDraft): string {
-  if (component.nature === "recurring") return "Monthly"
-  if (component.nature === "non_recurring") {
-    return component.revenueRecognition.method === "milestone_based" ? "Milestone Based" : "Full Recognition"
-  }
-  return "-"
+function milestoneDetailLines(milestone: Milestone, basisAmount: number | null, currencyCode: string | null): string[] {
+  const amount = calculateMilestoneAmount(basisAmount, milestone.recognitionPercent)
+  const amountLines = dualCurrencyLines(amount, currencyCode, "", formatAmount)
+  return [
+    milestone.name || "Milestone",
+    milestone.recognitionPercent !== null ? `${milestone.recognitionPercent}%` : "-",
+    ...(amountLines.length > 0 ? amountLines : ["-"]),
+    milestone.invoiceTiming ? invoiceTimingLabel(milestone.invoiceTiming) : "-",
+  ]
+}
+
+/**
+ * Recurring is always Monthly revenue (docs §22); On-Demand has no
+ * recognition concept captured in this model at all, so this honestly
+ * shows "-" rather than inventing one. Non-Recurring Full Recognition
+ * stays a single concise line (task correction §10). Non-Recurring
+ * Milestone Based shows the ENTIRE milestone schedule (task correction
+ * §8-9, §15): every milestone's own Name/%/Amount/Timing, never a bare
+ * "Milestone Based" label and never collapsed behind a "+N more" line, so
+ * Finance can read the whole revenue structure straight from the table.
+ */
+function recognitionColumnLines(component: CommercialComponentDraft, currencyCode: string | null): string[] {
+  if (component.nature !== "non_recurring") return component.nature === "recurring" ? ["Monthly"] : ["-"]
+  if (component.revenueRecognition.method === "full_recognition") return ["Full Recognition"]
+
+  const basisAmount = nonRecurringMilestoneBasisAmount(component)
+  const lines: string[] = []
+  component.revenueRecognition.milestones.forEach((milestone, index) => {
+    if (index > 0) lines.push("")
+    lines.push(...milestoneDetailLines(milestone, basisAmount, currencyCode))
+  })
+  return lines
 }
 
 /**
@@ -339,7 +366,7 @@ type ComponentTableCells = {
   mugQuantityLines: string[]
   mugCalculatedLines: string[]
   invoiceCycle: string
-  revenueRecognition: string
+  revenueRecognitionLines: string[]
   effectiveFrom: string
 }
 
@@ -360,7 +387,7 @@ function componentTableCells(component: CommercialComponentDraft, currencyCode: 
     mugQuantityLines: mugQuantityLines(component),
     mugCalculatedLines: mugCalculatedLines(component, currencyCode),
     invoiceCycle: invoiceCycleColumnSummary(component),
-    revenueRecognition: recognitionColumnSummary(component),
+    revenueRecognitionLines: recognitionColumnLines(component, currencyCode),
     effectiveFrom: formatEffectiveDate(component.effectiveFrom),
   }
 }
@@ -385,7 +412,7 @@ export {
   mugQuantityLines,
   mugCalculatedLines,
   invoiceCycleColumnSummary,
-  recognitionColumnSummary,
+  recognitionColumnLines,
   formatEffectiveDate,
   componentTableCells,
 }

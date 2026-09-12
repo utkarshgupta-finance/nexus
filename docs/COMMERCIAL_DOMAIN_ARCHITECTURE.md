@@ -1028,13 +1028,72 @@ The Pricing column already names the model and, for Slab, the Method
 is to answer "what did we actually agree to charge," so it was corrected
 to show the real numbers rather than summarizing them away: Slab shows one
 line per band ("1-100: INR 500 / User"), Designation Based shows one line
-per designation ("Sales Rep: INR 100 / User", capped at four rows with a
-final restrained "+N more" line rather than an unbounded cell), and Per
-Unit/Flat Fee show the plain rate or amount as before. A prior version of
-this stage collapsed Slab to its Method/unit alone and Designation Based to
-a bare row count ("N Designation Rates"); neither told Finance what the
-customer was actually being charged without opening Edit, which is exactly
-what this correction exists to fix.
+per designation ("Sales Rep: INR 100 / User"), and Per Unit/Flat Fee show
+the plain rate or amount as before. A prior version of this stage
+collapsed Slab to its Method/unit alone and Designation Based to a bare
+row count ("N Designation Rates"); neither told Finance what the customer
+was actually being charged without opening Edit, which is exactly what
+this correction exists to fix. See "Full visibility" below for why every
+row is shown rather than any of them being truncated.
+
+### Full visibility: finance-critical rate detail is never truncated behind a "+N more" line
+
+An early version of the Designation Based Rate column capped itself at
+four rows and collapsed the rest behind a "+N more" line, a restrained
+compromise for column width. A later correction reversed this
+deliberately: Finance must be able to read a component's entire
+commercial structure directly from the table, without opening Edit to
+discover what is hidden. Every Slab band, every Designation row, and
+every Non-Recurring Milestone (see "Milestone table detail" below) is
+shown in full, however many rows that is; rows may grow taller as a
+result, which is an accepted tradeoff, commercial clarity over forcing
+every row into one compact line. This principle applies uniformly:
+nothing in the Commercial Components table is ever truncated, paginated,
+or summarized away once it is real contracted or scheduled detail.
+
+### Non-Recurring Milestone table detail: the entire schedule, not a bare "Milestone Based" label
+
+A Non-Recurring component's Revenue Recognition column used to show only
+"Milestone Based" once that method was chosen, telling Finance nothing
+about the actual schedule. It now shows every milestone's own Name,
+Recognition %, Recognition Amount (with an INR equivalent alongside it
+for a foreign Billing Currency, exactly like every other amount in this
+stage), and Invoice Timing, laid out as a small detail block per
+milestone (`recognitionColumnLines` in `commercial-rate-summary.ts`). Full
+Recognition stays a single concise line ("Full Recognition"): only
+Milestone Based has a schedule worth expanding.
+
+### Structured Commercial Component validation: one function, not three independently maintained copies
+
+A component being "Incomplete" used to be a bare boolean with no way to
+tell the user what was actually missing. `validateCommercialComponent` in
+`commercial-rate.ts` replaces the guesswork: it returns every unmet
+requirement as a `{ field, message }` issue ("Rate required", "Invoice
+Frequency required", "Slab 2 Rate required", "Milestone percentages must
+total 100%"), not only a pass/fail flag. `isComponentComplete` (and so
+`isCommercialRateDraftComplete`, stage completeness) is now a thin wrapper
+that reads `.isComplete` off this same function, and the Commercial
+Components table reads `.issues` off it to show exactly why a row is
+incomplete right there, without the user needing to open Edit first. One
+function is the single source of truth for what "complete" means; the
+table's wording and the stage's own gate can never quietly drift apart
+into two different definitions of "complete."
+
+### Slab Rate is mandatory for every row, and a row can never follow an open-ended one
+
+Every Slab row's own Rate has always been required by `areSlabRowsValid`
+for both Slab Methods; a row with a From/To range but no Rate was always
+rejected. What changed is visibility, not the rule itself:
+`validateCommercialComponent` now names the specific row ("Slab 2 Rate
+required") rather than a generic "Slab incomplete". A second, previously
+unenforced structural rule was added at the same time: a row can never
+validly follow one that is still open-ended (`to: null`). The UI's Add
+Row already prevents creating this state from a blank slate, but a
+middle row's own To can still be hand-cleared back to open-ended after
+later rows already exist; `areSlabRowsValid` and
+`validateCommercialComponent` both now reject that shape regardless of
+how the data arrived, not only when it is freshly typed through this
+exact editor.
 
 ### Currency Settings governs a centrally-owned INR Conversion Rate; Commercial Rate only ever reads it
 

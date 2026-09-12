@@ -70,6 +70,7 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
   // codes, never the display label, matching every list above.
   pricing_unit: [
     { value: "USER", label: "User", active: true },
+    { value: "PERSON", label: "Person", active: true },
     { value: "MESSAGE", label: "Message", active: true },
     { value: "OUTLET", label: "Outlet", active: true },
     { value: "DISTRIBUTOR", label: "Distributor", active: true },

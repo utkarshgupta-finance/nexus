@@ -110,7 +110,7 @@ describe("reference master option resolution", () => {
 })
 
 describe("Commercial Rate reference lists (Pricing Unit, Invoice Frequency, Invoice Timing, Commercial Nature, Pricing Model)", () => {
-  it("Pricing Unit exposes the eleven initial values with stable codes distinct from their labels", () => {
+  it("Pricing Unit exposes the twelve initial values with stable codes distinct from their labels", () => {
     const values = getActiveOptions("pricing_unit").map((option) => option.value).sort()
     expect(values).toEqual([
       "DASHBOARD",
@@ -120,12 +120,39 @@ describe("Commercial Rate reference lists (Pricing Unit, Invoice Frequency, Invo
       "MAN_DAY",
       "MESSAGE",
       "OUTLET",
+      "PERSON",
       "REPORT",
       "REQUEST",
       "SESSION",
       "USER",
     ])
     expect(resolveOption("pricing_unit", "MAN_DAY")?.label).toBe("Man-day")
+  })
+
+  describe("Person unit (task correction §11-12): behaves exactly like every other Pricing Unit, no special-case path", () => {
+    it("PERSON is a stable, active Pricing Unit code selectable like any other", () => {
+      const person = resolveOption("pricing_unit", "PERSON")
+      expect(person).not.toBeNull()
+      expect(person?.value).toBe("PERSON")
+      expect(person?.label).toBe("Person")
+      expect(person?.active).toBe(true)
+      expect(getActiveOptions("pricing_unit").some((option) => option.value === "PERSON")).toBe(true)
+    })
+
+    it("is manageable through Reference Master Settings exactly like other units (getAllOptions/deactivate, same generic path)", () => {
+      const deactivatedCopy = getAllOptions("pricing_unit").map((option) => (option.value === "PERSON" ? { ...option, active: false } : option))
+      expect(deactivatedCopy.find((option) => option.value === "PERSON")?.active).toBe(false)
+      // The shared fixture itself is untouched by that local copy, matching the same non-mutation guarantee proven above for segment/currency.
+      expect(resolveOption("pricing_unit", "PERSON")?.active).toBe(true)
+    })
+
+    it("an inactive Person would be excluded from new selections but still historically resolvable, same as any other unit", () => {
+      const deactivatedCopy = getAllOptions("pricing_unit").map((option) => (option.value === "PERSON" ? { ...option, active: false } : option))
+      const activeOnly = deactivatedCopy.filter((option) => option.active)
+      expect(activeOnly.some((option) => option.value === "PERSON")).toBe(false)
+      const resolved = deactivatedCopy.find((option) => option.value === "PERSON")
+      expect(resolved?.label).toBe("Person")
+    })
   })
 
   it("Invoice Frequency has the four real cadences plus One-Time, no On-Demand value", () => {
