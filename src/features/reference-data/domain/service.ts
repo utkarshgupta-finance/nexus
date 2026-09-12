@@ -42,4 +42,17 @@ function resolveOption(listKey: ReferenceListKey, value: string): ReferenceOptio
   return REFERENCE_MASTER_FIXTURES[listKey].find((option) => option.value === value) ?? null
 }
 
-export { getActiveOptions, getAllOptions, resolveOption }
+/**
+ * The centrally governed "1 unit of `currencyCode` = X INR" rate (task
+ * correction §12-15). Returns `null`, never a guess, when the currency is
+ * not an active `currency` option or has no rate configured yet: a caller
+ * needing this rate (Commercial Rate's own FX display and completeness
+ * check) must treat `null` as "not configured", never fall back to 1 or
+ * any other invented value.
+ */
+function getInrConversionRate(currencyCode: string): number | null {
+  const option = REFERENCE_MASTER_FIXTURES.currency.find((entry) => entry.value === currencyCode && entry.active)
+  return option?.inrConversionRate ?? null
+}
+
+export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate }

@@ -1,11 +1,15 @@
 import { resolveOption } from "@/features/reference-data"
-import { calculateMugValue } from "./commercial-rate"
+import { calculateDesignationMugSummary, calculateMugValue, designationMinimumUnitsFor } from "./commercial-rate"
 import type { CommercialComponentDraft, CommercialNature, InvoiceTerms, MugOverlay, PricingModel, RevenueRecognition } from "./commercial-rate"
+import { isForeignCurrency, toInr } from "./commercial-rate-fx"
 
 /**
  * Human-readable calculation-preview strings: illustrative display
  * summaries only, never a real invoice calculation. Every value here comes
- * straight from what the user typed into this component.
+ * straight from what the user typed into this component, plus (task
+ * correction, "ADDITIONAL COMMERCIAL RATE TABLE STRUCTURE/FX CORRECTION")
+ * a read-only INR equivalent wherever Billing Currency is not already INR,
+ * resolved from Reference Master's own governed rate (`commercial-rate-fx.ts`).
  */
 
 function formatAmount(value: number | null, currencyCode: string | null): string {
@@ -40,6 +44,25 @@ function formatCompactAmount(value: number | null, currencyCode: string | null):
   return currencyCode ? `${currencyCode} ${compact}` : compact
 }
 
+/**
+ * One line for the transaction (Billing Currency) amount, plus a second
+ * line for its INR equivalent whenever Billing Currency is foreign and a
+ * governed rate is configured (task correction §9-10, §17, §19-20): never
+ * shown for INR itself (nothing to convert), and never a second line at
+ * all when the rate is not configured (§15's validation state is the place
+ * that surfaces that gap, not a silently-dropped or invented conversion
+ * here). `formatter` lets callers choose full precision (`formatAmount`,
+ * for Rate cells) or compact (`formatCompactAmount`, for MUG's monetary
+ * total) without duplicating this branching twice.
+ */
+function dualCurrencyLines(amount: number | null, currencyCode: string | null, suffix: string, formatter: (value: number | null, currencyCode: string | null) => string): string[] {
+  if (amount === null) return []
+  const primary = `${formatter(amount, currencyCode)}${suffix}`
+  if (!isForeignCurrency(currencyCode)) return [primary]
+  const inrAmount = toInr(amount, currencyCode)
+  return inrAmount === null ? [primary] : [primary, `${formatter(inrAmount, "INR")}${suffix}`]
+}
+
 function unitLabel(pricingUnitCode: string | null): string {
   if (!pricingUnitCode) return "Unit"
   return resolveOption("pricing_unit", pricingUnitCode)?.label ?? pricingUnitCode
@@ -70,7 +93,7 @@ function invoiceSummaryLine(terms: InvoiceTerms): string | null {
   return `Invoice: ${parts.join(" ")}`
 }
 
-/** "MUG: 5,000 Users": a unit quantity floor, never money. */
+/** "MUG: 5,000 Users": a unit quantity floor, never money. Not meaningful for Designation Based, which has one Minimum Units per designation instead (see `designationMugQuantityLines`). */
 function mugSummaryLine(mug: MugOverlay, pricingUnitCode: string | null): string | null {
   if (!mug.enabled) return null
   return `MUG: ${formatQuantity(mug.minimumUnits)} ${unitLabelForQuantity(pricingUnitCode, mug.minimumUnits)}`
@@ -81,8 +104,8 @@ function mugSummaryLine(mug: MugOverlay, pricingUnitCode: string | null): string
  * `mugSummaryLine`, never merged into it, since the contractual MUG line
  * must stay demonstrably money-free while this one is explicitly the
  * derived monetary reference (task correction §1). Returns `null` when the
- * value cannot be reliably calculated (Designation Based, or missing
- * rate/rows), rather than showing a fabricated amount.
+ * value cannot be reliably calculated (missing rate/rows), rather than
+ * showing a fabricated amount.
  */
 function calculatedMugValueLine(component: CommercialComponentDraft, currencyCode: string | null): string | null {
   const amount = calculateMugValue(component)
@@ -160,8 +183,10 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
 /**
  * Concise Pricing column label ("Per Unit", "Flat Fee", "Slab - Whole
  * Quantity", "Slab - Progressive", "Designation Based"). Slab's own Method
- * lives here, in the Pricing column, not in Rate: Rate is reserved for the
- * row count once a component is Slab-priced (see `rateColumnSummary`).
+ * lives here, in the Pricing column, never folded into Rate: Rate is
+ * reserved for the component's actual, real rates (task correction §7-8:
+ * "do not show only Progressive / User... the Pricing column already
+ * communicates the model").
  */
 function pricingColumnSummary(component: CommercialComponentDraft): string {
   if (component.pricingModel === "slab") {
@@ -171,22 +196,66 @@ function pricingColumnSummary(component: CommercialComponentDraft): string {
   return modelLabel(component.pricingModel)
 }
 
+/** How many designation rows the Rate column shows before collapsing the rest into "+N more" (task correction §8). */
+const DESIGNATION_ROWS_SHOWN_IN_TABLE = 4
+
 /**
- * Concise, single-value rate summary for the Commercial Components table's
- * own Rate column ("₹50 / User", "₹2,00,000", "3 Slabs / User", "4
- * Designation Rates"). Deliberately not the full multi-line
- * `summarizeComponent`, which stays for the open editor's own preview: a
- * table row has one line to work with per column.
+ * One line per Slab band, the component's actual contracted rate, never a
+ * generic "Whole Quantity / User" placeholder (task correction §7, §19):
+ * "1-100: INR 500 / User", or with an INR equivalent appended in
+ * parentheses once Billing Currency is foreign and a rate is configured:
+ * "1-100: USD 10 / User (INR 910 / User)". One line per band keeps this
+ * compact even with several bands, rather than a separate INR line per
+ * band, which would double the cell's height for no added clarity (a
+ * single band has only one value to disambiguate).
  */
-function rateColumnSummary(component: CommercialComponentDraft, currencyCode: string | null): string {
-  if (component.pricingModel === "flat_fee") return formatAmount(component.amount, currencyCode)
-  if (component.pricingModel === "per_unit") return `${formatAmount(component.rate, currencyCode)} / ${unitLabel(component.pricingUnit)}`
-  if (component.pricingModel === "slab") {
-    const count = component.slabRows.length
-    return `${count} Slab${count === 1 ? "" : "s"} / ${unitLabel(component.pricingUnit)}`
-  }
-  const count = component.designationRows.length
-  return `${count} Designation Rate${count === 1 ? "" : "s"}`
+function slabRateLines(component: Extract<CommercialComponentDraft, { pricingModel: "slab" }>, currencyCode: string | null): string[] {
+  const unit = unitLabel(component.pricingUnit)
+  return component.slabRows.map((row) => {
+    const range = row.to === null ? `${row.from ?? "-"}+` : `${row.from ?? "-"}-${row.to}`
+    const primary = `${formatAmount(row.rate, currencyCode)} / ${unit}`
+    if (row.rate === null || !isForeignCurrency(currencyCode)) return `${range}: ${primary}`
+    const inrAmount = toInr(row.rate, currencyCode)
+    return inrAmount === null ? `${range}: ${primary}` : `${range}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})`
+  })
+}
+
+/**
+ * One line per designation, the component's actual contracted rate, never
+ * a generic "N Designation Rates" placeholder (task correction §8, §20):
+ * "Sales Rep: INR 100 / User", or with an INR equivalent in parentheses for
+ * a foreign Billing Currency. Caps at `DESIGNATION_ROWS_SHOWN_IN_TABLE`
+ * rows, appending a final "+N more" line rather than growing the cell
+ * without bound (a restrained interaction, per the task correction, rather
+ * than a full expandable control for V1).
+ */
+function designationRateLines(component: Extract<CommercialComponentDraft, { pricingModel: "designation_based" }>, currencyCode: string | null): string[] {
+  const rows = component.designationRows
+  const shown = rows.slice(0, DESIGNATION_ROWS_SHOWN_IN_TABLE).map((row) => {
+    const unit = unitLabel(row.per)
+    const primary = `${formatAmount(row.rate, currencyCode)} / ${unit}`
+    const label = row.designation || "Designation"
+    if (row.rate === null || !isForeignCurrency(currencyCode)) return `${label}: ${primary}`
+    const inrAmount = toInr(row.rate, currencyCode)
+    return inrAmount === null ? `${label}: ${primary}` : `${label}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})`
+  })
+  const remaining = rows.length - DESIGNATION_ROWS_SHOWN_IN_TABLE
+  return remaining > 0 ? [...shown, `+${remaining} more`] : shown
+}
+
+/**
+ * The Commercial Components table's own Rate column: the component's
+ * actual, real contracted rate(s), one line per Slab band or Designation
+ * row, never a row-count or method-name placeholder (task correction §7-9,
+ * §19-20: "do not show only Progressive / User", "do NOT show 4
+ * Designation Rates"). Per Unit and Flat Fee are a single value, so a
+ * single (or, for a foreign Billing Currency, dual-currency) line.
+ */
+function rateColumnLines(component: CommercialComponentDraft, currencyCode: string | null): string[] {
+  if (component.pricingModel === "flat_fee") return dualCurrencyLines(component.amount, currencyCode, "", formatAmount)
+  if (component.pricingModel === "per_unit") return dualCurrencyLines(component.rate, currencyCode, ` / ${unitLabel(component.pricingUnit)}`, formatAmount)
+  if (component.pricingModel === "slab") return slabRateLines(component, currencyCode)
+  return designationRateLines(component, currencyCode)
 }
 
 /** "01-Oct-2026", or "-" once no Effective From has been chosen yet. Never a raw ISO date string in a table cell. */
@@ -199,11 +268,19 @@ function formatEffectiveDate(value: string | null): string {
   return `${day}-${month}-${date.getFullYear()}`
 }
 
-/** "Monthly Advance", "Quarterly Postpaid", or "-" once neither half is chosen yet. */
-function invoiceCycleColumnSummary(terms: InvoiceTerms): string {
-  const parts = [terms.invoiceFrequency ? invoiceFrequencyLabel(terms.invoiceFrequency) : null, terms.invoiceTiming ? invoiceTimingLabel(terms.invoiceTiming) : null].filter(
-    (part): part is string => part !== null
-  )
+/**
+ * "Monthly Advance", "Quarterly Postpaid", or "-" once neither half is
+ * chosen yet. A Non-Recurring component whose Revenue Recognition Method is
+ * Milestone Based shows Invoice Frequency alone ("One-Time"): Invoice
+ * Timing lives per milestone in that case (task correction §6), so the
+ * component-level Timing no longer applies and would be misleading here.
+ */
+function invoiceCycleColumnSummary(component: CommercialComponentDraft): string {
+  const usesMilestoneTiming = component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based"
+  const parts = [
+    component.invoiceTerms.invoiceFrequency ? invoiceFrequencyLabel(component.invoiceTerms.invoiceFrequency) : null,
+    !usesMilestoneTiming && component.invoiceTerms.invoiceTiming ? invoiceTimingLabel(component.invoiceTerms.invoiceTiming) : null,
+  ].filter((part): part is string => part !== null)
   return parts.length > 0 ? parts.join(" ") : "-"
 }
 
@@ -220,13 +297,47 @@ function recognitionColumnSummary(component: CommercialComponentDraft): string {
   return "-"
 }
 
+/**
+ * MUG column's quantity lines (task correction §11): a single line for Per
+ * Unit/Slab ("5,000 Users"), or one line per designation plus a final
+ * "Total: N Units" line for Designation Based ("Sales Rep: 500", "Manager:
+ * 50", "Total: 550 Users"), or `["-"]` once MUG is off or not applicable.
+ */
+function mugQuantityLines(component: CommercialComponentDraft): string[] {
+  if (!("mug" in component) || !component.mug.enabled) return ["-"]
+
+  if (component.pricingModel === "designation_based") {
+    const mug = component.mug
+    const lines = component.designationRows.map((row) => `${row.designation || "Designation"}: ${formatQuantity(designationMinimumUnitsFor(mug, row.id))}`)
+    const summary = calculateDesignationMugSummary(component)
+    const totalUnits = summary?.totalUnits ?? null
+    lines.push(`Total: ${formatQuantity(totalUnits)} ${unitLabelForQuantity(mugUnitCode(component), totalUnits)}`)
+    return lines
+  }
+
+  const line = mugSummaryLine(component.mug, mugUnitCode(component))
+  return line ? [line.replace("MUG: ", "")] : ["-"]
+}
+
+/**
+ * MUG column's calculated monetary lines (task correction §3, §11, §17):
+ * the component's own transaction-currency total, plus its INR equivalent
+ * for a foreign Billing Currency, both compact ("USD 50,000 / Month",
+ * "INR 45,50,000 / Month"). Empty when the value cannot be reliably
+ * calculated yet (no fabricated amount, matching `calculateMugValue`'s own
+ * "do not fake" rule).
+ */
+function mugCalculatedLines(component: CommercialComponentDraft, currencyCode: string | null): string[] {
+  return dualCurrencyLines(calculateMugValue(component), currencyCode, " / Month", formatCompactAmount)
+}
+
 type ComponentTableCells = {
   name: string
   nature: string
   pricing: string
-  rate: string
-  mugQuantity: string
-  mugCalculated: string | null
+  rateLines: string[]
+  mugQuantityLines: string[]
+  mugCalculatedLines: string[]
   invoiceCycle: string
   revenueRecognition: string
   effectiveFrom: string
@@ -241,26 +352,16 @@ type ComponentTableCells = {
  * component's table lives in already communicates its Nature.
  */
 function componentTableCells(component: CommercialComponentDraft, currencyCode: string | null): ComponentTableCells {
-  const base = {
+  return {
     name: component.description || "Untitled component",
     nature: natureLabel(component.nature),
     pricing: pricingColumnSummary(component),
-    rate: rateColumnSummary(component, currencyCode),
-    invoiceCycle: invoiceCycleColumnSummary(component.invoiceTerms),
+    rateLines: rateColumnLines(component, currencyCode),
+    mugQuantityLines: mugQuantityLines(component),
+    mugCalculatedLines: mugCalculatedLines(component, currencyCode),
+    invoiceCycle: invoiceCycleColumnSummary(component),
     revenueRecognition: recognitionColumnSummary(component),
     effectiveFrom: formatEffectiveDate(component.effectiveFrom),
-  }
-
-  if (!("mug" in component) || !component.mug.enabled) {
-    return { ...base, mugQuantity: "-", mugCalculated: null }
-  }
-
-  const quantityLine = mugSummaryLine(component.mug, mugUnitCode(component))
-  const calculatedValue = calculateMugValue(component)
-  return {
-    ...base,
-    mugQuantity: quantityLine ? quantityLine.replace("MUG: ", "") : "-",
-    mugCalculated: calculatedValue !== null ? formatCompactAmount(calculatedValue, currencyCode) : null,
   }
 }
 
@@ -268,6 +369,7 @@ export {
   formatAmount,
   formatQuantity,
   formatCompactAmount,
+  dualCurrencyLines,
   unitLabel,
   unitLabelForQuantity,
   invoiceSummaryLine,
@@ -279,7 +381,9 @@ export {
   recognitionSummaryLine,
   summarizeComponent,
   pricingColumnSummary,
-  rateColumnSummary,
+  rateColumnLines,
+  mugQuantityLines,
+  mugCalculatedLines,
   invoiceCycleColumnSummary,
   recognitionColumnSummary,
   formatEffectiveDate,

@@ -52,13 +52,18 @@ const REFERENCE_MASTER_FIXTURES: Record<ReferenceListKey, ReferenceOption[]> = {
   // so a chooser never shows a bare, ambiguous three-letter code. Only
   // these five start active; every other ISO currency is deliberately
   // left out rather than auto-activated, until a real business owner
-  // asks for it.
+  // asks for it. `inrConversionRate` is "1 unit of this currency = X INR"
+  // (task correction §12): INR's own rate is always 1; IDR is deliberately
+  // left unconfigured (`null`) so the missing-rate validation path (§15)
+  // has a real, illustrative example to exercise without inventing a
+  // number nobody has actually approved. Fictional, illustrative rates,
+  // not a live market feed.
   currency: [
-    { value: "INR", label: "INR - Indian Rupee", active: true },
-    { value: "USD", label: "USD - US Dollar", active: true },
-    { value: "GBP", label: "GBP - British Pound Sterling", active: true },
-    { value: "SGD", label: "SGD - Singapore Dollar", active: true },
-    { value: "IDR", label: "IDR - Indonesian Rupiah", active: true },
+    { value: "INR", label: "INR - Indian Rupee", active: true, inrConversionRate: 1 },
+    { value: "USD", label: "USD - US Dollar", active: true, inrConversionRate: 91 },
+    { value: "GBP", label: "GBP - British Pound Sterling", active: true, inrConversionRate: 121 },
+    { value: "SGD", label: "SGD - Singapore Dollar", active: true, inrConversionRate: 68 },
+    { value: "IDR", label: "IDR - Indonesian Rupiah", active: true, inrConversionRate: null },
   ],
   // Commercial Rate lists (Customer Onboarding Commercial Rate V1, corrected
   // business model, docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md §22). Stable

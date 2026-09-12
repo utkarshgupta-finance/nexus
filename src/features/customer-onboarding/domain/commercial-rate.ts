@@ -1,4 +1,5 @@
 import type { PricingRuleKind } from "@/features/commercial"
+import { isFxRateMissing } from "./commercial-rate-fx"
 
 /**
  * Onboarding Commercial Rate draft domain (Customer Onboarding Commercial
@@ -152,16 +153,57 @@ function isInvoiceTermsComplete(nature: CommercialNature, terms: InvoiceTerms): 
  * never gets a `mug` field; Non-Recurring is a one-time charge with no
  * monthly cadence to floor against, so it never gets one either, regardless
  * of pricing model (see `PricingFieldsNoMug` below).
+ *
+ * `designationMinimums` is the Designation Based case (task correction §2):
+ * a Minimum Units figure per designation pricing row, keyed by that row's
+ * own `id`, never a second place to re-enter Designation/Rate/Unit (those
+ * stay read-only, mirrored live from the pricing rows themselves, see
+ * `syncDesignationMinimums`). It is simply unused (`[]`) for Per Unit and
+ * Slab, which use `minimumUnits` instead: one MUG shape serves every
+ * Pricing Model rather than a parallel type per model, matching this
+ * file's existing tolerance for "present but unused for some variants"
+ * shapes (e.g. `RevenueRecognition.milestones`).
  */
-type MugOverlay = { enabled: false } | { enabled: true; minimumUnits: number | null }
+type DesignationMugRow = { designationRowId: string; minimumUnits: number | null }
+
+type MugOverlay = { enabled: false } | { enabled: true; minimumUnits: number | null; designationMinimums: DesignationMugRow[] }
 
 function emptyMug(): MugOverlay {
   return { enabled: false }
 }
 
-function isMugComplete(mug: MugOverlay): boolean {
+/**
+ * `designationRows` is required only for a Designation Based component: a
+ * MUG row is complete once every CURRENT designation pricing row (never a
+ * stale, since-deleted one) has a positive Minimum Units entry. Per Unit
+ * and Slab ignore `designationRows` entirely and fall back to the plain
+ * `minimumUnits` check.
+ */
+function isMugComplete(mug: MugOverlay, designationRows?: DesignationRow[]): boolean {
   if (!mug.enabled) return true
+  if (designationRows) {
+    return designationRows.every((row) => isPositive(designationMinimumUnitsFor(mug, row.id)))
+  }
   return isPositive(mug.minimumUnits)
+}
+
+/** The Minimum Units entered so far for one designation pricing row, or `null` if not yet entered. */
+function designationMinimumUnitsFor(mug: Extract<MugOverlay, { enabled: true }>, designationRowId: string): number | null {
+  return mug.designationMinimums.find((entry) => entry.designationRowId === designationRowId)?.minimumUnits ?? null
+}
+
+/**
+ * Keeps MUG's designation rows mirroring the pricing designation rows
+ * exactly (task correction §2: "do NOT allow the MUG section to diverge
+ * from the pricing designation list"): a pricing row with no MUG entry yet
+ * gets one (`minimumUnits: null`), and a MUG entry for a pricing row that
+ * no longer exists is dropped. Designation/Rate/Unit are never duplicated
+ * into this array at all: the UI always reads those live from the current
+ * `designationRows` by `id`, so a rename or rate edit on the pricing side
+ * is automatically reflected with no separate sync step.
+ */
+function syncDesignationMinimums(designationMinimums: DesignationMugRow[], designationRows: DesignationRow[]): DesignationMugRow[] {
+  return designationRows.map((row) => designationMinimums.find((entry) => entry.designationRowId === row.id) ?? { designationRowId: row.id, minimumUnits: null })
 }
 
 // =============================================================================
@@ -256,10 +298,20 @@ function areDesignationRowsValid(rows: DesignationRow[]): boolean {
 
 type RevenueRecognitionMethod = "full_recognition" | "milestone_based"
 
-type Milestone = { id: string; name: string; recognitionPercent: number | null }
+/**
+ * `invoiceTiming` is per milestone (task correction §4-6: "Invoice Timing
+ * applies PER MILESTONE for Milestone Based NRR... one Non-Recurring
+ * Commercial may contain a mix"), a Reference Master `invoice_timing`
+ * value exactly like every other Invoice Timing field in this stage, never
+ * a separate enum. Once Milestone Based is chosen, the component-level
+ * Invoice Timing no longer applies (see `isComponentComplete`): a single
+ * component-wide timing cannot express "50% Advance, 25% Postpaid, 25%
+ * Postpaid" at once.
+ */
+type Milestone = { id: string; name: string; recognitionPercent: number | null; invoiceTiming: string | null }
 
 function createMilestone(): Milestone {
-  return { id: newId(), name: "", recognitionPercent: null }
+  return { id: newId(), name: "", recognitionPercent: null, invoiceTiming: null }
 }
 
 type RevenueRecognition =
@@ -270,16 +322,38 @@ function emptyRevenueRecognition(): RevenueRecognition {
   return { method: "full_recognition" }
 }
 
-/** Milestone percentages must total 100, within floating-point tolerance. */
+/** Milestone percentages must total 100, within floating-point tolerance, and every milestone needs its own name, percentage, and Invoice Timing. */
 function isRevenueRecognitionComplete(recognition: RevenueRecognition): boolean {
   if (recognition.method === "full_recognition") return true
   if (recognition.milestones.length === 0) return false
-  const allNamed = recognition.milestones.every(
-    (milestone) => milestone.name.trim().length > 0 && isPositive(milestone.recognitionPercent)
+  const allComplete = recognition.milestones.every(
+    (milestone) => milestone.name.trim().length > 0 && isPositive(milestone.recognitionPercent) && milestone.invoiceTiming !== null
   )
-  if (!allNamed) return false
+  if (!allComplete) return false
   const total = recognition.milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
   return Math.abs(total - 100) < 0.001
+}
+
+/**
+ * The single total amount a milestone percentage allocates against (task
+ * correction §5: "Recognition Amount should preferably be calculated from
+ * Total Commercial Amount x Recognition %"). Only Flat Fee has one number
+ * that unambiguously means "the total commercial amount" for a one-time
+ * charge; Per Unit, Slab, and Designation Based have no single total
+ * captured anywhere in this stage for a Non-Recurring component (there is
+ * no quantity field to multiply a rate against), so this honestly returns
+ * `null` rather than inventing a total, and the milestone amount then
+ * shows as not calculable, same "do not fake" principle as
+ * `calculateMugValue`.
+ */
+function nonRecurringMilestoneBasisAmount(component: NonRecurringComponent): number | null {
+  return component.pricingModel === "flat_fee" ? component.amount : null
+}
+
+/** `basisAmount x (percent / 100)`, or `null` if either input is missing. Never a separately editable field (task correction §5). */
+function calculateMilestoneAmount(basisAmount: number | null, percent: number | null): number | null {
+  if (basisAmount === null || percent === null) return null
+  return basisAmount * (percent / 100)
 }
 
 // =============================================================================
@@ -386,12 +460,19 @@ function createComponent(nature: CommercialNature, pricingModel?: PricingModel):
  * only monetary reference from it, never a stored or independently editable
  * value. Per Unit: `MUG units x rate`. Slab: the applicable band(s) at the
  * MUG quantity, computed per the component's own Slab Method. Designation
- * Based: not calculable without inventing which designation's rate applies
- * to the MUG quantity, so this returns `null` rather than a guess. Flat Fee
- * and Non-Recurring never reach here at all (no `mug` field to begin with).
+ * Based: each designation's own Minimum Units x its own rate, summed (task
+ * correction §3), since Designation Based DOES have a real per-designation
+ * rate to apply here, unlike the single-quantity Slab/Per Unit case. Flat
+ * Fee and Non-Recurring never reach here at all (no `mug` field to begin
+ * with).
  */
 function calculateMugValue(component: CommercialComponentDraft): number | null {
   if (!("mug" in component) || !component.mug.enabled) return null
+
+  if (component.pricingModel === "designation_based") {
+    return calculateDesignationMugSummary(component)?.totalValue ?? null
+  }
+
   const quantity = component.mug.minimumUnits
   if (!isPositive(quantity)) return null
 
@@ -402,6 +483,36 @@ function calculateMugValue(component: CommercialComponentDraft): number | null {
     return calculateSlabAmountForQuantity(component.slabRows, component.slabMethod, quantity)
   }
   return null
+}
+
+/**
+ * Designation Based's own MUG total (task correction §3): each designation
+ * row's own Minimum Units x its own Rate, summed for `totalValue`, and
+ * summed alone for `totalUnits` ("Total MUG Units" in the UI). Returns
+ * `null` only when MUG is off or no designation has any Minimum Units
+ * entered yet, never a fabricated total; a row with no rate yet
+ * contributes its units to `totalUnits` but nothing to `totalValue`,
+ * exactly like every other "do not fake the amount" calculation in this
+ * file.
+ */
+function calculateDesignationMugSummary(
+  component: Extract<CommercialComponentDraft, { pricingModel: "designation_based" }> & { mug: MugOverlay }
+): { totalUnits: number; totalValue: number } | null {
+  if (!component.mug.enabled) return null
+  const mug = component.mug
+  let totalUnits = 0
+  let totalValue = 0
+  let anyEntered = false
+
+  for (const row of component.designationRows) {
+    const units = designationMinimumUnitsFor(mug, row.id)
+    if (!isPositive(units)) continue
+    anyEntered = true
+    totalUnits += units
+    if (row.rate !== null) totalValue += units * row.rate
+  }
+
+  return anyEntered ? { totalUnits, totalValue } : null
 }
 
 /**
@@ -454,16 +565,34 @@ function isPositive(value: number | null): value is number {
 }
 
 /**
- * Per-component required fields. Description, Invoice Timing (and Invoice
- * Frequency unless On-Demand) are required for every component; MUG is
- * required only once enabled, and only ever offered on Recurring/On-Demand
- * (never Non-Recurring, never Flat Fee); milestone percentages must total
- * 100 only once Non-Recurring's Revenue Recognition Method is Milestone
- * Based. Notes are never required.
+ * Whether this component's invoice terms are complete. Ordinarily this is
+ * just `isInvoiceTermsComplete`; the one exception is a Non-Recurring
+ * component whose Revenue Recognition Method is Milestone Based (task
+ * correction §6): once Invoice Timing lives per milestone instead, the
+ * component-level Invoice Timing no longer applies at all, so only
+ * Invoice Frequency (fixed to "one_time" automatically) is checked here.
+ */
+function isComponentInvoiceTermsComplete(component: CommercialComponentDraft): boolean {
+  if (component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based") {
+    return component.invoiceTerms.invoiceFrequency !== null
+  }
+  return isInvoiceTermsComplete(component.nature, component.invoiceTerms)
+}
+
+/**
+ * Per-component required fields. Description and Invoice Terms (see
+ * `isComponentInvoiceTermsComplete` for the Milestone Based exception) are
+ * required for every component; MUG is required only once enabled, and
+ * only ever offered on Recurring/On-Demand (never Non-Recurring, never
+ * Flat Fee); a Designation Based MUG additionally requires a Minimum Units
+ * entry per CURRENT designation row (task correction §2); milestone rows
+ * must total 100% and each carry its own Invoice Timing only once Non-
+ * Recurring's Revenue Recognition Method is Milestone Based. Notes are
+ * never required.
  */
 function isComponentComplete(component: CommercialComponentDraft): boolean {
   if (component.description.trim().length === 0) return false
-  if (!isInvoiceTermsComplete(component.nature, component.invoiceTerms)) return false
+  if (!isComponentInvoiceTermsComplete(component)) return false
   if (component.nature === "non_recurring" && !isRevenueRecognitionComplete(component.revenueRecognition)) return false
 
   if (component.pricingModel === "per_unit") {
@@ -479,16 +608,20 @@ function isComponentComplete(component: CommercialComponentDraft): boolean {
   }
   // designation_based
   if (!areDesignationRowsValid(component.designationRows)) return false
-  return component.nature === "non_recurring" ? true : isMugComplete(component.mug)
+  return component.nature === "non_recurring" ? true : isMugComplete(component.mug, component.designationRows)
 }
 
 /**
- * Stage Complete requires Billing Currency, at least one component, and
- * every component individually complete. There is no Commercial Scope to
- * additionally require: it does not exist in the corrected model.
+ * Stage Complete requires Billing Currency, a real INR Conversion Rate for
+ * that currency once it is not INR itself (task correction §15: "Commercial
+ * Rate should not become Complete until the required rate exists"), at
+ * least one component, and every component individually complete. There is
+ * no Commercial Scope to additionally require: it does not exist in the
+ * corrected model.
  */
 function isCommercialRateDraftComplete(draft: CommercialRateDraft): boolean {
   if (!draft.billingCurrency) return false
+  if (isFxRateMissing(draft.billingCurrency)) return false
   if (draft.components.length === 0) return false
   return draft.components.every(isComponentComplete)
 }
@@ -505,6 +638,8 @@ export {
   isInvoiceTermsComplete,
   emptyMug,
   isMugComplete,
+  designationMinimumUnitsFor,
+  syncDesignationMinimums,
   newId,
   createSlabRow,
   recalculateSlabFroms,
@@ -514,8 +649,11 @@ export {
   createMilestone,
   emptyRevenueRecognition,
   isRevenueRecognitionComplete,
+  nonRecurringMilestoneBasisAmount,
+  calculateMilestoneAmount,
   createComponent,
   calculateMugValue,
+  calculateDesignationMugSummary,
   calculateSlabAmountForQuantity,
   createEmptyCommercialRateDraft,
   isPositive,
@@ -529,6 +667,7 @@ export type {
   SlabMethod,
   InvoiceTerms,
   MugOverlay,
+  DesignationMugRow,
   SlabRow,
   DesignationRow,
   RevenueRecognitionMethod,

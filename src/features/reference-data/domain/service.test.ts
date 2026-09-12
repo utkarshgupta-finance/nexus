@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { getActiveOptions, getAllOptions, resolveOption } from "./service"
+import { getActiveOptions, getAllOptions, getInrConversionRate, resolveOption } from "./service"
 
 describe("reference master option resolution", () => {
   it("returns only active values for new selections", () => {
@@ -84,6 +84,28 @@ describe("reference master option resolution", () => {
     // the same non-mutation guarantee already proven above for segment.
     expect(resolveOption("currency", "IDR")?.active).toBe(true)
     expect(resolveOption("currency", "IDR")?.label).toBe("IDR - Indonesian Rupiah")
+  })
+
+  describe("getInrConversionRate (task correction §12-15: 1 unit of currency = X INR, centrally governed)", () => {
+    it("INR's own rate is always 1", () => {
+      expect(getInrConversionRate("INR")).toBe(1)
+    })
+
+    it("resolves USD's configured rate", () => {
+      expect(getInrConversionRate("USD")).toBe(91)
+    })
+
+    it("resolves GBP's configured rate", () => {
+      expect(getInrConversionRate("GBP")).toBe(121)
+    })
+
+    it("is null for a currency with no rate configured yet (IDR), never a guessed value", () => {
+      expect(getInrConversionRate("IDR")).toBeNull()
+    })
+
+    it("is null for a currency code that is not a real option at all", () => {
+      expect(getInrConversionRate("XYZ")).toBeNull()
+    })
   })
 })
 

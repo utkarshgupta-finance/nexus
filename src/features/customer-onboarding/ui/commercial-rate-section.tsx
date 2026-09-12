@@ -11,17 +11,23 @@ import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { getActiveOptions, resolveOption } from "@/features/reference-data"
-import { componentTableCells, formatAmount, mugUnitCode, unitLabel } from "../domain/commercial-rate-summary"
+import { componentTableCells, dualCurrencyLines, formatAmount, formatQuantity, mugUnitCode, unitLabel } from "../domain/commercial-rate-summary"
 import type { ComponentTableCells } from "../domain/commercial-rate-summary"
+import { inrConversionRateFor, isForeignCurrency } from "../domain/commercial-rate-fx"
 import {
+  calculateDesignationMugSummary,
+  calculateMilestoneAmount,
   calculateMugValue,
   createComponent,
   createDesignationRow,
   createMilestone,
   createSlabRow,
   defaultPricingModelFor,
+  designationMinimumUnitsFor,
   isComponentComplete,
+  nonRecurringMilestoneBasisAmount,
   recalculateSlabFroms,
+  syncDesignationMinimums,
 } from "../domain/commercial-rate"
 import type {
   CommercialComponentDraft,
@@ -97,6 +103,8 @@ function InvoiceTermsFields({
   component: CommercialComponentDraft
   onChange: (next: CommercialComponentDraft) => void
 }) {
+  /** Once Milestone Based recognition is chosen, Invoice Timing lives per milestone instead (task correction §6): a single component-level Timing cannot express a mix like "50% Advance, 25% Postpaid". */
+  const timingLivesOnMilestones = component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based"
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="flex flex-col gap-1.5">
@@ -115,60 +123,157 @@ function InvoiceTermsFields({
       </div>
       <div className="flex flex-col gap-1.5">
         <FieldLabel>Invoice Timing</FieldLabel>
-        <OptionSelect
-          listKey="invoice_timing"
-          value={component.invoiceTerms.invoiceTiming}
-          onChange={(value) => onChange({ ...component, invoiceTerms: { ...component.invoiceTerms, invoiceTiming: value } })}
-        />
+        {timingLivesOnMilestones ? (
+          <span className="pt-2 text-[0.7rem] text-muted-foreground">Set per milestone below (Milestone Based recognition).</span>
+        ) : (
+          <OptionSelect
+            listKey="invoice_timing"
+            value={component.invoiceTerms.invoiceTiming}
+            onChange={(value) => onChange({ ...component, invoiceTerms: { ...component.invoiceTerms, invoiceTiming: value } })}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Designation Based's own MUG area (task correction §2-3): Designation,
+ * Rate, and Unit are read-only, mirrored live from the pricing designation
+ * rows above; only Minimum Units is editable, per designation. Adding or
+ * removing a pricing designation row automatically adds or removes its
+ * mirrored row here (the `onChangeRows` call site in `ComponentEditor`
+ * keeps `designationMinimums` in sync via `syncDesignationMinimums`); a
+ * rename or rate edit needs no separate sync at all, since this component
+ * always reads the current designation/rate live from `designationRows`.
+ */
+function DesignationMugRowsEditor({
+  mug,
+  designationRows,
+  designationSummary,
+  currencyCode,
+  onChange,
+}: {
+  mug: Extract<MugOverlay, { enabled: true }>
+  designationRows: DesignationRow[]
+  designationSummary: { totalUnits: number; totalValue: number } | null
+  currencyCode: string | null
+  onChange: (next: MugOverlay) => void
+}) {
+  function updateMinimum(designationRowId: string, minimumUnits: number | null) {
+    const exists = mug.designationMinimums.some((entry) => entry.designationRowId === designationRowId)
+    const next = exists
+      ? mug.designationMinimums.map((entry) => (entry.designationRowId === designationRowId ? { ...entry, minimumUnits } : entry))
+      : [...mug.designationMinimums, { designationRowId, minimumUnits }]
+    onChange({ ...mug, designationMinimums: next })
+  }
+
+  return (
+    <div className="flex flex-col gap-2 pl-5.5">
+      <span className="text-[0.7rem] text-muted-foreground">
+        Designation, Rate, and Unit are mirrored from Pricing above and read-only here; only Minimum Units is editable.
+      </span>
+      <div className="flex flex-col gap-1.5">
+        <div className="grid grid-cols-3 gap-2 text-[0.7rem] text-muted-foreground">
+          <span>Designation</span>
+          <span>Rate</span>
+          <span>Minimum Units</span>
+        </div>
+        {designationRows.map((row) => (
+          <div key={row.id} className="grid grid-cols-3 items-center gap-2">
+            <span className="truncate text-xs text-foreground">{row.designation || "Designation"}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatAmount(row.rate, currencyCode)} / {unitLabel(row.per)}
+            </span>
+            <Input
+              type="number"
+              min={0}
+              value={designationMinimumUnitsFor(mug, row.id) ?? ""}
+              onChange={(event) => updateMinimum(row.id, event.target.value ? Number(event.target.value) : null)}
+              placeholder="e.g. 500"
+            />
+          </div>
+        ))}
+      </div>
+      {designationSummary ? (
+        <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-dashed px-2.5 py-2">
+          <span className="text-[0.7rem] font-medium text-foreground">Calculated MUG Value (reference only)</span>
+          <span className="text-xs text-muted-foreground">Total {formatQuantity(designationSummary.totalUnits)} Units</span>
+          {dualCurrencyLines(designationSummary.totalValue, currencyCode, " / Month", formatAmount).map((line) => (
+            <span key={line} className="text-xs text-muted-foreground">
+              {line}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
 
 function MugFields({
   mug,
+  pricingModel,
   pricingUnitCode,
+  designationRows,
+  designationSummary,
   calculatedValue,
   currencyCode,
   onChange,
 }: {
   mug: MugOverlay
+  pricingModel: PricingModel
   pricingUnitCode: string | null
-  /** Derived preview only, never a separately editable/stored field (task correction §1): null when it cannot be reliably calculated (e.g. Designation Based). */
+  /** Non-null only for Designation Based (task correction §2). */
+  designationRows: DesignationRow[] | null
+  designationSummary: { totalUnits: number; totalValue: number } | null
+  /** Derived preview only, never a separately editable/stored field (task correction §1). Used only outside the Designation Based case, which has its own summary above. */
   calculatedValue: number | null
   currencyCode: string | null
   onChange: (next: MugOverlay) => void
 }) {
   const unitWord = `${unitLabel(pricingUnitCode)}s`
+
+  function toggle(enabled: boolean) {
+    if (!enabled) {
+      onChange({ enabled: false })
+      return
+    }
+    const designationMinimums = pricingModel === "designation_based" && designationRows ? syncDesignationMinimums([], designationRows) : []
+    onChange({ enabled: true, minimumUnits: null, designationMinimums })
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <label className="flex items-center gap-2 text-xs text-foreground">
-        <input
-          type="checkbox"
-          className="size-3.5 accent-foreground"
-          checked={mug.enabled}
-          onChange={(event) => onChange(event.target.checked ? { enabled: true, minimumUnits: null } : { enabled: false })}
-        />
+        <input type="checkbox" className="size-3.5 accent-foreground" checked={mug.enabled} onChange={(event) => toggle(event.target.checked)} />
         Minimum Usage Guarantee (MUG)
       </label>
       {mug.enabled ? (
-        <div className="flex flex-col gap-1.5 pl-5.5 sm:max-w-xs">
-          <FieldLabel>Minimum {unitWord}</FieldLabel>
-          <Input
-            type="number"
-            min={0}
-            value={mug.minimumUnits ?? ""}
-            onChange={(event) => onChange({ ...mug, minimumUnits: event.target.value ? Number(event.target.value) : null })}
-            placeholder="e.g. 5000"
-          />
-          <span className="text-[0.7rem] text-muted-foreground">Assessed monthly, applied before pricing.</span>
-          {calculatedValue !== null ? (
-            <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-dashed px-2.5 py-2">
-              <span className="text-[0.7rem] font-medium text-foreground">Calculated MUG Value (reference only)</span>
-              <span className="text-xs text-muted-foreground">{formatAmount(calculatedValue, currencyCode)} / Month</span>
-            </div>
-          ) : null}
-        </div>
+        pricingModel === "designation_based" && designationRows ? (
+          <DesignationMugRowsEditor mug={mug} designationRows={designationRows} designationSummary={designationSummary} currencyCode={currencyCode} onChange={onChange} />
+        ) : (
+          <div className="flex flex-col gap-1.5 pl-5.5 sm:max-w-xs">
+            <FieldLabel>Minimum {unitWord}</FieldLabel>
+            <Input
+              type="number"
+              min={0}
+              value={mug.minimumUnits ?? ""}
+              onChange={(event) => onChange({ ...mug, minimumUnits: event.target.value ? Number(event.target.value) : null })}
+              placeholder="e.g. 5000"
+            />
+            <span className="text-[0.7rem] text-muted-foreground">Assessed monthly, applied before pricing.</span>
+            {calculatedValue !== null ? (
+              <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-dashed px-2.5 py-2">
+                <span className="text-[0.7rem] font-medium text-foreground">Calculated MUG Value (reference only)</span>
+                {dualCurrencyLines(calculatedValue, currencyCode, " / Month", formatAmount).map((line) => (
+                  <span key={line} className="text-xs text-muted-foreground">
+                    {line}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )
       ) : null}
     </div>
   )
@@ -332,54 +437,96 @@ function DesignationRowsEditor({ rows, onChangeRows }: { rows: DesignationRow[];
   )
 }
 
-function MilestoneRowsEditor({ milestones, onChangeMilestones }: { milestones: Milestone[]; onChangeMilestones: (milestones: Milestone[]) => void }) {
+/**
+ * Each milestone carries its own Invoice Timing and a calculated (never
+ * separately typed) Recognition Amount (task correction §4-6: "Invoice
+ * Timing applies PER MILESTONE... one Non-Recurring Commercial may contain
+ * a mix", "Recognition Amount should preferably be calculated from Total
+ * Commercial Amount x Recognition %"). `basisAmount` is `null` whenever
+ * this component's Pricing Model has no single total to allocate against
+ * (see `nonRecurringMilestoneBasisAmount`); the Recognition Amount then
+ * honestly shows "-" rather than a fabricated figure, and only Recognition
+ * % remains meaningful.
+ */
+function MilestoneRowsEditor({
+  milestones,
+  basisAmount,
+  currencyCode,
+  onChangeMilestones,
+}: {
+  milestones: Milestone[]
+  basisAmount: number | null
+  currencyCode: string | null
+  onChangeMilestones: (milestones: Milestone[]) => void
+}) {
   const total = milestones.reduce((sum, milestone) => sum + (milestone.recognitionPercent ?? 0), 0)
   const totalIsValid = Math.abs(total - 100) < 0.001
 
   return (
     <div className="flex flex-col gap-2">
       <span className="text-xs font-medium text-foreground">Milestones</span>
+      {basisAmount === null ? (
+        <span className="text-[0.7rem] text-muted-foreground">
+          Recognition Amount cannot be calculated for this Pricing Model; enter Recognition % for each milestone.
+        </span>
+      ) : null}
       <div className="flex flex-col gap-2">
-        {milestones.map((milestone) => (
-          <div key={milestone.id} className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <span className="text-[0.7rem] text-muted-foreground">Milestone Name / Description</span>
-              <Input
-                value={milestone.name}
-                onChange={(event) =>
-                  onChangeMilestones(milestones.map((entry) => (entry.id === milestone.id ? { ...entry, name: event.target.value } : entry)))
-                }
-                placeholder="e.g. Go-Live"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[0.7rem] text-muted-foreground">Recognition %</span>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                className="w-24"
-                value={milestone.recognitionPercent ?? ""}
-                onChange={(event) =>
-                  onChangeMilestones(
-                    milestones.map((entry) =>
-                      entry.id === milestone.id ? { ...entry, recognitionPercent: event.target.value ? Number(event.target.value) : null } : entry
+        {milestones.map((milestone) => {
+          const amount = calculateMilestoneAmount(basisAmount, milestone.recognitionPercent)
+          return (
+            <div key={milestone.id} className="grid grid-cols-2 items-end gap-2 rounded-md border p-2.5 sm:grid-cols-[1fr_auto_auto_auto_auto]">
+              <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+                <span className="text-[0.7rem] text-muted-foreground">Milestone Name / Description</span>
+                <Input
+                  value={milestone.name}
+                  onChange={(event) =>
+                    onChangeMilestones(milestones.map((entry) => (entry.id === milestone.id ? { ...entry, name: event.target.value } : entry)))
+                  }
+                  placeholder="e.g. Go-Live"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[0.7rem] text-muted-foreground">Recognition %</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="w-24"
+                  value={milestone.recognitionPercent ?? ""}
+                  onChange={(event) =>
+                    onChangeMilestones(
+                      milestones.map((entry) =>
+                        entry.id === milestone.id ? { ...entry, recognitionPercent: event.target.value ? Number(event.target.value) : null } : entry
+                      )
                     )
-                  )
-                }
-              />
+                  }
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[0.7rem] text-muted-foreground">Recognition Amount</span>
+                <span className="flex h-9 items-center text-xs text-muted-foreground">{amount !== null ? formatAmount(amount, currencyCode) : "-"}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[0.7rem] text-muted-foreground">Invoice Timing</span>
+                <OptionSelect
+                  listKey="invoice_timing"
+                  value={milestone.invoiceTiming}
+                  onChange={(value) => onChangeMilestones(milestones.map((entry) => (entry.id === milestone.id ? { ...entry, invoiceTiming: value } : entry)))}
+                  className="w-32"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Delete milestone"
+                disabled={milestones.length <= 1}
+                onClick={() => onChangeMilestones(milestones.filter((entry) => entry.id !== milestone.id))}
+              >
+                <XIcon className="size-3.5" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Delete milestone"
-              disabled={milestones.length <= 1}
-              onClick={() => onChangeMilestones(milestones.filter((entry) => entry.id !== milestone.id))}
-            >
-              <XIcon className="size-3.5" />
-            </Button>
-          </div>
-        ))}
+          )
+        })}
       </div>
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" className="w-fit" onClick={() => onChangeMilestones([...milestones, createMilestone()])}>
@@ -394,9 +541,13 @@ function MilestoneRowsEditor({ milestones, onChangeMilestones }: { milestones: M
 
 function RevenueRecognitionFields({
   recognition,
+  basisAmount,
+  currencyCode,
   onChange,
 }: {
   recognition: RevenueRecognition
+  basisAmount: number | null
+  currencyCode: string | null
   onChange: (next: RevenueRecognition) => void
 }) {
   return (
@@ -420,7 +571,12 @@ function RevenueRecognitionFields({
         <ToggleGroupItem value="milestone_based">Milestone Based</ToggleGroupItem>
       </ToggleGroup>
       {recognition.method === "milestone_based" ? (
-        <MilestoneRowsEditor milestones={recognition.milestones} onChangeMilestones={(milestones) => onChange({ method: "milestone_based", milestones })} />
+        <MilestoneRowsEditor
+          milestones={recognition.milestones}
+          basisAmount={basisAmount}
+          currencyCode={currencyCode}
+          onChangeMilestones={(milestones) => onChange({ method: "milestone_based", milestones })}
+        />
       ) : null}
     </div>
   )
@@ -519,7 +675,17 @@ function ComponentEditor({
       ) : null}
 
       {component.pricingModel === "designation_based" ? (
-        <DesignationRowsEditor rows={component.designationRows} onChangeRows={(rows) => onChange({ ...component, designationRows: rows })} />
+        <DesignationRowsEditor
+          rows={component.designationRows}
+          onChangeRows={(rows) => {
+            const next = { ...component, designationRows: rows } as CommercialComponentDraft
+            if ("mug" in next && next.mug.enabled) {
+              onChange({ ...next, mug: { ...next.mug, designationMinimums: syncDesignationMinimums(next.mug.designationMinimums, rows) } } as CommercialComponentDraft)
+              return
+            }
+            onChange(next)
+          }}
+        />
       ) : null}
 
       <Separator />
@@ -531,7 +697,10 @@ function ComponentEditor({
           <Separator />
           <MugFields
             mug={component.mug}
+            pricingModel={component.pricingModel}
             pricingUnitCode={mugUnitCode(component)}
+            designationRows={component.pricingModel === "designation_based" ? component.designationRows : null}
+            designationSummary={component.pricingModel === "designation_based" ? calculateDesignationMugSummary(component) : null}
             calculatedValue={calculateMugValue(component)}
             currencyCode={currencyCode}
             onChange={(mug) => onChange({ ...component, mug } as CommercialComponentDraft)}
@@ -542,7 +711,12 @@ function ComponentEditor({
       {component.nature === "non_recurring" ? (
         <>
           <Separator />
-          <RevenueRecognitionFields recognition={component.revenueRecognition} onChange={(revenueRecognition) => onChange({ ...component, revenueRecognition })} />
+          <RevenueRecognitionFields
+            recognition={component.revenueRecognition}
+            basisAmount={nonRecurringMilestoneBasisAmount(component)}
+            currencyCode={currencyCode}
+            onChange={(revenueRecognition) => onChange({ ...component, revenueRecognition })}
+          />
         </>
       ) : null}
 
@@ -596,12 +770,32 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   effectiveFrom: "Effective From",
 }
 
+/**
+ * Rate and MUG are always one-or-more lines now (task correction §7-11:
+ * actual Slab/Designation rates, dual-currency amounts), never a single
+ * collapsed string; every other column stays a single value.
+ */
 function ColumnValue({ column, cells }: { column: ColumnKey; cells: ComponentTableCells }) {
   if (column === "mug") {
     return (
       <div className="flex flex-col gap-0.5">
-        <span>{cells.mugQuantity}</span>
-        {cells.mugCalculated ? <span className="text-muted-foreground">{cells.mugCalculated}</span> : null}
+        {cells.mugQuantityLines.map((line, index) => (
+          <span key={index}>{line}</span>
+        ))}
+        {cells.mugCalculatedLines.map((line, index) => (
+          <span key={`calc-${index}`} className="text-muted-foreground">
+            {line}
+          </span>
+        ))}
+      </div>
+    )
+  }
+  if (column === "rate") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {cells.rateLines.map((line, index) => (
+          <span key={index}>{line}</span>
+        ))}
       </div>
     )
   }
@@ -893,6 +1087,35 @@ function NatureSection({
   )
 }
 
+/**
+ * A compact, read-only INR Conversion Rate readout next to Billing
+ * Currency (task correction §14): fetched from Reference Master, never a
+ * field the user can type into or override from Commercial Rate (§13). If
+ * no active rate is configured for this currency, this shows an
+ * actionable validation message instead of inventing a value (§15); the
+ * stage's own completeness check (`isCommercialRateDraftComplete`) already
+ * refuses to mark the stage Complete in that state.
+ */
+function FxRateDisplay({ currencyCode }: { currencyCode: string }) {
+  const rate = inrConversionRateFor(currencyCode)
+  return (
+    <div className="sm:max-w-xs sm:flex-1">
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel>INR Conversion Rate</FieldLabel>
+        {rate !== null ? (
+          <span className="flex h-9 items-center rounded-md border bg-muted px-3 text-xs text-muted-foreground">
+            1 {currencyCode} = INR {rate.toFixed(2)}
+          </span>
+        ) : (
+          <span className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-[0.7rem] text-destructive">
+            INR conversion rate is not configured for {currencyCode}. Configure it in Settings.
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function CommercialRateSection({
   value,
   onChange,
@@ -938,11 +1161,14 @@ function CommercialRateSection({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Rate</span>
-        <div className="sm:max-w-xs">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel>Billing Currency</FieldLabel>
-            <OptionSelect listKey="currency" value={value.billingCurrency} onChange={(billingCurrency) => onChange({ ...value, billingCurrency })} className="w-full" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="sm:max-w-xs sm:flex-1">
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel>Billing Currency</FieldLabel>
+              <OptionSelect listKey="currency" value={value.billingCurrency} onChange={(billingCurrency) => onChange({ ...value, billingCurrency })} className="w-full" />
+            </div>
           </div>
+          {isForeignCurrency(value.billingCurrency) ? <FxRateDisplay currencyCode={value.billingCurrency} /> : null}
         </div>
       </div>
 

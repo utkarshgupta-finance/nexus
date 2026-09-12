@@ -974,6 +974,115 @@ table (rather than expanding awkwardly inside a table row); saving or
 cancelling returns it to the table. Delete requires an explicit second
 confirmation click before anything is removed.
 
+### Designation Based MUG mirrors the pricing designation list, never a parallel one
+
+A Designation Based component's MUG is not one quantity, it is one Minimum
+Units figure per designation (`sales-rep@100/user needs a minimum 500
+Users, Manager@200/user needs a minimum 50`, and so on), so `MugOverlay`
+carries a `designationMinimums` array keyed by the pricing row's own `id`
+rather than a single `minimumUnits` number in this case
+(`commercial-rate.ts`). Designation, Rate, and Unit are never re-entered
+in the MUG area: they are read live from the pricing designation rows by
+that same `id` every time they are shown, so a rename, rate edit, add, or
+delete on the pricing side is automatically reflected with no separate
+sync step for rename/edit, and an explicit `syncDesignationMinimums` call
+(wired at the one place pricing rows actually change) keeps the array
+itself free of stale entries for a deleted row and populated with a
+`null`-until-entered entry for a newly added one. Only Minimum Units is
+ever editable here. The Calculated MUG Value for this case is `SUM(each
+designation's own Minimum Units x its own Rate)`
+(`calculateDesignationMugSummary`), shown alongside a Total MUG Units
+figure; a designation with no Minimum Units entered yet contributes
+nothing to either total rather than blocking the other rows' contribution,
+and the whole calculation is `null`, never a fabricated total, until at
+least one designation has a value.
+
+### Non-Recurring Milestones: Invoice Timing per milestone, Recognition Amount calculated from percentage
+
+A Milestone Based Non-Recurring component's Invoice Timing lives on each
+milestone (`Milestone.invoiceTiming`), not once at the component level:
+one NRR component can genuinely mix "50% Advance, 25% Postpaid, 25%
+Postpaid" across its own milestones, which a single component-wide Timing
+value cannot express. Once Milestone Based is chosen, the component-level
+Invoice Timing field no longer applies at all (`isComponentComplete`
+stops requiring it in that state, and the Commercial Components table's
+own Invoice Cycle column shows Invoice Frequency alone, "One-Time", for
+such a component); for Full Recognition, the component-level Invoice
+Timing continues to apply exactly as before. Each milestone's Recognition
+Amount is never a second, independently-typed number: it is calculated
+live as `Total Commercial Amount x Recognition % / 100`
+(`calculateMilestoneAmount`), so percentage and amount can never silently
+drift apart. "Total Commercial Amount" only has one unambiguous meaning
+today, a Flat Fee's own `amount` (`nonRecurringMilestoneBasisAmount`); Per
+Unit, Slab, and Designation Based have no single total captured anywhere
+for a one-time Non-Recurring charge, so the Recognition Amount honestly
+shows as not calculable for those, rather than inventing one, and only
+Recognition % remains the real allocation input. Milestone percentages
+must still total exactly 100 before the component is Complete, unchanged
+from the original Milestone Based design.
+
+### Commercial table Rate columns show the actual contracted rate, never a method name or a row count alone
+
+The Pricing column already names the model and, for Slab, the Method
+("Slab - Whole Quantity", "Slab - Progressive"); the Rate column's own job
+is to answer "what did we actually agree to charge," so it was corrected
+to show the real numbers rather than summarizing them away: Slab shows one
+line per band ("1-100: INR 500 / User"), Designation Based shows one line
+per designation ("Sales Rep: INR 100 / User", capped at four rows with a
+final restrained "+N more" line rather than an unbounded cell), and Per
+Unit/Flat Fee show the plain rate or amount as before. A prior version of
+this stage collapsed Slab to its Method/unit alone and Designation Based to
+a bare row count ("N Designation Rates"); neither told Finance what the
+customer was actually being charged without opening Edit, which is exactly
+what this correction exists to fix.
+
+### Currency Settings governs a centrally-owned INR Conversion Rate; Commercial Rate only ever reads it
+
+Reference Master's `currency` list now additionally carries an
+`inrConversionRate` field, interpreted as "1 unit of this currency = X
+INR" (`INR` itself is always exactly `1`, never a Settings-editable value;
+a currency with no rate configured yet carries `null`, never an invented
+default). This is edited only in Reference Master Settings; Commercial
+Rate shows it as a compact, explicitly read-only readout next to Billing
+Currency whenever Billing Currency is not INR itself
+(`src/features/customer-onboarding/domain/commercial-rate-fx.ts`'s
+`inrConversionRateFor`), and never as a field a user can type into or
+override from that stage. Every foreign-currency amount this stage shows
+(Rate, MUG, Flat Fee, Slab and Designation rows) is shown alongside its
+INR equivalent computed from this same governed rate, never a second,
+independently-editable INR amount. A foreign Billing Currency with no
+configured rate blocks the stage from Complete
+(`isCommercialRateDraftComplete`, via `isFxRateMissing`) and shows an
+actionable message ("INR conversion rate is not configured for X.
+Configure it in Settings.") rather than silently proceeding without a
+conversion or inventing one.
+
+### FX snapshot principle: a governed rate changing later must not silently revalue an approved historical version
+
+This mirrors the locked Commercial domain's own Currency domain principle
+(§18: transaction currency never collapses into a derived conversion, and
+any converted amount must carry its own provenance). Settings' governed
+INR Conversion Rate can change over time; once a Commercial
+Configuration/version built against a particular rate is approved, that
+rate must be frozen as part of that version's own snapshot, so a later
+Settings change never silently redefines what an already-approved
+historical version meant. No live Commercial Configuration write path
+exists yet for this stage to persist that snapshot into (unchanged from
+this section's own "no live billing engine" principle), so this is
+documented as a future persistence requirement, not built: `CommercialRateFxSnapshot`
+and `currentFxSnapshot` in `commercial-rate-fx.ts` define and prove out the
+exact shape (`currencyCode`, `inrConversionRate`) a real promotion step
+would need to capture and freeze at approval time, ahead of that write
+path existing.
+
+### Three Commercial tables remain the UI contract, unchanged
+
+Nothing in this correction reopens the three-Nature-scoped-table decision
+above: Recurring Commercials, Non-Recurring Commercials, and On-Demand
+Commercials remain three separate sections/tables with no Nature column,
+exactly as already documented. The Rate column correction above applies
+identically inside all three.
+
 ## 23. What this document is not
 
 Not a database schema. Not an implementation. Not a decision on Flowable,

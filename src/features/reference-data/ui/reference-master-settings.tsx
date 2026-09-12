@@ -111,6 +111,22 @@ function ReferenceMasterSettings() {
     }))
   }
 
+  /**
+   * INR Conversion Rate is "1 unit of this currency = X INR" (task
+   * correction §12), editable here only: Commercial Rate itself only ever
+   * reads this value, never writes it (§13-14). INR's own row is not
+   * editable, since its rate is always exactly 1 by definition, not a
+   * configurable business choice.
+   */
+  function updateInrConversionRate(value: string, rawInput: string) {
+    const parsed = rawInput.trim() === "" ? null : Number(rawInput)
+    const nextRate = parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null
+    setOptionsByList((current) => ({
+      ...current,
+      currency: current.currency.map((option) => (option.value === value ? { ...option, inrConversionRate: nextRate } : option)),
+    }))
+  }
+
   function handleAdd() {
     const value = newValue.trim().toLowerCase().replace(/\s+/g, "_")
     const label = newLabel.trim()
@@ -203,6 +219,7 @@ function ReferenceMasterSettings() {
               {selectedList === "phone_country_code" ? (
                 <TableHead className="hidden sm:table-cell">Dial code</TableHead>
               ) : null}
+              {selectedList === "currency" ? <TableHead>INR Conversion Rate</TableHead> : null}
               <TableHead className="w-20 sm:w-auto">Status</TableHead>
               <TableHead className="w-24 text-right sm:w-auto">Action</TableHead>
             </TableRow>
@@ -211,7 +228,7 @@ function ReferenceMasterSettings() {
             {visibleOptions.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={selectedList === "phone_country_code" ? 5 : 4}
+                  colSpan={selectedList === "phone_country_code" || selectedList === "currency" ? 5 : 4}
                   className="py-8 text-center text-xs text-muted-foreground"
                 >
                   No values match this search and filter.
@@ -233,6 +250,28 @@ function ReferenceMasterSettings() {
                   </TableCell>
                   {selectedList === "phone_country_code" ? (
                     <TableCell className="hidden text-foreground sm:table-cell">{option.dialCode}</TableCell>
+                  ) : null}
+                  {selectedList === "currency" ? (
+                    <TableCell>
+                      {option.value === "INR" ? (
+                        <span className="text-xs text-muted-foreground">1 (fixed)</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">1 {option.value} =</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={option.inrConversionRate ?? ""}
+                            onChange={(event) => updateInrConversionRate(option.value, event.target.value)}
+                            placeholder="Not configured"
+                            className="h-8 w-28"
+                            aria-label={`INR conversion rate for ${option.value}`}
+                          />
+                          <span className="text-xs text-muted-foreground">INR</span>
+                        </div>
+                      )}
+                    </TableCell>
                   ) : null}
                   <TableCell>
                     <Badge

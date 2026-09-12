@@ -8,4 +8,4 @@
  */
 
 export type { ReferenceListKey, ReferenceOption } from "./domain/types"
-export { getActiveOptions, getAllOptions, resolveOption } from "./domain/service"
+export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate } from "./domain/service"

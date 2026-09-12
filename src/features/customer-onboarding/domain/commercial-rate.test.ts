@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest"
 import {
   areDesignationRowsValid,
   areSlabRowsValid,
+  calculateDesignationMugSummary,
+  calculateMilestoneAmount,
   calculateMugValue,
   calculateSlabAmountForQuantity,
   createComponent,
@@ -11,13 +13,16 @@ import {
   createMilestone,
   createSlabRow,
   defaultPricingModelFor,
+  designationMinimumUnitsFor,
   isCommercialRateDraftComplete,
   isCommercialRateDraftStarted,
   isComponentComplete,
   isInvoiceTermsComplete,
   isMugComplete,
   isRevenueRecognitionComplete,
+  nonRecurringMilestoneBasisAmount,
   recalculateSlabFroms,
+  syncDesignationMinimums,
   toPricingRuleKind,
 } from "./commercial-rate"
 import type { CommercialComponentDraft, CommercialRateDraft, InvoiceTerms, OngoingComponent } from "./commercial-rate"
@@ -139,10 +144,88 @@ describe("isMugComplete (unit quantity, never money)", () => {
     expect(isMugComplete({ enabled: false })).toBe(true)
   })
   it("is false when enabled with no minimum units", () => {
-    expect(isMugComplete({ enabled: true, minimumUnits: null })).toBe(false)
+    expect(isMugComplete({ enabled: true, minimumUnits: null, designationMinimums: [] })).toBe(false)
   })
   it("is true once a positive minimum unit quantity is set", () => {
-    expect(isMugComplete({ enabled: true, minimumUnits: 5000 })).toBe(true)
+    expect(isMugComplete({ enabled: true, minimumUnits: 5000, designationMinimums: [] })).toBe(true)
+  })
+
+  describe("Designation Based (task correction §2): every current designation row needs its own positive Minimum Units", () => {
+    const rows = [
+      { id: "a", designation: "Sales Rep", rate: 100, per: "USER" },
+      { id: "b", designation: "Manager", rate: 200, per: "USER" },
+    ]
+
+    it("is false when no designation has a Minimum Units entry yet", () => {
+      expect(isMugComplete({ enabled: true, minimumUnits: null, designationMinimums: [] }, rows)).toBe(false)
+    })
+
+    it("is false when only some designations have a Minimum Units entry", () => {
+      const mug = { enabled: true as const, minimumUnits: null, designationMinimums: [{ designationRowId: "a", minimumUnits: 500 }] }
+      expect(isMugComplete(mug, rows)).toBe(false)
+    })
+
+    it("is true once every current designation row has a positive Minimum Units entry", () => {
+      const mug = {
+        enabled: true as const,
+        minimumUnits: null,
+        designationMinimums: [
+          { designationRowId: "a", minimumUnits: 500 },
+          { designationRowId: "b", minimumUnits: 50 },
+        ],
+      }
+      expect(isMugComplete(mug, rows)).toBe(true)
+    })
+
+    it("ignores a Minimum Units entry left over from a since-deleted designation row", () => {
+      const mug = {
+        enabled: true as const,
+        minimumUnits: null,
+        designationMinimums: [
+          { designationRowId: "a", minimumUnits: 500 },
+          { designationRowId: "b", minimumUnits: 50 },
+          { designationRowId: "deleted-row", minimumUnits: 999 },
+        ],
+      }
+      expect(isMugComplete(mug, rows)).toBe(true)
+    })
+  })
+})
+
+describe("syncDesignationMinimums (task correction §2: MUG mirrors the pricing designation list)", () => {
+  const rows = [
+    { id: "a", designation: "Sales Rep", rate: 100, per: "USER" },
+    { id: "b", designation: "Manager", rate: 200, per: "USER" },
+  ]
+
+  it("adds a mirrored row (Minimum Units null) for a pricing row with no MUG entry yet", () => {
+    const result = syncDesignationMinimums([], rows)
+    expect(result).toEqual([
+      { designationRowId: "a", minimumUnits: null },
+      { designationRowId: "b", minimumUnits: null },
+    ])
+  })
+
+  it("preserves an existing Minimum Units entry for a row that still exists", () => {
+    const result = syncDesignationMinimums([{ designationRowId: "a", minimumUnits: 500 }], rows)
+    expect(result.find((entry) => entry.designationRowId === "a")?.minimumUnits).toBe(500)
+  })
+
+  it("adds the newly added pricing row's mirrored entry alongside existing ones", () => {
+    const result = syncDesignationMinimums([{ designationRowId: "a", minimumUnits: 500 }], rows)
+    expect(result.find((entry) => entry.designationRowId === "b")?.minimumUnits).toBeNull()
+  })
+
+  it("drops the MUG entry for a pricing row that has been deleted", () => {
+    const onlyFirstRow = [rows[0]]
+    const result = syncDesignationMinimums([{ designationRowId: "a", minimumUnits: 500 }, { designationRowId: "b", minimumUnits: 50 }], onlyFirstRow)
+    expect(result).toEqual([{ designationRowId: "a", minimumUnits: 500 }])
+  })
+
+  it("a rename or rate edit on the pricing row needs no separate sync: designationMinimumUnitsFor still resolves by id", () => {
+    const renamedRows = [{ ...rows[0], designation: "Senior Sales Rep", rate: 120 }, rows[1]]
+    const mug = { enabled: true as const, minimumUnits: null, designationMinimums: syncDesignationMinimums([], rows) }
+    expect(designationMinimumUnitsFor(mug, renamedRows[0].id)).toBeNull()
   })
 })
 
@@ -217,23 +300,66 @@ describe("isRevenueRecognitionComplete", () => {
 
   it("Milestone Based is incomplete when percentages do not total 100", () => {
     const milestones = [
-      { ...createMilestone(), name: "Kickoff", recognitionPercent: 40 },
-      { ...createMilestone(), name: "Go-Live", recognitionPercent: 40 },
+      { ...createMilestone(), name: "Kickoff", recognitionPercent: 40, invoiceTiming: "advance" },
+      { ...createMilestone(), name: "Go-Live", recognitionPercent: 40, invoiceTiming: "advance" },
     ]
     expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(false)
   })
 
-  it("Milestone Based is complete once every milestone is named, positive, and percentages total exactly 100", () => {
+  it("Milestone Based is complete once every milestone is named, positive, carries its own Invoice Timing, and percentages total exactly 100", () => {
     const milestones = [
-      { ...createMilestone(), name: "Kickoff", recognitionPercent: 40 },
-      { ...createMilestone(), name: "Go-Live", recognitionPercent: 60 },
+      { ...createMilestone(), name: "Kickoff", recognitionPercent: 40, invoiceTiming: "advance" },
+      { ...createMilestone(), name: "Go-Live", recognitionPercent: 60, invoiceTiming: "postpaid" },
     ]
     expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(true)
   })
 
   it("is incomplete if any milestone is missing a name", () => {
-    const milestones = [{ ...createMilestone(), name: "", recognitionPercent: 100 }]
+    const milestones = [{ ...createMilestone(), name: "", recognitionPercent: 100, invoiceTiming: "advance" }]
     expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(false)
+  })
+
+  it("is incomplete if any milestone is missing its own Invoice Timing, even with a valid percentage total (task correction §4-6)", () => {
+    const milestones = [
+      { ...createMilestone(), name: "Kickoff", recognitionPercent: 50, invoiceTiming: "advance" },
+      { ...createMilestone(), name: "Go-Live", recognitionPercent: 50, invoiceTiming: null },
+    ]
+    expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(false)
+  })
+
+  it("supports a real mix of Advance and Postpaid across milestones (50% Advance, 25% Postpaid, 25% Postpaid)", () => {
+    const milestones = [
+      { ...createMilestone(), name: "Advance / Contract Signing", recognitionPercent: 50, invoiceTiming: "advance" },
+      { ...createMilestone(), name: "Milestone 2", recognitionPercent: 25, invoiceTiming: "postpaid" },
+      { ...createMilestone(), name: "Milestone 3", recognitionPercent: 25, invoiceTiming: "postpaid" },
+    ]
+    expect(isRevenueRecognitionComplete({ method: "milestone_based", milestones })).toBe(true)
+  })
+})
+
+describe("nonRecurringMilestoneBasisAmount / calculateMilestoneAmount (task correction §5)", () => {
+  it("Flat Fee is the milestone basis amount", () => {
+    const component = { ...createComponent("non_recurring", "flat_fee"), amount: 1000000 }
+    expect(nonRecurringMilestoneBasisAmount(component)).toBe(1000000)
+  })
+
+  it("Per Unit, Slab, and Designation Based have no single basis amount for Non-Recurring: never invented", () => {
+    expect(nonRecurringMilestoneBasisAmount(createComponent("non_recurring", "per_unit"))).toBeNull()
+    expect(nonRecurringMilestoneBasisAmount(createComponent("non_recurring", "slab"))).toBeNull()
+    expect(nonRecurringMilestoneBasisAmount(createComponent("non_recurring", "designation_based"))).toBeNull()
+  })
+
+  it("calculates the spec's own worked example: 10,00,000 x 50% = 5,00,000", () => {
+    expect(calculateMilestoneAmount(1000000, 50)).toBe(500000)
+  })
+
+  it("calculates the spec's own worked example for a 25% milestone: 10,00,000 x 25% = 2,50,000", () => {
+    expect(calculateMilestoneAmount(1000000, 25)).toBe(250000)
+  })
+
+  it("is null when either input is missing, never a fabricated amount", () => {
+    expect(calculateMilestoneAmount(null, 50)).toBeNull()
+    expect(calculateMilestoneAmount(1000000, null)).toBeNull()
   })
 })
 
@@ -248,10 +374,38 @@ describe("isComponentComplete", () => {
   it("Recurring + Per Unit: MUG optional, but required once enabled", () => {
     const base = { ...withDescription(createComponent("recurring", "per_unit"), "SFA"), rate: 50, pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS }
     expect(isComponentComplete(base)).toBe(true)
-    const withMugOn = { ...base, mug: { enabled: true, minimumUnits: null } }
+    const withMugOn = { ...base, mug: { enabled: true, minimumUnits: null, designationMinimums: [] } }
     expect(isComponentComplete(withMugOn)).toBe(false)
-    const withMugComplete = { ...base, mug: { enabled: true, minimumUnits: 5000 } }
+    const withMugComplete = { ...base, mug: { enabled: true, minimumUnits: 5000, designationMinimums: [] } }
     expect(isComponentComplete(withMugComplete)).toBe(true)
+  })
+
+  it("Designation Based MUG: requires a Minimum Units entry for every current designation row (task correction §2)", () => {
+    const base = {
+      ...withDescription(createComponent("recurring", "designation_based"), "Field Team"),
+      invoiceTerms: COMPLETE_TERMS,
+      designationRows: [
+        { id: "a", designation: "Sales Rep", rate: 100, per: "USER" },
+        { id: "b", designation: "Manager", rate: 200, per: "USER" },
+      ],
+    }
+    expect(isComponentComplete(base)).toBe(true)
+    const withMugOn = { ...base, mug: { enabled: true, minimumUnits: null, designationMinimums: [] } }
+    expect(isComponentComplete(withMugOn)).toBe(false)
+    const withOneEntered = { ...base, mug: { enabled: true, minimumUnits: null, designationMinimums: [{ designationRowId: "a", minimumUnits: 500 }] } }
+    expect(isComponentComplete(withOneEntered)).toBe(false)
+    const withAllEntered = {
+      ...base,
+      mug: {
+        enabled: true,
+        minimumUnits: null,
+        designationMinimums: [
+          { designationRowId: "a", minimumUnits: 500 },
+          { designationRowId: "b", minimumUnits: 50 },
+        ],
+      },
+    }
+    expect(isComponentComplete(withAllEntered)).toBe(true)
   })
 
   it("Flat Fee never offers MUG, for any nature", () => {
@@ -288,14 +442,32 @@ describe("isComponentComplete", () => {
 
     const milestoneBased = {
       ...withTerms,
-      revenueRecognition: { method: "milestone_based" as const, milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 50 }] },
+      revenueRecognition: { method: "milestone_based" as const, milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 50, invoiceTiming: "advance" }] },
     }
     expect(isComponentComplete(milestoneBased)).toBe(false)
     const milestoneComplete = {
       ...withTerms,
-      revenueRecognition: { method: "milestone_based" as const, milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 100 }] },
+      revenueRecognition: { method: "milestone_based" as const, milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 100, invoiceTiming: "advance" }] },
     }
     expect(isComponentComplete(milestoneComplete)).toBe(true)
+  })
+
+  it("Non-Recurring Milestone Based: the component-level Invoice Timing no longer applies, only per-milestone Timing does (task correction §6)", () => {
+    const component = {
+      ...withDescription(createComponent("non_recurring", "flat_fee"), "Implementation"),
+      amount: 500000,
+      // Component-level Invoice Timing deliberately left null: it must not block completeness once Milestone Based is chosen.
+      invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: null },
+      revenueRecognition: {
+        method: "milestone_based" as const,
+        milestones: [
+          { ...createMilestone(), name: "Advance / Contract Signing", recognitionPercent: 50, invoiceTiming: "advance" },
+          { ...createMilestone(), name: "Milestone 2", recognitionPercent: 25, invoiceTiming: "postpaid" },
+          { ...createMilestone(), name: "Milestone 3", recognitionPercent: 25, invoiceTiming: "postpaid" },
+        ],
+      },
+    }
+    expect(isComponentComplete(component)).toBe(true)
   })
 
   it("On-Demand + Per Unit: requires rate and unit; invoice frequency stays optional", () => {
@@ -341,6 +513,25 @@ describe("isCommercialRateDraftComplete / isCommercialRateDraftStarted (visited 
     const incomplete = withDescription(createComponent("non_recurring", "flat_fee"), "Implementation")
     const draft: CommercialRateDraft = { billingCurrency: "INR", components: [complete, incomplete] }
     expect(isCommercialRateDraftComplete(draft)).toBe(false)
+  })
+
+  describe("FX (task correction §15): a foreign Billing Currency needs a governed INR Conversion Rate before the stage can be Complete", () => {
+    const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
+
+    it("USD (configured in the fixture) does not block completeness", () => {
+      const draft: CommercialRateDraft = { billingCurrency: "USD", components: [component] }
+      expect(isCommercialRateDraftComplete(draft)).toBe(true)
+    })
+
+    it("IDR (deliberately left unconfigured in the fixture) blocks completeness even with every component otherwise complete", () => {
+      const draft: CommercialRateDraft = { billingCurrency: "IDR", components: [component] }
+      expect(isCommercialRateDraftComplete(draft)).toBe(false)
+    })
+
+    it("INR itself never needs a configured rate (it is always 1 by definition)", () => {
+      const draft: CommercialRateDraft = { billingCurrency: "INR", components: [component] }
+      expect(isCommercialRateDraftComplete(draft)).toBe(true)
+    })
   })
 })
 
@@ -452,14 +643,14 @@ describe("calculateSlabAmountForQuantity (task correction §1's worked example)"
   })
 })
 
-describe("calculateMugValue (task correction §1: a calculated reference, never a fabricated one)", () => {
+describe("calculateMugValue (task correction §1, §3: a calculated reference, never a fabricated one)", () => {
   it("Per Unit: MUG units x rate", () => {
-    const component = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000 } }
+    const component = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000, designationMinimums: [] } }
     expect(calculateMugValue(component)).toBe(250000)
   })
 
   it("Per Unit: null when rate is not yet set", () => {
-    const component = { ...createComponent("recurring", "per_unit"), rate: null, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000 } }
+    const component = { ...createComponent("recurring", "per_unit"), rate: null, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000, designationMinimums: [] } }
     expect(calculateMugValue(component)).toBeNull()
   })
 
@@ -472,7 +663,7 @@ describe("calculateMugValue (task correction §1: a calculated reference, never 
         { id: "1", from: 1, to: 100, rate: 100 },
         { id: "2", from: 101, to: 250, rate: 90 },
       ],
-      mug: { enabled: true, minimumUnits: 150 },
+      mug: { enabled: true, minimumUnits: 150, designationMinimums: [] },
     }
     expect(calculateMugValue(component)).toBe(13500)
   })
@@ -486,29 +677,71 @@ describe("calculateMugValue (task correction §1: a calculated reference, never 
         { id: "1", from: 1, to: 100, rate: 100 },
         { id: "2", from: 101, to: 250, rate: 90 },
       ],
-      mug: { enabled: true, minimumUnits: 150 },
+      mug: { enabled: true, minimumUnits: 150, designationMinimums: [] },
     }
     expect(calculateMugValue(component)).toBe(14500)
-  })
-
-  it("Designation Based: never calculated, would require inventing which designation's rate applies", () => {
-    const component = {
-      ...createComponent("recurring", "designation_based"),
-      designationRows: [{ id: "1", designation: "Sales Rep", rate: 50, per: "USER" }],
-      mug: { enabled: true, minimumUnits: 5000 },
-    }
-    expect(calculateMugValue(component)).toBeNull()
   })
 
   it("is null when MUG is disabled or the quantity is not set", () => {
     const disabled = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER" }
     expect(calculateMugValue(disabled)).toBeNull()
-    const noQuantity = { ...disabled, mug: { enabled: true, minimumUnits: null } }
+    const noQuantity = { ...disabled, mug: { enabled: true, minimumUnits: null, designationMinimums: [] } }
     expect(calculateMugValue(noQuantity)).toBeNull()
   })
 
   it("Flat Fee never has a mug field to calculate from", () => {
     const component = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
     expect(calculateMugValue(component)).toBeNull()
+  })
+})
+
+describe("calculateDesignationMugSummary / calculateMugValue for Designation Based (task correction §2-3)", () => {
+  const component = {
+    ...createComponent("recurring", "designation_based"),
+    designationRows: [
+      { id: "sales", designation: "Sales Rep", rate: 100, per: "USER" },
+      { id: "manager", designation: "Manager", rate: 200, per: "USER" },
+      { id: "admin", designation: "Admin", rate: 300, per: "USER" },
+    ],
+  }
+
+  it("calculates the spec's own worked example: (500x100) + (50x200) + (10x300) = 63,000", () => {
+    const withMug = {
+      ...component,
+      mug: {
+        enabled: true as const,
+        minimumUnits: null,
+        designationMinimums: [
+          { designationRowId: "sales", minimumUnits: 500 },
+          { designationRowId: "manager", minimumUnits: 50 },
+          { designationRowId: "admin", minimumUnits: 10 },
+        ],
+      },
+    }
+    const summary = calculateDesignationMugSummary(withMug)
+    expect(summary?.totalUnits).toBe(560)
+    expect(summary?.totalValue).toBe(63000)
+    expect(calculateMugValue(withMug)).toBe(63000)
+  })
+
+  it("a row contributes its units to the total but nothing to the value once its rate is not yet set", () => {
+    const withMug = {
+      ...component,
+      designationRows: [{ id: "sales", designation: "Sales Rep", rate: null, per: "USER" }],
+      mug: { enabled: true as const, minimumUnits: null, designationMinimums: [{ designationRowId: "sales", minimumUnits: 500 }] },
+    }
+    const summary = calculateDesignationMugSummary(withMug)
+    expect(summary?.totalUnits).toBe(500)
+    expect(summary?.totalValue).toBe(0)
+  })
+
+  it("returns null when MUG is off", () => {
+    expect(calculateDesignationMugSummary({ ...component, mug: { enabled: false } })).toBeNull()
+  })
+
+  it("returns null when no designation has a Minimum Units entry yet, never a fabricated total", () => {
+    const withMug = { ...component, mug: { enabled: true as const, minimumUnits: null, designationMinimums: [] } }
+    expect(calculateDesignationMugSummary(withMug)).toBeNull()
+    expect(calculateMugValue(withMug)).toBeNull()
   })
 })

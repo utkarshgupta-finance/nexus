@@ -53,16 +53,22 @@ type ReferenceListKey =
   | "pricing_model"
 
 /**
- * `dialCode` only applies to the `phone_country_code` list. Kept as an
- * optional field on the shared shape rather than a parallel type, since
+ * `dialCode` only applies to the `phone_country_code` list; `inrConversionRate`
+ * only applies to the `currency` list (task correction: "Extend Currency
+ * Settings / Reference Master to support a centrally governed INR
+ * conversion rate... 1 unit of foreign currency = X INR"). Both are kept as
+ * optional fields on the shared shape rather than parallel types, since
  * every other consumer of a Reference Master option only ever needs
- * `value`/`label`/`active`.
+ * `value`/`label`/`active`. INR's own row always carries `inrConversionRate:
+ * 1`; a foreign currency with no rate configured yet carries `null`, never
+ * a guessed value (see `getInrConversionRate` in ./service.ts).
  */
 type ReferenceOption = {
   value: string
   label: string
   active: boolean
   dialCode?: string
+  inrConversionRate?: number | null
 }
 
 export type { ReferenceListKey, ReferenceOption }
