@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { componentTableCells, dualCurrencyLines, formatAmount, formatCompactAmount, summarizeComponent } from "./commercial-rate-summary"
 import { createComponent, createMilestone } from "./commercial-rate"
+import { REFERENCE_MASTER_FIXTURES } from "@/features/reference-data/domain/fixtures"
 
 /**
  * Display-only summaries: these never imply a real invoice was calculated,
@@ -16,7 +17,7 @@ describe("summarizeComponent", () => {
       pricingUnit: "USER",
       invoiceTerms: { invoiceFrequency: "monthly", invoiceTiming: "advance" },
     }
-    const lines = summarizeComponent(component, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(lines[0]).toContain("50")
     expect(lines[0]).toContain("User")
     expect(lines[0]).toContain("Month")
@@ -24,7 +25,7 @@ describe("summarizeComponent", () => {
 
   it("formats Non-Recurring Flat Fee as a one-time amount and appends a Revenue Recognition line", () => {
     const component = { ...createComponent("non_recurring", "flat_fee"), amount: 500000 }
-    const lines = summarizeComponent(component, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(lines[0]).toContain("5,00,000")
     expect(lines[0]).toContain("one-time")
     expect(lines.some((line) => line.startsWith("Revenue Recognition"))).toBe(true)
@@ -40,7 +41,7 @@ describe("summarizeComponent", () => {
         { id: "2", from: 101, to: null, rate: 90 },
       ],
     }
-    const lines = summarizeComponent(component, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(lines[0]).toContain("Progressive")
     expect(lines[1]).toContain("1-100")
     expect(lines[2]).toContain("101+")
@@ -48,10 +49,10 @@ describe("summarizeComponent", () => {
 
   it("appends a MUG line in units, never money, only when MUG is enabled", () => {
     const withoutMug = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER" }
-    expect(summarizeComponent(withoutMug, "INR").some((line) => line.startsWith("MUG"))).toBe(false)
+    expect(summarizeComponent(REFERENCE_MASTER_FIXTURES, withoutMug, "INR").some((line) => line.startsWith("MUG"))).toBe(false)
 
     const withMug = { ...withoutMug, mug: { enabled: true as const, minimumUnits: 5000, designationMinimums: [] } }
-    const lines = summarizeComponent(withMug, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, withMug, "INR")
     const mugLine = lines.find((line) => line.startsWith("MUG"))
     expect(mugLine).toBeDefined()
     expect(mugLine).toContain("5,000")
@@ -66,7 +67,7 @@ describe("summarizeComponent", () => {
       pricingUnit: "USER",
       mug: { enabled: true as const, minimumUnits: 5000, designationMinimums: [] },
     }
-    const lines = summarizeComponent(component, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
     const calculatedLine = lines.find((line) => line.startsWith("Calculated MUG Value"))
     expect(calculatedLine).toBeDefined()
     expect(calculatedLine).toContain("2,50,000")
@@ -75,7 +76,7 @@ describe("summarizeComponent", () => {
 
   it("never shows a MUG line for Flat Fee, which has no unit basis", () => {
     const flatFee = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
-    expect(summarizeComponent(flatFee, "INR").some((line) => line.startsWith("MUG"))).toBe(false)
+    expect(summarizeComponent(REFERENCE_MASTER_FIXTURES, flatFee, "INR").some((line) => line.startsWith("MUG"))).toBe(false)
   })
 
   it("includes an Invoice line combining frequency and timing when both are set", () => {
@@ -84,7 +85,7 @@ describe("summarizeComponent", () => {
       amount: 200000,
       invoiceTerms: { invoiceFrequency: "half_yearly", invoiceTiming: "advance" },
     }
-    const lines = summarizeComponent(component, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
     const invoiceLine = lines.find((line) => line.startsWith("Invoice"))
     expect(invoiceLine).toContain("Half-Yearly")
     expect(invoiceLine).toContain("Advance")
@@ -102,7 +103,7 @@ describe("summarizeComponent", () => {
         ],
       },
     }
-    const lines = summarizeComponent(component, "INR")
+    const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(lines.some((line) => line.includes("Milestone Based") && line.includes("2 milestones"))).toBe(true)
   })
 })
@@ -128,26 +129,26 @@ describe("formatCompactAmount (table-cell space saving, never used for the full 
 
 describe("dualCurrencyLines (task correction §17-20: transaction currency + INR equivalent)", () => {
   it("is a single line for INR: nothing to convert", () => {
-    expect(dualCurrencyLines(200000, "INR", "", formatAmount)).toEqual(["INR 2,00,000"])
+    expect(dualCurrencyLines(REFERENCE_MASTER_FIXTURES, 200000, "INR", "", formatAmount)).toEqual(["INR 2,00,000"])
   })
 
   it("is two lines for a foreign currency with a configured rate: transaction amount, then INR equivalent", () => {
-    expect(dualCurrencyLines(100, "USD", " / User", formatAmount)).toEqual(["USD 100 / User", "INR 9,100 / User"])
+    expect(dualCurrencyLines(REFERENCE_MASTER_FIXTURES, 100, "USD", " / User", formatAmount)).toEqual(["USD 100 / User", "INR 9,100 / User"])
   })
 
   it("is a single line when the foreign currency has no configured rate, never a fabricated conversion", () => {
-    expect(dualCurrencyLines(100, "IDR", "", formatAmount)).toEqual(["IDR 100"])
+    expect(dualCurrencyLines(REFERENCE_MASTER_FIXTURES, 100, "IDR", "", formatAmount)).toEqual(["IDR 100"])
   })
 
   it("is an empty array for a null amount", () => {
-    expect(dualCurrencyLines(null, "USD", "", formatAmount)).toEqual([])
+    expect(dualCurrencyLines(REFERENCE_MASTER_FIXTURES, null, "USD", "", formatAmount)).toEqual([])
   })
 })
 
 describe("componentTableCells (Commercial Components table, task corrections §4-11 and the table-structure/FX corrections)", () => {
   it("Per Unit: Pricing is the model name, Rate is the value-only summary, never raw enum codes", () => {
     const component = { ...createComponent("recurring", "per_unit"), description: "SFA", rate: 50, pricingUnit: "USER" }
-    const cells = componentTableCells(component, "INR")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cells.name).toBe("SFA")
     expect(cells.nature).toBe("Recurring")
     expect(cells.pricing).toBe("Per Unit")
@@ -156,15 +157,15 @@ describe("componentTableCells (Commercial Components table, task corrections §4
 
   it("Per Unit: shows both the transaction currency rate and its INR equivalent for a foreign Billing Currency", () => {
     const component = { ...createComponent("recurring", "per_unit"), description: "SFA", rate: 100, pricingUnit: "USER" }
-    expect(componentTableCells(component, "USD").rateLines).toEqual(["USD 100 / User", "INR 9,100 / User"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD").rateLines).toEqual(["USD 100 / User", "INR 9,100 / User"])
   })
 
   it("Flat Fee: Rate is the plain amount, plus INR equivalent for a foreign currency", () => {
     const component = { ...createComponent("non_recurring", "flat_fee"), description: "Implementation", amount: 500000 }
-    expect(componentTableCells(component, "INR").rateLines).toEqual(["INR 5,00,000"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").rateLines).toEqual(["INR 5,00,000"])
 
     const foreign = { ...createComponent("non_recurring", "flat_fee"), description: "Implementation", amount: 10000 }
-    expect(componentTableCells(foreign, "USD").rateLines).toEqual(["USD 10,000", "INR 9,10,000"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, foreign, "USD").rateLines).toEqual(["USD 10,000", "INR 9,10,000"])
   })
 
   it("Slab: Pricing names the Method, Rate shows the actual per-band rates, never a row-count-only summary", () => {
@@ -178,7 +179,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         { id: "2", from: 101, to: null, rate: 400 },
       ],
     }
-    const cells = componentTableCells(component, "INR")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cells.pricing).toBe("Slab - Whole Quantity")
     expect(cells.rateLines).toEqual(["1-100: INR 500 / Distributor", "101+: INR 400 / Distributor"])
     // Task correction §7: never only the method/unit with no actual rate.
@@ -197,7 +198,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         { id: "3", from: 201, to: null, rate: 400 },
       ],
     }
-    const cells = componentTableCells(component, "INR")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cells.pricing).toBe("Slab - Progressive")
     expect(cells.rateLines).toEqual(["1-100: INR 500 / User", "101-200: INR 450 / User", "201+: INR 400 / User"])
   })
@@ -214,7 +215,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         { id: "3", from: 201, to: null, rate: 8 },
       ],
     }
-    const cells = componentTableCells(component, "USD")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD")
     expect(cells.rateLines).toEqual(["1-100: USD 10 / User (INR 910 / User)", "101-200: USD 9 / User (INR 819 / User)", "201+: USD 8 / User (INR 728 / User)"])
   })
 
@@ -227,7 +228,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         { id: "2", designation: "Manager", rate: 200, per: "USER" },
       ],
     }
-    const cells = componentTableCells(component, "INR")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cells.rateLines).toEqual(["Sales Rep: INR 100 / User", "Manager: INR 200 / User"])
     expect(cells.rateLines.join(" ")).not.toBe("2 Designation Rates")
   })
@@ -241,7 +242,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         { id: "2", designation: "Manager", rate: 15, per: "USER" },
       ],
     }
-    const cells = componentTableCells(component, "GBP")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "GBP")
     expect(cells.rateLines).toEqual(["Sales Rep: GBP 10 / User (INR 1,210 / User)", "Manager: GBP 15 / User (INR 1,815 / User)"])
   })
 
@@ -251,7 +252,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
       description: "Field Team",
       designationRows: [1, 2, 3, 4, 5, 6].map((n) => ({ id: String(n), designation: `Role ${n}`, rate: n * 10, per: "USER" })),
     }
-    const cells = componentTableCells(component, "INR")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cells.rateLines).toHaveLength(6)
     expect(cells.rateLines.some((line) => line.includes("more"))).toBe(false)
     expect(cells.rateLines[5]).toBe("Role 6: INR 60 / User")
@@ -264,11 +265,11 @@ describe("componentTableCells (Commercial Components table, task corrections §4
       pricingUnit: "USER",
       mug: { enabled: true as const, minimumUnits: 5000, designationMinimums: [] },
     }
-    const cellsInr = componentTableCells(component, "INR")
+    const cellsInr = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cellsInr.mugQuantityLines).toEqual(["5,000 Users"])
     expect(cellsInr.mugCalculatedLines).toEqual(["INR 2.5L / Month"])
 
-    const cellsUsd = componentTableCells(component, "USD")
+    const cellsUsd = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD")
     expect(cellsUsd.mugCalculatedLines).toEqual(["USD 2.5L / Month", "INR 227.5L / Month"])
   })
 
@@ -288,18 +289,18 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         ],
       },
     }
-    const cells = componentTableCells(component, "INR")
+    const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
     expect(cells.mugQuantityLines).toEqual(["Sales Rep: 500", "Manager: 50", "Total: 550 Users"])
     expect(cells.mugCalculatedLines).toEqual(["INR 60K / Month"])
   })
 
   it("MUG column is - when MUG is not enabled or not applicable", () => {
     const noMug = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER" }
-    expect(componentTableCells(noMug, "INR").mugQuantityLines).toEqual(["-"])
-    expect(componentTableCells(noMug, "INR").mugCalculatedLines).toEqual([])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, noMug, "INR").mugQuantityLines).toEqual(["-"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, noMug, "INR").mugCalculatedLines).toEqual([])
 
     const flatFee = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
-    expect(componentTableCells(flatFee, "INR").mugQuantityLines).toEqual(["-"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, flatFee, "INR").mugQuantityLines).toEqual(["-"])
   })
 
   it("Invoice Cycle combines frequency and timing into one readable value", () => {
@@ -308,7 +309,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
       amount: 200000,
       invoiceTerms: { invoiceFrequency: "quarterly", invoiceTiming: "postpaid" },
     }
-    expect(componentTableCells(component, "INR").invoiceCycle).toBe("Quarterly Postpaid")
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycle).toBe("Quarterly Postpaid")
   })
 
   it("Invoice Cycle shows Frequency alone for a Milestone Based Non-Recurring component, since Timing lives per milestone instead (task correction §6)", () => {
@@ -321,18 +322,18 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         milestones: [{ ...createMilestone(), name: "Go-Live", recognitionPercent: 100, invoiceTiming: "advance" }],
       },
     }
-    expect(componentTableCells(component, "INR").invoiceCycle).toBe("One-Time")
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").invoiceCycle).toBe("One-Time")
   })
 
   it("Revenue Recognition is Monthly for Recurring, Full Recognition for Non-Recurring (kept concise, task correction §10), and - for On-Demand", () => {
     const recurring = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
-    expect(componentTableCells(recurring, "INR").revenueRecognitionLines).toEqual(["Monthly"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, recurring, "INR").revenueRecognitionLines).toEqual(["Monthly"])
 
     const nonRecurring = { ...createComponent("non_recurring", "flat_fee"), amount: 500000 }
-    expect(componentTableCells(nonRecurring, "INR").revenueRecognitionLines).toEqual(["Full Recognition"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, nonRecurring, "INR").revenueRecognitionLines).toEqual(["Full Recognition"])
 
     const onDemand = { ...createComponent("on_demand", "flat_fee"), amount: 50000 }
-    expect(componentTableCells(onDemand, "INR").revenueRecognitionLines).toEqual(["-"])
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, onDemand, "INR").revenueRecognitionLines).toEqual(["-"])
   })
 
   describe("Revenue Recognition Milestone table detail (task correction §8-9, §15): every milestone's Name/%/Amount/Timing, all visible, never collapsed", () => {
@@ -349,7 +350,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
           ],
         },
       }
-      const lines = componentTableCells(component, "INR").revenueRecognitionLines
+      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").revenueRecognitionLines
       expect(lines).toContain("Contract Signing")
       expect(lines).toContain("50%")
       expect(lines).toContain("INR 5,00,000")
@@ -372,7 +373,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
           milestones: [{ ...createMilestone(), name: "Go Live", recognitionPercent: 25, invoiceTiming: "postpaid" }],
         },
       }
-      const lines = componentTableCells(component, "USD").revenueRecognitionLines
+      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD").revenueRecognitionLines
       expect(lines).toContain("USD 2,500")
       expect(lines).toContain("INR 2,27,500")
       expect(lines).toContain("Postpaid")
@@ -388,7 +389,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
           milestones: [{ ...createMilestone(), name: "Go Live", recognitionPercent: 100, invoiceTiming: "advance" }],
         },
       }
-      const lines = componentTableCells(component, "INR").revenueRecognitionLines
+      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").revenueRecognitionLines
       expect(lines).toContain("Go Live")
       expect(lines).toContain("100%")
       expect(lines).toContain("-")
@@ -407,7 +408,7 @@ describe("componentTableCells (Commercial Components table, task corrections §4
         amount: 1000000,
         revenueRecognition: { method: "milestone_based" as const, milestones },
       }
-      const lines = componentTableCells(component, "INR").revenueRecognitionLines
+      const lines = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").revenueRecognitionLines
       for (let index = 1; index <= 6; index += 1) {
         expect(lines).toContain(`Milestone ${index}`)
       }
@@ -417,13 +418,13 @@ describe("componentTableCells (Commercial Components table, task corrections §4
 
   it("Effective From is formatted for the table, or - when not set", () => {
     const withDate = { ...createComponent("recurring", "flat_fee"), amount: 200000, effectiveFrom: "2026-10-01" }
-    expect(componentTableCells(withDate, "INR").effectiveFrom).toBe("01-Oct-2026")
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, withDate, "INR").effectiveFrom).toBe("01-Oct-2026")
     const withoutDate = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
-    expect(componentTableCells(withoutDate, "INR").effectiveFrom).toBe("-")
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, withoutDate, "INR").effectiveFrom).toBe("-")
   })
 
   it("falls back to a placeholder name for a still-blank component", () => {
     const component = createComponent("recurring", "flat_fee")
-    expect(componentTableCells(component, "INR").name).toBe("Untitled component")
+    expect(componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR").name).toBe("Untitled component")
   })
 })

@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { getActiveOptions } from "@/features/reference-data"
 import type { ReferenceListKey, ReferenceOption } from "@/features/reference-data"
+import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapshot-context"
 import { CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages } from "../domain/process"
 import { COMMERCIAL_DOCUMENT_DEFINITIONS } from "../domain/commercial-documents"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
@@ -94,7 +95,8 @@ function makeRequestId(reactId: string) {
  * displays as Pending: there is no authenticated approval identity yet,
  * so this page never fabricates an "Approve" action (task spec §26).
  */
-function CustomerOnboardingPage() {
+function CustomerOnboardingPage({ snapshotUnavailable = false }: { snapshotUnavailable?: boolean }) {
+  const snapshot = useReferenceMasterSnapshot()
   const reactId = useId()
   const [requestId] = useState(() => makeRequestId(reactId))
   const [onboardingCase, setOnboardingCase] = useState(() => createCase(requestId, new Date().toISOString(), null))
@@ -131,10 +133,10 @@ function CustomerOnboardingPage() {
 
   const formDefinition = useMemo(() => {
     const optionsByList = Object.fromEntries(
-      REFERENCE_LISTS.map((list) => [list, getActiveOptions(list)])
+      REFERENCE_LISTS.map((list) => [list, getActiveOptions(snapshot, list)])
     ) as Record<ReferenceListKey, ReferenceOption[]>
     return buildCustomerOnboardingFormDefinition(optionsByList)
-  }, [])
+  }, [snapshot])
 
   const survey = useSurveyModel(formDefinition.json, mode)
 
@@ -292,7 +294,7 @@ function CustomerOnboardingPage() {
       companyRegistration: taxDocuments.companyRegistration !== null,
     }),
     commercial_documents: evaluateCommercialDocumentsStatus(),
-    commercial_rate: evaluateCommercialRateStatus(commercialRate),
+    commercial_rate: evaluateCommercialRateStatus(snapshot, commercialRate),
     agreement_approval: evaluateAgreementApprovalStatus(signedAgreement !== null, legalApprovalComplete, completionReady),
   }
 
@@ -320,6 +322,13 @@ function CustomerOnboardingPage() {
           )
         }
       />
+
+      {snapshotUnavailable ? (
+        <div className="mx-4 mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-xs text-destructive sm:mx-6">
+          Reference Master could not be reached. Industry, Segment, Business Unit, Tax Identifier Type, Currency, Pricing Unit, and Invoice
+          Frequency choices below may be incomplete until the backend is reachable again.
+        </div>
+      ) : null}
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6">
         <div className="flex flex-col gap-2">

@@ -15,6 +15,7 @@ import {
   isFieldValueEmpty,
   requiredTaxRegistrationFieldKeys,
 } from "./stage-status"
+import { REFERENCE_MASTER_FIXTURES } from "@/features/reference-data/domain/fixtures"
 
 const FULL_CUSTOMER_DETAILS_DATA: Record<string, unknown> = {
   [CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName]: "Northwind Fictional Retail Group Pvt Ltd",
@@ -178,12 +179,12 @@ describe("evaluateCommercialDocumentsStatus", () => {
 
 describe("evaluateCommercialRateStatus (visited != complete)", () => {
   it("is not_started with nothing entered", () => {
-    expect(evaluateCommercialRateStatus(createEmptyCommercialRateDraft())).toBe("not_started")
+    expect(evaluateCommercialRateStatus(REFERENCE_MASTER_FIXTURES, createEmptyCommercialRateDraft())).toBe("not_started")
   })
 
   it("is attention once Billing Currency is chosen but no component exists yet", () => {
     const draft: CommercialRateDraft = { ...createEmptyCommercialRateDraft(), billingCurrency: "INR" }
-    expect(evaluateCommercialRateStatus(draft)).toBe("attention")
+    expect(evaluateCommercialRateStatus(REFERENCE_MASTER_FIXTURES, draft)).toBe("attention")
   })
 
   it("is complete once currency and a fully specified component both exist", () => {
@@ -200,7 +201,7 @@ describe("evaluateCommercialRateStatus (visited != complete)", () => {
         },
       ],
     }
-    expect(evaluateCommercialRateStatus(draft)).toBe("complete")
+    expect(evaluateCommercialRateStatus(REFERENCE_MASTER_FIXTURES, draft)).toBe("complete")
   })
 })
 

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { resolveOption } from "@/features/reference-data"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-models/customer-master"
 
 /**
@@ -27,21 +28,23 @@ import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-m
  * read (see ../../../app/customers/[customerKey]/page.tsx), nothing here
  * performs its own data fetch.
  */
-function CustomerMasterDetail({ detail }: { detail: CustomerMasterDetailData }) {
+function CustomerMasterDetail({ detail, snapshot }: { detail: CustomerMasterDetailData; snapshot: ReferenceMasterSnapshot }) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
   const [viewingDocument, setViewingDocument] = useState<{ title: string; url: string; downloadUrl: string } | null>(null)
 
-  const countryLabel = enrichment ? (resolveOption("country", enrichment.countryCode)?.label ?? enrichment.countryCode) : null
+  const countryLabel = enrichment ? (resolveOption(snapshot, "country", enrichment.countryCode)?.label ?? enrichment.countryCode) : null
   const industryLabel = enrichment
-    ? (resolveOption("industry", enrichment.industryValue)?.label ?? enrichment.industryValue)
+    ? (resolveOption(snapshot, "industry", enrichment.industryValue)?.label ?? enrichment.industryValue)
     : null
-  const segmentLabel = enrichment ? (resolveOption("segment", enrichment.segmentValue)?.label ?? enrichment.segmentValue) : null
+  const segmentLabel = enrichment
+    ? (resolveOption(snapshot, "segment", enrichment.segmentValue)?.label ?? enrichment.segmentValue)
+    : null
   const businessUnitLabel = enrichment
-    ? (resolveOption("business_unit", enrichment.businessUnitValue)?.label ?? enrichment.businessUnitValue)
+    ? (resolveOption(snapshot, "business_unit", enrichment.businessUnitValue)?.label ?? enrichment.businessUnitValue)
     : null
   const billingCurrencyLabel = enrichment
-    ? (resolveOption("currency", enrichment.billingCurrencyCode)?.label ?? enrichment.billingCurrencyCode)
+    ? (resolveOption(snapshot, "currency", enrichment.billingCurrencyCode)?.label ?? enrichment.billingCurrencyCode)
     : null
 
   return (

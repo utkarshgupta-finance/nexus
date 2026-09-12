@@ -101,4 +101,21 @@ type ReferenceOption = {
   cadenceMonths?: number | null
 }
 
-export type { ReferenceListKey, ReferenceOption }
+/**
+ * One request's worth of every Reference Master list, active and
+ * inactive options alike. This is the shape that actually crosses the
+ * server/client boundary: a Server Component route loads it once (real
+ * data for the twelve persisted lists via ./service.ts's
+ * `loadReferenceMasterSnapshot`, real data for `country`/
+ * `phone_country_code` from ./countries.ts, never a Reference Master
+ * database table for those two, see docs/SETTINGS_ARCHITECTURE.md §2)
+ * and passes it down as a plain prop; every pure function in
+ * ./service.ts (`getActiveOptions`, `resolveOption`, and similar) takes
+ * this snapshot as an explicit parameter rather than reading a module
+ * global, so the same function works identically in a test (given a
+ * fixture-built snapshot) and in production (given a database-built
+ * one).
+ */
+type ReferenceMasterSnapshot = Record<ReferenceListKey, ReferenceOption[]>
+
+export type { ReferenceListKey, ReferenceOption, ReferenceMasterSnapshot }

@@ -160,14 +160,24 @@ field) must still resolve it to its original display label, even after
 it stops being offered for new selections. This requires two distinct
 read modes wherever reference values are consumed: an active-only mode
 for new selections, and a resolve-by-code mode that works regardless of
-current active state. Customer Onboarding Stage 1 (`src/features/
-reference-data/`) is the first real consumer of this shape. No table
-implementing it exists yet (M7, `supabase/migrations/
-20260908013210_master_data_foundation.sql`, created two purpose-built
-tables, `customers` and `capabilities`, not this generic one), so that
-feature holds its option lists in a TypeScript fixture behind the exact
-contract above (`getActiveOptions` / `resolveOption`), so the eventual
-generic table replaces the fixture without any calling code changing.
+current active state. Customer Onboarding Stage 1 and Commercial Rate
+(`src/features/reference-data/`) are the first real consumers of this
+shape, and as of `supabase/migrations/
+20260912080000_reference_master_foundation.sql`, this exact generic
+shape is a real table: `reference_lists` (the migration-managed catalog
+of list categories) and `reference_options` (stable `code`, editable
+`label`, `is_active`, `sort_order`, plus two typed governed columns
+scoped by list). `getActiveOptions`/`resolveOption` and the rest of
+`src/features/reference-data/domain/service.ts` are unchanged in
+contract, pure functions over an explicit snapshot parameter; only where
+that snapshot comes from changed, from an in-repo TypeScript fixture to
+`src/features/reference-data/server.ts`'s real database read. See
+`docs/SETTINGS_ARCHITECTURE.md` §6 for the full read/write architecture.
+M7 (`supabase/migrations/20260908013210_master_data_foundation.sql`)
+remains two separate, purpose-built tables, `customers` and
+`capabilities`, deliberately not folded into this generic model: neither
+is an extensible pick-list a form selects from, both are canonical
+business identities in their own right.
 
 `docs/SETTINGS_ARCHITECTURE.md` is the authoritative, feature-level
 elaboration of this section for Customer Onboarding: the Settings

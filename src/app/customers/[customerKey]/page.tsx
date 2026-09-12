@@ -1,6 +1,8 @@
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
 import { getCustomerMasterDetailByKey } from "@/features/customers/server"
+import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
 /**
  * Customer Master detail: one record, read-only (task spec §15, §18).
@@ -50,5 +52,12 @@ export default async function CustomerMasterDetailRoute({
     )
   }
 
-  return <CustomerMasterDetail detail={detail} />
+  let snapshot: ReferenceMasterSnapshot
+  try {
+    snapshot = await loadReferenceMasterSnapshot()
+  } catch {
+    snapshot = emptySnapshot()
+  }
+
+  return <CustomerMasterDetail detail={detail} snapshot={snapshot} />
 }

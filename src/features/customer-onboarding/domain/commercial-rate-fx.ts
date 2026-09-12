@@ -1,4 +1,5 @@
 import { getInrConversionRate } from "@/features/reference-data"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
 /**
  * Commercial Rate's FX support (task correction §12-20): Billing Currency
@@ -11,13 +12,19 @@ import { getInrConversionRate } from "@/features/reference-data"
  * (`docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §18): transaction currency
  * never collapses into a derived conversion, and any converted amount
  * must carry its own rate/provenance.
+ *
+ * Every function that needs the governed rate takes an explicit
+ * `snapshot: ReferenceMasterSnapshot` parameter, the same request-scoped
+ * snapshot every other Reference Master read in this app now requires
+ * (see `@/features/reference-data`'s own header), so this module never
+ * reads a fixture or a database result directly.
  */
 
 /** INR's own rate is always exactly 1, by definition, never a Settings lookup. */
-function inrConversionRateFor(currencyCode: string | null): number | null {
+function inrConversionRateFor(snapshot: ReferenceMasterSnapshot, currencyCode: string | null): number | null {
   if (!currencyCode) return null
   if (currencyCode === "INR") return 1
-  return getInrConversionRate(currencyCode)
+  return getInrConversionRate(snapshot, currencyCode)
 }
 
 /** Whether `currencyCode` is a real, non-INR transaction currency (the only case where an INR equivalent is ever shown). A type predicate so callers narrow straight from `string | null` to `string`. */
@@ -31,9 +38,9 @@ function isForeignCurrency(currencyCode: string | null): currencyCode is string 
  * rate of 1 for a foreign currency: a missing rate must read as missing
  * (see `isFxRateMissing`), not silently as "no conversion needed."
  */
-function toInr(amount: number | null, currencyCode: string | null): number | null {
+function toInr(snapshot: ReferenceMasterSnapshot, amount: number | null, currencyCode: string | null): number | null {
   if (amount === null) return null
-  const rate = inrConversionRateFor(currencyCode)
+  const rate = inrConversionRateFor(snapshot, currencyCode)
   if (rate === null) return null
   return amount * rate
 }
@@ -44,8 +51,8 @@ function toInr(amount: number | null, currencyCode: string | null): number | nul
  * not become Complete while this is true; the UI surfaces this as an
  * actionable validation message, never a silently-skipped conversion.
  */
-function isFxRateMissing(currencyCode: string | null): boolean {
-  return isForeignCurrency(currencyCode) && inrConversionRateFor(currencyCode) === null
+function isFxRateMissing(snapshot: ReferenceMasterSnapshot, currencyCode: string | null): boolean {
+  return isForeignCurrency(currencyCode) && inrConversionRateFor(snapshot, currencyCode) === null
 }
 
 /**
@@ -66,9 +73,9 @@ type CommercialRateFxSnapshot = {
   inrConversionRate: number
 }
 
-function currentFxSnapshot(currencyCode: string | null): CommercialRateFxSnapshot | null {
+function currentFxSnapshot(snapshot: ReferenceMasterSnapshot, currencyCode: string | null): CommercialRateFxSnapshot | null {
   if (!currencyCode) return null
-  const rate = inrConversionRateFor(currencyCode)
+  const rate = inrConversionRateFor(snapshot, currencyCode)
   return rate === null ? null : { currencyCode, inrConversionRate: rate }
 }
 

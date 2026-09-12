@@ -896,15 +896,16 @@ Commercial Rate's own lists under three configuration levels:
   `pricing_model`, `invoice_timing`, `slab_method`,
   `revenue_recognition_method`): a new value needs new application/
   calculation code before it means anything, so Settings never allows
-  adding one. Only `pricing_model` (via its own `OptionSelect`) and
-  `invoice_timing` today actually gate real Commercial Rate editor UI
-  from their active state; `commercial_nature` (the three fixed table
-  sections), `slab_method`, and `revenue_recognition_method` (both fixed
-  `ToggleGroup`s) are governed here for documentation and future-proofing,
-  not yet wired to hide themselves when deactivated. Settings still
-  allows Activate/Deactivate for all five, an honest gap rather than a
-  silently broken promise (`docs/SETTINGS_ARCHITECTURE.md` states this
-  plainly).
+  adding one. As of 2026-09-12, all five gate real Commercial Rate editor
+  UI from their active state: `pricing_model`/`invoice_timing` via
+  `OptionSelect`, `commercial_nature`'s three fixed sections by hiding a
+  deactivated Nature's own Add button (its section and its existing
+  components keep rendering), and `slab_method`/`revenue_recognition_method`'s
+  `ToggleGroup`s by only offering an active value as a new choice while
+  never hiding whichever value a component already carries. See
+  `docs/SETTINGS_ARCHITECTURE.md` §7 for the exact mechanism and its
+  disclosed limit (no automated UI test covers this, only live
+  verification).
 
 Payment Terms is no longer a Reference Master list here: it was removed
 from Commercial Rate's scope entirely (see the vocabulary table above).

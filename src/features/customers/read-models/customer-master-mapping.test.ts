@@ -5,6 +5,7 @@ import { DEMO_CUSTOMER_KEY } from "../domain/demo-enrichment"
 import { DEMO_DOCUMENTS } from "../domain/demo-documents"
 import type { CustomerRow } from "../data/row-types"
 import { toCustomerMasterDetail, toCustomerMasterListEntry } from "./customer-master-mapping"
+import { REFERENCE_MASTER_FIXTURES } from "@/features/reference-data/domain/fixtures"
 
 const DEMO_ROW: CustomerRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -61,10 +62,10 @@ describe("customer master read model composition", () => {
     const detail = toCustomerMasterDetail(DEMO_ROW)
     const enrichment = detail.enrichment
     if (!enrichment) throw new Error("expected demo enrichment")
-    expect(resolveOption("country", enrichment.countryCode)?.label).toBe("India")
-    expect(resolveOption("industry", enrichment.industryValue)?.label).toBe("FMCG")
-    expect(resolveOption("segment", enrichment.segmentValue)?.label).toBe("Enterprise")
-    expect(resolveOption("business_unit", enrichment.businessUnitValue)?.label).toBe("India Enterprise")
-    expect(resolveOption("currency", enrichment.billingCurrencyCode)?.label).toBe("INR - Indian Rupee")
+    expect(resolveOption(REFERENCE_MASTER_FIXTURES, "country", enrichment.countryCode)?.label).toBe("India")
+    expect(resolveOption(REFERENCE_MASTER_FIXTURES, "industry", enrichment.industryValue)?.label).toBe("FMCG")
+    expect(resolveOption(REFERENCE_MASTER_FIXTURES, "segment", enrichment.segmentValue)?.label).toBe("Enterprise")
+    expect(resolveOption(REFERENCE_MASTER_FIXTURES, "business_unit", enrichment.businessUnitValue)?.label).toBe("India Enterprise")
+    expect(resolveOption(REFERENCE_MASTER_FIXTURES, "currency", enrichment.billingCurrencyCode)?.label).toBe("INR - Indian Rupee")
   })
 })

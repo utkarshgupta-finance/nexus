@@ -1,5 +1,4 @@
-import { REFERENCE_MASTER_FIXTURES } from "./fixtures"
-import type { ReferenceListKey, ReferenceOption } from "./types"
+import type { ReferenceListKey, ReferenceMasterSnapshot, ReferenceOption } from "./types"
 
 /**
  * Reference Master option-resolution contract. Two distinct modes, both
@@ -14,14 +13,20 @@ import type { ReferenceListKey, ReferenceOption } from "./types"
  *   display its original label, never a blank or a silently substituted
  *   current value.
  *
- * Backed by an in-repo fixture for now (see ./fixtures.ts's header for
- * why); callers only ever see this contract, never the fixture shape
- * directly, so swapping the fixture for a real generic reference table
- * later is invisible to every caller.
+ * Every function here is a pure, synchronous read over an explicit
+ * `ReferenceMasterSnapshot` parameter, never a module-level import of a
+ * fixture or a database result: this is what lets the exact same
+ * functions serve tests (a fixture-built snapshot,
+ * `REFERENCE_MASTER_FIXTURES` in ./fixtures.ts) and production (a
+ * database-built snapshot, `loadReferenceMasterSnapshot` in
+ * ../server.ts) without any caller-visible difference. See
+ * ../server.ts for how a snapshot is actually loaded, and
+ * docs/SETTINGS_ARCHITECTURE.md for the source-of-truth transition this
+ * enables.
  */
 
-function getActiveOptions(listKey: ReferenceListKey): ReferenceOption[] {
-  return REFERENCE_MASTER_FIXTURES[listKey].filter((option) => option.active)
+function getActiveOptions(snapshot: ReferenceMasterSnapshot, listKey: ReferenceListKey): ReferenceOption[] {
+  return snapshot[listKey].filter((option) => option.active)
 }
 
 /**
@@ -29,8 +34,8 @@ function getActiveOptions(listKey: ReferenceListKey): ReferenceOption[] {
  * Reference Master Settings screen, which must show and manage inactive
  * values too, not for form field choices (use `getActiveOptions` there).
  */
-function getAllOptions(listKey: ReferenceListKey): ReferenceOption[] {
-  return REFERENCE_MASTER_FIXTURES[listKey]
+function getAllOptions(snapshot: ReferenceMasterSnapshot, listKey: ReferenceListKey): ReferenceOption[] {
+  return snapshot[listKey]
 }
 
 /**
@@ -38,8 +43,8 @@ function getAllOptions(listKey: ReferenceListKey): ReferenceOption[] {
  * active state. Returns null only if the value was never a real option
  * for this list, never merely because it is now inactive.
  */
-function resolveOption(listKey: ReferenceListKey, value: string): ReferenceOption | null {
-  return REFERENCE_MASTER_FIXTURES[listKey].find((option) => option.value === value) ?? null
+function resolveOption(snapshot: ReferenceMasterSnapshot, listKey: ReferenceListKey, value: string): ReferenceOption | null {
+  return snapshot[listKey].find((option) => option.value === value) ?? null
 }
 
 /**
@@ -50,8 +55,8 @@ function resolveOption(listKey: ReferenceListKey, value: string): ReferenceOptio
  * check) must treat `null` as "not configured", never fall back to 1 or
  * any other invented value.
  */
-function getInrConversionRate(currencyCode: string): number | null {
-  const option = REFERENCE_MASTER_FIXTURES.currency.find((entry) => entry.value === currencyCode && entry.active)
+function getInrConversionRate(snapshot: ReferenceMasterSnapshot, currencyCode: string): number | null {
+  const option = snapshot.currency.find((entry) => entry.value === currencyCode && entry.active)
   return option?.inrConversionRate ?? null
 }
 
@@ -61,8 +66,8 @@ function getInrConversionRate(currencyCode: string): number | null {
  * invoice cadence"). `null` for the reserved "One-Time" row, and for any
  * inactive or unrecognized code, never a guessed number.
  */
-function getInvoiceFrequencyCadence(code: string): number | null {
-  const option = REFERENCE_MASTER_FIXTURES.invoice_frequency.find((entry) => entry.value === code && entry.active)
+function getInvoiceFrequencyCadence(snapshot: ReferenceMasterSnapshot, code: string): number | null {
+  const option = snapshot.invoice_frequency.find((entry) => entry.value === code && entry.active)
   return option?.cadenceMonths ?? null
 }
 

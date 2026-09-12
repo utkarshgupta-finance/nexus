@@ -27,6 +27,7 @@ import {
   validateCommercialComponent,
 } from "./commercial-rate"
 import type { CommercialComponentDraft, CommercialRateDraft, InvoiceTerms, OngoingComponent } from "./commercial-rate"
+import { REFERENCE_MASTER_FIXTURES } from "@/features/reference-data/domain/fixtures"
 
 const COMPLETE_TERMS: InvoiceTerms = { invoiceFrequency: "monthly", invoiceTiming: "advance" }
 
@@ -524,26 +525,26 @@ describe("isCommercialRateDraftComplete / isCommercialRateDraftStarted (visited 
   it("empty draft is neither started nor complete", () => {
     const draft = createEmptyCommercialRateDraft()
     expect(isCommercialRateDraftStarted(draft)).toBe(false)
-    expect(isCommercialRateDraftComplete(draft)).toBe(false)
+    expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(false)
   })
 
   it("is started once currency is chosen, still not complete with zero components", () => {
     const draft: CommercialRateDraft = { ...createEmptyCommercialRateDraft(), billingCurrency: "INR" }
     expect(isCommercialRateDraftStarted(draft)).toBe(true)
-    expect(isCommercialRateDraftComplete(draft)).toBe(false)
+    expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(false)
   })
 
   it("has no Commercial Scope concept: currency plus one complete component is enough", () => {
     const component = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
     const draft: CommercialRateDraft = { billingCurrency: "INR", components: [component] }
-    expect(isCommercialRateDraftComplete(draft)).toBe(true)
+    expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(true)
   })
 
   it("supports multiple components, incomplete if any one of them is incomplete", () => {
     const complete = { ...withDescription(createComponent("recurring", "flat_fee"), "Platform Fee"), invoiceTerms: COMPLETE_TERMS, amount: 200000 }
     const incomplete = withDescription(createComponent("non_recurring", "flat_fee"), "Implementation")
     const draft: CommercialRateDraft = { billingCurrency: "INR", components: [complete, incomplete] }
-    expect(isCommercialRateDraftComplete(draft)).toBe(false)
+    expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(false)
   })
 
   describe("FX (task correction §15): a foreign Billing Currency needs a governed INR Conversion Rate before the stage can be Complete", () => {
@@ -551,17 +552,17 @@ describe("isCommercialRateDraftComplete / isCommercialRateDraftStarted (visited 
 
     it("USD (configured in the fixture) does not block completeness", () => {
       const draft: CommercialRateDraft = { billingCurrency: "USD", components: [component] }
-      expect(isCommercialRateDraftComplete(draft)).toBe(true)
+      expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(true)
     })
 
     it("IDR (deliberately left unconfigured in the fixture) blocks completeness even with every component otherwise complete", () => {
       const draft: CommercialRateDraft = { billingCurrency: "IDR", components: [component] }
-      expect(isCommercialRateDraftComplete(draft)).toBe(false)
+      expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(false)
     })
 
     it("INR itself never needs a configured rate (it is always 1 by definition)", () => {
       const draft: CommercialRateDraft = { billingCurrency: "INR", components: [component] }
-      expect(isCommercialRateDraftComplete(draft)).toBe(true)
+      expect(isCommercialRateDraftComplete(REFERENCE_MASTER_FIXTURES, draft)).toBe(true)
     })
   })
 })

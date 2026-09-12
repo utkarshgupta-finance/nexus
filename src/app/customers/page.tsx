@@ -1,6 +1,8 @@
 import { CustomersPage } from "@/features/customers/ui/customers-page"
 import { listCustomerMaster } from "@/features/customers/server"
 import type { CustomerMasterListEntry } from "@/features/customers/server"
+import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
 /**
  * Customer Master reads the real backend (task spec: "Customer Master
@@ -38,5 +40,14 @@ export default async function CustomersRoute() {
     customerMasterUnavailable = true
   }
 
-  return <CustomersPage customerMasterEntries={customerMasterEntries} customerMasterUnavailable={customerMasterUnavailable} />
+  let snapshot: ReferenceMasterSnapshot
+  try {
+    snapshot = await loadReferenceMasterSnapshot()
+  } catch {
+    snapshot = emptySnapshot()
+  }
+
+  return (
+    <CustomersPage customerMasterEntries={customerMasterEntries} customerMasterUnavailable={customerMasterUnavailable} snapshot={snapshot} />
+  )
 }

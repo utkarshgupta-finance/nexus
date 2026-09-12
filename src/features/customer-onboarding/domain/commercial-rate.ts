@@ -1,4 +1,5 @@
 import type { PricingRuleKind } from "@/features/commercial"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { isFxRateMissing } from "./commercial-rate-fx"
 
 /**
@@ -730,9 +731,9 @@ function isComponentComplete(component: CommercialComponentDraft): boolean {
  * no Commercial Scope to additionally require: it does not exist in the
  * corrected model.
  */
-function isCommercialRateDraftComplete(draft: CommercialRateDraft): boolean {
+function isCommercialRateDraftComplete(snapshot: ReferenceMasterSnapshot, draft: CommercialRateDraft): boolean {
   if (!draft.billingCurrency) return false
-  if (isFxRateMissing(draft.billingCurrency)) return false
+  if (isFxRateMissing(snapshot, draft.billingCurrency)) return false
   if (draft.components.length === 0) return false
   return draft.components.every(isComponentComplete)
 }

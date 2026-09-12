@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { getActiveOptions, resolveOption } from "@/features/reference-data"
+import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapshot-context"
 import { componentTableCells, dualCurrencyLines, formatAmount, formatQuantity, mugUnitCode, unitLabel } from "../domain/commercial-rate-summary"
 import type { ComponentTableCells } from "../domain/commercial-rate-summary"
 import { inrConversionRateFor, isForeignCurrency } from "../domain/commercial-rate-fx"
@@ -53,9 +54,19 @@ import type {
  * ../domain/commercial-rate.ts's header for the draft-capture design.
  */
 
-function selectLabel(listKey: Parameters<typeof getActiveOptions>[0], value: string | null): string {
+const SLAB_METHOD_CHOICES: { value: SlabMethod; label: string }[] = [
+  { value: "whole_quantity", label: "Whole Quantity" },
+  { value: "progressive", label: "Progressive" },
+]
+
+const REVENUE_RECOGNITION_METHOD_CHOICES: { value: RevenueRecognition["method"]; label: string }[] = [
+  { value: "full_recognition", label: "Full Recognition" },
+  { value: "milestone_based", label: "Milestone Based" },
+]
+
+function selectLabel(snapshot: ReturnType<typeof useReferenceMasterSnapshot>, listKey: Parameters<typeof getActiveOptions>[1], value: string | null): string {
   if (!value) return "Select..."
-  return resolveOption(listKey, value)?.label ?? value
+  return resolveOption(snapshot, listKey, value)?.label ?? value
 }
 
 function OptionSelect({
@@ -64,12 +75,13 @@ function OptionSelect({
   onChange,
   className,
 }: {
-  listKey: Parameters<typeof getActiveOptions>[0]
+  listKey: Parameters<typeof getActiveOptions>[1]
   value: string | null
   onChange: (value: string) => void
   className?: string
 }) {
-  const options = useMemo(() => getActiveOptions(listKey), [listKey])
+  const snapshot = useReferenceMasterSnapshot()
+  const options = useMemo(() => getActiveOptions(snapshot, listKey), [snapshot, listKey])
   return (
     // `value` is passed straight through, including `null`: base-ui's Select
     // treats an explicit `null` as "controlled, nothing selected" but treats
@@ -78,7 +90,7 @@ function OptionSelect({
     // a user made a first selection, which base-ui does not support.
     <Select value={value} onValueChange={(next) => onChange(next as string)}>
       <SelectTrigger className={className ?? "w-full"}>
-        <SelectValue placeholder="Select...">{() => selectLabel(listKey, value)}</SelectValue>
+        <SelectValue placeholder="Select...">{() => selectLabel(snapshot, listKey, value)}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
@@ -104,6 +116,7 @@ function InvoiceTermsFields({
   component: CommercialComponentDraft
   onChange: (next: CommercialComponentDraft) => void
 }) {
+  const snapshot = useReferenceMasterSnapshot()
   /** Once Milestone Based recognition is chosen, Invoice Timing lives per milestone instead (task correction §6): a single component-level Timing cannot express a mix like "50% Advance, 25% Postpaid". */
   const timingLivesOnMilestones = component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based"
   return (
@@ -112,7 +125,7 @@ function InvoiceTermsFields({
         <FieldLabel>Invoice Frequency{component.nature === "on_demand" ? " (optional)" : ""}</FieldLabel>
         {component.nature === "non_recurring" ? (
           <Badge variant="ghost" className="w-fit bg-muted text-muted-foreground">
-            {selectLabel("invoice_frequency", component.invoiceTerms.invoiceFrequency)}
+            {selectLabel(snapshot, "invoice_frequency", component.invoiceTerms.invoiceFrequency)}
           </Badge>
         ) : (
           <OptionSelect
@@ -161,6 +174,8 @@ function DesignationMugRowsEditor({
   currencyCode: string | null
   onChange: (next: MugOverlay) => void
 }) {
+  const snapshot = useReferenceMasterSnapshot()
+
   function updateMinimum(designationRowId: string, minimumUnits: number | null) {
     const exists = mug.designationMinimums.some((entry) => entry.designationRowId === designationRowId)
     const next = exists
@@ -184,7 +199,7 @@ function DesignationMugRowsEditor({
           <div key={row.id} className="grid grid-cols-3 items-center gap-2">
             <span className="truncate text-xs text-foreground">{row.designation || "Designation"}</span>
             <span className="text-xs text-muted-foreground">
-              {formatAmount(row.rate, currencyCode)} / {unitLabel(row.per)}
+              {formatAmount(row.rate, currencyCode)} / {unitLabel(snapshot, row.per)}
             </span>
             <Input
               type="number"
@@ -200,7 +215,7 @@ function DesignationMugRowsEditor({
         <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-dashed px-2.5 py-2">
           <span className="text-[0.7rem] font-medium text-foreground">Calculated MUG Value (reference only)</span>
           <span className="text-xs text-muted-foreground">Total {formatQuantity(designationSummary.totalUnits)} Units</span>
-          {dualCurrencyLines(designationSummary.totalValue, currencyCode, " / Month", formatAmount).map((line) => (
+          {dualCurrencyLines(snapshot, designationSummary.totalValue, currencyCode, " / Month", formatAmount).map((line) => (
             <span key={line} className="text-xs text-muted-foreground">
               {line}
             </span>
@@ -232,7 +247,8 @@ function MugFields({
   currencyCode: string | null
   onChange: (next: MugOverlay) => void
 }) {
-  const unitWord = `${unitLabel(pricingUnitCode)}s`
+  const snapshot = useReferenceMasterSnapshot()
+  const unitWord = `${unitLabel(snapshot, pricingUnitCode)}s`
 
   function toggle(enabled: boolean) {
     if (!enabled) {
@@ -266,7 +282,7 @@ function MugFields({
             {calculatedValue !== null ? (
               <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-dashed px-2.5 py-2">
                 <span className="text-[0.7rem] font-medium text-foreground">Calculated MUG Value (reference only)</span>
-                {dualCurrencyLines(calculatedValue, currencyCode, " / Month", formatAmount).map((line) => (
+                {dualCurrencyLines(snapshot, calculatedValue, currencyCode, " / Month", formatAmount).map((line) => (
                   <span key={line} className="text-xs text-muted-foreground">
                     {line}
                   </span>
@@ -295,6 +311,17 @@ function SlabRowsEditor({
   onChangeMethod: (value: SlabMethod) => void
   onChangeRows: (rows: SlabRow[]) => void
 }) {
+  const snapshot = useReferenceMasterSnapshot()
+  /**
+   * System Rule gating (task correction §21): a Slab Method deactivated in
+   * Settings no longer offers itself for a new choice, but the value this
+   * component already carries always keeps its own toggle item rendered,
+   * so an existing selection is never hidden or silently forced to
+   * change.
+   */
+  const activeSlabMethods = new Set(getActiveOptions(snapshot, "slab_method").map((option) => option.value))
+  const slabMethodChoices = SLAB_METHOD_CHOICES.filter((choice) => activeSlabMethods.has(choice.value) || choice.value === slabMethod)
+
   /** Every row mutation goes through this so From always stays derived and in sync (task correction §2-3: never a value the user types). */
   function updateRows(nextRows: SlabRow[]) {
     onChangeRows(recalculateSlabFroms(nextRows))
@@ -319,8 +346,11 @@ function SlabRowsEditor({
             size="sm"
             className="w-fit"
           >
-            <ToggleGroupItem value="whole_quantity">Whole Quantity</ToggleGroupItem>
-            <ToggleGroupItem value="progressive">Progressive</ToggleGroupItem>
+            {slabMethodChoices.map((choice) => (
+              <ToggleGroupItem key={choice.value} value={choice.value}>
+                {choice.label}
+              </ToggleGroupItem>
+            ))}
           </ToggleGroup>
         </div>
       </div>
@@ -551,6 +581,13 @@ function RevenueRecognitionFields({
   currencyCode: string | null
   onChange: (next: RevenueRecognition) => void
 }) {
+  const snapshot = useReferenceMasterSnapshot()
+  /** Same System Rule gating as SlabRowsEditor's Slab Method toggle (task correction §21): the currently selected method always keeps its own item, even if deactivated. */
+  const activeRecognitionMethods = new Set(getActiveOptions(snapshot, "revenue_recognition_method").map((option) => option.value))
+  const recognitionChoices = REVENUE_RECOGNITION_METHOD_CHOICES.filter(
+    (choice) => activeRecognitionMethods.has(choice.value) || choice.value === recognition.method
+  )
+
   return (
     <div className="flex flex-col gap-2">
       <FieldLabel>Revenue Recognition Method</FieldLabel>
@@ -568,8 +605,11 @@ function RevenueRecognitionFields({
         size="sm"
         className="w-fit"
       >
-        <ToggleGroupItem value="full_recognition">Full Recognition</ToggleGroupItem>
-        <ToggleGroupItem value="milestone_based">Milestone Based</ToggleGroupItem>
+        {recognitionChoices.map((choice) => (
+          <ToggleGroupItem key={choice.value} value={choice.value}>
+            {choice.label}
+          </ToggleGroupItem>
+        ))}
       </ToggleGroup>
       {recognition.method === "milestone_based" ? (
         <MilestoneRowsEditor
@@ -906,6 +946,8 @@ function ComponentsTable({
   onCancelDelete: () => void
   disabled: boolean
 }) {
+  const snapshot = useReferenceMasterSnapshot()
+
   return (
     <>
       <div className="hidden overflow-x-auto rounded-lg border sm:block">
@@ -921,7 +963,7 @@ function ComponentsTable({
           </TableHeader>
           <TableBody>
             {components.map((component) => {
-              const cells = componentTableCells(component, currencyCode)
+              const cells = componentTableCells(snapshot, component, currencyCode)
               const validation = validateCommercialComponent(component)
               return (
                 <TableRow key={component.id}>
@@ -955,7 +997,7 @@ function ComponentsTable({
 
       <div className="flex flex-col gap-3 sm:hidden">
         {components.map((component) => {
-          const cells = componentTableCells(component, currencyCode)
+          const cells = componentTableCells(snapshot, component, currencyCode)
           const validation = validateCommercialComponent(component)
           return (
             <div key={component.id} className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm">
@@ -1074,9 +1116,17 @@ function NatureSection({
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
 }) {
+  const snapshot = useReferenceMasterSnapshot()
   const editingComponent = openEditor?.mode === "edit" ? (components.find((component) => component.id === openEditor.id) ?? null) : null
   const isAddingHere = openEditor?.mode === "add" && openEditor.draft.nature === nature
   const tableComponents = editingComponent ? components.filter((component) => component.id !== editingComponent.id) : components
+  /**
+   * System Rule gating (task correction §21): a deactivated Commercial
+   * Nature no longer offers a new Add action, but its section (title,
+   * existing components table) always keeps rendering regardless, so a
+   * historical component under a now-inactive Nature is never hidden.
+   */
+  const natureIsActive = getActiveOptions(snapshot, "commercial_nature").some((option) => option.value === nature)
 
   return (
     <div className="flex flex-col gap-3">
@@ -1106,7 +1156,7 @@ function NatureSection({
         <ComponentEditor component={openEditor.draft} currencyCode={currencyCode} onChange={onEditorChange} onCommit={onCommitAdd} onCancel={onCancelAdd} commitLabel={addLabel} />
       ) : null}
 
-      {openEditor === null ? (
+      {openEditor === null && natureIsActive ? (
         <Button variant="outline" size="sm" className="w-fit" onClick={() => onStartAdd(nature)}>
           <PlusIcon data-icon="inline-start" className="size-3.5" />
           {addLabel}
@@ -1126,7 +1176,8 @@ function NatureSection({
  * refuses to mark the stage Complete in that state.
  */
 function FxRateDisplay({ currencyCode }: { currencyCode: string }) {
-  const rate = inrConversionRateFor(currencyCode)
+  const snapshot = useReferenceMasterSnapshot()
+  const rate = inrConversionRateFor(snapshot, currencyCode)
   return (
     <div className="sm:max-w-xs sm:flex-1">
       <div className="flex flex-col gap-1.5">

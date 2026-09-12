@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { CheckCircle2Icon, CircleSlashIcon, PlusIcon, SearchIcon } from "lucide-react"
 
 import { PageHeader } from "@/components/product/page-header"
@@ -9,8 +9,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { getAllOptions, isValidIsoCurrencyCode } from "@/features/reference-data"
-import type { ReferenceListKey, ReferenceOption } from "@/features/reference-data"
+import { isValidIsoCurrencyCode } from "@/features/reference-data"
+import type { ReferenceListKey, ReferenceMasterSnapshot, ReferenceOption } from "@/features/reference-data"
+import {
+  addCurrencyOptionAction,
+  addInvoiceFrequencyOptionAction,
+  addStandardOptionAction,
+  setOptionActiveAction,
+  updateCurrencyRateAction,
+} from "../actions"
+import type { ActionResult } from "../actions"
 
 /**
  * Customer Onboarding Settings: the governed administrative workspace for
@@ -19,15 +27,15 @@ import type { ReferenceListKey, ReferenceOption } from "@/features/reference-dat
  * this screen's own structure and the three configuration levels below;
  * this header only summarizes it).
  *
- * No live, safe write path exists yet (no per-user authorization boundary
- * in Nexus, see src/features/commercial/server.ts's own header comment
- * for the same constraint), so this screen holds its own local copy of
- * the fixture and never writes back to features/reference-data's shared
- * module state: changes here are scoped to this page's session only,
- * exactly like `nexus-dev`'s other fixture-backed screens. This is a
- * deliberate honesty boundary, not an oversight: the UI and domain
- * behavior below are real, but "Settings edits persist forever" is not
- * true yet.
+ * Backed by a real, persistent Reference Master
+ * (supabase/migrations/20260912080000_reference_master_foundation.sql):
+ * `initialSnapshot` is loaded server-side by
+ * `src/app/settings/customer-onboarding/page.tsx` for the first render,
+ * and every Add/Activate/Deactivate/governed-parameter-update below calls
+ * a Server Action (`../actions.ts`) that writes through `../server.ts`
+ * (service_role, server-only) and revalidates every route that reads a
+ * snapshot. A reload retains every change; this is no longer a
+ * component-state-only illusion.
  *
  * No delete action anywhere: a Reference Master value is deactivated,
  * never removed, so historical resolution keeps working.
@@ -168,24 +176,6 @@ const LIST_CONFIGS: ListConfig[] = [
   },
 ]
 
-/** Every `ReferenceListKey` this screen needs a fixture copy of, including the two excluded from navigation (still loaded so a future re-inclusion needs no reshaping of the state object). */
-const ALL_LIST_KEYS: ReferenceListKey[] = [
-  "country",
-  "industry",
-  "segment",
-  "business_unit",
-  "tax_identifier_type",
-  "phone_country_code",
-  "currency",
-  "pricing_unit",
-  "invoice_frequency",
-  "invoice_timing",
-  "commercial_nature",
-  "pricing_model",
-  "slab_method",
-  "revenue_recognition_method",
-]
-
 const GROUPS: { key: SettingsGroup; label: string }[] = [
   { key: "customer", label: "Customer Setup" },
   { key: "commercial", label: "Commercial Setup" },
@@ -233,12 +223,16 @@ function formatCadence(cadenceMonths: number | null | undefined): string {
   return `Every ${cadenceMonths} month${cadenceMonths === 1 ? "" : "s"}`
 }
 
-function ReferenceMasterSettings() {
-  const [optionsByList, setOptionsByList] = useState<Record<ReferenceListKey, ReferenceOption[]>>(() => {
-    const initial = {} as Record<ReferenceListKey, ReferenceOption[]>
-    for (const key of ALL_LIST_KEYS) initial[key] = getAllOptions(key)
-    return initial
-  })
+type ReferenceMasterSettingsProps = {
+  initialSnapshot: ReferenceMasterSnapshot
+  snapshotUnavailable: boolean
+}
+
+function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: ReferenceMasterSettingsProps) {
+  const [optionsByList, setOptionsByList] = useState<ReferenceMasterSnapshot>(initialSnapshot)
+  const [isSaving, startSaving] = useTransition()
+  /** Buffers an in-progress edit to an INR Conversion Rate input until blur, so a real database write fires once per edit rather than once per keystroke (a per-keystroke write was harmless against local-only state, but is a real, race-prone network call now that this is a persistent field). */
+  const [rateDrafts, setRateDrafts] = useState<Record<string, string>>({})
   const [selectedGroup, setSelectedGroup] = useState<SettingsGroup>("customer")
   const [selectedList, setSelectedList] = useState<ReferenceListKey>("industry")
   const [searchQuery, setSearchQuery] = useState("")
@@ -298,24 +292,44 @@ function ReferenceMasterSettings() {
     resetListFilters()
   }
 
+  /** Applies a successful action's confirmed option into local render state; on failure, surfaces the server's own error message rather than assuming the mutation happened. */
+  function applyActionResult(listKey: ReferenceListKey, result: ActionResult) {
+    if (!result.ok) {
+      setAddError(result.error)
+      return
+    }
+    const option = result.option
+    setOptionsByList((current) => {
+      const existingIndex = current[listKey].findIndex((entry) => entry.value === option.value)
+      const nextList =
+        existingIndex === -1
+          ? [...current[listKey], option]
+          : current[listKey].map((entry) => (entry.value === option.value ? option : entry))
+      return { ...current, [listKey]: nextList }
+    })
+    setAddError(null)
+  }
+
   function requestDeactivate(value: string) {
     setConfirmingDeactivateValue(value)
   }
 
   function confirmDeactivate(value: string) {
-    setOptionsByList((current) => ({
-      ...current,
-      [activeList.key]: current[activeList.key].map((option) => (option.value === value ? { ...option, active: false } : option)),
-    }))
+    const listKey = activeList.key
     setConfirmingDeactivateValue(null)
+    startSaving(async () => {
+      const result = await setOptionActiveAction(listKey, value, false)
+      applyActionResult(listKey, result)
+    })
   }
 
   /** Activating needs no confirmation: it only ever expands what is selectable, never removes anything from a historical record. */
   function activate(value: string) {
-    setOptionsByList((current) => ({
-      ...current,
-      [activeList.key]: current[activeList.key].map((option) => (option.value === value ? { ...option, active: true } : option)),
-    }))
+    const listKey = activeList.key
+    startSaving(async () => {
+      const result = await setOptionActiveAction(listKey, value, true)
+      applyActionResult(listKey, result)
+    })
   }
 
   /**
@@ -328,10 +342,10 @@ function ReferenceMasterSettings() {
   function updateInrConversionRate(value: string, rawInput: string) {
     const parsed = rawInput.trim() === "" ? null : Number(rawInput)
     const nextRate = parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null
-    setOptionsByList((current) => ({
-      ...current,
-      currency: current.currency.map((option) => (option.value === value ? { ...option, inrConversionRate: nextRate } : option)),
-    }))
+    startSaving(async () => {
+      const result = await updateCurrencyRateAction(value, nextRate)
+      applyActionResult("currency", result)
+    })
   }
 
   function handleAddStandard() {
@@ -345,14 +359,16 @@ function ReferenceMasterSettings() {
       setAddError(`"${value}" already exists in this list.`)
       return
     }
-    setOptionsByList((current) => ({
-      ...current,
-      [activeList.key]: [...current[activeList.key], { value, label, active: true }],
-    }))
-    setNewLabel("")
-    setNewValue("")
-    setValueTouched(false)
-    setAddError(null)
+    const listKey = activeList.key as Parameters<typeof addStandardOptionAction>[0]
+    startSaving(async () => {
+      const result = await addStandardOptionAction(listKey, value, label)
+      applyActionResult(listKey, result)
+      if (result.ok) {
+        setNewLabel("")
+        setNewValue("")
+        setValueTouched(false)
+      }
+    })
   }
 
   /** Currency Add validates against the real ISO 4217 code catalogue (task correction §9): never an invented or malformed code. */
@@ -371,13 +387,14 @@ function ReferenceMasterSettings() {
       setAddError(`"${code}" already exists in this list.`)
       return
     }
-    setOptionsByList((current) => ({
-      ...current,
-      currency: [...current.currency, { value: code, label: `${code} - ${name}`, active: true, inrConversionRate: null }],
-    }))
-    setNewCurrencyCode("")
-    setNewCurrencyName("")
-    setAddError(null)
+    startSaving(async () => {
+      const result = await addCurrencyOptionAction(code, name)
+      applyActionResult("currency", result)
+      if (result.ok) {
+        setNewCurrencyCode("")
+        setNewCurrencyName("")
+      }
+    })
   }
 
   /** A new recurring Invoice Frequency requires a positive, machine-readable cadence (task correction §14): never arbitrary text with no cadence, and never the reserved "One-Time" shape (`cadenceMonths: null`). */
@@ -397,13 +414,14 @@ function ReferenceMasterSettings() {
       setAddError(`"${value}" already exists in this list.`)
       return
     }
-    setOptionsByList((current) => ({
-      ...current,
-      invoice_frequency: [...current.invoice_frequency, { value, label, active: true, cadenceMonths: cadence }],
-    }))
-    setNewFrequencyLabel("")
-    setNewFrequencyCadence("")
-    setAddError(null)
+    startSaving(async () => {
+      const result = await addInvoiceFrequencyOptionAction(value, label, cadence)
+      applyActionResult("invoice_frequency", result)
+      if (result.ok) {
+        setNewFrequencyLabel("")
+        setNewFrequencyCadence("")
+      }
+    })
   }
 
   const showCadenceColumn = activeList.key === "invoice_frequency"
@@ -414,10 +432,16 @@ function ReferenceMasterSettings() {
     <div className="flex flex-1 flex-col">
       <PageHeader
         title="Customer Onboarding Settings"
-        description="Local development only. Changes here are not saved and do not affect other sessions."
+        description="Changes here are saved to the shared Reference Master and take effect for every session on the next load."
       />
 
       <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 sm:py-4">
+        {snapshotUnavailable ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-xs text-destructive">
+            Reference Master could not be reached. The values shown below may be incomplete or stale; Add, Activate, and Deactivate are
+            unavailable until the backend is reachable again.
+          </div>
+        ) : null}
         <div className="-mx-1 overflow-x-auto px-1">
           <ToggleGroup
             value={[selectedGroup]}
@@ -538,8 +562,17 @@ function ReferenceMasterSettings() {
                             type="number"
                             min={0}
                             step="any"
-                            value={option.inrConversionRate ?? ""}
-                            onChange={(event) => updateInrConversionRate(option.value, event.target.value)}
+                            disabled={snapshotUnavailable}
+                            value={rateDrafts[option.value] ?? option.inrConversionRate ?? ""}
+                            onChange={(event) => setRateDrafts((current) => ({ ...current, [option.value]: event.target.value }))}
+                            onBlur={(event) => {
+                              updateInrConversionRate(option.value, event.target.value)
+                              setRateDrafts((current) => {
+                                const next = { ...current }
+                                delete next[option.value]
+                                return next
+                              })
+                            }}
                             placeholder="Not configured"
                             className="h-8 w-28"
                             aria-label={`INR conversion rate for ${option.value}`}
@@ -564,16 +597,21 @@ function ReferenceMasterSettings() {
                           unchanged.
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <Button variant="destructive" size="sm" onClick={() => confirmDeactivate(option.value)}>
+                          <Button variant="destructive" size="sm" disabled={isSaving} onClick={() => confirmDeactivate(option.value)}>
                             Confirm
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setConfirmingDeactivateValue(null)}>
+                          <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => setConfirmingDeactivateValue(null)}>
                             Cancel
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <Button variant="outline" size="sm" onClick={() => (option.active ? requestDeactivate(option.value) : activate(option.value))}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isSaving || snapshotUnavailable}
+                        onClick={() => (option.active ? requestDeactivate(option.value) : activate(option.value))}
+                      >
                         {option.active ? "Deactivate" : "Activate"}
                       </Button>
                     )}
@@ -628,7 +666,7 @@ function ReferenceMasterSettings() {
                   className="w-full font-mono sm:w-40"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={handleAddStandard} className="sm:w-auto">
+              <Button variant="outline" size="sm" disabled={isSaving || snapshotUnavailable} onClick={handleAddStandard} className="sm:w-auto">
                 <PlusIcon data-icon="inline-start" />
                 Add
               </Button>
@@ -667,7 +705,7 @@ function ReferenceMasterSettings() {
                   className="w-full sm:w-56"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={handleAddCurrency} className="sm:w-auto">
+              <Button variant="outline" size="sm" disabled={isSaving || snapshotUnavailable} onClick={handleAddCurrency} className="sm:w-auto">
                 <PlusIcon data-icon="inline-start" />
                 Add
               </Button>
@@ -709,7 +747,7 @@ function ReferenceMasterSettings() {
                   className="w-full sm:w-28"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={handleAddInvoiceFrequency} className="sm:w-auto">
+              <Button variant="outline" size="sm" disabled={isSaving || snapshotUnavailable} onClick={handleAddInvoiceFrequency} className="sm:w-auto">
                 <PlusIcon data-icon="inline-start" />
                 Add
               </Button>

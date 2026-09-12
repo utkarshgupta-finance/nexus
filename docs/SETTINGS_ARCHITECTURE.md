@@ -133,38 +133,160 @@ a caller needing the real cadence reads `cadenceMonths` (or the
 `getInvoiceFrequencyCadence` service helper), never parses the label
 text.
 
-## 6. Persistence status: honest, not aspirational
+## 6. Persistence status: real, database-backed, since 2026-09-12
 
-Nothing in this workspace writes to a real, shared, permanent store yet.
-`docs/DATA_ARCHITECTURE.md` §6 already locks the intended eventual shape
-(a generic reference table: stable code, label, active flag, sort order);
-no such table exists (M7 built two purpose-built tables, `customers` and
-`capabilities`, not a generic one). Until it does, every Reference Master
-list lives in one shared, in-repo TypeScript fixture
-(`src/features/reference-data/domain/fixtures.ts`) that Customer
-Onboarding and Commercial Rate both read from at request time
-(`getActiveOptions`/`resolveOption`/`getInrConversionRate`/
-`getInvoiceFrequencyCadence`), so those two features can never drift into
-two different copies of the same list.
+**[IMPLEMENTED]** Every Reference Master list this workspace shows,
+except `country`/`phone_country_code` (§2), is now persisted in Supabase:
+`supabase/migrations/20260912080000_reference_master_foundation.sql`
+creates `reference_lists` (the migration-managed catalog of the twelve
+list categories) and `reference_options` (the generic option row: stable
+`code`, editable `label`, `is_active`, `sort_order`, and two typed,
+list-scoped governed columns, `inr_conversion_rate` and
+`cadence_months`), exactly the shape `docs/DATA_ARCHITECTURE.md` §6
+already locked. This closes the gap that section's own text used to
+describe: "no such table exists" is no longer true.
 
-The Settings **screen itself** holds its own local copy of that fixture
-in component state and never writes back to the shared module: an edit
-made in Settings (adding a unit, deactivating a currency, changing an FX
-rate) is visible only within that one page's own session, exactly like
-`nexus-dev`'s other fixture-backed screens, and is gone on reload. This
-means the live propagation described conceptually in this task ("Settings
-change reflected in new Commercial Rate selection") is real at the level
-of "Commercial Rate always reads the current shared fixture, never a
-stale hardcoded copy," but not yet real at the level of "an edit made in
-the Settings UI in one browser tab is immediately visible in another tab
-or another page of the same session." Closing that gap requires the same
-real reference-data table `docs/DATA_ARCHITECTURE.md` §6 already
-anticipates, plus a safe, authorized write path (none exists yet, no
-per-user authorization boundary in Nexus today, see
-`src/features/commercial/server.ts`'s own header comment for the
-identical constraint). This is stated plainly rather than pretended away:
-the domain and UI behavior above are real and tested; "Settings edits
-persist across sessions" is not true yet.
+**Read path.** `src/features/reference-data/domain/service.ts` is
+unchanged in spirit: `getActiveOptions`, `getAllOptions`, `resolveOption`,
+`getInrConversionRate`, `getInvoiceFrequencyCadence` are still pure,
+synchronous functions. What changed is where the data they operate on
+comes from: every one of them now takes an explicit
+`ReferenceMasterSnapshot` parameter (a plain `Record<ReferenceListKey,
+ReferenceOption[]>`) instead of reading a module-level fixture import.
+`src/features/reference-data/server.ts` (`server-only`, following the
+identical trust-boundary pattern as `src/features/commercial/server.ts`
+and `src/features/customers/server.ts`) builds that snapshot for real:
+`loadReferenceMasterSnapshot()` reads every `reference_options` row via
+the service-role Supabase client, groups it by list
+(`src/features/reference-data/domain/snapshot.ts`'s pure
+`buildPersistedSnapshot`, kept out of `server.ts` specifically so it has
+a normal, importable unit test, see `domain/snapshot.test.ts`), and fills
+in `country`/`phone_country_code` from the same real `countries-list`
+catalogue (`domain/countries.ts`) as before. A Server Component route
+(`src/app/forms/customer-onboarding/page.tsx`,
+`src/app/settings/customer-onboarding/page.tsx`,
+`src/app/customers/page.tsx`, `src/app/customers/[customerKey]/page.tsx`)
+loads this snapshot once per request and passes it down: directly as a
+prop for a component one hop away (`ReferenceMasterSettings`,
+`CustomersPage`, `CustomerMasterDetail`), or through
+`src/features/reference-data/ui/snapshot-context.tsx`'s
+`ReferenceMasterSnapshotProvider`/`useReferenceMasterSnapshot` for the
+deeply nested Commercial Rate component tree, where prop-drilling through
+every intermediate component would be needlessly invasive. Every pure
+domain function still receives the snapshot as an explicit argument at
+its own call site; only the UI layer reads the context.
+
+**Write path.** `server.ts` also exports `addReferenceOption`,
+`setReferenceOptionActive`, `updateCurrencyInrConversionRate`,
+`updateInvoiceFrequencyCadence`, each a thin call into
+`src/features/reference-data/data/reference-master.data.ts` (plain
+PostgREST `insert`/`update` through the service-role client, no RPC,
+matching the exact pattern `src/features/customers/data/customers.data.ts`
+already established for a table with no complex multi-step write). Real
+Next.js Server Actions (`src/features/reference-data/actions.ts`,
+`"use server"`) wrap these for the Settings screen: `addStandardOptionAction`,
+`addCurrencyOptionAction`, `addInvoiceFrequencyOptionAction`,
+`setOptionActiveAction`, `updateCurrencyRateAction`. Each one calls
+`revalidatePath` for every route that reads a snapshot after a successful
+write, so the change is visible on next load anywhere in the app, not
+only inside the Settings tab that made it. `ReferenceMasterSettings`
+calls these actions directly (a Client Component may call a Server Action
+without a form submission) and applies the server's own confirmed
+response into its local render state, never assuming the mutation
+succeeded from client-side optimism alone.
+
+**What this closes.** The propagation this task originally described as
+partial ("Settings change reflected in new Commercial Rate selection" was
+real only at the shared-fixture level, not across browser
+tabs/sessions) is now real end to end: add a Pricing Unit in Settings,
+reload `/forms/customer-onboarding` in a different tab, and it is there,
+because both routes load the same `reference_options` table, not two
+independent copies.
+
+**What is still local-only.** Nothing changed about Commercial
+Configuration itself (§4's FX snapshot principle, still just a shape
+proven out, no real promotion write path). Fixture role after this
+migration, see §6a below.
+
+### 6a. Fixture's role now: tests and seed data only
+
+`src/features/reference-data/domain/fixtures.ts`
+(`REFERENCE_MASTER_FIXTURES`) is never read by production code path
+anymore: every route loads a real snapshot via `server.ts`. The fixture
+still serves two purposes, both legitimate:
+
+- **Tests.** Every existing domain test (`service.test.ts`,
+  `commercial-rate-summary.test.ts`, and similar) passes
+  `REFERENCE_MASTER_FIXTURES` as the `ReferenceMasterSnapshot` argument
+  to the same pure functions production code calls, proving the domain
+  logic without a database.
+- **Seed data source.** The migration's own seed `INSERT` statements were
+  authored by hand from this fixture's values at migration-authoring
+  time (task correction §13: "do not invent new values"), not read from
+  it at runtime. The fixture and the seeded table can, in principle,
+  drift apart after this point (an Add in Settings changes the table,
+  never the fixture); this is expected and correct, not a bug, since the
+  fixture's only remaining job is to give tests deterministic input.
+
+### 6b. Error states: honest, never silently empty
+
+`loadReferenceMasterSnapshot()` throws on a real backend failure (a
+missing credential, a network error, an RLS/permission problem); it never
+catches and returns an empty snapshot itself (task correction §23, "do
+not pretend empty list means there are no values"). Every calling route
+wraps the call in its own `try`/`catch`, matching the exact pattern
+`src/app/customers/page.tsx` already established for Customer Master, and
+passes an explicit `snapshotUnavailable: boolean` down so the UI shows a
+visible, honest banner ("Reference Master could not be reached...")
+rather than an indistinguishable empty list. Settings additionally
+disables Add/Activate/Deactivate while unavailable, since a write against
+data that might already be stale is worse than no write at all.
+
+### 6c. Caching and freshness
+
+Every Reference-Master-reading route is `export const dynamic =
+"force-dynamic"` (the same requirement `CLAUDE.md`'s Deployment section
+already states for any live-backend read): Next.js never freezes a
+snapshot at build time. Freshness after a Settings write is explicit, not
+implicit: each Server Action calls `revalidatePath` for every route that
+reads a snapshot (`/settings/customer-onboarding`,
+`/forms/customer-onboarding`, `/customers`) immediately after a
+successful write, so the very next request to any of those routes gets a
+fresh read, never a stale cached one. There is no time-based revalidation
+window to reason about; a write is visible the moment its own request
+completes.
+
+### 6d. Audit
+
+`reference_options` carries the same generic, database-enforced audit
+trigger (`fn_audit_row('id')`) as every other Platform Core table
+(`docs/DATA_ARCHITECTURE.md` §9): every INSERT/UPDATE/DELETE attempt is
+captured in `audit_log`, including the rejected DELETE attempts the
+lifecycle trigger blocks. `reference_lists` (the list-category catalog)
+is deliberately not audited, matching the identical precedent already
+set for `resource_types`: migration-only structural metadata with a text
+primary key, not row-audit shaped. `actor_user_id` on every audit row is
+`null` for all current Reference Master writes: Nexus has no
+authenticated session yet to populate it from (§6e), and this module
+never fabricates one.
+
+### 6e. Authorization honesty
+
+Unchanged from the rest of this app's own stated limitation
+(`src/features/commercial/server.ts`'s header, `src/features/customers/
+server.ts`'s header): `server.ts`'s write functions take `actorUserId` as
+an explicit parameter, and every current call site
+(`src/features/reference-data/actions.ts`) passes `null`, since there is
+no real Nexus user identity anywhere yet. `service_role` (the credential
+every write ultimately authenticates as) bypasses RLS entirely; RLS on
+`reference_lists`/`reference_options` denies `anon`/`authenticated` all
+direct access, the same deny-by-default posture as every other Platform
+Core table. This means: the write path is safe from an unauthenticated
+browser reaching the database directly, but Settings' own Add/Activate/
+Deactivate buttons are not yet gated by any real per-user permission
+check, because that platform capability does not exist in Nexus at all
+yet. Add that check at the Server Action call site once it does; do not
+invent a parallel one here.
 
 ## 7. Reference Master reuse, not one table per dropdown
 
@@ -180,16 +302,26 @@ is a deliberate constraint, not an accident: a future generic reference
 table (§6) replaces the fixture once, behind these same four functions,
 without every consumer needing to change.
 
-**Honesty note on Level 3 today:** of the five System Rules lists, only
-`pricing_model` (via `OptionSelect` in the Commercial Rate editor) and
-`invoice_timing` (via the same mechanism) actually read `getActiveOptions`
-to decide what a user can pick. `commercial_nature` renders as three fixed
-table sections (`NATURE_SECTIONS` in `commercial-rate-section.tsx`), and
-`slab_method`/`revenue_recognition_method` render as fixed `ToggleGroup`
-options; none of these three dynamically hide themselves when deactivated
-in Settings yet. This is an honest, disclosed gap rather than a silently
-broken governance promise, and closing it is a UI change to those three
-call sites, not a data-model change, whenever it is prioritized.
+**Honesty note on Level 3, updated 2026-09-12:** all five System Rules
+lists now respect Settings' active/inactive state. `pricing_model` and
+`invoice_timing` already read `getActiveOptions` via `OptionSelect`.
+`commercial_nature`'s three fixed sections (`NATURE_SECTIONS` in
+`commercial-rate-section.tsx`) now check `getActiveOptions(snapshot,
+"commercial_nature")` before showing that section's own Add button: a
+deactivated Nature can no longer start a new component, but its section,
+and every component it already contains, keeps rendering unconditionally
+(task correction §21, "existing saved/historical values remain
+resolvable... do not allow an inactive rule to destroy historical
+rendering"). `slab_method`'s and `revenue_recognition_method`'s
+`ToggleGroup` choices are filtered the same way: only active options are
+offered for a **new** choice, but whichever value a component already
+carries always keeps its own toggle item rendered even if later
+deactivated, so an existing selection is never hidden or force-changed.
+No automated component test covers this (this codebase's test suite is
+domain/service-level only, `vitest.config.ts` scopes to `*.test.ts`, no
+`.test.tsx`/React Testing Library anywhere yet); it is verified live in
+the browser instead, the same way every other UI behavior in this
+feature has been verified in every prior round.
 
 ## 8. Used By
 

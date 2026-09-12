@@ -1,4 +1,5 @@
 import { resolveOption } from "@/features/reference-data"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import {
   calculateDesignationMugSummary,
   calculateMilestoneAmount,
@@ -16,6 +17,14 @@ import { isForeignCurrency, toInr } from "./commercial-rate-fx"
  * correction, "ADDITIONAL COMMERCIAL RATE TABLE STRUCTURE/FX CORRECTION")
  * a read-only INR equivalent wherever Billing Currency is not already INR,
  * resolved from Reference Master's own governed rate (`commercial-rate-fx.ts`).
+ *
+ * Every function that resolves a Reference Master label or rate takes an
+ * explicit `snapshot: ReferenceMasterSnapshot` parameter (the same
+ * request-scoped snapshot `@/features/reference-data`'s pure functions
+ * already require), never a module-level fixture import: this is what
+ * lets Commercial Rate read the real, persistent Reference Master
+ * (supabase/migrations/20260912080000_reference_master_foundation.sql)
+ * without this file ever touching Supabase directly.
  */
 
 function formatAmount(value: number | null, currencyCode: string | null): string {
@@ -61,48 +70,55 @@ function formatCompactAmount(value: number | null, currencyCode: string | null):
  * for Rate cells) or compact (`formatCompactAmount`, for MUG's monetary
  * total) without duplicating this branching twice.
  */
-function dualCurrencyLines(amount: number | null, currencyCode: string | null, suffix: string, formatter: (value: number | null, currencyCode: string | null) => string): string[] {
+function dualCurrencyLines(
+  snapshot: ReferenceMasterSnapshot,
+  amount: number | null,
+  currencyCode: string | null,
+  suffix: string,
+  formatter: (value: number | null, currencyCode: string | null) => string
+): string[] {
   if (amount === null) return []
   const primary = `${formatter(amount, currencyCode)}${suffix}`
   if (!isForeignCurrency(currencyCode)) return [primary]
-  const inrAmount = toInr(amount, currencyCode)
+  const inrAmount = toInr(snapshot, amount, currencyCode)
   return inrAmount === null ? [primary] : [primary, `${formatter(inrAmount, "INR")}${suffix}`]
 }
 
-function unitLabel(pricingUnitCode: string | null): string {
+function unitLabel(snapshot: ReferenceMasterSnapshot, pricingUnitCode: string | null): string {
   if (!pricingUnitCode) return "Unit"
-  return resolveOption("pricing_unit", pricingUnitCode)?.label ?? pricingUnitCode
+  return resolveOption(snapshot, "pricing_unit", pricingUnitCode)?.label ?? pricingUnitCode
 }
 
 /** "Minimum Users", "Minimum Messages": pluralizes the unit label for a MUG quantity other than exactly one. */
-function unitLabelForQuantity(pricingUnitCode: string | null, quantity: number | null): string {
-  const label = unitLabel(pricingUnitCode)
+function unitLabelForQuantity(snapshot: ReferenceMasterSnapshot, pricingUnitCode: string | null, quantity: number | null): string {
+  const label = unitLabel(snapshot, pricingUnitCode)
   return quantity === 1 ? label : `${label}s`
 }
 
-function invoiceFrequencyLabel(code: string | null): string {
+function invoiceFrequencyLabel(snapshot: ReferenceMasterSnapshot, code: string | null): string {
   if (!code) return ""
-  return resolveOption("invoice_frequency", code)?.label ?? code
+  return resolveOption(snapshot, "invoice_frequency", code)?.label ?? code
 }
 
-function invoiceTimingLabel(code: string | null): string {
+function invoiceTimingLabel(snapshot: ReferenceMasterSnapshot, code: string | null): string {
   if (!code) return ""
-  return resolveOption("invoice_timing", code)?.label ?? code
+  return resolveOption(snapshot, "invoice_timing", code)?.label ?? code
 }
 
 /** "Invoice: Half-Yearly Advance". Omits either half that has not been chosen yet (On-Demand's frequency is optional). */
-function invoiceSummaryLine(terms: InvoiceTerms): string | null {
-  const parts = [terms.invoiceFrequency ? invoiceFrequencyLabel(terms.invoiceFrequency) : null, terms.invoiceTiming ? invoiceTimingLabel(terms.invoiceTiming) : null].filter(
-    (part): part is string => part !== null
-  )
+function invoiceSummaryLine(snapshot: ReferenceMasterSnapshot, terms: InvoiceTerms): string | null {
+  const parts = [
+    terms.invoiceFrequency ? invoiceFrequencyLabel(snapshot, terms.invoiceFrequency) : null,
+    terms.invoiceTiming ? invoiceTimingLabel(snapshot, terms.invoiceTiming) : null,
+  ].filter((part): part is string => part !== null)
   if (parts.length === 0) return null
   return `Invoice: ${parts.join(" ")}`
 }
 
 /** "MUG: 5,000 Users": a unit quantity floor, never money. Not meaningful for Designation Based, which has one Minimum Units per designation instead (see `designationMugQuantityLines`). */
-function mugSummaryLine(mug: MugOverlay, pricingUnitCode: string | null): string | null {
+function mugSummaryLine(snapshot: ReferenceMasterSnapshot, mug: MugOverlay, pricingUnitCode: string | null): string | null {
   if (!mug.enabled) return null
-  return `MUG: ${formatQuantity(mug.minimumUnits)} ${unitLabelForQuantity(pricingUnitCode, mug.minimumUnits)}`
+  return `MUG: ${formatQuantity(mug.minimumUnits)} ${unitLabelForQuantity(snapshot, pricingUnitCode, mug.minimumUnits)}`
 }
 
 /**
@@ -119,12 +135,12 @@ function calculatedMugValueLine(component: CommercialComponentDraft, currencyCod
   return `Calculated MUG Value: ${formatAmount(amount, currencyCode)} / Month`
 }
 
-function natureLabel(nature: CommercialNature): string {
-  return resolveOption("commercial_nature", nature)?.label ?? nature
+function natureLabel(snapshot: ReferenceMasterSnapshot, nature: CommercialNature): string {
+  return resolveOption(snapshot, "commercial_nature", nature)?.label ?? nature
 }
 
-function modelLabel(pricingModel: PricingModel): string {
-  return resolveOption("pricing_model", pricingModel)?.label ?? pricingModel
+function modelLabel(snapshot: ReferenceMasterSnapshot, pricingModel: PricingModel): string {
+  return resolveOption(snapshot, "pricing_model", pricingModel)?.label ?? pricingModel
 }
 
 /** "Revenue Recognition: Milestone Based (3 milestones)". */
@@ -146,7 +162,7 @@ function mugUnitCode(component: Extract<CommercialComponentDraft, { nature: "rec
  * per Slab row / Designation row), an optional MUG line, an Invoice line,
  * and, for Non-Recurring, a Revenue Recognition line.
  */
-function summarizeComponent(component: CommercialComponentDraft, currencyCode: string | null): string[] {
+function summarizeComponent(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft, currencyCode: string | null): string[] {
   const lines: string[] = []
 
   if (component.pricingModel === "flat_fee") {
@@ -154,9 +170,9 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
     lines.push(`${formatAmount(component.amount, currencyCode)}${suffix}`)
   } else if (component.pricingModel === "per_unit") {
     const suffix = component.nature === "recurring" ? " / Month" : ""
-    lines.push(`${formatAmount(component.rate, currencyCode)} / ${unitLabel(component.pricingUnit)}${suffix}`)
+    lines.push(`${formatAmount(component.rate, currencyCode)} / ${unitLabel(snapshot, component.pricingUnit)}${suffix}`)
   } else if (component.pricingModel === "slab") {
-    const unit = unitLabel(component.pricingUnit)
+    const unit = unitLabel(snapshot, component.pricingUnit)
     const methodLabel = component.slabMethod === "progressive" ? "Progressive" : "Whole Quantity"
     lines.push(`Slab (${methodLabel})`)
     for (const row of component.slabRows) {
@@ -165,18 +181,18 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
     }
   } else {
     for (const row of component.designationRows) {
-      lines.push(`${row.designation || "Designation"}: ${formatAmount(row.rate, currencyCode)} / ${unitLabel(row.per)}`)
+      lines.push(`${row.designation || "Designation"}: ${formatAmount(row.rate, currencyCode)} / ${unitLabel(snapshot, row.per)}`)
     }
   }
 
   if (component.nature !== "non_recurring" && "mug" in component) {
-    const mugLine = mugSummaryLine(component.mug, mugUnitCode(component))
+    const mugLine = mugSummaryLine(snapshot, component.mug, mugUnitCode(component))
     if (mugLine) lines.push(mugLine)
     const calculatedLine = calculatedMugValueLine(component, currencyCode)
     if (calculatedLine) lines.push(calculatedLine)
   }
 
-  const invoiceLine = invoiceSummaryLine(component.invoiceTerms)
+  const invoiceLine = invoiceSummaryLine(snapshot, component.invoiceTerms)
   if (invoiceLine) lines.push(invoiceLine)
 
   if (component.nature === "non_recurring") {
@@ -194,12 +210,12 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
  * "do not show only Progressive / User... the Pricing column already
  * communicates the model").
  */
-function pricingColumnSummary(component: CommercialComponentDraft): string {
+function pricingColumnSummary(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft): string {
   if (component.pricingModel === "slab") {
     const methodLabel = component.slabMethod === "progressive" ? "Progressive" : "Whole Quantity"
     return `Slab - ${methodLabel}`
   }
-  return modelLabel(component.pricingModel)
+  return modelLabel(snapshot, component.pricingModel)
 }
 
 /**
@@ -212,13 +228,17 @@ function pricingColumnSummary(component: CommercialComponentDraft): string {
  * band, which would double the cell's height for no added clarity (a
  * single band has only one value to disambiguate).
  */
-function slabRateLines(component: Extract<CommercialComponentDraft, { pricingModel: "slab" }>, currencyCode: string | null): string[] {
-  const unit = unitLabel(component.pricingUnit)
+function slabRateLines(
+  snapshot: ReferenceMasterSnapshot,
+  component: Extract<CommercialComponentDraft, { pricingModel: "slab" }>,
+  currencyCode: string | null
+): string[] {
+  const unit = unitLabel(snapshot, component.pricingUnit)
   return component.slabRows.map((row) => {
     const range = row.to === null ? `${row.from ?? "-"}+` : `${row.from ?? "-"}-${row.to}`
     const primary = `${formatAmount(row.rate, currencyCode)} / ${unit}`
     if (row.rate === null || !isForeignCurrency(currencyCode)) return `${range}: ${primary}`
-    const inrAmount = toInr(row.rate, currencyCode)
+    const inrAmount = toInr(snapshot, row.rate, currencyCode)
     return inrAmount === null ? `${range}: ${primary}` : `${range}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})`
   })
 }
@@ -231,13 +251,17 @@ function slabRateLines(component: Extract<CommercialComponentDraft, { pricingMod
  * 100 / User", or with an INR equivalent in parentheses for a foreign
  * Billing Currency.
  */
-function designationRateLines(component: Extract<CommercialComponentDraft, { pricingModel: "designation_based" }>, currencyCode: string | null): string[] {
+function designationRateLines(
+  snapshot: ReferenceMasterSnapshot,
+  component: Extract<CommercialComponentDraft, { pricingModel: "designation_based" }>,
+  currencyCode: string | null
+): string[] {
   return component.designationRows.map((row) => {
-    const unit = unitLabel(row.per)
+    const unit = unitLabel(snapshot, row.per)
     const primary = `${formatAmount(row.rate, currencyCode)} / ${unit}`
     const label = row.designation || "Designation"
     if (row.rate === null || !isForeignCurrency(currencyCode)) return `${label}: ${primary}`
-    const inrAmount = toInr(row.rate, currencyCode)
+    const inrAmount = toInr(snapshot, row.rate, currencyCode)
     return inrAmount === null ? `${label}: ${primary}` : `${label}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})`
   })
 }
@@ -250,11 +274,12 @@ function designationRateLines(component: Extract<CommercialComponentDraft, { pri
  * Designation Rates"). Per Unit and Flat Fee are a single value, so a
  * single (or, for a foreign Billing Currency, dual-currency) line.
  */
-function rateColumnLines(component: CommercialComponentDraft, currencyCode: string | null): string[] {
-  if (component.pricingModel === "flat_fee") return dualCurrencyLines(component.amount, currencyCode, "", formatAmount)
-  if (component.pricingModel === "per_unit") return dualCurrencyLines(component.rate, currencyCode, ` / ${unitLabel(component.pricingUnit)}`, formatAmount)
-  if (component.pricingModel === "slab") return slabRateLines(component, currencyCode)
-  return designationRateLines(component, currencyCode)
+function rateColumnLines(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft, currencyCode: string | null): string[] {
+  if (component.pricingModel === "flat_fee") return dualCurrencyLines(snapshot, component.amount, currencyCode, "", formatAmount)
+  if (component.pricingModel === "per_unit")
+    return dualCurrencyLines(snapshot, component.rate, currencyCode, ` / ${unitLabel(snapshot, component.pricingUnit)}`, formatAmount)
+  if (component.pricingModel === "slab") return slabRateLines(snapshot, component, currencyCode)
+  return designationRateLines(snapshot, component, currencyCode)
 }
 
 /** "01-Oct-2026", or "-" once no Effective From has been chosen yet. Never a raw ISO date string in a table cell. */
@@ -274,11 +299,11 @@ function formatEffectiveDate(value: string | null): string {
  * Timing lives per milestone in that case (task correction §6), so the
  * component-level Timing no longer applies and would be misleading here.
  */
-function invoiceCycleColumnSummary(component: CommercialComponentDraft): string {
+function invoiceCycleColumnSummary(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft): string {
   const usesMilestoneTiming = component.nature === "non_recurring" && component.revenueRecognition.method === "milestone_based"
   const parts = [
-    component.invoiceTerms.invoiceFrequency ? invoiceFrequencyLabel(component.invoiceTerms.invoiceFrequency) : null,
-    !usesMilestoneTiming && component.invoiceTerms.invoiceTiming ? invoiceTimingLabel(component.invoiceTerms.invoiceTiming) : null,
+    component.invoiceTerms.invoiceFrequency ? invoiceFrequencyLabel(snapshot, component.invoiceTerms.invoiceFrequency) : null,
+    !usesMilestoneTiming && component.invoiceTerms.invoiceTiming ? invoiceTimingLabel(snapshot, component.invoiceTerms.invoiceTiming) : null,
   ].filter((part): part is string => part !== null)
   return parts.length > 0 ? parts.join(" ") : "-"
 }
@@ -290,14 +315,14 @@ function invoiceCycleColumnSummary(component: CommercialComponentDraft): string 
  * milestone with Name/%/Amount/Timing"). Returns 4-5 lines depending on
  * whether an INR equivalent applies.
  */
-function milestoneDetailLines(milestone: Milestone, basisAmount: number | null, currencyCode: string | null): string[] {
+function milestoneDetailLines(snapshot: ReferenceMasterSnapshot, milestone: Milestone, basisAmount: number | null, currencyCode: string | null): string[] {
   const amount = calculateMilestoneAmount(basisAmount, milestone.recognitionPercent)
-  const amountLines = dualCurrencyLines(amount, currencyCode, "", formatAmount)
+  const amountLines = dualCurrencyLines(snapshot, amount, currencyCode, "", formatAmount)
   return [
     milestone.name || "Milestone",
     milestone.recognitionPercent !== null ? `${milestone.recognitionPercent}%` : "-",
     ...(amountLines.length > 0 ? amountLines : ["-"]),
-    milestone.invoiceTiming ? invoiceTimingLabel(milestone.invoiceTiming) : "-",
+    milestone.invoiceTiming ? invoiceTimingLabel(snapshot, milestone.invoiceTiming) : "-",
   ]
 }
 
@@ -311,7 +336,7 @@ function milestoneDetailLines(milestone: Milestone, basisAmount: number | null, 
  * "Milestone Based" label and never collapsed behind a "+N more" line, so
  * Finance can read the whole revenue structure straight from the table.
  */
-function recognitionColumnLines(component: CommercialComponentDraft, currencyCode: string | null): string[] {
+function recognitionColumnLines(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft, currencyCode: string | null): string[] {
   if (component.nature !== "non_recurring") return component.nature === "recurring" ? ["Monthly"] : ["-"]
   if (component.revenueRecognition.method === "full_recognition") return ["Full Recognition"]
 
@@ -319,7 +344,7 @@ function recognitionColumnLines(component: CommercialComponentDraft, currencyCod
   const lines: string[] = []
   component.revenueRecognition.milestones.forEach((milestone, index) => {
     if (index > 0) lines.push("")
-    lines.push(...milestoneDetailLines(milestone, basisAmount, currencyCode))
+    lines.push(...milestoneDetailLines(snapshot, milestone, basisAmount, currencyCode))
   })
   return lines
 }
@@ -330,19 +355,21 @@ function recognitionColumnLines(component: CommercialComponentDraft, currencyCod
  * "Total: N Units" line for Designation Based ("Sales Rep: 500", "Manager:
  * 50", "Total: 550 Users"), or `["-"]` once MUG is off or not applicable.
  */
-function mugQuantityLines(component: CommercialComponentDraft): string[] {
+function mugQuantityLines(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft): string[] {
   if (!("mug" in component) || !component.mug.enabled) return ["-"]
 
   if (component.pricingModel === "designation_based") {
     const mug = component.mug
-    const lines = component.designationRows.map((row) => `${row.designation || "Designation"}: ${formatQuantity(designationMinimumUnitsFor(mug, row.id))}`)
+    const lines = component.designationRows.map(
+      (row) => `${row.designation || "Designation"}: ${formatQuantity(designationMinimumUnitsFor(mug, row.id))}`
+    )
     const summary = calculateDesignationMugSummary(component)
     const totalUnits = summary?.totalUnits ?? null
-    lines.push(`Total: ${formatQuantity(totalUnits)} ${unitLabelForQuantity(mugUnitCode(component), totalUnits)}`)
+    lines.push(`Total: ${formatQuantity(totalUnits)} ${unitLabelForQuantity(snapshot, mugUnitCode(component), totalUnits)}`)
     return lines
   }
 
-  const line = mugSummaryLine(component.mug, mugUnitCode(component))
+  const line = mugSummaryLine(snapshot, component.mug, mugUnitCode(component))
   return line ? [line.replace("MUG: ", "")] : ["-"]
 }
 
@@ -354,8 +381,8 @@ function mugQuantityLines(component: CommercialComponentDraft): string[] {
  * calculated yet (no fabricated amount, matching `calculateMugValue`'s own
  * "do not fake" rule).
  */
-function mugCalculatedLines(component: CommercialComponentDraft, currencyCode: string | null): string[] {
-  return dualCurrencyLines(calculateMugValue(component), currencyCode, " / Month", formatCompactAmount)
+function mugCalculatedLines(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft, currencyCode: string | null): string[] {
+  return dualCurrencyLines(snapshot, calculateMugValue(component), currencyCode, " / Month", formatCompactAmount)
 }
 
 type ComponentTableCells = {
@@ -378,16 +405,16 @@ type ComponentTableCells = {
  * though no table currently renders it as its own column: the section a
  * component's table lives in already communicates its Nature.
  */
-function componentTableCells(component: CommercialComponentDraft, currencyCode: string | null): ComponentTableCells {
+function componentTableCells(snapshot: ReferenceMasterSnapshot, component: CommercialComponentDraft, currencyCode: string | null): ComponentTableCells {
   return {
     name: component.description || "Untitled component",
-    nature: natureLabel(component.nature),
-    pricing: pricingColumnSummary(component),
-    rateLines: rateColumnLines(component, currencyCode),
-    mugQuantityLines: mugQuantityLines(component),
-    mugCalculatedLines: mugCalculatedLines(component, currencyCode),
-    invoiceCycle: invoiceCycleColumnSummary(component),
-    revenueRecognitionLines: recognitionColumnLines(component, currencyCode),
+    nature: natureLabel(snapshot, component.nature),
+    pricing: pricingColumnSummary(snapshot, component),
+    rateLines: rateColumnLines(snapshot, component, currencyCode),
+    mugQuantityLines: mugQuantityLines(snapshot, component),
+    mugCalculatedLines: mugCalculatedLines(snapshot, component, currencyCode),
+    invoiceCycle: invoiceCycleColumnSummary(snapshot, component),
+    revenueRecognitionLines: recognitionColumnLines(snapshot, component, currencyCode),
     effectiveFrom: formatEffectiveDate(component.effectiveFrom),
   }
 }

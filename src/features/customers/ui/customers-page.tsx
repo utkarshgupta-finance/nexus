@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CUSTOMER_ONBOARDING_FIELD_KEYS, CUSTOMER_ONBOARDING_STAGES } from "@/features/customer-onboarding"
 import type { CustomerOnboardingCase, CustomerOnboardingCaseStatus } from "@/features/customer-onboarding"
 import { resolveOption } from "@/features/reference-data"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { FIXTURE_ONBOARDING_CASES } from "../fixtures/onboarding-cases.fixture"
 import type { CustomerMasterListEntry } from "../read-models/customer-master"
 
@@ -45,9 +46,11 @@ function legalEntityName(onboardingCase: CustomerOnboardingCase): string {
 function CustomersPage({
   customerMasterEntries,
   customerMasterUnavailable,
+  snapshot,
 }: {
   customerMasterEntries: CustomerMasterListEntry[]
   customerMasterUnavailable: boolean
+  snapshot: ReferenceMasterSnapshot
 }) {
   return (
     <div className="flex flex-1 flex-col">
@@ -184,19 +187,19 @@ function CustomersPage({
                       {enrichment?.brandName ?? "-"}
                     </TableCell>
                     <TableCell className="hidden text-foreground sm:table-cell">
-                      {enrichment ? (resolveOption("country", enrichment.countryCode)?.label ?? enrichment.countryCode) : "-"}
+                      {enrichment ? (resolveOption(snapshot, "country", enrichment.countryCode)?.label ?? enrichment.countryCode) : "-"}
                     </TableCell>
                     <TableCell className="hidden text-foreground md:table-cell">
-                      {enrichment ? (resolveOption("segment", enrichment.segmentValue)?.label ?? enrichment.segmentValue) : "-"}
+                      {enrichment ? (resolveOption(snapshot, "segment", enrichment.segmentValue)?.label ?? enrichment.segmentValue) : "-"}
                     </TableCell>
                     <TableCell className="hidden text-foreground md:table-cell">
                       {enrichment
-                        ? (resolveOption("business_unit", enrichment.businessUnitValue)?.label ?? enrichment.businessUnitValue)
+                        ? (resolveOption(snapshot, "business_unit", enrichment.businessUnitValue)?.label ?? enrichment.businessUnitValue)
                         : "-"}
                     </TableCell>
                     <TableCell className="hidden text-foreground sm:table-cell">
                       {enrichment
-                        ? (resolveOption("currency", enrichment.billingCurrencyCode)?.label ?? enrichment.billingCurrencyCode)
+                        ? (resolveOption(snapshot, "currency", enrichment.billingCurrencyCode)?.label ?? enrichment.billingCurrencyCode)
                         : "-"}
                     </TableCell>
                     <TableCell>

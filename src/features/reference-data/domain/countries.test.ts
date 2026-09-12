@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { COUNTRY_CATALOGUE, toCountryOptions, toPhoneCountryCodeOptions } from "./countries"
 import { getActiveOptions, resolveOption } from "./service"
+import { REFERENCE_MASTER_FIXTURES } from "./fixtures"
 
 function findCountry(name: string) {
   return COUNTRY_CATALOGUE.find((country) => country.name === name)
@@ -61,20 +62,20 @@ describe("country reference master options", () => {
   })
 
   it("appears in active selection mode", () => {
-    const active = getActiveOptions("country")
+    const active = getActiveOptions(REFERENCE_MASTER_FIXTURES, "country")
     expect(active.some((option) => option.value === "IN")).toBe(true)
   })
 
   it("excludes a deactivated country from new selections without touching the shared catalogue", () => {
-    const active = getActiveOptions("country")
+    const active = getActiveOptions(REFERENCE_MASTER_FIXTURES, "country")
     const deactivatedCopy = active.map((option) => (option.value === "IN" ? { ...option, active: false } : option))
     expect(deactivatedCopy.find((option) => option.value === "IN")?.active).toBe(false)
     // The shared, canonical source is untouched by that local copy.
-    expect(getActiveOptions("country").some((option) => option.value === "IN")).toBe(true)
+    expect(getActiveOptions(REFERENCE_MASTER_FIXTURES, "country").some((option) => option.value === "IN")).toBe(true)
   })
 
   it("still resolves a country that would be historically deactivated", () => {
-    const resolved = resolveOption("country", "IN")
+    const resolved = resolveOption(REFERENCE_MASTER_FIXTURES, "country", "IN")
     expect(resolved?.label).toBe("India")
   })
 })

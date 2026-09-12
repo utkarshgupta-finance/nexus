@@ -1,3 +1,4 @@
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { CUSTOMER_ONBOARDING_FIELD_KEYS, TAX_IDENTIFIER_TYPE_OTHER } from "../forms/customer-onboarding-form-definition"
 import { isCommercialRateDraftComplete, isCommercialRateDraftStarted } from "./commercial-rate"
 import type { CommercialRateDraft } from "./commercial-rate"
@@ -137,8 +138,8 @@ function evaluateCommercialDocumentsStatus(): CustomerOnboardingStageStatus {
  * opening the stage and picking a currency alone is "attention," not
  * "complete," until an actual commercial component has been captured.
  */
-function evaluateCommercialRateStatus(draft: CommercialRateDraft): CustomerOnboardingStageStatus {
-  if (isCommercialRateDraftComplete(draft)) return "complete"
+function evaluateCommercialRateStatus(snapshot: ReferenceMasterSnapshot, draft: CommercialRateDraft): CustomerOnboardingStageStatus {
+  if (isCommercialRateDraftComplete(snapshot, draft)) return "complete"
   if (isCommercialRateDraftStarted(draft)) return "attention"
   return "not_started"
 }
