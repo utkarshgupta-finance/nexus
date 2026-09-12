@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { summarizeComponent } from "./commercial-rate-summary"
+import { componentTableCells, formatCompactAmount, summarizeComponent } from "./commercial-rate-summary"
 import { createComponent, createMilestone } from "./commercial-rate"
 
 /**
@@ -59,6 +59,26 @@ describe("summarizeComponent", () => {
     expect(mugLine).not.toContain("INR")
   })
 
+  it("appends a separate Calculated MUG Value line (money) alongside the unit-only MUG line, never merging the two", () => {
+    const component = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000 } }
+    const lines = summarizeComponent(component, "INR")
+    const calculatedLine = lines.find((line) => line.startsWith("Calculated MUG Value"))
+    expect(calculatedLine).toBeDefined()
+    expect(calculatedLine).toContain("2,50,000")
+    expect(calculatedLine).toContain("Month")
+  })
+
+  it("omits the Calculated MUG Value line for Designation Based, which cannot be reliably calculated", () => {
+    const component = {
+      ...createComponent("recurring", "designation_based"),
+      designationRows: [{ id: "1", designation: "Sales Rep", rate: 50, per: "USER" }],
+      mug: { enabled: true, minimumUnits: 5000 },
+    }
+    const lines = summarizeComponent(component, "INR")
+    expect(lines.some((line) => line.startsWith("MUG"))).toBe(true)
+    expect(lines.some((line) => line.startsWith("Calculated MUG Value"))).toBe(false)
+  })
+
   it("never shows a MUG line for Flat Fee, which has no unit basis", () => {
     const flatFee = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
     expect(summarizeComponent(flatFee, "INR").some((line) => line.startsWith("MUG"))).toBe(false)
@@ -90,5 +110,112 @@ describe("summarizeComponent", () => {
     }
     const lines = summarizeComponent(component, "INR")
     expect(lines.some((line) => line.includes("Milestone Based") && line.includes("2 milestones"))).toBe(true)
+  })
+})
+
+describe("formatCompactAmount (table-cell space saving, never used for the full precise amount)", () => {
+  it("abbreviates lakhs", () => {
+    expect(formatCompactAmount(250000, "INR")).toBe("INR 2.5L")
+    expect(formatCompactAmount(500000, "INR")).toBe("INR 5L")
+  })
+
+  it("abbreviates thousands below a lakh", () => {
+    expect(formatCompactAmount(1500, "INR")).toBe("INR 1.5K")
+  })
+
+  it("leaves small amounts as plain digits", () => {
+    expect(formatCompactAmount(500, "INR")).toBe("INR 500")
+  })
+
+  it("is - for null, never a fabricated figure", () => {
+    expect(formatCompactAmount(null, "INR")).toBe("-")
+  })
+})
+
+describe("componentTableCells (Commercial Components table, task correction §4-8)", () => {
+  it("Per Unit: Pricing is the model name, Rate is the value-only summary, never raw enum codes", () => {
+    const component = { ...createComponent("recurring", "per_unit"), description: "SFA", rate: 50, pricingUnit: "USER" }
+    const cells = componentTableCells(component, "INR")
+    expect(cells.name).toBe("SFA")
+    expect(cells.nature).toBe("Recurring")
+    expect(cells.pricing).toBe("Per Unit")
+    expect(cells.rate).toBe("INR 50 / User")
+  })
+
+  it("Flat Fee: Rate is the plain amount", () => {
+    const component = { ...createComponent("non_recurring", "flat_fee"), description: "Implementation", amount: 500000 }
+    const cells = componentTableCells(component, "INR")
+    expect(cells.rate).toBe("INR 5,00,000")
+  })
+
+  it("Slab: Rate summarizes the method and unit", () => {
+    const component = { ...createComponent("recurring", "slab"), description: "DMS", pricingUnit: "DISTRIBUTOR", slabMethod: "whole_quantity" as const }
+    const cells = componentTableCells(component, "INR")
+    expect(cells.rate).toBe("Whole Quantity / Distributor")
+  })
+
+  it("Designation Based: Rate counts the rows, never listing raw codes", () => {
+    const component = {
+      ...createComponent("recurring", "designation_based"),
+      description: "Field Team",
+      designationRows: [
+        { id: "1", designation: "Sales Rep", rate: 50, per: "USER" },
+        { id: "2", designation: "Manager", rate: 80, per: "USER" },
+      ],
+    }
+    const cells = componentTableCells(component, "INR")
+    expect(cells.rate).toBe("2 Designation Rates")
+  })
+
+  it("MUG column shows the unit quantity plus a calculated value when calculable", () => {
+    const component = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000 } }
+    const cells = componentTableCells(component, "INR")
+    expect(cells.mugQuantity).toBe("5,000 Users")
+    expect(cells.mugCalculated).toBe("INR 2.5L")
+  })
+
+  it("MUG column shows only the quantity, no calculated value, for Designation Based", () => {
+    const component = {
+      ...createComponent("recurring", "designation_based"),
+      designationRows: [{ id: "1", designation: "Sales Rep", rate: 50, per: "USER" }],
+      mug: { enabled: true, minimumUnits: 5000 },
+    }
+    const cells = componentTableCells(component, "INR")
+    expect(cells.mugQuantity).toBe("5,000 Users")
+    expect(cells.mugCalculated).toBeNull()
+  })
+
+  it("MUG column is - when MUG is not enabled or not applicable", () => {
+    const noMug = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER" }
+    expect(componentTableCells(noMug, "INR").mugQuantity).toBe("-")
+    expect(componentTableCells(noMug, "INR").mugCalculated).toBeNull()
+
+    const flatFee = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
+    expect(componentTableCells(flatFee, "INR").mugQuantity).toBe("-")
+  })
+
+  it("Invoice Cycle combines frequency and timing into one readable value", () => {
+    const component = {
+      ...createComponent("recurring", "flat_fee"),
+      amount: 200000,
+      invoiceTerms: { invoiceFrequency: "quarterly", invoiceTiming: "postpaid" },
+    }
+    expect(componentTableCells(component, "INR").invoiceCycle).toBe("Quarterly Postpaid")
+  })
+
+  it("Revenue Recognition is Monthly for Recurring, the chosen method for Non-Recurring, and - for On-Demand", () => {
+    const recurring = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
+    expect(componentTableCells(recurring, "INR").revenueRecognition).toBe("Monthly")
+
+    const nonRecurring = { ...createComponent("non_recurring", "flat_fee"), amount: 500000 }
+    expect(componentTableCells(nonRecurring, "INR").revenueRecognition).toBe("Full Recognition")
+
+    const onDemand = { ...createComponent("on_demand", "flat_fee"), amount: 50000 }
+    expect(componentTableCells(onDemand, "INR").revenueRecognition).toBe("-")
+  })
+
+  it("falls back to a placeholder name for a still-blank component", () => {
+    const component = createComponent("recurring", "flat_fee")
+    expect(componentTableCells(component, "INR").name).toBe("Untitled component")
   })
 })

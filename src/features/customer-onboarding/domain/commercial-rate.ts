@@ -178,12 +178,46 @@ function newId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)
 }
 
-function createSlabRow(): SlabRow {
-  return { id: newId(), from: null, to: null, rate: null }
+/**
+ * From defaults to a contiguous continuation of the previous row (task
+ * correction: "the FIRST slab should default From = 1... new From = previous
+ * slab To + 1"), never a blank field the user has to fill in by hand. If the
+ * previous row is still open-ended (`to: null`), there is no well-defined
+ * next From yet; the UI itself never allows adding a row in that state (see
+ * `recalculateSlabFroms`'s own header), so this is only a defensive fallback.
+ */
+function createSlabRow(previousRow: SlabRow | null = null): SlabRow {
+  return {
+    id: newId(),
+    from: previousRow ? (previousRow.to !== null ? previousRow.to + 1 : previousRow.from) : 1,
+    to: null,
+    rate: null,
+  }
 }
 
 function createDesignationRow(): DesignationRow {
   return { id: newId(), designation: "", rate: null, per: "USER" }
+}
+
+/**
+ * From is never a value the user edits directly (task correction: "prefer
+ * keeping From values system-derived/readonly after the first row" - this
+ * stage keeps every row's From system-derived, including the first, which is
+ * always 1, since a slab always starts counting from the first unit). This
+ * makes rows contiguous and gap/overlap-free by construction rather than by
+ * validation after the fact: call this after any edit to a row's own To, or
+ * after adding/removing a row, so every later row's From stays in sync with
+ * whatever precedes it. A row whose own To is still null (open-ended) is
+ * never followed by another row in the UI, so its own successor's From (if
+ * any slipped through) is left unchanged rather than guessed.
+ */
+function recalculateSlabFroms(rows: SlabRow[]): SlabRow[] {
+  return rows.map((row, index) => {
+    if (index === 0) return row.from === 1 ? row : { ...row, from: 1 }
+    const previous = rows[index - 1]
+    if (previous.to === null || row.from === previous.to + 1) return row
+    return { ...row, from: previous.to + 1 }
+  })
 }
 
 /**
@@ -192,7 +226,11 @@ function createDesignationRow(): DesignationRow {
  * Slab Methods: Progressive bands are just as non-overlapping/contiguous as
  * Whole Quantity bands, the methods differ only in how the total is
  * calculated, never in row shape or validation. Rows are compared in the
- * order given, not re-sorted.
+ * order given, not re-sorted. In practice this can no longer happen once
+ * rows have passed through `recalculateSlabFroms`, since From is no longer a
+ * value a user can mistype; this check remains as a general-purpose,
+ * UI-independent validator (for example, for data arriving from a future
+ * promotion path that does not go through this exact editor).
  */
 function areSlabRowsValid(rows: SlabRow[]): boolean {
   if (rows.length === 0) return false
@@ -339,6 +377,61 @@ function createComponent(nature: CommercialNature, pricingModel?: PricingModel):
 }
 
 // =============================================================================
+// MUG calculated value (task correction: "a calculated reference value...
+// not a separately editable contractual field... do not fake the amount")
+// =============================================================================
+
+/**
+ * The MUG contractual input stays a unit quantity; this derives a display-
+ * only monetary reference from it, never a stored or independently editable
+ * value. Per Unit: `MUG units x rate`. Slab: the applicable band(s) at the
+ * MUG quantity, computed per the component's own Slab Method. Designation
+ * Based: not calculable without inventing which designation's rate applies
+ * to the MUG quantity, so this returns `null` rather than a guess. Flat Fee
+ * and Non-Recurring never reach here at all (no `mug` field to begin with).
+ */
+function calculateMugValue(component: CommercialComponentDraft): number | null {
+  if (!("mug" in component) || !component.mug.enabled) return null
+  const quantity = component.mug.minimumUnits
+  if (!isPositive(quantity)) return null
+
+  if (component.pricingModel === "per_unit") {
+    return component.rate !== null ? quantity * component.rate : null
+  }
+  if (component.pricingModel === "slab") {
+    return calculateSlabAmountForQuantity(component.slabRows, component.slabMethod, quantity)
+  }
+  return null
+}
+
+/**
+ * Whole Quantity: the entire quantity is priced at the single band it falls
+ * into. Progressive: each band up to the quantity is priced separately and
+ * summed. Worked example from the task correction, MUG = 150 against rows
+ * 1-100 @100 and 101-250 @90: Whole Quantity = 150 x 90 = 13,500; Progressive
+ * = (100 x 100) + (50 x 90) = 14,500.
+ */
+function calculateSlabAmountForQuantity(rows: SlabRow[], method: SlabMethod, quantity: number): number | null {
+  if (rows.length === 0) return null
+
+  if (method === "whole_quantity") {
+    const band = rows.find((row) => row.from !== null && quantity >= row.from && (row.to === null || quantity <= row.to))
+    if (!band || band.rate === null) return null
+    return quantity * band.rate
+  }
+
+  let total = 0
+  for (const row of rows) {
+    if (row.from === null || row.rate === null) return null
+    if (quantity < row.from) break
+    const bandTop = row.to === null ? quantity : Math.min(row.to, quantity)
+    const unitsInBand = bandTop - row.from + 1
+    if (unitsInBand > 0) total += unitsInBand * row.rate
+  }
+  return total
+}
+
+// =============================================================================
 // Commercial Rate draft (header + components)
 // =============================================================================
 
@@ -356,7 +449,7 @@ function createEmptyCommercialRateDraft(): CommercialRateDraft {
 // Validation: Draft stays permissive, Stage Complete does not
 // =============================================================================
 
-function isPositive(value: number | null): boolean {
+function isPositive(value: number | null): value is number {
   return value !== null && Number.isFinite(value) && value > 0
 }
 
@@ -414,6 +507,7 @@ export {
   isMugComplete,
   newId,
   createSlabRow,
+  recalculateSlabFroms,
   createDesignationRow,
   areSlabRowsValid,
   areDesignationRowsValid,
@@ -421,6 +515,8 @@ export {
   emptyRevenueRecognition,
   isRevenueRecognitionComplete,
   createComponent,
+  calculateMugValue,
+  calculateSlabAmountForQuantity,
   createEmptyCommercialRateDraft,
   isPositive,
   isComponentComplete,

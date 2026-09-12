@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest"
 import {
   areDesignationRowsValid,
   areSlabRowsValid,
+  calculateMugValue,
+  calculateSlabAmountForQuantity,
   createComponent,
   createDesignationRow,
   createEmptyCommercialRateDraft,
@@ -15,6 +17,7 @@ import {
   isInvoiceTermsComplete,
   isMugComplete,
   isRevenueRecognitionComplete,
+  recalculateSlabFroms,
   toPricingRuleKind,
 } from "./commercial-rate"
 import type { CommercialComponentDraft, CommercialRateDraft, InvoiceTerms, OngoingComponent } from "./commercial-rate"
@@ -364,5 +367,148 @@ describe("createSlabRow / createDesignationRow / createMilestone", () => {
     expect(createSlabRow().id).not.toBe(createSlabRow().id)
     expect(createDesignationRow().id).not.toBe(createDesignationRow().id)
     expect(createMilestone().id).not.toBe(createMilestone().id)
+  })
+})
+
+describe("createSlabRow: From defaults (task correction §2)", () => {
+  it("the first row (no previous) defaults From to 1", () => {
+    expect(createSlabRow().from).toBe(1)
+    expect(createSlabRow(null).from).toBe(1)
+  })
+
+  it("a row created after a closed previous row defaults From to previous To + 1", () => {
+    const previous = { id: "1", from: 1, to: 100, rate: 100 }
+    expect(createSlabRow(previous).from).toBe(101)
+  })
+
+  it("a row created after a still-open-ended previous row keeps the previous row's own From (defensive fallback, the UI never allows this)", () => {
+    const previous = { id: "1", from: 1, to: null, rate: 100 }
+    expect(createSlabRow(previous).from).toBe(1)
+  })
+})
+
+describe("recalculateSlabFroms (task correction §2-3: From is system-derived, never typed)", () => {
+  it("forces the first row's From to 1 even if it was set to something else", () => {
+    const rows = [{ id: "1", from: 5, to: 100, rate: 100 }]
+    expect(recalculateSlabFroms(rows)[0].from).toBe(1)
+  })
+
+  it("cascades From = previous To + 1 down a chain of rows", () => {
+    const rows = [
+      { id: "1", from: 1, to: 100, rate: 100 },
+      { id: "2", from: 999, to: 250, rate: 90 },
+      { id: "3", from: 999, to: null, rate: 80 },
+    ]
+    const recalculated = recalculateSlabFroms(rows)
+    expect(recalculated.map((row) => row.from)).toEqual([1, 101, 251])
+  })
+
+  it("recalculates every later From when an earlier row's To changes", () => {
+    const rows = [
+      { id: "1", from: 1, to: 100, rate: 100 },
+      { id: "2", from: 101, to: 250, rate: 90 },
+    ]
+    const edited = rows.map((row) => (row.id === "1" ? { ...row, to: 150 } : row))
+    expect(recalculateSlabFroms(edited).map((row) => row.from)).toEqual([1, 151])
+  })
+
+  it("never produces overlapping or gapped rows: consecutive rows are always contiguous", () => {
+    const rows = recalculateSlabFroms([
+      { id: "1", from: 1, to: 50, rate: 10 },
+      { id: "2", from: 1, to: 120, rate: 9 },
+      { id: "3", from: 1, to: null, rate: 8 },
+    ])
+    expect(areSlabRowsValid(rows)).toBe(true)
+    expect(rows[1].from).toBe(51)
+    expect(rows[2].from).toBe(121)
+  })
+})
+
+describe("calculateSlabAmountForQuantity (task correction §1's worked example)", () => {
+  const rows = [
+    { id: "1", from: 1, to: 100, rate: 100 },
+    { id: "2", from: 101, to: 250, rate: 90 },
+  ]
+
+  it("Whole Quantity: prices the entire quantity at the single band it falls into (150 x 90 = 13,500)", () => {
+    expect(calculateSlabAmountForQuantity(rows, "whole_quantity", 150)).toBe(13500)
+  })
+
+  it("Progressive: prices each band separately and sums ((100 x 100) + (50 x 90) = 14,500)", () => {
+    expect(calculateSlabAmountForQuantity(rows, "progressive", 150)).toBe(14500)
+  })
+
+  it("Whole Quantity: a quantity inside the first band uses that band's own rate", () => {
+    expect(calculateSlabAmountForQuantity(rows, "whole_quantity", 50)).toBe(5000)
+  })
+
+  it("returns null when there are no rows, never fabricating an amount", () => {
+    expect(calculateSlabAmountForQuantity([], "whole_quantity", 150)).toBeNull()
+  })
+
+  it("returns null when the quantity does not fall inside any Whole Quantity band", () => {
+    const incompleteRows = [{ id: "1", from: 1, to: 100, rate: 100 }]
+    expect(calculateSlabAmountForQuantity(incompleteRows, "whole_quantity", 150)).toBeNull()
+  })
+})
+
+describe("calculateMugValue (task correction §1: a calculated reference, never a fabricated one)", () => {
+  it("Per Unit: MUG units x rate", () => {
+    const component = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000 } }
+    expect(calculateMugValue(component)).toBe(250000)
+  })
+
+  it("Per Unit: null when rate is not yet set", () => {
+    const component = { ...createComponent("recurring", "per_unit"), rate: null, pricingUnit: "USER", mug: { enabled: true, minimumUnits: 5000 } }
+    expect(calculateMugValue(component)).toBeNull()
+  })
+
+  it("Whole Quantity Slab: uses the band the MUG quantity falls into", () => {
+    const component = {
+      ...createComponent("recurring", "slab"),
+      pricingUnit: "USER",
+      slabMethod: "whole_quantity" as const,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100 },
+        { id: "2", from: 101, to: 250, rate: 90 },
+      ],
+      mug: { enabled: true, minimumUnits: 150 },
+    }
+    expect(calculateMugValue(component)).toBe(13500)
+  })
+
+  it("Progressive Slab: sums each band up to the MUG quantity", () => {
+    const component = {
+      ...createComponent("recurring", "slab"),
+      pricingUnit: "USER",
+      slabMethod: "progressive" as const,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100 },
+        { id: "2", from: 101, to: 250, rate: 90 },
+      ],
+      mug: { enabled: true, minimumUnits: 150 },
+    }
+    expect(calculateMugValue(component)).toBe(14500)
+  })
+
+  it("Designation Based: never calculated, would require inventing which designation's rate applies", () => {
+    const component = {
+      ...createComponent("recurring", "designation_based"),
+      designationRows: [{ id: "1", designation: "Sales Rep", rate: 50, per: "USER" }],
+      mug: { enabled: true, minimumUnits: 5000 },
+    }
+    expect(calculateMugValue(component)).toBeNull()
+  })
+
+  it("is null when MUG is disabled or the quantity is not set", () => {
+    const disabled = { ...createComponent("recurring", "per_unit"), rate: 50, pricingUnit: "USER" }
+    expect(calculateMugValue(disabled)).toBeNull()
+    const noQuantity = { ...disabled, mug: { enabled: true, minimumUnits: null } }
+    expect(calculateMugValue(noQuantity)).toBeNull()
+  })
+
+  it("Flat Fee never has a mug field to calculate from", () => {
+    const component = { ...createComponent("recurring", "flat_fee"), amount: 200000 }
+    expect(calculateMugValue(component)).toBeNull()
   })
 })

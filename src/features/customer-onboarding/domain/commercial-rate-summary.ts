@@ -1,5 +1,6 @@
 import { resolveOption } from "@/features/reference-data"
-import type { CommercialComponentDraft, InvoiceTerms, MugOverlay, RevenueRecognition } from "./commercial-rate"
+import { calculateMugValue } from "./commercial-rate"
+import type { CommercialComponentDraft, CommercialNature, InvoiceTerms, MugOverlay, PricingModel, RevenueRecognition } from "./commercial-rate"
 
 /**
  * Human-readable calculation-preview strings: illustrative display
@@ -16,6 +17,27 @@ function formatAmount(value: number | null, currencyCode: string | null): string
 function formatQuantity(value: number | null): string {
   if (value === null) return "-"
   return value.toLocaleString("en-IN")
+}
+
+/** Trims a decimal to at most one place, dropping a trailing ".0" (2.5, not 2.50; 5, not 5.0). */
+function trimToOneDecimal(value: number): string {
+  const rounded = Math.round(value * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
+/**
+ * A space-saving amount for table cells (e.g. "2.5L" for 2,50,000), never
+ * used for the full, precise amounts shown in the component editor or the
+ * calculation-preview lines. Lakh/thousand grouping matches the "en-IN"
+ * digit grouping already used everywhere else in this stage, applied here as
+ * a magnitude abbreviation rather than full digits, purely for column width.
+ */
+function formatCompactAmount(value: number | null, currencyCode: string | null): string {
+  if (value === null) return "-"
+  const magnitude = Math.abs(value)
+  const compact =
+    magnitude >= 100000 ? `${trimToOneDecimal(value / 100000)}L` : magnitude >= 1000 ? `${trimToOneDecimal(value / 1000)}K` : value.toLocaleString("en-IN")
+  return currencyCode ? `${currencyCode} ${compact}` : compact
 }
 
 function unitLabel(pricingUnitCode: string | null): string {
@@ -52,6 +74,28 @@ function invoiceSummaryLine(terms: InvoiceTerms): string | null {
 function mugSummaryLine(mug: MugOverlay, pricingUnitCode: string | null): string | null {
   if (!mug.enabled) return null
   return `MUG: ${formatQuantity(mug.minimumUnits)} ${unitLabelForQuantity(pricingUnitCode, mug.minimumUnits)}`
+}
+
+/**
+ * "Calculated MUG Value: INR 2,50,000 / Month": a separate line from
+ * `mugSummaryLine`, never merged into it, since the contractual MUG line
+ * must stay demonstrably money-free while this one is explicitly the
+ * derived monetary reference (task correction §1). Returns `null` when the
+ * value cannot be reliably calculated (Designation Based, or missing
+ * rate/rows), rather than showing a fabricated amount.
+ */
+function calculatedMugValueLine(component: CommercialComponentDraft, currencyCode: string | null): string | null {
+  const amount = calculateMugValue(component)
+  if (amount === null) return null
+  return `Calculated MUG Value: ${formatAmount(amount, currencyCode)} / Month`
+}
+
+function natureLabel(nature: CommercialNature): string {
+  return resolveOption("commercial_nature", nature)?.label ?? nature
+}
+
+function modelLabel(pricingModel: PricingModel): string {
+  return resolveOption("pricing_model", pricingModel)?.label ?? pricingModel
 }
 
 /** "Revenue Recognition: Milestone Based (3 milestones)". */
@@ -99,6 +143,8 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
   if (component.nature !== "non_recurring" && "mug" in component) {
     const mugLine = mugSummaryLine(component.mug, mugUnitCode(component))
     if (mugLine) lines.push(mugLine)
+    const calculatedLine = calculatedMugValueLine(component, currencyCode)
+    if (calculatedLine) lines.push(calculatedLine)
   }
 
   const invoiceLine = invoiceSummaryLine(component.invoiceTerms)
@@ -111,14 +157,102 @@ function summarizeComponent(component: CommercialComponentDraft, currencyCode: s
   return lines
 }
 
+/**
+ * Concise, single-value rate summary for the Commercial Components table's
+ * own Rate column ("₹50 / User", "₹2,00,000", "Whole Quantity / User", "3
+ * Designation Rates"). Deliberately not the full multi-line
+ * `summarizeComponent`, which stays for the open editor's own preview: a
+ * table row has one line to work with per column.
+ */
+function rateColumnSummary(component: CommercialComponentDraft, currencyCode: string | null): string {
+  if (component.pricingModel === "flat_fee") return formatAmount(component.amount, currencyCode)
+  if (component.pricingModel === "per_unit") return `${formatAmount(component.rate, currencyCode)} / ${unitLabel(component.pricingUnit)}`
+  if (component.pricingModel === "slab") {
+    const methodLabel = component.slabMethod === "progressive" ? "Progressive" : "Whole Quantity"
+    return `${methodLabel} / ${unitLabel(component.pricingUnit)}`
+  }
+  const count = component.designationRows.length
+  return `${count} Designation Rate${count === 1 ? "" : "s"}`
+}
+
+/** "Monthly Advance", "Quarterly Postpaid", or "-" once neither half is chosen yet. */
+function invoiceCycleColumnSummary(terms: InvoiceTerms): string {
+  const parts = [terms.invoiceFrequency ? invoiceFrequencyLabel(terms.invoiceFrequency) : null, terms.invoiceTiming ? invoiceTimingLabel(terms.invoiceTiming) : null].filter(
+    (part): part is string => part !== null
+  )
+  return parts.length > 0 ? parts.join(" ") : "-"
+}
+
+/**
+ * Recurring is always Monthly revenue (docs §22); Non-Recurring shows its
+ * own chosen method; On-Demand has no recognition concept captured in this
+ * model at all, so this honestly shows "-" rather than inventing one.
+ */
+function recognitionColumnSummary(component: CommercialComponentDraft): string {
+  if (component.nature === "recurring") return "Monthly"
+  if (component.nature === "non_recurring") {
+    return component.revenueRecognition.method === "milestone_based" ? "Milestone Based" : "Full Recognition"
+  }
+  return "-"
+}
+
+type ComponentTableCells = {
+  name: string
+  nature: string
+  pricing: string
+  rate: string
+  mugQuantity: string
+  mugCalculated: string | null
+  invoiceCycle: string
+  revenueRecognition: string
+}
+
+/**
+ * Every value the Commercial Components table (and its mobile card
+ * fallback) needs for one row, computed once so both layouts render
+ * identically from the same source (task correction §10: "the underlying
+ * information and actions must remain identical").
+ */
+function componentTableCells(component: CommercialComponentDraft, currencyCode: string | null): ComponentTableCells {
+  const base = {
+    name: component.description || "Untitled component",
+    nature: natureLabel(component.nature),
+    pricing: modelLabel(component.pricingModel),
+    rate: rateColumnSummary(component, currencyCode),
+    invoiceCycle: invoiceCycleColumnSummary(component.invoiceTerms),
+    revenueRecognition: recognitionColumnSummary(component),
+  }
+
+  if (!("mug" in component) || !component.mug.enabled) {
+    return { ...base, mugQuantity: "-", mugCalculated: null }
+  }
+
+  const quantityLine = mugSummaryLine(component.mug, mugUnitCode(component))
+  const calculatedValue = calculateMugValue(component)
+  return {
+    ...base,
+    mugQuantity: quantityLine ? quantityLine.replace("MUG: ", "") : "-",
+    mugCalculated: calculatedValue !== null ? formatCompactAmount(calculatedValue, currencyCode) : null,
+  }
+}
+
 export {
   formatAmount,
   formatQuantity,
+  formatCompactAmount,
   unitLabel,
   unitLabelForQuantity,
   invoiceSummaryLine,
   mugSummaryLine,
+  calculatedMugValueLine,
   mugUnitCode,
+  natureLabel,
+  modelLabel,
   recognitionSummaryLine,
   summarizeComponent,
+  rateColumnSummary,
+  invoiceCycleColumnSummary,
+  recognitionColumnSummary,
+  componentTableCells,
 }
+export type { ComponentTableCells }

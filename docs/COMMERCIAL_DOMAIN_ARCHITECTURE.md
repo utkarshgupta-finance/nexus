@@ -916,6 +916,46 @@ are illustrative display strings built directly from what the user
 typed, never a usage-driven calculation, and never claim to be an
 invoice.
 
+### MUG's calculated value is a preview, never a stored fact
+
+The MUG contractual input stays exactly one number: a unit quantity. A
+second, derived figure, the Calculated MUG Value, is shown next to it
+wherever MUG appears (the component editor and the Commercial Components
+table), computed live from that quantity and the component's own pricing
+(`calculateMugValue` in `commercial-rate.ts`): quantity x rate for Per
+Unit, the applicable Slab band(s) for Slab (using whichever Slab Method
+the component already has), and never fabricated for Designation Based,
+where no single rate applies to the MUG quantity without inventing an
+allocation across designations. This value is never written back into
+the draft as its own field: it is recomputed from the contractual inputs
+every time it is shown, exactly like the rest of this stage's
+calculation-preview strings.
+
+### Slab rows are contiguous by construction, not by validation
+
+A Slab row's From is never typed by the user, on any row, including the
+first (`createSlabRow`/`recalculateSlabFroms` in `commercial-rate.ts`):
+the first row's From is always 1, and every later row's From is always
+the previous row's To + 1, recalculated automatically whenever a row is
+added, removed, or has its own To edited. This makes overlapping or
+gapped slabs structurally impossible rather than merely flagged after
+the fact, and it means a slab row can never be added after one that is
+still open-ended (no upper limit to continue from), which the UI
+enforces by disabling Add Row in that state.
+
+### Commercial Components render as a table, not stacked cards
+
+Once saved, Commercial Components are shown in a table (Component,
+Nature, Pricing, Rate, MUG, Invoice Cycle, Revenue Recognition, Actions)
+on desktop, and as an equivalent compact card per component on mobile,
+both rendered from the same computed cell values
+(`componentTableCells` in `commercial-rate-summary.ts`) so neither
+information nor the Edit/Delete actions differ between the two layouts.
+Editing a component pulls it out of the table into the full component
+editor above the table (rather than expanding awkwardly inside a table
+row); saving or cancelling returns it to the table. Delete requires an
+explicit second confirmation click before anything is removed.
+
 ## 23. What this document is not
 
 Not a database schema. Not an implementation. Not a decision on Flowable,
