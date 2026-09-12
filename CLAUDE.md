@@ -46,6 +46,29 @@ CEO, Documentation. Full framework in `docs/guide/NEXUS_PRINCIPLES.md`
 This is a thinking framework applied while working, not a separate
 approval step.
 
+## Every governed mutation must derive and enforce identity server-side
+
+Once Nexus has a real authenticated session (`src/platform/auth/`) and a
+real permission resolver (`src/platform/permissions/`), any persistent
+governed mutation, in Settings or any future module, must:
+
+1. Derive the authenticated user server-side
+   (`getCurrentNexusSession`/`requirePermission`), never trust a
+   client-supplied user id, query parameter, hidden form field, or
+   UI-selected actor.
+2. Map that authenticated identity to the Nexus `app_users` row.
+3. Enforce the required permission server-side before the mutation runs,
+   denying by default on any missing session, unprovisioned/inactive
+   user, or missing permission.
+4. Perform the privileged database mutation only after authorization
+   succeeds.
+5. Write the real, resolved actor identity into the audit trail, never a
+   fabricated or client-supplied one.
+
+A React Server Action's own indirection is not authorization by itself;
+it hides the network call, it does not verify who is calling it. See
+`docs/AUTHORIZATION_MODEL.md` for the full model this implements.
+
 ## Never fake auth, approval, or persistence
 
 Never invent a working login, a clickable "Approve" action, a saved

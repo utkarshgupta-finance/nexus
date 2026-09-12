@@ -270,23 +270,40 @@ primary key, not row-audit shaped. `actor_user_id` on every audit row is
 authenticated session yet to populate it from (§6e), and this module
 never fabricates one.
 
-### 6e. Authorization honesty
+### 6e. Authorization honesty [IMPLEMENTED, updated 2026-09-12]
 
-Unchanged from the rest of this app's own stated limitation
-(`src/features/commercial/server.ts`'s header, `src/features/customers/
-server.ts`'s header): `server.ts`'s write functions take `actorUserId` as
-an explicit parameter, and every current call site
-(`src/features/reference-data/actions.ts`) passes `null`, since there is
-no real Nexus user identity anywhere yet. `service_role` (the credential
-every write ultimately authenticates as) bypasses RLS entirely; RLS on
-`reference_lists`/`reference_options` denies `anon`/`authenticated` all
-direct access, the same deny-by-default posture as every other Platform
-Core table. This means: the write path is safe from an unauthenticated
-browser reaching the database directly, but Settings' own Add/Activate/
-Deactivate buttons are not yet gated by any real per-user permission
-check, because that platform capability does not exist in Nexus at all
-yet. Add that check at the Server Action call site once it does; do not
-invent a parallel one here.
+This section originally disclosed that no real Nexus user identity or
+per-user permission check existed at all. That gap is now closed: see
+`docs/AUTHORIZATION_MODEL.md` §10-14 for the full authentication and
+authorization foundation. Concretely for Settings:
+
+- `src/features/reference-data/actions.ts`'s write functions call
+  `requirePermission("reference_master", "write")`
+  (`src/platform/permissions/server.ts`) before performing any mutation,
+  deriving the actor from the current authenticated session, never from
+  a client-supplied parameter. `/settings/customer-onboarding` itself
+  requires `reference_master.read` to load at all
+  (`src/components/product/auth-gate.tsx`).
+- `server.ts`'s write functions still take `actorUserId` as an explicit
+  parameter (this did not change: `src/features/commercial/server.ts`
+  and `src/features/customers/server.ts` follow the identical pattern),
+  but every current Settings call site now passes the real, resolved
+  `appUserId` from the authorized session, never `null`.
+- `service_role` (the credential every write ultimately authenticates
+  as) still bypasses RLS entirely; RLS still denies `anon`/
+  `authenticated` all direct access. The application-service permission
+  check above is what stands between an authenticated Nexus session and
+  a privileged write, exactly the layering `docs/AUTHORIZATION_MODEL.md`
+  §6 describes.
+- Reference Master writes moved from plain PostgREST calls into RPC
+  functions specifically so a real actor identity reaches
+  `audit_log.actor_user_id` (`docs/AUTHORIZATION_MODEL.md` §14 has the
+  full reasoning).
+
+Remaining honest limitation: only Reference Master is enforced this way
+today. Every other Nexus route/action remains unauthenticated-reachable
+until it is built out with the same `requirePermission` call, feature by
+feature.
 
 ## 7. Reference Master reuse, not one table per dropdown
 

@@ -5,10 +5,18 @@ contains no real Nexus role names, permission lists, or organizational
 structure. Every role and permission named below is a generic,
 illustrative example only.
 
-**Status: locked design.** See `docs/PLATFORM_ARCHITECTURE.md` §8 for how
-authorization relates to identity, assignment, and workflow. Nothing in
-this document has been implemented. No table, role, or permission exists
-because of this document.
+**Status: [IMPLEMENTED] as of 2026-09-12.** See
+`docs/PLATFORM_ARCHITECTURE.md` §8 for how authorization relates to
+identity, assignment, and workflow. §§1-9 below describe the design as
+originally locked; §§10-15 describe what actually exists now: real
+Supabase Auth sessions, a real `app_users` mapping, a real permission
+resolver, and real server-side enforcement on the Customer Onboarding
+Settings workspace. `roles`/`permissions`/`role_permissions`/`user_roles`
+have existed as schema since Migration 1
+(`supabase/migrations/20260906084244_platform_core_foundation.sql`); this
+round is what seeds a first real permission catalog into them and builds
+the application-service enforcement layer this document always
+described but never had code behind.
 
 ## 1. Principle: data-driven, not hardcoded
 
@@ -181,12 +189,162 @@ record's available actions, and whether it appears in a given user's My
 Work queue at all, are computed from that data rather than hardcoded per
 screen. See `docs/PLATFORM_ARCHITECTURE.md` §11.
 
-## 9. What this document does not cover
+## 9. What §§1-8 do not cover
 
-No real Nexus role, permission, or organizational scope is named here.
-Session management is out of scope; §2 covers only the identity/
-authorization boundary, not how Supabase Auth issues or refreshes a
-session. Specific resources and actions for any real feature are defined
-when that feature
-is built, against its approved product requirements, not against anything
-in this document.
+No real Nexus role, permission, or organizational scope is named in
+§§1-8. Specific resources and actions for any real feature are defined
+when that feature is built, against its approved product requirements,
+not against anything in this document.
+
+## 10. [IMPLEMENTED] Authentication provider: Supabase Auth
+
+Supabase Auth is the authentication identity provider (§2 already
+anticipated this; this section states the concrete implementation).
+**Auth method: email + password.** Chosen over magic link or OAuth for
+V1 because it needs no external email delivery dependency and no OAuth
+app registration, matching the task's own "prefer a simple V1" guidance;
+password verification is handled entirely by Supabase Auth, Nexus never
+stores or sees a password beyond the single sign-in call
+(`src/features/auth/actions.ts`). Revisit this choice if a real business
+requirement (SSO with an existing identity provider, for example) asks
+for it later; nothing in the identity/authorization boundary below
+depends on which method was chosen.
+
+Three distinct Supabase clients now exist, each with a narrow, named
+purpose:
+
+- `src/lib/supabase/browser-client.ts`: anon key, browser-only, used only
+  where a Client Component needs a Supabase session operation directly
+  (none currently do; sign-in/sign-out run as Server Actions instead, see
+  §11).
+- `src/lib/supabase/server-auth-client.ts`: anon key, server-only, reads
+  the authenticated user from the request's own session cookie. This is
+  the authoritative "who is calling" source (`src/platform/auth/
+  server.ts`).
+- `src/lib/supabase/server-client.ts` (already existed): service role
+  key, server-only, privileged execution path. Never an identity source;
+  see §2 and §14.
+
+`middleware.ts` refreshes the session cookie on every request (the
+standard `@supabase/ssr` Next.js pattern) and enforces nothing itself;
+enforcement stays in the application-service layer per §6.
+
+## 11. [IMPLEMENTED] App user mapping and provisioning
+
+`app_users.id` reuses `auth.users.id` directly (Migration 1); no
+`auth_user_id` column or second mapping table was needed or added. An
+authenticated Supabase Auth user with no matching `app_users` row is
+`unprovisioned`: Nexus never auto-creates an `app_users` row or grants
+default access just because someone can authenticate (task correction
+§6). Provisioning a real user means inserting their `app_users` row (and
+any `user_roles` grant) as a deliberate administrative action; nothing
+in this round builds a self-service provisioning UI, since granting
+Nexus access is exactly the kind of action that should never be
+self-service.
+
+## 12. [IMPLEMENTED] Current session/user contract
+
+`src/platform/auth/server.ts`'s `getCurrentNexusSession()` is the one
+place the rest of the app derives identity, returning a Nexus-owned
+`NexusSession` (`src/platform/auth/domain/types.ts`), never a raw
+Supabase `User`/`Session` or raw `app_users`/`roles`/`permissions` row.
+Five distinct states, all deliberately kept apart rather than collapsed
+into `user | null` (task correction §26):
+
+- `unauthenticated`: no valid session at all.
+- `unavailable`: the session/backend itself could not be resolved (a
+  missing environment variable, a database/network failure). Distinct
+  from `unauthenticated`: a visitor who is genuinely signed out is not
+  the same as a visitor whose status could not be determined.
+- `unprovisioned`: a real session, but no `app_users` row.
+- `inactive`: an `app_users` row exists, `is_active = false`.
+- `active`: a real, active user, carrying whatever roles/permissions
+  their current global `user_roles`/`role_permissions` grants resolve
+  to.
+
+Every state except `active` denies every governed action; only `active`
+ever carries a non-empty `permissions` array.
+
+## 13. [IMPLEMENTED] Permission resolution and enforcement guards
+
+`src/platform/permissions/server.ts` exports `hasPermission(resource,
+action)` (read-only check, never throws) and `requirePermission(resource,
+action)` (deny-by-default enforcement, throws `AuthorizationError` naming
+the specific denial reason, returns the active session, with a real
+`appUserId`, only when every check passes). Resolution walks exactly the
+chain §3 describes: `app_users -> user_roles (active, global) -> roles
+(active) -> role_permissions (active) -> permissions (active)`
+(`src/platform/auth/data/rbac.data.ts`). `src/platform/permissions/
+domain/has-permission.ts`'s `sessionHasPermission` is the pure check
+underneath both, safe to reuse anywhere a session has already been
+fetched (a Server Component deciding what to render) without a second
+database round trip.
+
+These guards are deliberately feature-agnostic (task correction §27):
+`requirePermission("reference_master", "write")` today, and the same
+function, unchanged, is what a future Commercial Configuration write,
+Customer Master Change Request, Legal approval, Workflow approval, or
+form submission action calls with its own resource/action pair. Nothing
+here is coupled to Settings.
+
+## 14. [IMPLEMENTED] Reference Master permissions and enforcement
+
+Two permissions exist today (`supabase/migrations/
+20260912150000_auth_authorization_foundation.sql`): `reference_master`
+`read` and `reference_master` `write`. Two illustrative roles grant them:
+`reference_master_viewer` (read only) and `reference_master_admin` (read
+and write); neither is a real Nexus organizational title, matching §1's
+own naming principle.
+
+`/settings/customer-onboarding` requires `reference_master.read` to view
+at all (`src/components/product/auth-gate.tsx`, wrapping the route);
+every mutating Server Action in `src/features/reference-data/actions.ts`
+independently requires `reference_master.write` before performing any
+write, deriving the actor from the resolved session, never from a
+client-supplied parameter. The Settings UI itself also reads whether the
+current session can write and hides Add/Activate/Deactivate/governed-
+value-edit controls entirely when it cannot (task correction §22:
+"prefer a clear read-only treatment," never a control that is shown but
+will always fail); this is a rendering convenience only, the Server
+Action's own check is what actually enforces this, exactly as §6
+already stated for the general model.
+
+**Actor-aware audit.** `reference_options` writes moved from plain
+PostgREST `insert`/`update` calls into RPC functions
+(`add_reference_option`, `set_reference_option_active`,
+`update_currency_inr_conversion_rate`, `update_invoice_frequency_cadence`),
+matching the exact `set_config('app.current_user_id', ...)`-then-mutate
+pattern every Commercial RPC already used
+(`docs/DATA_ARCHITECTURE.md` §9): this is the only way a real actor
+identity reaches `audit_log.actor_user_id`, since PostgREST gives each
+plain `.insert()`/`.update()` call its own transaction, and the audit
+trigger reads a transaction-local Postgres setting. `actorUserId = null`
+is retained only for genuinely system-originated writes (none exist for
+Reference Master today; every current write is a real authenticated
+Settings action).
+
+## 15. Current limitations, honestly stated
+
+- **Global permissions only.** `user_roles.scope_resource_id` is never
+  populated by this round; every grant is global, matching §5's own
+  "immediate implementation supports global assignment only." Scoped
+  authorization (a role limited to one customer, one business unit) is
+  still the documented future extension in §5, not built.
+- **No self-service provisioning UI.** Granting `app_users`/`user_roles`
+  rows today is a direct administrative action (a migration for
+  catalog-level roles/permissions, a data insert for a specific user's
+  grant), not a Settings screen. Building that UI is future work, not
+  a security gap: the underlying tables and enforcement are real either
+  way.
+- **Only Reference Master is protected today.** `requirePermission` is
+  feature-agnostic and ready for reuse (§13), but only `src/features/
+  reference-data/actions.ts` and `/settings/customer-onboarding` actually
+  call it yet. Every other route/action in Nexus remains unauthenticated-
+  reachable, an explicitly disclosed gap, not a silently broken
+  promise, to be closed feature by feature as each is built out.
+- **RLS remains deny-by-default, not user-aware.** No user-session RLS
+  policy was introduced this round; Platform Core tables remain denied
+  to `anon`/`authenticated` entirely, and the service-role client
+  (bypassing RLS) is still the only path that reaches them, gated by the
+  application-service checks in §13-14, exactly the layering §6 already
+  specified.

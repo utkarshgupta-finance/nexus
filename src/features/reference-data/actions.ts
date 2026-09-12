@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 
+import { requirePermission } from "@/platform/permissions/server"
+import { AuthorizationError } from "@/platform/permissions"
 import { addReferenceOption, setReferenceOptionActive, updateCurrencyInrConversionRate } from "./server"
 import { ReferenceMasterOperationError } from "./domain/errors"
 import { isValidIsoCurrencyCode } from "./domain/currency-codes"
@@ -16,13 +18,17 @@ import type { ReferenceOption } from "./domain/types"
  * one page's own session (task correction §18: "No component-state-only
  * illusion").
  *
- * `actorUserId` is always `null` here: Nexus has no authenticated session
- * to derive a real one from yet (../server.ts's own header comment has
- * the full reasoning). This is passed explicitly rather than omitted, so
- * the gap stays visible in code, not hidden behind a default parameter.
+ * Every mutating action calls `requirePermission("reference_master",
+ * "write")` first (`src/platform/permissions/server.ts`): this derives
+ * the current authenticated Nexus user from the request's own session,
+ * server-side, and denies before any database write is attempted if that
+ * session is missing, unprovisioned, inactive, or lacks the permission.
+ * The resolved session's real `appUserId` is what gets passed as the
+ * audit actor, never a client-supplied value. There is no `actorUserId`
+ * parameter anywhere in this file a browser could substitute; a client
+ * cannot claim to be a different Nexus user by calling this action
+ * differently.
  */
-
-const ACTOR_USER_ID: string | null = null
 
 type ActionResult = { ok: true; option: ReferenceOption } | { ok: false; error: string }
 
@@ -33,6 +39,7 @@ function revalidateReferenceMasterConsumers() {
 }
 
 function toActionError(error: unknown): ActionResult {
+  if (error instanceof AuthorizationError) return { ok: false, error: error.message }
   if (error instanceof ReferenceMasterOperationError) {
     if (error.kind === "conflict") return { ok: false, error: "This value already exists in this list." }
     return { ok: false, error: error.message }
@@ -48,7 +55,8 @@ async function addStandardOptionAction(
 ): Promise<ActionResult> {
   if (!code.trim() || !label.trim()) return { ok: false, error: "Enter a label (a code is suggested automatically)." }
   try {
-    const option = await addReferenceOption({ listKey, code: code.trim(), label: label.trim() }, ACTOR_USER_ID)
+    const actor = await requirePermission("reference_master", "write")
+    const option = await addReferenceOption({ listKey, code: code.trim(), label: label.trim() }, actor.appUserId)
     revalidateReferenceMasterConsumers()
     return { ok: true, option }
   } catch (error) {
@@ -63,9 +71,10 @@ async function addCurrencyOptionAction(code: string, name: string): Promise<Acti
   if (!upperCode || !trimmedName) return { ok: false, error: "Enter both a currency code and a name." }
   if (!isValidIsoCurrencyCode(upperCode)) return { ok: false, error: `"${upperCode}" is not a recognized ISO 4217 currency code.` }
   try {
+    const actor = await requirePermission("reference_master", "write")
     const option = await addReferenceOption(
       { listKey: "currency", code: upperCode, label: `${upperCode} - ${trimmedName}`, inrConversionRate: null },
-      ACTOR_USER_ID
+      actor.appUserId
     )
     revalidateReferenceMasterConsumers()
     return { ok: true, option }
@@ -82,9 +91,10 @@ async function addInvoiceFrequencyOptionAction(code: string, label: string, cade
     return { ok: false, error: "Enter a whole number cadence in months (e.g. 2 for Every 2 Months)." }
   }
   try {
+    const actor = await requirePermission("reference_master", "write")
     const option = await addReferenceOption(
       { listKey: "invoice_frequency", code: code.trim(), label: trimmedLabel, cadenceMonths },
-      ACTOR_USER_ID
+      actor.appUserId
     )
     revalidateReferenceMasterConsumers()
     return { ok: true, option }
@@ -99,7 +109,8 @@ async function setOptionActiveAction(
   isActive: boolean
 ): Promise<ActionResult> {
   try {
-    const option = await setReferenceOptionActive(listKey, code, isActive, ACTOR_USER_ID)
+    const actor = await requirePermission("reference_master", "write")
+    const option = await setReferenceOptionActive(listKey, code, isActive, actor.appUserId)
     revalidateReferenceMasterConsumers()
     return { ok: true, option }
   } catch (error) {
@@ -112,7 +123,8 @@ async function updateCurrencyRateAction(code: string, rate: number | null): Prom
     return { ok: false, error: "Enter a positive INR conversion rate, or leave it blank if not yet configured." }
   }
   try {
-    const option = await updateCurrencyInrConversionRate(code, rate, ACTOR_USER_ID)
+    const actor = await requirePermission("reference_master", "write")
+    const option = await updateCurrencyInrConversionRate(code, rate, actor.appUserId)
     revalidateReferenceMasterConsumers()
     return { ok: true, option }
   } catch (error) {

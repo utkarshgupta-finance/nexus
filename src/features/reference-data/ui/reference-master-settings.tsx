@@ -226,9 +226,11 @@ function formatCadence(cadenceMonths: number | null | undefined): string {
 type ReferenceMasterSettingsProps = {
   initialSnapshot: ReferenceMasterSnapshot
   snapshotUnavailable: boolean
+  /** Whether the current Nexus user holds `reference_master.write` (resolved server-side in the route, never trusted from the client). `false` means read-only: view/search stays available, every mutation control is hidden, never shown disabled-but-clickable-looking. */
+  canWrite: boolean
 }
 
-function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: ReferenceMasterSettingsProps) {
+function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrite }: ReferenceMasterSettingsProps) {
   const [optionsByList, setOptionsByList] = useState<ReferenceMasterSnapshot>(initialSnapshot)
   const [isSaving, startSaving] = useTransition()
   /** Buffers an in-progress edit to an INR Conversion Rate input until blur, so a real database write fires once per edit rather than once per keystroke (a per-keystroke write was harmless against local-only state, but is a real, race-prone network call now that this is a persistent field). */
@@ -442,6 +444,12 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: Refer
             unavailable until the backend is reachable again.
           </div>
         ) : null}
+        {!canWrite ? (
+          <div className="rounded-md border border-dashed px-3 py-3 text-xs text-muted-foreground">
+            You have read-only access to Reference Master. You can view and search every list; adding, activating, deactivating, and
+            editing governed values requires the reference_master.write permission. Contact your administrator for write access.
+          </div>
+        ) : null}
         <div className="-mx-1 overflow-x-auto px-1">
           <ToggleGroup
             value={[selectedGroup]}
@@ -562,7 +570,7 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: Refer
                             type="number"
                             min={0}
                             step="any"
-                            disabled={snapshotUnavailable}
+                            disabled={snapshotUnavailable || !canWrite}
                             value={rateDrafts[option.value] ?? option.inrConversionRate ?? ""}
                             onChange={(event) => setRateDrafts((current) => ({ ...current, [option.value]: event.target.value }))}
                             onBlur={(event) => {
@@ -590,7 +598,9 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: Refer
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {confirmingDeactivateValue === option.value ? (
+                    {!canWrite ? (
+                      <span className="text-[0.7rem] text-muted-foreground">-</span>
+                    ) : confirmingDeactivateValue === option.value ? (
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-[0.65rem] text-muted-foreground">
                           Deactivate &quot;{option.label}&quot;? It will no longer be available for new selections. Existing historical records will remain
@@ -622,6 +632,8 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: Refer
           </TableBody>
         </Table>
 
+        {!canWrite ? null : (
+        <>
         {activeList.addMode === "disabled" ? (
           <div className="flex flex-col gap-1 rounded-md border border-dashed px-3 py-3">
             <span className="text-xs font-medium text-muted-foreground">Adding is not available for this list</span>
@@ -755,6 +767,8 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable }: Refer
             {addError ? <p className="text-[0.7rem] text-destructive">{addError}</p> : null}
           </div>
         ) : null}
+        </>
+        )}
       </div>
     </div>
   )

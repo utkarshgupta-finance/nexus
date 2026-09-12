@@ -6,10 +6,16 @@ per-feature.
 
 Planned capabilities (added incrementally, only when first needed):
 
+- `auth/` **[IMPLEMENTED]**: Supabase Auth session resolution and the
+  Nexus-owned `NexusSession` identity contract (`getCurrentNexusSession`).
+  See `docs/AUTHORIZATION_MODEL.md` §10-12.
 - `workflow/`: generic maker-checker state machine
 - `approvals/`: cross-cutting approval log
 - `audit/`: automatic before/after change tracking
-- `permissions/`: role to module access mapping
+- `permissions/` **[IMPLEMENTED]**: `hasPermission`/`requirePermission`
+  deny-by-default authorization guards, resolved from `roles`/
+  `permissions`/`role_permissions`/`user_roles`. See
+  `docs/AUTHORIZATION_MODEL.md` §13-14.
 - `policy/`: runtime-configurable thresholds and settings
 - `attachments/`: file upload/storage handling
 
