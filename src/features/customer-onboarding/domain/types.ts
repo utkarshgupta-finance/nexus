@@ -102,6 +102,10 @@ type CustomerOnboardingCase = {
   sentBack: CustomerOnboardingSentBack | null
   approvedBy: AppUserId | null
   approvedAt: string | null
+  /** Set only once, atomically, by approve_customer_onboarding_case; null until then. */
+  customerId: string | null
+  /** Set only once, atomically, by approve_customer_onboarding_case; null until then. */
+  commercialConfigurationId: string | null
 }
 
 // =============================================================================

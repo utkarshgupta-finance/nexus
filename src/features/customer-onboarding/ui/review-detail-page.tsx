@@ -1,10 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { CheckCircle2Icon } from "lucide-react"
 
 import { PageHeader } from "@/components/product/page-header"
 import { KeyValueGrid } from "@/components/product/key-value-grid"
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,7 +54,8 @@ function ReviewDetailPage({
   const [sendBackReason, setSendBackReason] = useState("")
   const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [actionError, setActionError] = useState<string | null>(null)
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const [pendingAction, setPendingAction] = useState<"approve" | "send_back" | null>(null)
+  const [approvalResult, setApprovalResult] = useState<{ customerKey: string | null; commercialConfigurationId: string | null } | null>(null)
 
   const values = onboardingCase.currentRevision.data
   const commercialRate = values[CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate] as CommercialRateDraft | undefined
@@ -59,11 +63,11 @@ function ReviewDetailPage({
 
   async function handleApprove() {
     setActionError(null)
-    setIsSubmittingAction(true)
+    setPendingAction("approve")
     const result = await approveOnboardingCaseAction(requestId, effectiveDate)
-    setIsSubmittingAction(false)
+    setPendingAction(null)
     if (result.ok) {
-      router.push(`/customers`)
+      setApprovalResult({ customerKey: result.customerKey, commercialConfigurationId: result.commercialConfigurationId })
       router.refresh()
     } else {
       setActionError(result.error)
@@ -76,9 +80,9 @@ function ReviewDetailPage({
       return
     }
     setActionError(null)
-    setIsSubmittingAction(true)
+    setPendingAction("send_back")
     const result = await sendBackOnboardingCaseAction(requestId, sendBackReason, null)
-    setIsSubmittingAction(false)
+    setPendingAction(null)
     if (result.ok) {
       router.push("/reviews")
       router.refresh()
@@ -156,7 +160,29 @@ function ReviewDetailPage({
           })}
         </section>
 
-        {canApprove && (onboardingCase.status === "submitted" || onboardingCase.status === "resubmitted") ? (
+        {approvalResult ? (
+          <section className="flex flex-col items-center gap-3 rounded-lg border bg-card p-4 text-center shadow-sm sm:p-6">
+            <span className="flex size-9 items-center justify-center rounded-full bg-success/10 text-success">
+              <CheckCircle2Icon className="size-4" />
+            </span>
+            <h2 className="text-sm font-semibold text-foreground">Customer approved</h2>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              The Customer Master, Commercial Configuration, and Commercial Version 1 have all been created.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {approvalResult.customerKey ? (
+                <Button size="sm" render={<Link href={`/customers/${approvalResult.customerKey}`} />}>
+                  Open Customer
+                </Button>
+              ) : null}
+              {approvalResult.commercialConfigurationId ? (
+                <Button variant="outline" size="sm" render={<Link href={`/commercials/${approvalResult.commercialConfigurationId}`} />}>
+                  Open Commercials
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        ) : canApprove && (onboardingCase.status === "submitted" || onboardingCase.status === "resubmitted") ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Decision</h2>
 
@@ -174,26 +200,26 @@ function ReviewDetailPage({
                   onChange={(event) => setSendBackReason(event.target.value)}
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setIsSendingBack(false)} disabled={isSubmittingAction}>
+                  <Button size="sm" variant="outline" onClick={() => setIsSendingBack(false)} disabled={pendingAction !== null}>
                     Cancel
                   </Button>
-                  <Button size="sm" onClick={handleSendBack} disabled={isSubmittingAction}>
+                  <PendingButton size="sm" onClick={handleSendBack} pending={pendingAction === "send_back"} pendingLabel="Sending back...">
                     Confirm Send Back
-                  </Button>
+                  </PendingButton>
                 </div>
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="effective-date">
-                    Effective From (Commercial Configuration)
+                    Commercial Effective From
                   </label>
                   <Input id="effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
                 </div>
-                <Button size="sm" onClick={handleApprove} disabled={isSubmittingAction}>
+                <PendingButton size="sm" onClick={handleApprove} pending={pendingAction === "approve"} pendingLabel="Approving...">
                   Approve
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsSendingBack(true)} disabled={isSubmittingAction}>
+                </PendingButton>
+                <Button size="sm" variant="outline" onClick={() => setIsSendingBack(true)} disabled={pendingAction !== null}>
                   Send Back
                 </Button>
               </div>

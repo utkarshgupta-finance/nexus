@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -157,9 +158,9 @@ function CommercialVersionReviewPage({
 
             {mode === "idle" ? (
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={handleApprove} disabled={isSubmittingAction}>
+                <PendingButton size="sm" onClick={handleApprove} pending={isSubmittingAction} pendingLabel="Approving...">
                   Approve &amp; Activate
-                </Button>
+                </PendingButton>
                 <Button size="sm" variant="outline" onClick={() => setMode("reject")} disabled={isSubmittingAction}>
                   Reject
                 </Button>
@@ -179,9 +180,9 @@ function CommercialVersionReviewPage({
                   <Button size="sm" variant="outline" onClick={() => setMode("idle")} disabled={isSubmittingAction}>
                     Cancel
                   </Button>
-                  <Button size="sm" onClick={handleReject} disabled={isSubmittingAction}>
+                  <PendingButton size="sm" onClick={handleReject} pending={isSubmittingAction} pendingLabel="Rejecting...">
                     Confirm Reject
-                  </Button>
+                  </PendingButton>
                 </div>
               </div>
             )}

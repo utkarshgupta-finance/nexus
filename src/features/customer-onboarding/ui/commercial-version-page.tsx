@@ -4,9 +4,11 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 
 import { saveCommercialVersionDraftAction, submitCommercialVersionAction } from "../actions"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
@@ -39,23 +41,23 @@ function CommercialVersionPage({
   const [showSubmitPanel, setShowSubmitPanel] = useState(false)
   const [reason, setReason] = useState(initialVersion.reason ?? "")
   const [effectiveDate, setEffectiveDate] = useState(initialVersion.effectiveDate ?? new Date().toISOString().slice(0, 10))
-  const [isSaving, setIsSaving] = useState(false)
+  const [pendingAction, setPendingAction] = useState<"save" | "submit" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   async function handleSaveDraft() {
     setActionError(null)
-    setIsSaving(true)
+    setPendingAction("save")
     const result = await saveCommercialVersionDraftAction(requestId, commercialRate)
-    setIsSaving(false)
+    setPendingAction(null)
     if (!result.ok) setActionError(result.error)
   }
 
   async function handleSubmit() {
     setActionError(null)
-    setIsSaving(true)
+    setPendingAction("submit")
     await saveCommercialVersionDraftAction(requestId, commercialRate)
     const result = await submitCommercialVersionAction(requestId, reason, effectiveDate)
-    setIsSaving(false)
+    setPendingAction(null)
     if (result.ok) {
       router.push(`/commercials/${configId}`)
       router.refresh()
@@ -81,13 +83,30 @@ function CommercialVersionPage({
           <p className="text-xs text-muted-foreground">This version has already been {initialVersion.status} and can no longer be edited.</p>
         ) : (
           <>
-            <CommercialRateSection
-              value={commercialRate}
-              onChange={setCommercialRate}
-              onPrevious={() => router.push(`/commercials/${configId}`)}
-              onSaveDraft={handleSaveDraft}
-              onNext={() => setShowSubmitPanel(true)}
-            />
+            <CommercialRateSection value={commercialRate} onChange={setCommercialRate} />
+
+            <Separator />
+
+            <div className="flex items-center justify-between gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push(`/commercials/${configId}`)} disabled={pendingAction !== null}>
+                Previous
+              </Button>
+              <div className="flex items-center gap-2">
+                <PendingButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveDraft}
+                  pending={pendingAction === "save"}
+                  pendingLabel="Saving..."
+                  disabled={pendingAction === "submit"}
+                >
+                  Save Draft
+                </PendingButton>
+                <Button size="sm" onClick={() => setShowSubmitPanel(true)} disabled={pendingAction !== null}>
+                  Next
+                </Button>
+              </div>
+            </div>
 
             {showSubmitPanel ? (
               <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
@@ -111,9 +130,9 @@ function CommercialVersionPage({
                     </label>
                     <Input id="version-effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
                   </div>
-                  <Button size="sm" onClick={handleSubmit} disabled={isSaving}>
+                  <PendingButton size="sm" onClick={handleSubmit} pending={pendingAction === "submit"} pendingLabel="Submitting...">
                     Submit
-                  </Button>
+                  </PendingButton>
                 </div>
               </section>
             ) : null}

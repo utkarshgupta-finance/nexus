@@ -54,5 +54,34 @@ function toProcessJourneyStages(
   }))
 }
 
-export { CUSTOMER_ONBOARDING_PROCESS_KEY, CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages }
+/** True only for the very first stage (order 1): the bottom footer never renders a Previous button here. */
+function isFirstOnboardingStage(order: number): boolean {
+  return order === 1
+}
+
+/** True only for the last stage: the bottom footer shows Submit instead of Next here. */
+function isLastOnboardingStage(order: number): boolean {
+  return order === CUSTOMER_ONBOARDING_STAGES.length
+}
+
+/**
+ * The one lookup both the bottom footer's Previous/Next buttons and the
+ * stage capsules use to find the adjacent stage by order (Customer
+ * Lifecycle V1 UX pass, defect §2: every stage needs consistent
+ * Previous/Save Draft/Next|Submit navigation). Returns null past either
+ * end, never wrapping around.
+ */
+function adjacentOnboardingStage(order: number, direction: "previous" | "next"): CustomerOnboardingStageMeta | null {
+  const targetOrder = direction === "previous" ? order - 1 : order + 1
+  return CUSTOMER_ONBOARDING_STAGES.find((stage) => stage.order === targetOrder) ?? null
+}
+
+export {
+  CUSTOMER_ONBOARDING_PROCESS_KEY,
+  CUSTOMER_ONBOARDING_STAGES,
+  toProcessJourneyStages,
+  isFirstOnboardingStage,
+  isLastOnboardingStage,
+  adjacentOnboardingStage,
+}
 export type { CustomerOnboardingStageMeta }

@@ -1236,15 +1236,9 @@ function FxRateDisplay({ currencyCode }: { currencyCode: string }) {
 function CommercialRateSection({
   value,
   onChange,
-  onPrevious,
-  onSaveDraft,
-  onNext,
 }: {
   value: CommercialRateDraft
   onChange: (next: CommercialRateDraft) => void
-  onPrevious: () => void
-  onSaveDraft: () => void
-  onNext: () => void
 }) {
   const [openEditor, setOpenEditor] = useState<OpenEditor>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
@@ -1314,22 +1308,6 @@ function CommercialRateSection({
           />
         </div>
       ))}
-
-      <Separator />
-
-      <div className="flex items-center justify-between gap-2">
-        <Button variant="outline" size="sm" onClick={onPrevious}>
-          Previous
-        </Button>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onSaveDraft}>
-            Save Draft
-          </Button>
-          <Button size="sm" onClick={onNext}>
-            Next
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }

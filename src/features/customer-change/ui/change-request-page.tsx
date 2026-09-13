@@ -4,8 +4,8 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 import { saveChangeDraftAction, submitChangeRequestAction } from "../actions"
@@ -51,7 +51,7 @@ function ChangeRequestPage({
   const [formValues, setFormValues] = useState<Record<string, string | null>>(initialFormValues)
   const [reason, setReason] = useState(initialChangeRequest.reason ?? "")
   const [effectiveDate, setEffectiveDate] = useState(initialChangeRequest.effectiveDate ?? new Date().toISOString().slice(0, 10))
-  const [isSaving, setIsSaving] = useState(false)
+  const [pendingAction, setPendingAction] = useState<"save" | "submit" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const requirements = useMemo(() => evaluateCustomerChangeRequirements(currentValues, formValues), [currentValues, formValues])
@@ -62,18 +62,18 @@ function ChangeRequestPage({
 
   async function handleSaveDraft() {
     setActionError(null)
-    setIsSaving(true)
+    setPendingAction("save")
     const result = await saveChangeDraftAction(requestId, formValues)
-    setIsSaving(false)
+    setPendingAction(null)
     if (!result.ok) setActionError(result.error)
   }
 
   async function handleSubmit() {
     setActionError(null)
-    setIsSaving(true)
+    setPendingAction("submit")
     await saveChangeDraftAction(requestId, formValues)
     const result = await submitChangeRequestAction(requestId, reason, effectiveDate)
-    setIsSaving(false)
+    setPendingAction(null)
     if (result.ok) {
       router.push(`/customers`)
       router.refresh()
@@ -143,12 +143,19 @@ function ChangeRequestPage({
                 </label>
                 <Input id="effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
               </div>
-              <Button size="sm" variant="outline" onClick={handleSaveDraft} disabled={isSaving}>
+              <PendingButton
+                size="sm"
+                variant="outline"
+                onClick={handleSaveDraft}
+                pending={pendingAction === "save"}
+                pendingLabel="Saving..."
+                disabled={pendingAction === "submit"}
+              >
                 Save Draft
-              </Button>
-              <Button size="sm" onClick={handleSubmit} disabled={isSaving}>
+              </PendingButton>
+              <PendingButton size="sm" onClick={handleSubmit} pending={pendingAction === "submit"} pendingLabel="Submitting..." disabled={pendingAction === "save"}>
                 Submit
-              </Button>
+              </PendingButton>
             </div>
           </section>
         ) : null}

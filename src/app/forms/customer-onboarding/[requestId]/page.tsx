@@ -42,17 +42,12 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
     snapshot = emptySnapshot()
   }
 
-  const canPromoteCommercial = await hasPermission("commercial_configuration", "write")
+  const canReview = await hasPermission("customer", "approve")
 
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_CREATE} loginRedirectTo={`/forms/customer-onboarding/${requestId}`}>
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-        <CustomerOnboardingPage
-          requestId={requestId}
-          initialCase={onboardingCase}
-          snapshotUnavailable={snapshotUnavailable}
-          canPromoteCommercial={canPromoteCommercial}
-        />
+        <CustomerOnboardingPage requestId={requestId} initialCase={onboardingCase} snapshotUnavailable={snapshotUnavailable} canReview={canReview} />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>
   )

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import { CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages } from "./process"
+import {
+  CUSTOMER_ONBOARDING_STAGES,
+  toProcessJourneyStages,
+  isFirstOnboardingStage,
+  isLastOnboardingStage,
+  adjacentOnboardingStage,
+} from "./process"
 
 describe("Customer Onboarding stage order", () => {
   it("lists all five V1 stages in the required business order", () => {
@@ -68,5 +74,36 @@ describe("toProcessJourneyStages", () => {
     expect(stages.find((stage) => stage.id === "commercial_rate")?.isCurrent).toBeFalsy()
     // Completeness is unaffected by which stage is current (the bug this replaces).
     expect(stages.find((stage) => stage.id === "tax_registration")?.state).toBe("complete")
+  })
+})
+
+describe("onboarding stage footer navigation (Customer Lifecycle V1 UX pass, defect: consistent Previous/Save Draft/Next|Submit)", () => {
+  it("treats only order 1 as the first stage", () => {
+    expect(CUSTOMER_ONBOARDING_STAGES.map((stage) => isFirstOnboardingStage(stage.order))).toEqual([true, false, false, false, false])
+  })
+
+  it("treats only the last stage (order 5) as the last stage", () => {
+    expect(CUSTOMER_ONBOARDING_STAGES.map((stage) => isLastOnboardingStage(stage.order))).toEqual([false, false, false, false, true])
+  })
+
+  it("Next exists for stages 1-4 (adjacentOnboardingStage('next') is non-null)", () => {
+    for (const stage of CUSTOMER_ONBOARDING_STAGES.filter((entry) => entry.order < 5)) {
+      expect(adjacentOnboardingStage(stage.order, "next")).not.toBeNull()
+    }
+    expect(adjacentOnboardingStage(5, "next")).toBeNull()
+  })
+
+  it("Previous exists for stages 2-5 (adjacentOnboardingStage('previous') is non-null)", () => {
+    for (const stage of CUSTOMER_ONBOARDING_STAGES.filter((entry) => entry.order > 1)) {
+      expect(adjacentOnboardingStage(stage.order, "previous")).not.toBeNull()
+    }
+    expect(adjacentOnboardingStage(1, "previous")).toBeNull()
+  })
+
+  it("Next/Previous always resolve to the immediately adjacent stage, never skipping or wrapping", () => {
+    expect(adjacentOnboardingStage(1, "next")?.key).toBe("tax_registration")
+    expect(adjacentOnboardingStage(3, "next")?.key).toBe("commercial_rate")
+    expect(adjacentOnboardingStage(3, "previous")?.key).toBe("tax_registration")
+    expect(adjacentOnboardingStage(5, "previous")?.key).toBe("commercial_rate")
   })
 })

@@ -17,7 +17,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { getActiveOptions } from "@/features/reference-data"
 import type { ReferenceListKey, ReferenceOption } from "@/features/reference-data"
 import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapshot-context"
-import { CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages } from "../domain/process"
+import {
+  CUSTOMER_ONBOARDING_STAGES,
+  toProcessJourneyStages,
+  isFirstOnboardingStage,
+  isLastOnboardingStage,
+  adjacentOnboardingStage,
+} from "../domain/process"
 import { COMMERCIAL_DOCUMENT_DEFINITIONS } from "../domain/commercial-documents"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
@@ -43,7 +49,9 @@ import {
 import { AttachmentUpload } from "./attachment-upload"
 import type { SelectedAttachmentFile } from "./attachment-upload"
 import { CommercialRateSection } from "./commercial-rate-section"
-import { CommercialConfigurationPromotionPanel } from "./commercial-configuration-promotion-panel"
+import { OnboardingStageFooter } from "./onboarding-stage-footer"
+import type { OnboardingStageFooterAction } from "./onboarding-stage-footer"
+import { OnboardingSubmittedScreen } from "./onboarding-submitted-screen"
 
 const REFERENCE_LISTS: ReferenceListKey[] = [
   "country",
@@ -86,20 +94,21 @@ function CustomerOnboardingPage({
   requestId,
   initialCase,
   snapshotUnavailable = false,
-  canPromoteCommercial = false,
+  canReview = false,
 }: {
   /** The real, persisted onboarding case identity (customer_onboarding_cases.request_id). */
   requestId: string
   /** Loaded server-side from the real database (see ../server.ts's getOnboardingCase); this page never starts from a fake in-memory case. */
   initialCase: CustomerOnboardingCase
   snapshotUnavailable?: boolean
-  /** Server-derived: whether the current session holds commercial_configuration.write (see ../actions.ts). Rendering is convenience only; the write itself is independently re-checked server-side. */
-  canPromoteCommercial?: boolean
+  /** Server-derived: whether the current session holds customer.approve (see ../actions.ts). Gates the Submitted screen's "Review Now" action; independently re-checked server-side on the Review route itself. */
+  canReview?: boolean
 }) {
   const snapshot = useReferenceMasterSnapshot()
   const [onboardingCase, setOnboardingCase] = useState(initialCase)
-  const [isSaving, setIsSaving] = useState(false)
+  const [pendingAction, setPendingAction] = useState<OnboardingStageFooterAction>(null)
   const [draftSaved, setDraftSaved] = useState(false)
+  const [submittedViewMode, setSubmittedViewMode] = useState<"confirmation" | "detail">("confirmation")
   const [activeStageKey, setActiveStageKey] = useState<CustomerOnboardingStageKey>(initialCase.currentStageKey)
   const [country, setCountry] = useState<string | null>(
     (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.country] as string | undefined) ?? DEFAULT_COUNTRY_CODE
@@ -216,15 +225,48 @@ function CustomerOnboardingPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initialCase is the one-time server-loaded snapshot this survey primes from; it must never re-run and re-overwrite in-progress edits just because the case's own local state (a value this same effect helped produce) has since changed.
   }, [survey])
 
+  /** The one direct path that moves the active stage, reused by the stage capsules, and by the bottom footer's Previous/Next (Commercial Documents, Commercial Rate, and Agreement & Approval are not survey pages, see ../forms/customer-onboarding-form-definition.ts's header, so only the else branch applies to them). */
+  function goToStage(stageKey: CustomerOnboardingStageKey) {
+    const stage = CUSTOMER_ONBOARDING_STAGES.find((entry) => entry.key === stageKey)
+    if (!stage) return
+    if (stage.order <= SURVEY_STAGE_ORDER_LIMIT) {
+      // eslint-disable-next-line react-hooks/immutability -- SurveyJS Model is an imperative instance; this is its documented API for changing the current page (see platform/forms/use-survey-model.ts for the same pattern with `survey.mode`).
+      survey.currentPageNo = stage.order - 1
+    } else {
+      setActiveStageKey(stage.key)
+      setOnboardingCase((current) => setCurrentStage(current, stage.key))
+    }
+  }
+
+  function handleStageTabChange(value: string[]) {
+    if (!value[0]) return
+    goToStage(value[0] as CustomerOnboardingStageKey)
+  }
+
   async function handleSaveDraft() {
-    setIsSaving(true)
+    setPendingAction("save")
     setDraftSaved(false)
     const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
     const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
-    setIsSaving(false)
+    setPendingAction(null)
     if (result.ok) {
       setOnboardingCase(result.onboardingCase)
       setDraftSaved(true)
+    } else {
+      setSubmitError(result.error)
+    }
+  }
+
+  /** Next always persists the current draft first (draft navigation is permissive: it never requires the current stage to be complete), then advances. */
+  async function handleNext(targetStageKey: CustomerOnboardingStageKey) {
+    setPendingAction("next")
+    setDraftSaved(false)
+    const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
+    const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
+    setPendingAction(null)
+    if (result.ok) {
+      setOnboardingCase(result.onboardingCase)
+      goToStage(targetStageKey)
     } else {
       setSubmitError(result.error)
     }
@@ -248,38 +290,22 @@ function CustomerOnboardingPage({
 
     if (!fieldsValid || documentErrorMessages.length > 0) return
 
-    setIsSaving(true)
+    setPendingAction("submit")
+    setDraftSaved(false)
     const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
     const saveResult = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
     if (!saveResult.ok) {
-      setIsSaving(false)
+      setPendingAction(null)
       setSubmitError(saveResult.error)
       return
     }
     const submitResult = await submitOnboardingCaseAction(requestId)
-    setIsSaving(false)
+    setPendingAction(null)
     if (submitResult.ok) {
       setOnboardingCase(submitResult.onboardingCase)
+      setSubmittedViewMode("confirmation")
     } else {
       setSubmitError(submitResult.error)
-    }
-  }
-
-  function handleStageTabChange(value: string[]) {
-    if (!value[0]) return
-    const stage = CUSTOMER_ONBOARDING_STAGES.find((entry) => entry.key === value[0])
-    if (!stage) return
-    if (stage.order <= SURVEY_STAGE_ORDER_LIMIT) {
-      // eslint-disable-next-line react-hooks/immutability -- SurveyJS Model is an imperative instance; this is its documented API for changing the current page (see platform/forms/use-survey-model.ts for the same pattern with `survey.mode`).
-      survey.currentPageNo = stage.order - 1
-    } else {
-      // Commercial Documents, Commercial Rate, and Agreement & Approval
-      // are not survey pages (see
-      // ../forms/customer-onboarding-form-definition.ts's header), so
-      // there is no survey page change to react to: this is the one
-      // direct path that moves the active stage for them.
-      setActiveStageKey(stage.key)
-      setOnboardingCase((current) => setCurrentStage(current, stage.key))
     }
   }
 
@@ -313,6 +339,32 @@ function CustomerOnboardingPage({
     agreement_approval: evaluateAgreementApprovalStatus(signedAgreement !== null, legalApprovalComplete, completionReady),
   }
 
+  const currentStageMeta = CUSTOMER_ONBOARDING_STAGES.find((stage) => stage.key === activeStageKey)
+  const isFirstStage = isFirstOnboardingStage(currentStageMeta?.order ?? 1)
+  const isLastStage = isLastOnboardingStage(currentStageMeta?.order ?? 1)
+
+  // Submitted/resubmitted defaults to the Submitted confirmation screen
+  // (task defect §3: a green "Submitted" badge alone left the user with
+  // no idea what to do next). The underlying business rule is unchanged:
+  // a submitted case is never a Customer Master, so this never claims
+  // otherwise. "View Request" swaps to the read-only survey below.
+  if ((onboardingCase.status === "submitted" || onboardingCase.status === "resubmitted") && submittedViewMode === "confirmation") {
+    const legalName = (onboardingCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName] as string) || "This customer"
+    return (
+      <div className="flex flex-1 flex-col">
+        <PageHeader title="Customer Onboarding" description={`Request ${requestId}`} />
+        <OnboardingSubmittedScreen
+          legalName={legalName}
+          requestId={requestId}
+          submittedAt={onboardingCase.currentRevision.submittedAt}
+          revisionNumber={onboardingCase.currentRevision.revisionNumber}
+          canReview={canReview}
+          onViewRequest={() => setSubmittedViewMode("detail")}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -320,21 +372,18 @@ function CustomerOnboardingPage({
         description={`Request ${requestId}`}
         actions={
           isLocked ? (
-            <Badge variant="ghost" className="gap-1 bg-success/10 text-success">
-              <CheckCircle2Icon data-icon="inline-start" className="size-3" />
-              Submitted
-            </Badge>
-          ) : (
-            <div className="flex items-center gap-3">
-              {draftSaved ? <span className="text-[0.7rem] text-muted-foreground">Draft saved</span> : null}
-              <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
-                Save Draft
-              </Button>
-              <Button size="sm" onClick={handleSubmit} disabled={isSaving}>
-                Submit
-              </Button>
+            <div className="flex items-center gap-2">
+              <Badge variant="ghost" className="gap-1 bg-success/10 text-success">
+                <CheckCircle2Icon data-icon="inline-start" className="size-3" />
+                {onboardingCase.status === "approved" ? "Approved" : "Submitted"}
+              </Badge>
+              {onboardingCase.status !== "approved" ? (
+                <Button variant="outline" size="sm" onClick={() => setSubmittedViewMode("confirmation")}>
+                  Back to Summary
+                </Button>
+              ) : null}
             </div>
-          )
+          ) : null
         }
       />
 
@@ -456,14 +505,7 @@ function CustomerOnboardingPage({
 
           {activeStageKey === "commercial_rate" ? (
             <div className="flex flex-col gap-4">
-              <CommercialRateSection
-                value={commercialRate}
-                onChange={setCommercialRate}
-                onPrevious={() => handleStageTabChange(["commercial_documents"])}
-                onSaveDraft={handleSaveDraft}
-                onNext={() => handleStageTabChange(["agreement_approval"])}
-              />
-              {canPromoteCommercial ? <CommercialConfigurationPromotionPanel draft={commercialRate} /> : null}
+              <CommercialRateSection value={commercialRate} onChange={setCommercialRate} />
             </div>
           ) : null}
 
@@ -514,6 +556,30 @@ function CustomerOnboardingPage({
             <p role="alert" className="text-xs text-destructive">
               {submitError}
             </p>
+          ) : null}
+
+          {!isLocked ? (
+            <>
+              <Separator />
+              {draftSaved ? <p className="text-[0.7rem] text-muted-foreground">Draft saved.</p> : null}
+              <OnboardingStageFooter
+                isFirstStage={isFirstStage}
+                isLastStage={isLastStage}
+                pendingAction={pendingAction}
+                // eslint-disable-next-line react-hooks/immutability -- goToStage's own SurveyJS Model mutation is already justified at its definition; this closure just forwards to it.
+                onPrevious={() => {
+                  const previous = adjacentOnboardingStage(currentStageMeta?.order ?? 1, "previous")
+                  if (previous) goToStage(previous.key)
+                }}
+                onSaveDraft={handleSaveDraft}
+                // eslint-disable-next-line react-hooks/immutability -- handleNext's eventual goToStage call is already justified at its definition; this closure just forwards to it.
+                onNext={() => {
+                  const next = adjacentOnboardingStage(currentStageMeta?.order ?? 1, "next")
+                  if (next) handleNext(next.key)
+                }}
+                onSubmit={handleSubmit}
+              />
+            </>
           ) : null}
         </div>
       </div>

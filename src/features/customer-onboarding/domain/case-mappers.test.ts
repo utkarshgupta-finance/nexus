@@ -118,4 +118,25 @@ describe("toCustomerOnboardingCase", () => {
       expect(domainCase.status).toBe(status)
     }
   })
+
+  it("a submitted or resubmitted case has no Customer Master identity yet (Customer Lifecycle V1 UX pass, defect §3: submitted is never a Customer Master)", () => {
+    for (const status of ["submitted", "resubmitted"] as const) {
+      const domainCase = toCustomerOnboardingCase(baseCaseRow({ status }), [draftRevisionRow({ status: "submitted", submitted_at: "t1", submitted_by: "a" })])
+      expect(domainCase.customerId).toBeNull()
+      expect(domainCase.commercialConfigurationId).toBeNull()
+    }
+  })
+
+  it("maps customer_id/commercial_configuration_id straight through, null until approval sets them", () => {
+    const beforeApproval = toCustomerOnboardingCase(baseCaseRow(), [draftRevisionRow()])
+    expect(beforeApproval.customerId).toBeNull()
+    expect(beforeApproval.commercialConfigurationId).toBeNull()
+
+    const afterApproval = toCustomerOnboardingCase(
+      baseCaseRow({ status: "approved", customer_id: "customer-1", commercial_configuration_id: "config-1" }),
+      [draftRevisionRow()]
+    )
+    expect(afterApproval.customerId).toBe("customer-1")
+    expect(afterApproval.commercialConfigurationId).toBe("config-1")
+  })
 })

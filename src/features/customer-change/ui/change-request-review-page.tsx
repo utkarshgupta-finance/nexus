@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -140,9 +141,9 @@ function ChangeRequestReviewPage({
 
             {mode === "idle" ? (
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={handleApprove} disabled={isSubmittingAction}>
+                <PendingButton size="sm" onClick={handleApprove} pending={isSubmittingAction} pendingLabel="Approving...">
                   Approve
-                </Button>
+                </PendingButton>
                 <Button size="sm" variant="outline" onClick={() => setMode("send_back")} disabled={isSubmittingAction}>
                   Send Back
                 </Button>
@@ -165,9 +166,14 @@ function ChangeRequestReviewPage({
                   <Button size="sm" variant="outline" onClick={() => setMode("idle")} disabled={isSubmittingAction}>
                     Cancel
                   </Button>
-                  <Button size="sm" onClick={mode === "send_back" ? handleSendBack : handleReject} disabled={isSubmittingAction}>
+                  <PendingButton
+                    size="sm"
+                    onClick={mode === "send_back" ? handleSendBack : handleReject}
+                    pending={isSubmittingAction}
+                    pendingLabel={mode === "send_back" ? "Sending back..." : "Rejecting..."}
+                  >
                     Confirm {mode === "send_back" ? "Send Back" : "Reject"}
-                  </Button>
+                  </PendingButton>
                 </div>
               </div>
             )}

@@ -42,6 +42,8 @@ function toCustomerOnboardingCase(row: CustomerOnboardingCaseRow, revisions: Sub
         : null,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
+    customerId: row.customer_id,
+    commercialConfigurationId: row.commercial_configuration_id,
   }
 }
 

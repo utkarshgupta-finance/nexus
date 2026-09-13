@@ -5,15 +5,18 @@ approval into a real Customer Master + Commercial Configuration, the
 Customer Change Request lifecycle (Customer workspace tabs, Field
 History), the governed Commercial Configuration Version 2+ draft/
 activate lifecycle, and Permanent Customer Deletion are all implemented
-and persisted; see each section for exact scope and two known,
-honestly-stated gaps: (1) Version History does not yet surface an
-"Approved By" column for governed versions (§4); (2) the one real human
-account (`utkarsh.gupta@mobisy.com`) currently holds
-`commercial_configuration_viewer` (read-only), not
-`commercial_configuration_admin`, so it cannot yet exercise the new
-Commercial Version 2 write/approve UI through a real session; granting
-it that role was attempted and blocked by this environment's own
-permission safeguard pending explicit user authorization.
+and persisted. Version History surfaces an "Approved By" column for
+governed versions (§4), and the real human account
+(`utkarsh.gupta@mobisy.com`) holds `commercial_configuration_admin` and
+`reference_master_admin`, so it can exercise the Commercial Version 2
+write/approve UI through a real session. A Customer Lifecycle V1 UX
+pass (manual testing round) additionally added: shared loading/pending
+feedback across route navigation and every mutating action, a
+consistent Previous/Save Draft/Next/Submit footer across all five
+Onboarding stages, a Submitted confirmation screen, an Approve success
+screen linking straight to the new Customer and Commercials, and removal
+of the development-only Commercial Configuration promotion panel from
+the real onboarding flow (§4).
 
 ## 1. Onboarding Case lifecycle: IMPLEMENTED
 
@@ -79,10 +82,11 @@ duplicate click.
 
 The TypeScript service (`approveOnboardingCase`) reads the case's
 submitted Commercial Rate draft back out and maps each component through
-the exact same `mapOnboardingComponentToCommercialComponentInsert`
-(`domain/commercial-configuration-promotion.ts`) the interactive
-Commercial Rate promotion panel already uses, so a component's stored
-shape is identical regardless of which path created it.
+`mapOnboardingComponentToCommercialComponentInsert`
+(`domain/commercial-configuration-promotion.ts`), the same mapping used
+by Commercial Configuration Version 2+'s draft/activate path (§4), so a
+component's stored shape is identical regardless of which governed path
+created it.
 
 ## 3. Customer Master: governed by Change Requests
 
@@ -192,16 +196,22 @@ screen, depending on status.
 
 ## 4. Commercial Version 2+ (draft/activate): IMPLEMENTED
 
-`create_commercial_change_for_configuration` (used by the pre-existing
-interactive Commercial Rate promotion panel) is left fully intact: it
-still creates a live, immediately-effective Change with no draft phase,
-and remains available. Alongside it,
+The interactive "Promote to Commercial Configuration (development)"
+panel that previously called `create_commercial_change_for_configuration`
+directly from the Customer Onboarding UI has been removed from the real
+user-facing flow (Customer Lifecycle V1 UX pass): the real approval
+flow now creates Commercial Version 1 automatically, and every later
+version goes through the governed path below. The underlying RPC itself
+is untouched (still used internally by `approveOnboardingCase` for
+Version 1), it is simply no longer exposed as a form asking for a raw
+Customer Master id, Configuration key, or Configuration name.
+
 `supabase/migrations/20260913070000_commercial_configuration_version_lifecycle.sql`
-adds a new, governed, parallel path: `commercial_configuration_versions`
-extends `requests` 1:1 (the same precedent `customer_onboarding_cases`
-and `customer_change_requests` both already established), with the
-proposed Commercial Rate draft living in `submission_revisions`, never
-duplicated.
+adds the governed, parallel path for every version after the first:
+`commercial_configuration_versions` extends `requests` 1:1 (the same
+precedent `customer_onboarding_cases` and `customer_change_requests`
+both already established), with the proposed Commercial Rate draft
+living in `submission_revisions`, never duplicated.
 
 Real, permission-gated RPCs (`commercial_configuration.write` for the
 requester side, `commercial_configuration.approve` for the reviewer

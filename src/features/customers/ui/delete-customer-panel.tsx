@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -120,9 +121,9 @@ function DeleteCustomerPanel({ customerId, customerKey }: { customerId: string; 
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">You can deactivate this customer instead: it stays fully intact, just marked inactive.</p>
-          <Button size="sm" variant="outline" className="w-fit" onClick={handleDeactivate} disabled={isSubmitting}>
+          <PendingButton size="sm" variant="outline" className="w-fit" onClick={handleDeactivate} pending={isSubmitting} pendingLabel="Deactivating...">
             Deactivate Instead
-          </Button>
+          </PendingButton>
         </div>
       ) : eligibility && eligibility.eligible ? (
         <div className="flex flex-col gap-3">
@@ -147,15 +148,17 @@ function DeleteCustomerPanel({ customerId, customerKey }: { customerId: string; 
             </label>
             <Input id="delete-confirmation" value={confirmationText} onChange={(event) => setConfirmationText(event.target.value)} />
           </div>
-          <Button
+          <PendingButton
             size="sm"
             variant="destructive"
             className="w-fit"
             onClick={handleDelete}
-            disabled={isSubmitting || confirmationText !== CONFIRMATION_TEXT || !reason.trim()}
+            pending={isSubmitting}
+            pendingLabel="Deleting..."
+            disabled={confirmationText !== CONFIRMATION_TEXT || !reason.trim()}
           >
             Permanently Delete
-          </Button>
+          </PendingButton>
         </div>
       ) : null}
     </section>
