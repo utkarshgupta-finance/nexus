@@ -80,6 +80,31 @@ applies to workflow/approval identity specifically: a role reference
 (e.g. `FINANCE_HEAD`, `BU_HEAD`) is never resolved to a hardcoded person
 or a fake "logged in as" user.
 
+## Approved business truth is never edited directly
+
+Once a Customer Master record or a Commercial Configuration version has
+been approved, it is never mutated in place by ordinary application
+code. A change to either goes through a governed proposed change: current
+truth -> proposed change -> review -> approval -> apply -> new current
+truth. The old truth remains historically understandable (see
+`docs/CUSTOMER_LIFECYCLE.md`). Draft records (an onboarding case still in
+`draft`/`sent_back`, a Commercial Version still unapproved) may be edited
+directly; approved/current records may not. If you find an "Edit" control
+against an approved record, replace it with a "Create Change Request" or
+"Create New Version" control instead of restoring direct mutation.
+
+## Garbage data may be permanently removed only by a specially authorized admin
+
+Real business history must never be destroyed. Permanent deletion of a
+Customer Master record (or similar) is permitted only for genuine
+garbage/test data confirmed to have no protected downstream history
+(invoices, recognized revenue, historical Commercial Versions beyond a
+safe initial state, and similar), gated by its own permission
+(`customer.delete_permanent`), never granted broadly. The fact that a
+deletion happened must remain permanently auditable even after the
+source record is physically removed: a deletion audit row must never
+depend on a foreign key to the row it describes.
+
 ## Structural changes must be documented in the same task
 
 A change is structural if it introduces or alters an architectural

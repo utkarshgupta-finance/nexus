@@ -1,42 +1,38 @@
-import { CustomerOnboardingPage } from "@/features/customer-onboarding/ui/customer-onboarding-page"
-import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
-import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
-import type { ReferenceMasterSnapshot } from "@/features/reference-data"
-import { hasPermission } from "@/platform/permissions/server"
+import { redirect } from "next/navigation"
+
+import { AuthGate } from "@/components/product/auth-gate"
+import { getCurrentNexusSession } from "@/platform/auth/server"
+import { requirePermission } from "@/platform/permissions/server"
+import { createOnboardingCase } from "@/features/customer-onboarding/services/case.service"
 
 /**
- * Customer Onboarding reads the real, persistent Reference Master
- * (supabase/migrations/20260912080000_reference_master_foundation.sql)
- * for Industry/Segment/Business Unit/Tax Identifier Type/Currency/
- * Pricing Unit/Invoice Frequency, loaded once here and threaded down
- * through `ReferenceMasterSnapshotProvider` to every Client Component
- * that needs it (`CustomerOnboardingPage` and, several levels deeper,
- * `CommercialRateSection`), rather than each of them reading Supabase
- * directly. `dynamic = "force-dynamic"` for the same reason as
- * `src/app/customers/page.tsx`: this route has no dynamic API of its own
- * to opt it out of static optimization.
- *
- * The read is wrapped: a missing credential or an unreachable database
- * must show an honest unavailable state (task correction §23), never
- * crash the page or silently render as if there are no values.
+ * "New Customer" entry point (Customer Lifecycle V1, task §54: Customers
+ * -> New Customer -> Customer Onboarding). Visiting this bare route,
+ * once authorized, always creates one real, persisted Customer
+ * Onboarding Case (create_customer_onboarding_case,
+ * supabase/migrations/20260913040000_customer_lifecycle_onboarding_foundation.sql)
+ * and immediately redirects to its own stable URL
+ * (/forms/customer-onboarding/[requestId]), which is what every
+ * subsequent Save Draft/Submit/refresh actually operates on. This route
+ * itself never renders the form.
  */
 export const dynamic = "force-dynamic"
 
-export default async function CustomerOnboardingRoute() {
-  let snapshot: ReferenceMasterSnapshot
-  let snapshotUnavailable = false
-  try {
-    snapshot = await loadReferenceMasterSnapshot()
-  } catch {
-    snapshotUnavailable = true
-    snapshot = emptySnapshot()
-  }
+const CUSTOMER_CREATE = { resource: "customer", action: "create" }
 
-  const canPromoteCommercial = await hasPermission("commercial_configuration", "write")
+async function CreateAndRedirect() {
+  const actor = await requirePermission("customer", "create")
+  const onboardingCase = await createOnboardingCase(actor.appUserId)
+  redirect(`/forms/customer-onboarding/${onboardingCase.requestId}`)
+  return null
+}
+
+export default async function NewCustomerOnboardingRoute() {
+  const session = await getCurrentNexusSession()
 
   return (
-    <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-      <CustomerOnboardingPage snapshotUnavailable={snapshotUnavailable} canPromoteCommercial={canPromoteCommercial} />
-    </ReferenceMasterSnapshotProvider>
+    <AuthGate session={session} requiredPermission={CUSTOMER_CREATE} loginRedirectTo="/forms/customer-onboarding">
+      <CreateAndRedirect />
+    </AuthGate>
   )
 }

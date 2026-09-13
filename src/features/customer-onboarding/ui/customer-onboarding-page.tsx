@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Survey } from "survey-react-ui"
 import { CheckCircle2Icon, ClockIcon } from "lucide-react"
 
@@ -21,8 +21,10 @@ import { CUSTOMER_ONBOARDING_STAGES, toProcessJourneyStages } from "../domain/pr
 import { COMMERCIAL_DOCUMENT_DEFINITIONS } from "../domain/commercial-documents"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
-import { createCase, setCurrentStage, submitCase, updateRevisionData } from "../domain/case"
+import { setCurrentStage } from "../domain/case"
+import type { CustomerOnboardingCase } from "../domain/types"
 import { isEligibleForCompletion } from "../domain/completion"
+import { saveOnboardingDraftAction, submitOnboardingCaseAction } from "../actions"
 import { fetchStatesForCountry } from "../domain/geography-client"
 import {
   evaluateAgreementApprovalStatus,
@@ -69,22 +71,6 @@ const COMMERCIAL_DOCUMENT_STATE_KEYS = {
 } as const
 
 /**
- * A deterministic six-digit id derived from React's own `useId()` value,
- * not `Math.random()`: `useId()` is guaranteed identical between the
- * server render and the client hydration render, so deriving from it
- * avoids the hydration mismatch a random value would cause on the
- * visible "Request REQ-XXXXXX" text, without deferring the id to a
- * post-mount effect.
- */
-function makeRequestId(reactId: string) {
-  let hash = 0
-  for (let index = 0; index < reactId.length; index += 1) {
-    hash = (hash * 31 + reactId.charCodeAt(index)) >>> 0
-  }
-  return `REQ-${100000 + (hash % 900000)}`
-}
-
-/**
  * Customer Onboarding: Customer Details, Tax & Registration, Commercial
  * Documents, Commercial Rate, Agreement & Approval. Creation access is
  * intentionally unrestricted here (task spec §27): any appropriately
@@ -97,20 +83,27 @@ function makeRequestId(reactId: string) {
  * so this page never fabricates an "Approve" action (task spec §26).
  */
 function CustomerOnboardingPage({
+  requestId,
+  initialCase,
   snapshotUnavailable = false,
   canPromoteCommercial = false,
 }: {
+  /** The real, persisted onboarding case identity (customer_onboarding_cases.request_id). */
+  requestId: string
+  /** Loaded server-side from the real database (see ../server.ts's getOnboardingCase); this page never starts from a fake in-memory case. */
+  initialCase: CustomerOnboardingCase
   snapshotUnavailable?: boolean
   /** Server-derived: whether the current session holds commercial_configuration.write (see ../actions.ts). Rendering is convenience only; the write itself is independently re-checked server-side. */
   canPromoteCommercial?: boolean
 }) {
   const snapshot = useReferenceMasterSnapshot()
-  const reactId = useId()
-  const [requestId] = useState(() => makeRequestId(reactId))
-  const [onboardingCase, setOnboardingCase] = useState(() => createCase(requestId, new Date().toISOString(), null))
+  const [onboardingCase, setOnboardingCase] = useState(initialCase)
+  const [isSaving, setIsSaving] = useState(false)
   const [draftSaved, setDraftSaved] = useState(false)
-  const [activeStageKey, setActiveStageKey] = useState<CustomerOnboardingStageKey>("customer_details")
-  const [country, setCountry] = useState<string | null>(DEFAULT_COUNTRY_CODE)
+  const [activeStageKey, setActiveStageKey] = useState<CustomerOnboardingStageKey>(initialCase.currentStageKey)
+  const [country, setCountry] = useState<string | null>(
+    (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.country] as string | undefined) ?? DEFAULT_COUNTRY_CODE
+  )
   const [taxDocuments, setTaxDocuments] = useState<{
     gst: SelectedAttachmentFile | null
     pan: SelectedAttachmentFile | null
@@ -124,7 +117,9 @@ function CustomerOnboardingPage({
     piCopy: SelectedAttachmentFile | null
   }>({ proposal: null, customerPo: null, piCopy: null })
   const [signedAgreement, setSignedAgreement] = useState<SelectedAttachmentFile | null>(null)
-  const [commercialRate, setCommercialRate] = useState<CommercialRateDraft>(() => createEmptyCommercialRateDraft())
+  const [commercialRate, setCommercialRate] = useState<CommercialRateDraft>(
+    () => (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate] as CommercialRateDraft | undefined) ?? createEmptyCommercialRateDraft()
+  )
   const [submitError, setSubmitError] = useState<string | null>(null)
   /**
    * Bumped on every SurveyJS `onValueChanged` event (see the effect below),
@@ -136,7 +131,7 @@ function CustomerOnboardingPage({
    */
   const [, forceRerenderOnFieldChange] = useState(0)
 
-  const isLocked = onboardingCase.currentRevision.status === "submitted"
+  const isLocked = onboardingCase.status === "submitted" || onboardingCase.status === "resubmitted" || onboardingCase.status === "approved"
   const mode: SurveyFormMode = isLocked ? "readonly" : "edit"
 
   const formDefinition = useMemo(() => {
@@ -151,6 +146,9 @@ function CustomerOnboardingPage({
   // Country -> State -> City wiring, plus stage-tab sync. One effect, torn
   // down together, since all three subscribe to the same Model instance.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- SurveyJS Model is an imperative instance; priming it with the real persisted revision data is its documented `data` setter, the same class of mutation use-survey-model.ts already disables this rule for.
+    survey.data = initialCase.currentRevision.data
+
     let currentCountry: string | null = (survey.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.country) as string) ?? null
 
     function loadStatesForCountry(countryCode: string | null) {
@@ -215,21 +213,24 @@ function CustomerOnboardingPage({
       survey.onValueChanged.remove(handleValueChanged)
       survey.onCurrentPageChanged.remove(handleCurrentPageChanged)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialCase is the one-time server-loaded snapshot this survey primes from; it must never re-run and re-overwrite in-progress edits just because the case's own local state (a value this same effect helped produce) has since changed.
   }, [survey])
 
-  function handleSaveDraft() {
-    setOnboardingCase((current) =>
-      updateRevisionData(
-        current,
-        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate },
-        new Date().toISOString(),
-        null
-      )
-    )
-    setDraftSaved(true)
+  async function handleSaveDraft() {
+    setIsSaving(true)
+    setDraftSaved(false)
+    const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
+    const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
+    setIsSaving(false)
+    if (result.ok) {
+      setOnboardingCase(result.onboardingCase)
+      setDraftSaved(true)
+    } else {
+      setSubmitError(result.error)
+    }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const fieldsValid = survey.validate()
     const isIndia = country === DEFAULT_COUNTRY_CODE
     const documentErrors = isIndia
@@ -247,15 +248,21 @@ function CustomerOnboardingPage({
 
     if (!fieldsValid || documentErrorMessages.length > 0) return
 
-    setOnboardingCase((current) => {
-      const withLatestData = updateRevisionData(
-        current,
-        { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate },
-        new Date().toISOString(),
-        null
-      )
-      return submitCase(withLatestData, new Date().toISOString(), null)
-    })
+    setIsSaving(true)
+    const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
+    const saveResult = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
+    if (!saveResult.ok) {
+      setIsSaving(false)
+      setSubmitError(saveResult.error)
+      return
+    }
+    const submitResult = await submitOnboardingCaseAction(requestId)
+    setIsSaving(false)
+    if (submitResult.ok) {
+      setOnboardingCase(submitResult.onboardingCase)
+    } else {
+      setSubmitError(submitResult.error)
+    }
   }
 
   function handleStageTabChange(value: string[]) {
@@ -320,16 +327,22 @@ function CustomerOnboardingPage({
           ) : (
             <div className="flex items-center gap-3">
               {draftSaved ? <span className="text-[0.7rem] text-muted-foreground">Draft saved</span> : null}
-              <Button variant="outline" size="sm" onClick={handleSaveDraft}>
+              <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
                 Save Draft
               </Button>
-              <Button size="sm" onClick={handleSubmit}>
+              <Button size="sm" onClick={handleSubmit} disabled={isSaving}>
                 Submit
               </Button>
             </div>
           )
         }
       />
+
+      {onboardingCase.status === "sent_back" && onboardingCase.sentBack ? (
+        <div className="mx-4 mt-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-3 text-xs text-foreground sm:mx-6">
+          <span className="font-medium">Sent back for revision.</span> {onboardingCase.sentBack.reason}
+        </div>
+      ) : null}
 
       {snapshotUnavailable ? (
         <div className="mx-4 mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-xs text-destructive sm:mx-6">

@@ -5,7 +5,15 @@ import { AuthorizationError } from "@/platform/permissions"
 import { loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 
 import { promoteOnboardingDraftAsNewConfiguration, promoteOnboardingDraftAsNewVersion } from "./server/commercial-configuration-promotion"
+import {
+  createOnboardingCase,
+  saveOnboardingDraft,
+  submitOnboardingCase,
+  sendBackOnboardingCase,
+  approveOnboardingCase,
+} from "./services/case.service"
 import type { CommercialRateDraft } from "./domain/commercial-rate"
+import type { CustomerOnboardingCase } from "./domain/types"
 
 /**
  * Server Action for promoting a Commercial Rate onboarding draft into the
@@ -94,5 +102,88 @@ async function promoteCommercialRateDraftAsNewVersionAction(input: {
   }
 }
 
-export { promoteCommercialRateDraftAsNewConfigurationAction, promoteCommercialRateDraftAsNewVersionAction }
-export type { PromotionActionResult }
+/**
+ * Real, database-backed Customer Onboarding Case lifecycle actions
+ * (Customer Lifecycle V1). Each derives the authenticated actor
+ * server-side via `requirePermission`, exactly like the promotion actions
+ * above; none accepts a client-supplied actor id. `customer.create`
+ * gates the requester-side actions (create/save/submit, since editing
+ * one's own onboarding case is a creation activity), `customer.approve`
+ * gates the reviewer-side actions (send back/approve), matching
+ * docs/AUTHORIZATION_MODEL.md's resource+action convention.
+ */
+
+type CaseActionResult = { ok: true; onboardingCase: CustomerOnboardingCase } | { ok: false; error: string }
+
+function toCaseActionError(error: unknown): CaseActionResult {
+  if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof Error) return { ok: false, error: error.message }
+  return { ok: false, error: "An unexpected error occurred while updating this Customer Onboarding case." }
+}
+
+async function createOnboardingCaseAction(): Promise<CaseActionResult> {
+  try {
+    const actor = await requirePermission("customer", "create")
+    const onboardingCase = await createOnboardingCase(actor.appUserId)
+    return { ok: true, onboardingCase }
+  } catch (error) {
+    return toCaseActionError(error)
+  }
+}
+
+async function saveOnboardingDraftAction(
+  requestId: string,
+  rawData: Record<string, unknown>,
+  currentStageKey: string
+): Promise<CaseActionResult> {
+  try {
+    const actor = await requirePermission("customer", "create")
+    const onboardingCase = await saveOnboardingDraft(requestId, rawData, currentStageKey, actor.appUserId)
+    return { ok: true, onboardingCase }
+  } catch (error) {
+    return toCaseActionError(error)
+  }
+}
+
+/** Serves both a first Submit and a post-send-back Resubmit; see services/case.service.ts's own comment. */
+async function submitOnboardingCaseAction(requestId: string): Promise<CaseActionResult> {
+  try {
+    const actor = await requirePermission("customer", "create")
+    const onboardingCase = await submitOnboardingCase(requestId, actor.appUserId)
+    return { ok: true, onboardingCase }
+  } catch (error) {
+    return toCaseActionError(error)
+  }
+}
+
+async function sendBackOnboardingCaseAction(requestId: string, reason: string, targetStageKey: string | null): Promise<CaseActionResult> {
+  try {
+    const actor = await requirePermission("customer", "approve")
+    const onboardingCase = await sendBackOnboardingCase(requestId, reason, targetStageKey, actor.appUserId)
+    return { ok: true, onboardingCase }
+  } catch (error) {
+    return toCaseActionError(error)
+  }
+}
+
+async function approveOnboardingCaseAction(requestId: string, effectiveDate: string): Promise<CaseActionResult> {
+  try {
+    const actor = await requirePermission("customer", "approve")
+    const snapshot = await loadReferenceMasterSnapshot()
+    const onboardingCase = await approveOnboardingCase(requestId, actor.appUserId, snapshot, effectiveDate)
+    return { ok: true, onboardingCase }
+  } catch (error) {
+    return toCaseActionError(error)
+  }
+}
+
+export {
+  promoteCommercialRateDraftAsNewConfigurationAction,
+  promoteCommercialRateDraftAsNewVersionAction,
+  createOnboardingCaseAction,
+  saveOnboardingDraftAction,
+  submitOnboardingCaseAction,
+  sendBackOnboardingCaseAction,
+  approveOnboardingCaseAction,
+}
+export type { PromotionActionResult, CaseActionResult }

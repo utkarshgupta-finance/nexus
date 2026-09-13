@@ -1,0 +1,149 @@
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/server-client"
+
+import { CaseOperationError, parseCaseError } from "../domain/case-errors"
+import type { CustomerOnboardingCaseRow, SubmissionRevisionRow } from "./case-row-types"
+
+/**
+ * Repository for customer_onboarding_cases and the submission_revisions
+ * rows it extends (supabase/migrations/20260913040000_customer_lifecycle_onboarding_foundation.sql,
+ * 20260907044335_submission_data_foundation.sql). Mirrors
+ * src/features/commercial/data/configuration.data.ts's own shape: thin
+ * RPC wrappers plus a small number of plain reads, nothing else.
+ */
+
+async function callSingleRowRpc<TRow>(fn: string, args: Record<string, unknown>): Promise<TRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  if (!data) throw new CaseOperationError(parseCaseError({ message: `${fn} returned no row` }))
+  return data as TRow
+}
+
+type CreateCaseInput = { newRequestId: string; initialRawData: Record<string, unknown>; actorUserId: string }
+
+async function createCase(input: CreateCaseInput): Promise<CustomerOnboardingCaseRow> {
+  return callSingleRowRpc<CustomerOnboardingCaseRow>("create_customer_onboarding_case", {
+    p_new_request_id: input.newRequestId,
+    p_initial_raw_data: input.initialRawData,
+    p_actor_user_id: input.actorUserId,
+  })
+}
+
+type SaveDraftInput = { requestId: string; rawData: Record<string, unknown>; currentStageKey: string; actorUserId: string }
+
+async function saveDraft(input: SaveDraftInput): Promise<CustomerOnboardingCaseRow> {
+  return callSingleRowRpc<CustomerOnboardingCaseRow>("save_customer_onboarding_draft", {
+    p_request_id: input.requestId,
+    p_raw_data: input.rawData,
+    p_current_stage_key: input.currentStageKey,
+    p_actor_user_id: input.actorUserId,
+  })
+}
+
+async function submitCase(requestId: string, actorUserId: string): Promise<CustomerOnboardingCaseRow> {
+  return callSingleRowRpc<CustomerOnboardingCaseRow>("submit_customer_onboarding_case", {
+    p_request_id: requestId,
+    p_actor_user_id: actorUserId,
+  })
+}
+
+type SendBackInput = { requestId: string; reason: string; targetStageKey: string | null; actorUserId: string }
+
+async function sendBackCase(input: SendBackInput): Promise<CustomerOnboardingCaseRow> {
+  return callSingleRowRpc<CustomerOnboardingCaseRow>("send_back_customer_onboarding_case", {
+    p_request_id: input.requestId,
+    p_reason: input.reason,
+    p_target_stage_key: input.targetStageKey,
+    p_actor_user_id: input.actorUserId,
+  })
+}
+
+type ApproveCaseInput = {
+  requestId: string
+  customerKey: string
+  customerName: string
+  commercialConfigurationKey: string
+  commercialConfigurationName: string
+  components: Record<string, unknown>[]
+  effectiveDate: string
+  actorUserId: string
+}
+
+async function approveCase(input: ApproveCaseInput): Promise<CustomerOnboardingCaseRow> {
+  return callSingleRowRpc<CustomerOnboardingCaseRow>("approve_customer_onboarding_case", {
+    p_request_id: input.requestId,
+    p_customer_key: input.customerKey,
+    p_customer_name: input.customerName,
+    p_commercial_configuration_key: input.commercialConfigurationKey,
+    p_commercial_configuration_name: input.commercialConfigurationName,
+    p_components: input.components,
+    p_effective_date: input.effectiveDate,
+    p_actor_user_id: input.actorUserId,
+  })
+}
+
+async function getCaseByRequestId(requestId: string): Promise<CustomerOnboardingCaseRow | null> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("customer_onboarding_cases").select("*").eq("request_id", requestId).maybeSingle()
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data
+}
+
+/** Every case not yet approved, oldest first: the review queue's data source. */
+async function listCasesAwaitingReview(): Promise<CustomerOnboardingCaseRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_onboarding_cases")
+    .select("*")
+    .in("status", ["submitted", "resubmitted"])
+    .order("updated_at", { ascending: true })
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
+async function listRevisionsForRequest(requestId: string): Promise<SubmissionRevisionRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("submission_revisions")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("revision_number", { ascending: true })
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
+async function getLatestRevisionForRequest(requestId: string): Promise<SubmissionRevisionRow | null> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("submission_revisions")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("revision_number", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data
+}
+
+/** create_next_revision (20260907044335_submission_data_foundation.sql): the resubmit-after-send-back path already opens this via send_back_customer_onboarding_case, but a requester restarting after a stale read may need it directly. */
+async function createNextRevision(requestId: string, sourceRevisionId: string, actorUserId: string): Promise<SubmissionRevisionRow> {
+  return callSingleRowRpc<SubmissionRevisionRow>("create_next_revision", {
+    p_request_id: requestId,
+    p_source_revision_id: sourceRevisionId,
+    p_actor_user_id: actorUserId,
+  })
+}
+
+export {
+  createCase,
+  saveDraft,
+  submitCase,
+  sendBackCase,
+  approveCase,
+  getCaseByRequestId,
+  listCasesAwaitingReview,
+  listRevisionsForRequest,
+  getLatestRevisionForRequest,
+  createNextRevision,
+}
+export type { CreateCaseInput, SaveDraftInput, SendBackInput, ApproveCaseInput }
