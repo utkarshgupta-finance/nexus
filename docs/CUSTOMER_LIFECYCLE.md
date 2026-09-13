@@ -1,10 +1,12 @@
 # Customer Lifecycle
 
-Status: **PARTIALLY IMPLEMENTED.** The Onboarding Case lifecycle and its
-atomic approval into a real Customer Master + Commercial Configuration are
-implemented and persisted. Customer Change Requests, Commercial Version
-2+ (draft/activate), and Permanent Customer Deletion are designed below
-but not yet built; see each section's own status line.
+Status: **PARTIALLY IMPLEMENTED.** The Onboarding Case lifecycle, its
+atomic approval into a real Customer Master + Commercial Configuration,
+and the Customer Change Request lifecycle (including the Customer
+workspace tabs and Field History) are implemented and persisted.
+Commercial Version 2+ (draft/activate) and Permanent Customer Deletion
+are designed below but not yet built; see each section's own status
+line.
 
 ## 1. Onboarding Case lifecycle: IMPLEMENTED
 
@@ -75,17 +77,111 @@ the exact same `mapOnboardingComponentToCommercialComponentInsert`
 Commercial Rate promotion panel already uses, so a component's stored
 shape is identical regardless of which path created it.
 
-## 3. Customer Master: read-only, not yet governed by Change Requests
+## 3. Customer Master: governed by Change Requests
 
-Customer Master (`customers`) remains read-only through the application
-today; only `approve_customer_onboarding_case` writes to it. There is no
-Customer Master Change Request table, UI, or workflow evaluation wired
-up yet. `docs/DATA_ARCHITECTURE.md` §15 already names the target shape
-("Customer Master Change Request": current value + proposed value per
-changed attribute, evaluated by the Workflow rule evaluator in
-`src/platform/workflow/domain/evaluator.ts` for required
-approvals/evidence) and remains the authoritative design for that future
-work; nothing here supersedes it.
+Customer Master (`customers`) was extended
+(`supabase/migrations/20260913060000_customer_change_request_foundation.sql`)
+with five real, governed columns: `segment`, `business_unit`, `country`,
+`industry`, `brand_name` (all nullable text; `name` was already real).
+`fn_protect_customer_lifecycle` (the same trigger that has always
+blocked direct writes to Customer Master) was extended to allow these
+six columns to change, but ONLY through
+`approve_customer_change_request`: nothing else in the application ever
+writes to `customers` directly.
+
+`customer_onboarding_cases` approval
+(`20260913063000_populate_customer_columns_on_onboarding_approval.sql`)
+now also populates these five columns from the onboarding form's own
+data at approval time, so every newly onboarded customer starts with
+real values instead of nulls.
+
+## 3a. Customer Change Request lifecycle: IMPLEMENTED
+
+`customer_change_requests` extends `requests` 1:1, the same
+precedent `customer_onboarding_cases` and `commercial_changes` both
+already established. `customer_change_request_requirements` persists
+the Workflow rule evaluator's own output at Submit time (see §3b).
+`customer_field_history` is real, permanent, field-level business
+history: one row per changed field, per approved Change Request,
+written inside the same atomic transaction that updates `customers`.
+
+Real, permission-gated RPCs (`customer.change_request` for the
+requester side, `customer.approve` for the reviewer side), all
+following the established `set_config('app.current_user_id', ...)`
+actor-audit pattern:
+
+- `create_customer_change_request`: mints the request, its first draft
+  revision, and the change request row, capturing the customer's
+  CURRENT `row_version` as `base_customer_row_version` for later
+  staleness detection.
+- `save_customer_change_draft`: updates the current draft revision's
+  `raw_data`. Always allowed regardless of which fields are proposed.
+- `submit_customer_change_request`: freezes the draft revision via
+  `submit_revision`, bulk-inserts the TS-computed Workflow
+  requirements, and transitions to `submitted` or `resubmitted`.
+- `send_back_customer_change_request` / `reject_customer_change_request`:
+  require a non-empty reason; send-back opens the next draft revision
+  immediately (`create_next_revision`), reject is terminal and never
+  touches `customers`.
+- `approve_customer_change_request`: the atomic apply. Re-verifies
+  `customers.row_version` against the Change Request's own
+  `base_customer_row_version` (raising `CUSTOMER_CHANGE_STALE_BASE` if
+  the customer changed since this request was created), writes one
+  `customer_field_history` row per actually-changed field (skipping
+  fields the proposal touches but does not actually change), updates
+  `customers` in a single combined `UPDATE` statement (exactly one
+  `row_version` bump per approval), and marks the request approved.
+  Idempotent on `status = 'approved'`, matching the onboarding
+  approval's own established idempotency pattern. Deliberately checks
+  only the six known, fixed governed columns, never dynamic SQL against
+  arbitrary field names.
+
+TypeScript layering mirrors `src/features/customer-onboarding/` exactly,
+in a sibling feature `src/features/customer-change/`: `domain/` (pure:
+`governed-fields.ts`, `diff.ts`, `workflow-rules.ts`,
+`change-request-mappers.ts`) -> `data/change-request.data.ts` (RPC
+wrappers) -> `services/change-request.service.ts` -> `server.ts` /
+`actions.ts`.
+
+## 3b. Customer Change Request workflow requirements: IMPLEMENTED (informational)
+
+`src/features/customer-change/domain/workflow-rules.ts` wires the
+existing, pure Nexus Workflow rule evaluator
+(`src/platform/workflow/domain/evaluator.ts`) into Customer Change
+Requests with a real, non-fabricated rule set: a Segment change
+requires Finance Head approval; a Business Unit change requires BOTH
+the outgoing and incoming Business Unit Head's approval (kept distinct
+via the evaluator's own scope-value dedup mechanism); a Legal Entity
+Name change requires updated registration evidence. These are computed
+fresh at Submit time from the customer's real current values vs the
+draft's proposed values, persisted to `customer_change_request_requirements`,
+and shown to both the requester (before Submit) and the reviewer
+(before deciding).
+
+Simplification, stated honestly: since no per-role user directory exists
+in this environment (only one real human account,
+`customer_lifecycle_admin`), persisted requirements are informational/
+transparency-only in this V1. The actual approval gate remains a single
+Approve / Send Back / Reject decision by any `customer.approve` holder,
+not a per-requirement individual sign-off. This mirrors the onboarding
+case review's own established simplification exactly.
+
+## 3c. Customer workspace: IMPLEMENTED
+
+`/customers/[customerKey]` is a tabbed workspace
+(`src/features/customers/ui/customer-master-detail.tsx`): Overview,
+Customer Details, Tax & Registration, Commercials, Documents, Change
+Requests, History. A real governed field (`record.segment` etc.) always
+wins over demo enrichment; demo enrichment is shown only as a fallback
+for a field that has never been set. There is no direct Edit action
+anywhere on this screen; the only mutating entry point is "Create
+Change Request".
+
+The History tab renders `customer_field_history` directly: Field / Old
+Value / New Value / Effective Date / Changed At. The Change Requests tab
+lists every Change Request against this customer with a link to either
+its requester-facing draft screen or its reviewer-facing decision
+screen, depending on status.
 
 ## 4. Commercial Version 2+ (draft/activate): not yet built
 
@@ -112,8 +208,12 @@ reason/time only), so the fact of deletion survives the row it describes.
 
 ## 6. Permissions
 
-Seeded this round: `customer.create`, `customer.read`, `customer.approve`,
+Seeded: `customer.create`, `customer.read`, `customer.approve`,
 `customer.change_request`, `customer.delete_permanent`, and one role,
 `Customer Lifecycle Admin`, holding all five. `customer.change_request`
-and `customer.delete_permanent` exist as permissions now so the schema
-and role model are ready for §3/§5 above; nothing currently checks them.
+now gates every requester-side Customer Change Request action
+(create/save/submit); `customer.approve` gates the reviewer-side
+decision (send back/reject/approve), the same role that already gated
+onboarding case approval. `customer.delete_permanent` exists as a
+permission now so the schema and role model are ready for §5 above;
+nothing currently checks it.

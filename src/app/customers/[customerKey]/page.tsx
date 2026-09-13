@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
 import { getCustomerMasterDetailByKey } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
+import { listChangeRequestsForCustomer, listCustomerFieldHistory } from "@/features/customer-change/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
@@ -68,5 +69,18 @@ export default async function CustomerMasterDetailRoute({
     commercialConfigurationId = null
   }
 
-  return <CustomerMasterDetail detail={detail} snapshot={snapshot} commercialConfigurationId={commercialConfigurationId} />
+  const [changeRequests, fieldHistory] = await Promise.all([
+    listChangeRequestsForCustomer(detail.record.id),
+    listCustomerFieldHistory(detail.record.id),
+  ])
+
+  return (
+    <CustomerMasterDetail
+      detail={detail}
+      snapshot={snapshot}
+      commercialConfigurationId={commercialConfigurationId}
+      changeRequests={changeRequests}
+      fieldHistory={fieldHistory}
+    />
+  )
 }

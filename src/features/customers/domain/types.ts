@@ -3,17 +3,23 @@
  *
  * Matches `customers` exactly as created by
  * `supabase/migrations/20260908013210_master_data_foundation.sql` and
- * confirmed against the live table (`docs/MASTER_DATA_FOUNDATION_DESIGN.md`
- * §5.2). This table is deliberately a minimal stable identity, not a
- * CRM record: it has no country, industry, segment, business unit,
- * contact, or tax field. Anything Customer Master shows beyond
- * id/key/name/isActive/audit columns is demo/read-model enrichment (see
- * ./demo-enrichment.ts), never presented as this type.
+ * extended by
+ * `supabase/migrations/20260913060000_customer_change_request_foundation.sql`,
+ * which added segment/businessUnit/country/industry/brandName as real,
+ * governed columns (changed only via an approved Customer Change
+ * Request, see src/features/customer-change/). Contact and tax fields
+ * still have no real column; anything beyond this type is demo/read-model
+ * enrichment (see ./demo-enrichment.ts), never presented as backend truth.
  */
 type CustomerMasterRecord = {
   id: string
   key: string
   name: string
+  segment: string | null
+  businessUnit: string | null
+  country: string | null
+  industry: string | null
+  brandName: string | null
   isActive: boolean
   rowVersion: number
   createdAt: string

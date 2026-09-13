@@ -2,6 +2,8 @@
  * Hand-authored row shape for `customers`, matching the applied
  * migration exactly:
  *   supabase/migrations/20260908013210_master_data_foundation.sql
+ *   supabase/migrations/20260913060000_customer_change_request_foundation.sql
+ *     (segment/business_unit/country/industry/brand_name)
  *
  * Same "no `supabase gen types` output yet" caveat as
  * `src/features/commercial/data/row-types.ts`. Internal to
@@ -12,6 +14,11 @@ type CustomerRow = {
   id: string
   key: string
   name: string
+  segment: string | null
+  business_unit: string | null
+  country: string | null
+  industry: string | null
+  brand_name: string | null
   is_active: boolean
   row_version: number
   created_at: string

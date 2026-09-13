@@ -7,6 +7,11 @@ const FAKE_ROW: CustomerRow = {
   id: "11111111-1111-4111-8111-111111111111",
   key: "demo-northstar-consumer-products",
   name: "Northstar Consumer Products Pvt Ltd",
+  segment: "enterprise",
+  business_unit: "india_enterprise",
+  country: "IN",
+  industry: "fmcg",
+  brand_name: "Northstar",
   is_active: true,
   row_version: 1,
   created_at: "2026-09-01T00:00:00.000Z",
@@ -21,6 +26,11 @@ describe("toCustomerMasterRecord", () => {
       id: FAKE_ROW.id,
       key: FAKE_ROW.key,
       name: FAKE_ROW.name,
+      segment: "enterprise",
+      businessUnit: "india_enterprise",
+      country: "IN",
+      industry: "fmcg",
+      brandName: "Northstar",
       isActive: true,
       rowVersion: 1,
       createdAt: FAKE_ROW.created_at,
@@ -33,7 +43,10 @@ describe("toCustomerMasterRecord", () => {
   it("never invents a field the real backend table does not have", () => {
     const record = toCustomerMasterRecord(FAKE_ROW)
     expect(Object.keys(record).sort()).toEqual(
-      ["id", "key", "name", "isActive", "rowVersion", "createdAt", "createdBy", "updatedAt", "updatedBy"].sort()
+      [
+        "id", "key", "name", "segment", "businessUnit", "country", "industry", "brandName",
+        "isActive", "rowVersion", "createdAt", "createdBy", "updatedAt", "updatedBy",
+      ].sort()
     )
   })
 })
