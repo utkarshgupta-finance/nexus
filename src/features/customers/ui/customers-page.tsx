@@ -24,9 +24,9 @@ import type { FormerNameSearchResult } from "../server/former-name-search"
  * Cases are Customer Onboarding requests that have not yet become an
  * approved Customer Master record: submitted onboarding never gets
  * mixed into the table below, but the requester and reviewer both need
- * somewhere obvious to find them, so this page links to the real
- * Reviews queue (/reviews) rather than rendering a second, separate list
- * here. Customer Master reads the real backend (see ../server.ts,
+ * somewhere obvious to find them, so this page links to the unified
+ * Approvals inbox (/approvals) rather than rendering a second, separate
+ * list here. Customer Master reads the real backend (see ../server.ts,
  * src/app/customers/page.tsx): `customerMasterEntries` is whatever the
  * real `customers` table currently holds after filtering (Customer
  * Search, task Phase B) is applied server-side.
@@ -55,9 +55,9 @@ function CustomersPage({
         title="Customers"
         description="Approved Customer Master records."
         actions={
-          <Button variant="outline" size="sm" render={<Link href="/reviews" />}>
+          <Button variant="outline" size="sm" render={<Link href="/approvals" />}>
             <ListChecksIcon data-icon="inline-start" className="size-3.5" />
-            Onboarding Requests
+            Approvals
           </Button>
         }
       />
@@ -67,8 +67,8 @@ function CustomersPage({
           <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
           <p className="text-xs text-muted-foreground">
             A customer creation request is not a Customer Master until it is approved. Submitted and in-progress onboarding requests are tracked in{" "}
-            <Link href="/reviews" className="font-medium text-foreground underline underline-offset-2">
-              Onboarding Requests
+            <Link href="/approvals" className="font-medium text-foreground underline underline-offset-2">
+              Approvals
             </Link>
             , not below.
           </p>

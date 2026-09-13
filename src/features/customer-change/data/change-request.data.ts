@@ -100,6 +100,18 @@ async function listChangeRequestsAwaitingReview(): Promise<CustomerChangeRequest
   return data ?? []
 }
 
+/** Every Change Request regardless of status, newest first: the unified Approvals inbox's data source (task Phase E), capped since this only ever backs an operational inbox, never a report. */
+async function listAllChangeRequests(): Promise<CustomerChangeRequestRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_change_requests")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  return data ?? []
+}
+
 /** Every Change Request against one customer, newest first: the Customer -> Change Requests tab's data source. */
 async function listChangeRequestsForCustomer(customerId: string): Promise<CustomerChangeRequestRow[]> {
   const supabase = getSupabaseServiceRoleClient()
@@ -179,6 +191,7 @@ export {
   approveChangeRequest,
   getChangeRequestByRequestId,
   listChangeRequestsAwaitingReview,
+  listAllChangeRequests,
   listChangeRequestsForCustomer,
   getLatestRevisionForRequest,
   listRequirementsForRequest,

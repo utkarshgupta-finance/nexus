@@ -14,6 +14,7 @@ export {
   loadChangeRequest,
   previewRequirements,
   listChangeRequestReviewQueue,
+  listAllChangeRequestEntries,
   listChangeRequestsForCustomer,
   listCustomerFieldHistory,
   searchFormerCustomerNames,

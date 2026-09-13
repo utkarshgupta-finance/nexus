@@ -397,3 +397,29 @@ Known gap, stated honestly: Commercial Version History
 "Approved By" as a raw UUID prefix rather than through this same
 resolver; wiring it through is a small, isolated follow-up, not done in
 this round.
+
+## 9. Unified Approvals inbox: IMPLEMENTED
+
+`/approvals` (`src/app/approvals/page.tsx`) replaces the sidebar's
+previously fragmented three-page Reviews flow (Onboarding Reviews,
+Change Request Reviews, Commercial Version Reviews, each a separate
+route cross-linked only by small text links) with one operational
+list across all three lifecycles, filterable by Needs My Action / Sent
+Back / Completed / All. Each row still opens the same real, unchanged
+`/reviews/*` decision screen for that request type; this is a unified
+list, not a new decision surface, so no governed RPC, permission, or
+approval logic was touched.
+
+New platform capability: `src/platform/approvals/` (`domain/inbox.ts`
+is the pure bucket/sort/filter logic, directly unit-tested;
+`server.ts` gathers a "list every request of this type regardless of
+status" read from each of the three features and resolves customer
+names and requester emails via `platform/audit`). Each feature gained
+one additive `listAll*Entries` data/service function alongside its
+existing `listAllCasesAwaitingReview`-style queue reads; nothing about
+the existing per-type review queues changed.
+
+The sidebar's "Reviews" entry was removed in favor of the "Approvals"
+entry it already listed (previously a dead link: no `/approvals` route
+existed yet). The Customers page's "Onboarding Requests" link now
+points to `/approvals` for the same reason.

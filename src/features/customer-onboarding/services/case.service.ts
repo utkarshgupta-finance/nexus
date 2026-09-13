@@ -77,11 +77,12 @@ type ReviewQueueEntry = {
   status: CustomerOnboardingCase["status"]
   customerLegalName: string
   currentRevisionNumber: number
+  createdBy: string | null
+  createdAt: string
   updatedAt: string
 }
 
-async function listOnboardingReviewQueue(): Promise<ReviewQueueEntry[]> {
-  const rows = await caseData.listCasesAwaitingReview()
+async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.listCasesAwaitingReview>>): Promise<ReviewQueueEntry[]> {
   const entries: ReviewQueueEntry[] = []
   for (const row of rows) {
     const latest = await caseData.getLatestRevisionForRequest(row.request_id)
@@ -91,10 +92,21 @@ async function listOnboardingReviewQueue(): Promise<ReviewQueueEntry[]> {
       status: row.status,
       customerLegalName: typeof values[CUSTOMER_LEGAL_NAME_FIELD] === "string" ? (values[CUSTOMER_LEGAL_NAME_FIELD] as string) : "(untitled)",
       currentRevisionNumber: latest?.revision_number ?? 1,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
       updatedAt: row.updated_at,
     })
   }
   return entries
+}
+
+async function listOnboardingReviewQueue(): Promise<ReviewQueueEntry[]> {
+  return toReviewQueueEntries(await caseData.listCasesAwaitingReview())
+}
+
+/** Every onboarding case regardless of status: the unified Approvals inbox's data source (task Phase E). */
+async function listAllOnboardingEntries(): Promise<ReviewQueueEntry[]> {
+  return toReviewQueueEntries(await caseData.listAllCases())
 }
 
 /**
@@ -172,6 +184,7 @@ export {
   submitOnboardingCase,
   sendBackOnboardingCase,
   listOnboardingReviewQueue,
+  listAllOnboardingEntries,
   approveOnboardingCase,
   getOnboardingOriginForCustomer,
 }

@@ -109,6 +109,18 @@ async function listCasesAwaitingReview(): Promise<CustomerOnboardingCaseRow[]> {
   return data ?? []
 }
 
+/** Every case regardless of status, newest first: the unified Approvals inbox's data source (task Phase E), capped since this only ever backs an operational inbox, never a report. */
+async function listAllCases(): Promise<CustomerOnboardingCaseRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_onboarding_cases")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
 async function listRevisionsForRequest(requestId: string): Promise<SubmissionRevisionRow[]> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase
@@ -151,6 +163,7 @@ export {
   getCaseByRequestId,
   getCaseByCustomerId,
   listCasesAwaitingReview,
+  listAllCases,
   listRevisionsForRequest,
   getLatestRevisionForRequest,
   createNextRevision,

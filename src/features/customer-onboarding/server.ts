@@ -10,12 +10,13 @@ import "server-only"
  * the same trust boundary commercial/server.ts already documents.
  */
 
-export { getOnboardingCase, listOnboardingReviewQueue, getOnboardingOriginForCustomer } from "./services/case.service"
+export { getOnboardingCase, listOnboardingReviewQueue, listAllOnboardingEntries, getOnboardingOriginForCustomer } from "./services/case.service"
 export type { ReviewQueueEntry } from "./services/case.service"
 export type { OnboardingOrigin } from "./domain/types"
 export {
   loadVersion,
   listVersionReviewQueue,
+  listAllVersionEntries,
   listVersionsForConfiguration,
 } from "./services/commercial-version.service"
 export type { ReviewQueueEntry as CommercialVersionReviewQueueEntry } from "./services/commercial-version.service"

@@ -105,12 +105,24 @@ type ReviewQueueEntry = {
   requestId: string
   customerId: string
   status: CustomerChangeRequest["status"]
+  createdBy: string | null
+  createdAt: string
   updatedAt: string
+}
+
+function toReviewQueueEntry(row: { request_id: string; customer_id: string; status: CustomerChangeRequest["status"]; created_by: string | null; created_at: string; updated_at: string }): ReviewQueueEntry {
+  return { requestId: row.request_id, customerId: row.customer_id, status: row.status, createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at }
 }
 
 async function listChangeRequestReviewQueue(): Promise<ReviewQueueEntry[]> {
   const rows = await changeData.listChangeRequestsAwaitingReview()
-  return rows.map((row) => ({ requestId: row.request_id, customerId: row.customer_id, status: row.status, updatedAt: row.updated_at }))
+  return rows.map(toReviewQueueEntry)
+}
+
+/** Every Change Request regardless of status: the unified Approvals inbox's data source (task Phase E). */
+async function listAllChangeRequestEntries(): Promise<ReviewQueueEntry[]> {
+  const rows = await changeData.listAllChangeRequests()
+  return rows.map(toReviewQueueEntry)
 }
 
 async function listChangeRequestsForCustomer(customerId: string): Promise<CustomerChangeRequest[]> {
@@ -148,6 +160,7 @@ export {
   rejectChangeRequest,
   approveChangeRequest,
   listChangeRequestReviewQueue,
+  listAllChangeRequestEntries,
   listChangeRequestsForCustomer,
   listCustomerFieldHistory,
   searchFormerCustomerNames,

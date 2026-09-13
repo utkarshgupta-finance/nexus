@@ -113,11 +113,35 @@ async function approveVersion(requestId: string, actorUserId: string, snapshot: 
   return approved
 }
 
-type ReviewQueueEntry = { requestId: string; commercialConfigurationId: string; status: CommercialConfigurationVersion["status"]; updatedAt: string }
+type ReviewQueueEntry = {
+  requestId: string
+  commercialConfigurationId: string
+  status: CommercialConfigurationVersion["status"]
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+function toReviewQueueEntry(row: { request_id: string; commercial_configuration_id: string; status: CommercialConfigurationVersion["status"]; created_by: string | null; created_at: string; updated_at: string }): ReviewQueueEntry {
+  return {
+    requestId: row.request_id,
+    commercialConfigurationId: row.commercial_configuration_id,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
 
 async function listVersionReviewQueue(): Promise<ReviewQueueEntry[]> {
   const rows = await versionData.listVersionsAwaitingReview()
-  return rows.map((row) => ({ requestId: row.request_id, commercialConfigurationId: row.commercial_configuration_id, status: row.status, updatedAt: row.updated_at }))
+  return rows.map(toReviewQueueEntry)
+}
+
+/** Every version regardless of status: the unified Approvals inbox's data source (task Phase E). */
+async function listAllVersionEntries(): Promise<ReviewQueueEntry[]> {
+  const rows = await versionData.listAllVersions()
+  return rows.map(toReviewQueueEntry)
 }
 
 async function listVersionsForConfiguration(commercialConfigurationId: string): Promise<CommercialConfigurationVersion[]> {
@@ -134,6 +158,7 @@ export {
   rejectVersion,
   approveVersion,
   listVersionReviewQueue,
+  listAllVersionEntries,
   listVersionsForConfiguration,
 }
 export type { ReviewQueueEntry }

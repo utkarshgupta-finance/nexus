@@ -65,7 +65,6 @@ const OPERATIONS_SECTION: NavSection = {
   items: [
     { label: "Customer Onboarding", href: "/forms/customer-onboarding", icon: UserPlusIcon },
     { label: "Customers", href: "/customers", icon: Building2Icon },
-    { label: "Reviews", href: "/reviews", icon: ListChecksIcon },
     { label: "Go-Live", href: "/go-live", icon: RocketIcon },
     { label: "Ledger", href: "/ledger", icon: BookOpenIcon },
     { label: "Suspensions", href: "/suspensions", icon: PauseCircleIcon },

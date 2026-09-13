@@ -92,6 +92,18 @@ async function listVersionsAwaitingReview(): Promise<CommercialConfigurationVers
   return data ?? []
 }
 
+/** Every version regardless of status, newest first: the unified Approvals inbox's data source (task Phase E), capped since this only ever backs an operational inbox, never a report. */
+async function listAllVersions(): Promise<CommercialConfigurationVersionRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("commercial_configuration_versions")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (error) throw new CommercialVersionOperationError(parseCommercialVersionError(error))
+  return data ?? []
+}
+
 /** Every version against one Commercial Configuration, newest first. */
 async function listVersionsForConfiguration(commercialConfigurationId: string): Promise<CommercialConfigurationVersionRow[]> {
   const supabase = getSupabaseServiceRoleClient()
@@ -125,6 +137,7 @@ export {
   approveVersion,
   getVersionByRequestId,
   listVersionsAwaitingReview,
+  listAllVersions,
   listVersionsForConfiguration,
   getLatestRevisionForRequest,
 }
