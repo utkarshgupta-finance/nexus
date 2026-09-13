@@ -47,6 +47,7 @@ function VersionHistoryTable({
                 <TableHead>Billing Currency</TableHead>
                 <TableHead>FX Snapshot</TableHead>
                 <TableHead>Created At</TableHead>
+                <TableHead>Approved By</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -65,6 +66,7 @@ function VersionHistoryTable({
                   <TableCell>{version.billingCurrency ?? "-"}</TableCell>
                   <TableCell>{formatFxSnapshot(version.billingCurrency, version.fxSnapshotRate)}</TableCell>
                   <TableCell>{version.createdAt.slice(0, 10)}</TableCell>
+                  <TableCell className="font-mono text-[0.7rem] text-muted-foreground">{version.approvedBy ? version.approvedBy.slice(0, 8) : "-"}</TableCell>
                   <TableCell>
                     <button
                       type="button"

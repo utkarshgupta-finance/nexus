@@ -115,4 +115,17 @@ describe("toVersionSummaries (task correction: 'version' is every Component grou
     expect(versions[0].fxSnapshotRate).toBeNull()
     expect(versions[0].status).toBe("active")
   })
+
+  it("approvedBy is null when no lookup map is provided, and null for a version omitted from a provided map, matching commercial_configuration_versions only existing for the governed lifecycle", () => {
+    const changes = [
+      change({ id: "chg-1", effectiveDate: "2026-01-01", category: "initial_setup" }),
+      change({ id: "chg-2", effectiveDate: "2026-06-01", category: "amendment" }),
+    ]
+    const withoutMap = toVersionSummaries(changes, [])
+    expect(withoutMap.map((v) => v.approvedBy)).toEqual([null, null])
+
+    const withPartialMap = toVersionSummaries(changes, [], new Map([["chg-2", "app-user-2"]]))
+    expect(withPartialMap.find((v) => v.changeId === "chg-1")?.approvedBy).toBeNull()
+    expect(withPartialMap.find((v) => v.changeId === "chg-2")?.approvedBy).toBe("app-user-2")
+  })
 })

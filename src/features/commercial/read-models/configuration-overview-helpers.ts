@@ -120,11 +120,17 @@ type VersionSummary = {
   reason: string | null
   createdAt: string
   createdBy: string | null
+  /** The actor who approved this version through the governed Commercial Configuration Version lifecycle (commercial_configuration_versions.decided_by); null for a version created through the older immediate-promotion path, which has no such row, or for the initial_setup version, which is never approved through that lifecycle. Never fabricated. */
+  approvedBy: string | null
   componentIds: string[]
 }
 
-/** Groups components by their originating Change into version summaries, ordered oldest first. */
-function toVersionSummaries(changes: CommercialChange[], components: CommercialComponent[]): VersionSummary[] {
+/** Groups components by their originating Change into version summaries, ordered oldest first. `approvedByChangeId` is an optional changeId -> actor lookup sourced from commercial_configuration_versions.decided_by, entirely additive: omitting it leaves every approvedBy null, exactly as before this field existed. */
+function toVersionSummaries(
+  changes: CommercialChange[],
+  components: CommercialComponent[],
+  approvedByChangeId?: Map<string, string | null>
+): VersionSummary[] {
   const orderedChanges = [...changes].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
   return orderedChanges.map((change, index) => {
     const versionComponents = components.filter((component) => component.commercialChangeId === change.id)
@@ -141,6 +147,7 @@ function toVersionSummaries(changes: CommercialChange[], components: CommercialC
       reason: change.reason,
       createdAt: change.createdAt,
       createdBy: change.createdBy,
+      approvedBy: approvedByChangeId?.get(change.id) ?? null,
       componentIds: versionComponents.map((component) => component.id),
     }
   })

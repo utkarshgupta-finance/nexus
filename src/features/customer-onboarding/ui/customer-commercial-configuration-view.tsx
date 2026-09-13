@@ -180,6 +180,7 @@ function CustomerCommercialConfigurationView({
   components,
   snapshot,
   canCreateVersion = false,
+  approvedByChangeId,
 }: {
   customerName: string
   configuration: CommercialConfiguration
@@ -188,8 +189,10 @@ function CustomerCommercialConfigurationView({
   snapshot: ReferenceMasterSnapshot
   /** Gates the "Create New Version" entry point into the governed draft/submit/approve lifecycle (Customer Lifecycle V1, Phase 10-13); resolved server-side from `commercial_configuration.write`. */
   canCreateVersion?: boolean
+  /** changeId -> approving actor, sourced from commercial_configuration_versions.decided_by for versions created through the governed lifecycle; omitted (or missing an entry) simply leaves that version's Approved By blank, never fabricated. */
+  approvedByChangeId?: Map<string, string | null>
 }) {
-  const versions = useMemo(() => toVersionSummaries(changes, components), [changes, components])
+  const versions = useMemo(() => toVersionSummaries(changes, components, approvedByChangeId), [changes, components, approvedByChangeId])
   const activeVersion = versions.find((version) => version.status === "active") ?? versions[versions.length - 1] ?? null
   const [selectedVersionNumber, setSelectedVersionNumber] = useState<number | null>(activeVersion?.versionNumber ?? null)
   const selectedVersion = versions.find((version) => version.versionNumber === selectedVersionNumber) ?? activeVersion

@@ -209,6 +209,7 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       reason: null,
       createdAt: "2025-01-01T00:00:00Z",
       createdBy: null,
+      approvedBy: null,
       componentIds: ["comp-platform-v1", "comp-api", "comp-storage"],
     },
     {
@@ -223,6 +224,7 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       reason: "Added Premium Support and Onboarding Services with a shared spend commitment.",
       createdAt: "2025-07-01T00:00:00Z",
       createdBy: null,
+      approvedBy: null,
       componentIds: ["comp-support", "comp-onboarding"],
     },
     {
@@ -237,6 +239,7 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       reason: "Annual renewal; Platform Access terms refreshed for the new period.",
       createdAt: "2026-01-01T00:00:00Z",
       createdBy: null,
+      approvedBy: null,
       componentIds: ["comp-platform-v2"],
     },
   ],
