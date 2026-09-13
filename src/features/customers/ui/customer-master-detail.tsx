@@ -27,6 +27,7 @@ import {
 import { DeleteCustomerPanel } from "./delete-customer-panel"
 import { CustomerActivityTimeline } from "./customer-activity-timeline"
 import type { CustomerActivityEvent } from "../domain/activity"
+import type { OnboardingOrigin } from "@/features/customer-onboarding/server"
 
 /**
  * Customer workspace (Customer Lifecycle V1, task §3): Overview, Customer
@@ -55,6 +56,7 @@ function CustomerMasterDetail({
   fieldHistory,
   canDeletePermanently = false,
   activityEvents,
+  onboardingOrigin,
 }: {
   detail: CustomerMasterDetailData
   snapshot: ReferenceMasterSnapshot
@@ -66,6 +68,8 @@ function CustomerMasterDetail({
   canDeletePermanently?: boolean
   /** Customer Activity timeline (task Phase C), resolved server-side. */
   activityEvents: CustomerActivityEvent[]
+  /** The onboarding case that created this Customer Master (task Phase N); null for a customer created directly, never through onboarding. */
+  onboardingOrigin: OnboardingOrigin | null
 }) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
@@ -79,6 +83,8 @@ function CustomerMasterDetail({
   const segmentLabel = resolveLabel("segment", resolveSegmentCode(record, enrichment))
   const businessUnitLabel = resolveLabel("business_unit", resolveBusinessUnitCode(record, enrichment))
   const billingCurrencyLabel = resolveLabel("currency", resolveBillingCurrencyCode(enrichment))
+  const statusLabel = (status: string) => status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
+  const latestChangeRequest = [...changeRequests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] ?? null
 
   return (
     <div className="flex flex-1 flex-col">
@@ -124,6 +130,47 @@ function CustomerMasterDetail({
                   { label: "Customer ID", value: <span className="font-mono text-[0.7rem]">{record.id}</span> },
                   { label: "Legal Entity Name", value: record.name },
                   { label: "Brand", value: brandName ?? "Not available" },
+                ]}
+              />
+            </section>
+            <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Summary</h2>
+              <KeyValueGrid
+                columns={3}
+                items={[
+                  { label: "Segment", value: segmentLabel ?? "Not available" },
+                  { label: "Business Unit", value: businessUnitLabel ?? "Not available" },
+                  { label: "Country", value: countryLabel ?? "Not available" },
+                  { label: "Status", value: record.isActive ? "Active" : "Inactive" },
+                  {
+                    label: "Originating Onboarding Request",
+                    value: onboardingOrigin ? (
+                      <Link href={`/reviews/${onboardingOrigin.requestId}`} className="font-medium text-foreground underline underline-offset-2">
+                        View request
+                      </Link>
+                    ) : (
+                      "Created directly (not through Onboarding)"
+                    ),
+                  },
+                  {
+                    label: "Latest Change Request",
+                    value: latestChangeRequest ? (
+                      <Link
+                        href={
+                          latestChangeRequest.status === "draft" || latestChangeRequest.status === "sent_back"
+                            ? `/customers/${record.key}/change-requests/${latestChangeRequest.requestId}`
+                            : `/reviews/change-requests/${latestChangeRequest.requestId}`
+                        }
+                        className="font-medium text-foreground underline underline-offset-2"
+                      >
+                        {statusLabel(latestChangeRequest.status)}
+                      </Link>
+                    ) : (
+                      "None yet"
+                    ),
+                  },
+                  { label: "Created At", value: new Date(record.createdAt).toLocaleDateString() },
+                  { label: "Last Changed At", value: new Date(record.updatedAt).toLocaleDateString() },
                 ]}
               />
             </section>

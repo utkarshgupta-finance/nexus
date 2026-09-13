@@ -423,3 +423,16 @@ The sidebar's "Reviews" entry was removed in favor of the "Approvals"
 entry it already listed (previously a dead link: no `/approvals` route
 existed yet). The Customers page's "Onboarding Requests" link now
 points to `/approvals` for the same reason.
+
+## 10. Customer Summary: IMPLEMENTED
+
+The Customer workspace's Overview tab gained a "Summary" section for a
+Finance reader who wants the state of a customer without clicking
+through every tab: Segment, Business Unit, Country, Status, the
+originating Onboarding Request (linking to its `/reviews/:requestId`
+decision screen, or "Created directly" for a customer never onboarded
+through the governed flow), the most recent Change Request (linking to
+its own draft or decision screen depending on status), and Created
+At/Last Changed At. No fabricated metric (MRR, health score, and
+similar) was added: every value here is a real column or a real
+request already persisted elsewhere in this document.
