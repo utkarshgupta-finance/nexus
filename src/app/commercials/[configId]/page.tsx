@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
+import { hasPermission } from "@/platform/permissions/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { getCustomerById } from "@/features/customers/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
@@ -60,6 +61,8 @@ export default async function CommercialConfigurationPage({ params }: { params: 
     snapshot = emptySnapshot()
   }
 
+  const canCreateVersion = await hasPermission("commercial_configuration", "write")
+
   return (
     <AuthGate session={session} requiredPermission={COMMERCIAL_CONFIGURATION_READ} loginRedirectTo={`/commercials/${configId}`}>
       {unavailable ? (
@@ -71,6 +74,7 @@ export default async function CommercialConfigurationPage({ params }: { params: 
           changes={changes}
           components={components}
           snapshot={snapshot}
+          canCreateVersion={canCreateVersion}
         />
       ) : (
         notFound()

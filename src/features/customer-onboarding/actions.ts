@@ -12,8 +12,16 @@ import {
   sendBackOnboardingCase,
   approveOnboardingCase,
 } from "./services/case.service"
+import {
+  createVersionFromActive,
+  saveVersionDraft,
+  submitVersion,
+  rejectVersion,
+  approveVersion,
+} from "./services/commercial-version.service"
 import type { CommercialRateDraft } from "./domain/commercial-rate"
 import type { CustomerOnboardingCase } from "./domain/types"
+import type { CommercialConfigurationVersion, CommercialVersionChangeCategory } from "./domain/commercial-version-types"
 
 /**
  * Server Action for promoting a Commercial Rate onboarding draft into the
@@ -177,6 +185,77 @@ async function approveOnboardingCaseAction(requestId: string, effectiveDate: str
   }
 }
 
+/**
+ * Real, database-backed Commercial Configuration Version lifecycle
+ * actions (Customer Lifecycle V1, Phase 10-13), mirroring the Customer
+ * Onboarding Case actions above exactly: each derives the authenticated
+ * actor server-side via `requirePermission`, never accepts a
+ * client-supplied actor id. `commercial_configuration.write` gates the
+ * draft-authoring actions (create/save/submit), matching every other
+ * Commercial Configuration write in this codebase;
+ * `commercial_configuration.approve` gates the reviewer-side decision
+ * (reject/approve).
+ */
+
+type CommercialVersionActionResult = { ok: true; version: CommercialConfigurationVersion } | { ok: false; error: string }
+
+function toCommercialVersionActionError(error: unknown): CommercialVersionActionResult {
+  if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof Error) return { ok: false, error: error.message }
+  return { ok: false, error: "An unexpected error occurred while updating this Commercial Configuration Version." }
+}
+
+async function createCommercialVersionAction(commercialConfigurationId: string, changeCategory: CommercialVersionChangeCategory): Promise<CommercialVersionActionResult> {
+  try {
+    const actor = await requirePermission("commercial_configuration", "write")
+    const version = await createVersionFromActive(commercialConfigurationId, changeCategory, actor.appUserId)
+    return { ok: true, version }
+  } catch (error) {
+    return toCommercialVersionActionError(error)
+  }
+}
+
+async function saveCommercialVersionDraftAction(requestId: string, commercialRate: CommercialRateDraft): Promise<CommercialVersionActionResult> {
+  try {
+    const actor = await requirePermission("commercial_configuration", "write")
+    const version = await saveVersionDraft(requestId, commercialRate, actor.appUserId)
+    return { ok: true, version }
+  } catch (error) {
+    return toCommercialVersionActionError(error)
+  }
+}
+
+async function submitCommercialVersionAction(requestId: string, reason: string, effectiveDate: string): Promise<CommercialVersionActionResult> {
+  try {
+    const actor = await requirePermission("commercial_configuration", "write")
+    const version = await submitVersion(requestId, reason, effectiveDate, actor.appUserId)
+    return { ok: true, version }
+  } catch (error) {
+    return toCommercialVersionActionError(error)
+  }
+}
+
+async function rejectCommercialVersionAction(requestId: string, reason: string): Promise<CommercialVersionActionResult> {
+  try {
+    const actor = await requirePermission("commercial_configuration", "approve")
+    const version = await rejectVersion(requestId, reason, actor.appUserId)
+    return { ok: true, version }
+  } catch (error) {
+    return toCommercialVersionActionError(error)
+  }
+}
+
+async function approveCommercialVersionAction(requestId: string): Promise<CommercialVersionActionResult> {
+  try {
+    const actor = await requirePermission("commercial_configuration", "approve")
+    const snapshot = await loadReferenceMasterSnapshot()
+    const version = await approveVersion(requestId, actor.appUserId, snapshot)
+    return { ok: true, version }
+  } catch (error) {
+    return toCommercialVersionActionError(error)
+  }
+}
+
 export {
   promoteCommercialRateDraftAsNewConfigurationAction,
   promoteCommercialRateDraftAsNewVersionAction,
@@ -185,5 +264,10 @@ export {
   submitOnboardingCaseAction,
   sendBackOnboardingCaseAction,
   approveOnboardingCaseAction,
+  createCommercialVersionAction,
+  saveCommercialVersionDraftAction,
+  submitCommercialVersionAction,
+  rejectCommercialVersionAction,
+  approveCommercialVersionAction,
 }
-export type { PromotionActionResult, CaseActionResult }
+export type { PromotionActionResult, CaseActionResult, CommercialVersionActionResult }

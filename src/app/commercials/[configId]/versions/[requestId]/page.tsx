@@ -1,0 +1,42 @@
+import { notFound } from "next/navigation"
+
+import { AuthGate } from "@/components/product/auth-gate"
+import { getCurrentNexusSession } from "@/platform/auth/server"
+import { loadVersion } from "@/features/customer-onboarding/server"
+import { CommercialVersionPage } from "@/features/customer-onboarding/ui/commercial-version-page"
+import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
+import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
+import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+
+/**
+ * The real Commercial Configuration Version draft screen: reads one
+ * real, persisted version by its stable request id, the same
+ * "bare create route redirects here" shape as
+ * /forms/customer-onboarding/[requestId]/page.tsx.
+ */
+export const dynamic = "force-dynamic"
+
+const COMMERCIAL_CONFIGURATION_WRITE = { resource: "commercial_configuration", action: "write" }
+
+export default async function CommercialConfigurationVersionRoute({ params }: { params: Promise<{ configId: string; requestId: string }> }) {
+  const { configId, requestId } = await params
+  const session = await getCurrentNexusSession()
+
+  const version = await loadVersion(requestId)
+  if (!version || version.commercialConfigurationId !== configId) notFound()
+
+  let snapshot: ReferenceMasterSnapshot
+  try {
+    snapshot = await loadReferenceMasterSnapshot()
+  } catch {
+    snapshot = emptySnapshot()
+  }
+
+  return (
+    <AuthGate session={session} requiredPermission={COMMERCIAL_CONFIGURATION_WRITE} loginRedirectTo={`/commercials/${configId}/versions/${requestId}`}>
+      <ReferenceMasterSnapshotProvider snapshot={snapshot}>
+        <CommercialVersionPage requestId={requestId} configId={configId} initialVersion={version} />
+      </ReferenceMasterSnapshotProvider>
+    </AuthGate>
+  )
+}

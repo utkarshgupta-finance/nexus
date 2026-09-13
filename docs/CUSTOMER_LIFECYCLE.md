@@ -183,14 +183,55 @@ lists every Change Request against this customer with a link to either
 its requester-facing draft screen or its reviewer-facing decision
 screen, depending on status.
 
-## 4. Commercial Version 2+ (draft/activate): not yet built
+## 4. Commercial Version 2+ (draft/activate): IMPLEMENTED
 
-Creating a new Commercial Change against an existing Configuration
-(`createCommercialChangeForConfiguration`) is real and already used by
-the Commercial Rate promotion panel, but there is no draft/activate
-split: calling it creates a live, immediately-effective Change. A true
-"Draft Version 2, edited, then Submitted/Approved/Activated, closing the
-prior version's effective period" flow is not implemented.
+`create_commercial_change_for_configuration` (used by the pre-existing
+interactive Commercial Rate promotion panel) is left fully intact: it
+still creates a live, immediately-effective Change with no draft phase,
+and remains available. Alongside it,
+`supabase/migrations/20260913070000_commercial_configuration_version_lifecycle.sql`
+adds a new, governed, parallel path: `commercial_configuration_versions`
+extends `requests` 1:1 (the same precedent `customer_onboarding_cases`
+and `customer_change_requests` both already established), with the
+proposed Commercial Rate draft living in `submission_revisions`, never
+duplicated.
+
+Real, permission-gated RPCs (`commercial_configuration.write` for the
+requester side, `commercial_configuration.approve` for the reviewer
+side):
+
+- `create_commercial_configuration_version`: mints the request, its
+  first draft revision (seeded from the configuration's current active
+  Components via `toDraftComponent`, the exact inverse of the promotion
+  mapper), and the version row.
+- `save_commercial_configuration_version_draft` / `submit_commercial_configuration_version`
+  / `reject_commercial_configuration_version`: mirror the Customer
+  Change Request lifecycle's own shape exactly.
+- `approve_commercial_configuration_version`: the atomic apply/activate.
+  Mints a real request via `create_system_commercial_request`, closes
+  the prior active version's Components (`effective_to = new effective
+  date - 1`, the same closure logic `create_commercial_change_for_configuration`
+  already used, now gated on approval instead of firing at draft
+  creation), inserts the new `commercial_changes` row, and materializes
+  every Component (with its FX snapshot preserved from draft time, never
+  recomputed) via the existing `add_commercial_component`/
+  `add_commercial_commitment` RPCs. Idempotent on `status = 'approved'`.
+  The prior version's Components are never edited or deleted, only
+  closed: Version 1 stays immutable and fully visible in Version History
+  forever.
+
+TypeScript layering lives inside `src/features/customer-onboarding/`
+(not a new feature, and not `src/features/commercial/`), reusing that
+feature's own Commercial Rate editor (`CommercialRateSection`),
+promotion mapper (`mapOnboardingComponentToCommercialComponentInsert`),
+and reconstruction helper (`toDraftComponent`) directly, since Commercial
+Configuration promotion/versioning logic already lives there
+(`domain/commercial-configuration-promotion.ts`,
+`domain/commercial-configuration-view.ts`) and a feature must not import
+another feature's internals (docs/ARCHITECTURE.md).
+
+"Create New Version" on `/commercials/[configId]` (gated on
+`commercial_configuration.write`) is the new, governed entry point.
 
 ## 5. Permanent Customer Deletion: not yet built
 

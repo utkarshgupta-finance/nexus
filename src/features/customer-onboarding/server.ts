@@ -12,3 +12,9 @@ import "server-only"
 
 export { getOnboardingCase, listOnboardingReviewQueue } from "./services/case.service"
 export type { ReviewQueueEntry } from "./services/case.service"
+export {
+  loadVersion,
+  listVersionReviewQueue,
+  listVersionsForConfiguration,
+} from "./services/commercial-version.service"
+export type { ReviewQueueEntry as CommercialVersionReviewQueueEntry } from "./services/commercial-version.service"

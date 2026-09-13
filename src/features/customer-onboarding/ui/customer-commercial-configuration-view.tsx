@@ -1,9 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 
 import { PageHeader } from "@/components/product/page-header"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { CommercialChange, CommercialComponent, CommercialConfiguration } from "@/features/commercial"
@@ -120,10 +122,12 @@ function CustomerCommercialConfigurationHeader({
   customerName,
   configuration,
   version,
+  canCreateVersion,
 }: {
   customerName: string
   configuration: CommercialConfiguration
   version: ReturnType<typeof toVersionSummaries>[number] | null
+  canCreateVersion: boolean
 }) {
   const metadata = [
     { label: "Version", value: version ? `Version ${version.versionNumber}` : "-" },
@@ -134,17 +138,24 @@ function CustomerCommercialConfigurationHeader({
 
   return (
     <div className="flex flex-col gap-3 border-b px-6 py-4">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <h1 className="text-base font-semibold text-foreground">{customerName}</h1>
-          <Badge
-            variant="ghost"
-            className={version?.status === "active" ? "bg-success/10 text-success dark:bg-success/15" : "bg-muted text-muted-foreground"}
-          >
-            {version?.status === "active" ? "Active" : "Superseded"}
-          </Badge>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold text-foreground">{customerName}</h1>
+            <Badge
+              variant="ghost"
+              className={version?.status === "active" ? "bg-success/10 text-success dark:bg-success/15" : "bg-muted text-muted-foreground"}
+            >
+              {version?.status === "active" ? "Active" : "Superseded"}
+            </Badge>
+          </div>
+          <p className="font-mono text-[0.7rem] text-muted-foreground">{configuration.key}</p>
         </div>
-        <p className="font-mono text-[0.7rem] text-muted-foreground">{configuration.key}</p>
+        {canCreateVersion ? (
+          <Button variant="outline" size="sm" render={<Link href={`/commercials/${configuration.id}/versions/new`} />}>
+            Create New Version
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -168,12 +179,15 @@ function CustomerCommercialConfigurationView({
   changes,
   components,
   snapshot,
+  canCreateVersion = false,
 }: {
   customerName: string
   configuration: CommercialConfiguration
   changes: CommercialChange[]
   components: CommercialComponent[]
   snapshot: ReferenceMasterSnapshot
+  /** Gates the "Create New Version" entry point into the governed draft/submit/approve lifecycle (Customer Lifecycle V1, Phase 10-13); resolved server-side from `commercial_configuration.write`. */
+  canCreateVersion?: boolean
 }) {
   const versions = useMemo(() => toVersionSummaries(changes, components), [changes, components])
   const activeVersion = versions.find((version) => version.status === "active") ?? versions[versions.length - 1] ?? null
@@ -200,7 +214,12 @@ function CustomerCommercialConfigurationView({
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader title="Commercials" description="Persisted Commercial Configuration for this customer." />
-      <CustomerCommercialConfigurationHeader customerName={customerName} configuration={configuration} version={selectedVersion} />
+      <CustomerCommercialConfigurationHeader
+        customerName={customerName}
+        configuration={configuration}
+        version={selectedVersion}
+        canCreateVersion={canCreateVersion}
+      />
 
       <div className="flex flex-col gap-6 py-4">
         {selectedVersion ? (

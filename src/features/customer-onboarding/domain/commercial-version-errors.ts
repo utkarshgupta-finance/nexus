@@ -1,0 +1,88 @@
+/**
+ * Typed Commercial Configuration Version error model, mirroring
+ * ./case-errors.ts's own shape exactly: every RPC in
+ * supabase/migrations/20260913070000_commercial_configuration_version_lifecycle.sql
+ * raises named tokens via `raise exception 'TOKEN: message', ...`
+ * (SQLSTATE P0001), and this is the one place that understands that
+ * shape.
+ */
+
+type CommercialVersionErrorKind =
+  | "commercial_version_not_found"
+  | "commercial_version_configuration_not_found"
+  | "commercial_version_invalid_category"
+  | "commercial_version_not_submittable"
+  | "commercial_version_not_approvable"
+  | "commercial_version_not_rejectable"
+  | "commercial_version_no_draft_revision"
+  | "commercial_version_reject_reason_required"
+  | "invalid_input"
+  | "conflict"
+  | "not_found"
+  | "unexpected_result_shape"
+  | "unknown"
+
+type CommercialVersionError = {
+  kind: CommercialVersionErrorKind
+  message: string
+  sqlState: string | null
+  cause: string
+}
+
+const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
+  COMMERCIAL_VERSION_NOT_FOUND: "commercial_version_not_found",
+  COMMERCIAL_VERSION_CONFIGURATION_NOT_FOUND: "commercial_version_configuration_not_found",
+  COMMERCIAL_VERSION_INVALID_CATEGORY: "commercial_version_invalid_category",
+  COMMERCIAL_VERSION_NOT_SUBMITTABLE: "commercial_version_not_submittable",
+  COMMERCIAL_VERSION_NOT_APPROVABLE: "commercial_version_not_approvable",
+  COMMERCIAL_VERSION_NOT_REJECTABLE: "commercial_version_not_rejectable",
+  COMMERCIAL_VERSION_NO_DRAFT_REVISION: "commercial_version_no_draft_revision",
+  COMMERCIAL_VERSION_REJECT_REASON_REQUIRED: "commercial_version_reject_reason_required",
+}
+
+const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {
+  "23505": "conflict",
+  "23514": "invalid_input",
+  "23502": "invalid_input",
+  "23503": "invalid_input",
+}
+
+type PostgrestLikeError = {
+  message: string
+  code?: string | null
+  details?: string | null
+  hint?: string | null
+}
+
+function parseCommercialVersionError(error: PostgrestLikeError): CommercialVersionError {
+  const sqlState = error.code ?? null
+  const rawMessage = error.message ?? ""
+
+  const tokenMatch = /^([A-Z][A-Z0-9_]*):\s*([\s\S]*)$/.exec(rawMessage)
+  if (tokenMatch) {
+    const [, token, detail] = tokenMatch
+    const kind = NAMED_TOKEN_KINDS[token]
+    if (kind) {
+      return { kind, message: detail || rawMessage, sqlState, cause: rawMessage }
+    }
+  }
+
+  if (sqlState && SQLSTATE_KINDS[sqlState]) {
+    return { kind: SQLSTATE_KINDS[sqlState], message: rawMessage, sqlState, cause: rawMessage }
+  }
+
+  return { kind: "unknown", message: rawMessage || "An unexpected error occurred.", sqlState, cause: rawMessage }
+}
+
+class CommercialVersionOperationError extends Error {
+  readonly commercialVersionError: CommercialVersionError
+
+  constructor(commercialVersionError: CommercialVersionError) {
+    super(commercialVersionError.message)
+    this.name = "CommercialVersionOperationError"
+    this.commercialVersionError = commercialVersionError
+  }
+}
+
+export { parseCommercialVersionError, CommercialVersionOperationError }
+export type { CommercialVersionErrorKind, CommercialVersionError, PostgrestLikeError }
