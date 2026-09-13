@@ -233,19 +233,53 @@ another feature's internals (docs/ARCHITECTURE.md).
 "Create New Version" on `/commercials/[configId]` (gated on
 `commercial_configuration.write`) is the new, governed entry point.
 
-## 5. Permanent Customer Deletion: not yet built
+## 5. Permanent Customer Deletion: IMPLEMENTED
 
-Designed, not implemented. The intended shape, consistent with
-`docs/DATA_ARCHITECTURE.md` §10 (soft deletion is the default; hard
-deletion is a deliberate, narrow exception): a `customer.delete_permanent`
-permission (seeded, not yet granted broadly, see
-`20260913040000_customer_lifecycle_onboarding_foundation.sql`), an
-eligibility check inspecting the real M9/M10 tables
-(`usage_facts`, `earned_results`, `billing_calculations`,
-`reconciliation_adjustments`) for protected history before allowing
-physical deletion, and an immutable deletion-audit row with no foreign
-key back to the deleted customer (a snapshot of key/name/status/actor/
-reason/time only), so the fact of deletion survives the row it describes.
+`supabase/migrations/20260913080000_permanent_customer_deletion.sql`
+(fixed by `20260913081000_fix_delete_customer_permanently_eligibility.sql`
+after direct smoke-testing caught the original eligibility bar being
+unreachable, see below) adds `delete_customer_permanently`, gated on
+`customer.delete_permanent` (still granted only to `Customer Lifecycle
+Admin`).
+
+Eligibility is schema-derived, never invented: a customer is eligible
+for permanent deletion only when it has **zero `commercial_configurations`
+rows** and zero approved `customer_change_requests`. This is a stricter
+bar than "zero real Commercial Components" because `commercial_changes`
+itself carries its own unconditional append-only trigger
+(`fn_reject_update_delete`, from an earlier round) and
+`commercial_configurations.customer_id` is a RESTRICT foreign key:
+once a customer has been approved into a Commercial Configuration, even
+an empty-shell one, that Configuration and its `initial_setup` Change
+can never be deleted, so the customer can never be deleted either. This
+was discovered by direct SQL smoke-testing before writing any
+TypeScript (the original migration's "zero Commercial Components" bar
+would have failed for every real onboarded customer, since
+`approve_customer_onboarding_case` always creates a Commercial
+Configuration, even for zero components). A genuinely never-commercialized
+customer (created directly via `insertCustomer`, the same path the very
+first demo customer used, never through onboarding) has zero Commercial
+Configurations and remains eligible.
+
+`customers` has carried an unconditional DELETE-rejecting trigger
+(`fn_protect_customer_lifecycle`) since its own foundation migration.
+This migration extends it with a narrow, session-local bypass
+(`app.permit_customer_delete`), set only by
+`delete_customer_permanently` for the duration of its own transaction.
+
+`customer_deletion_audit` follows the exact same "no FK back to the
+described row" discipline `audit_log.row_id` already established: a
+plain, unconstrained snapshot column (key/name/segment/business unit/
+country/industry/brand/was-active/reason/actor/time), append-only via
+its own `fn_reject_update_delete` trigger, so a deletion's evidence
+survives the row it describes, permanently, and cannot itself be
+altered or removed.
+
+Customer -> More Actions -> "Permanently Delete Customer"
+(`src/features/customers/ui/delete-customer-panel.tsx`) checks real
+eligibility before enabling anything, requires a Reason and typing
+"DELETE" to confirm, and offers "Deactivate Instead" (sets `is_active =
+false`, the customer stays fully intact) when blocked.
 
 ## 6. Permissions
 

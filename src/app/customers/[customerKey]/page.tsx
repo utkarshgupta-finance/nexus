@@ -4,6 +4,7 @@ import { getCustomerMasterDetailByKey } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { listChangeRequestsForCustomer, listCustomerFieldHistory } from "@/features/customer-change/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
+import { hasPermission } from "@/platform/permissions/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
 /**
@@ -69,9 +70,10 @@ export default async function CustomerMasterDetailRoute({
     commercialConfigurationId = null
   }
 
-  const [changeRequests, fieldHistory] = await Promise.all([
+  const [changeRequests, fieldHistory, canDeletePermanently] = await Promise.all([
     listChangeRequestsForCustomer(detail.record.id),
     listCustomerFieldHistory(detail.record.id),
+    hasPermission("customer", "delete_permanent"),
   ])
 
   return (
@@ -81,6 +83,7 @@ export default async function CustomerMasterDetailRoute({
       commercialConfigurationId={commercialConfigurationId}
       changeRequests={changeRequests}
       fieldHistory={fieldHistory}
+      canDeletePermanently={canDeletePermanently}
     />
   )
 }

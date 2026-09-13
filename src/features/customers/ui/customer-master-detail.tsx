@@ -16,6 +16,7 @@ import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
 import { labelForGovernedField } from "@/features/customer-change"
 import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-models/customer-master"
+import { DeleteCustomerPanel } from "./delete-customer-panel"
 
 /**
  * Customer workspace (Customer Lifecycle V1, task §3): Overview, Customer
@@ -42,6 +43,7 @@ function CustomerMasterDetail({
   commercialConfigurationId,
   changeRequests,
   fieldHistory,
+  canDeletePermanently = false,
 }: {
   detail: CustomerMasterDetailData
   snapshot: ReferenceMasterSnapshot
@@ -49,6 +51,8 @@ function CustomerMasterDetail({
   commercialConfigurationId: string | null
   changeRequests: CustomerChangeRequest[]
   fieldHistory: CustomerFieldHistoryEntry[]
+  /** Gates the "More Actions -> Permanently Delete Customer" entry point (Customer Lifecycle V1, Phase 14-16); resolved server-side from `customer.delete_permanent`. */
+  canDeletePermanently?: boolean
 }) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
@@ -134,6 +138,12 @@ function CustomerMasterDetail({
                   changed shows the real governed value instead.
                 </p>
               </div>
+            ) : null}
+            {canDeletePermanently ? (
+              <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+                <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">More Actions</h2>
+                <DeleteCustomerPanel customerId={record.id} customerKey={record.key} />
+              </section>
             ) : null}
           </TabsPanel>
 

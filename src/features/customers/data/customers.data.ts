@@ -58,5 +58,18 @@ async function insertCustomer(input: InsertCustomerInput): Promise<CustomerRow> 
   return data
 }
 
-export { getCustomerByKey, getCustomerById, listCustomers, insertCustomer }
+/** Sets `is_active`, the one column fn_protect_customer_lifecycle already permits to change in either direction. Used by the "Deactivate" offer on a customer whose permanent deletion is blocked by real business history (Customer Lifecycle V1, Phase 14-16). */
+async function setCustomerActive(customerId: string, isActive: boolean, actorUserId: string): Promise<CustomerRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customers")
+    .update({ is_active: isActive, updated_by: actorUserId })
+    .eq("id", customerId)
+    .select("*")
+    .single()
+  if (error) throw new CustomerOperationError(parseCustomerError(error))
+  return data
+}
+
+export { getCustomerByKey, getCustomerById, listCustomers, insertCustomer, setCustomerActive }
 export type { InsertCustomerInput }
