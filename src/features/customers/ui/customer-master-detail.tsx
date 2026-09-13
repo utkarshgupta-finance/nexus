@@ -16,7 +16,17 @@ import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
 import { labelForGovernedField } from "@/features/customer-change"
 import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-models/customer-master"
+import {
+  resolveBrandName,
+  resolveCountryCode,
+  resolveIndustryCode,
+  resolveSegmentCode,
+  resolveBusinessUnitCode,
+  resolveBillingCurrencyCode,
+} from "../domain/display-fields"
 import { DeleteCustomerPanel } from "./delete-customer-panel"
+import { CustomerActivityTimeline } from "./customer-activity-timeline"
+import type { CustomerActivityEvent } from "../domain/activity"
 
 /**
  * Customer workspace (Customer Lifecycle V1, task §3): Overview, Customer
@@ -44,6 +54,7 @@ function CustomerMasterDetail({
   changeRequests,
   fieldHistory,
   canDeletePermanently = false,
+  activityEvents,
 }: {
   detail: CustomerMasterDetailData
   snapshot: ReferenceMasterSnapshot
@@ -53,35 +64,21 @@ function CustomerMasterDetail({
   fieldHistory: CustomerFieldHistoryEntry[]
   /** Gates the "More Actions -> Permanently Delete Customer" entry point (Customer Lifecycle V1, Phase 14-16); resolved server-side from `customer.delete_permanent`. */
   canDeletePermanently?: boolean
+  /** Customer Activity timeline (task Phase C), resolved server-side. */
+  activityEvents: CustomerActivityEvent[]
 }) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
   const [viewingDocument, setViewingDocument] = useState<{ title: string; url: string; downloadUrl: string } | null>(null)
 
-  const brandName = record.brandName ?? enrichment?.brandName ?? null
-  const countryLabel = record.country
-    ? (resolveOption(snapshot, "country", record.country)?.label ?? record.country)
-    : enrichment
-      ? (resolveOption(snapshot, "country", enrichment.countryCode)?.label ?? enrichment.countryCode)
-      : null
-  const industryLabel = record.industry
-    ? (resolveOption(snapshot, "industry", record.industry)?.label ?? record.industry)
-    : enrichment
-      ? (resolveOption(snapshot, "industry", enrichment.industryValue)?.label ?? enrichment.industryValue)
-      : null
-  const segmentLabel = record.segment
-    ? (resolveOption(snapshot, "segment", record.segment)?.label ?? record.segment)
-    : enrichment
-      ? (resolveOption(snapshot, "segment", enrichment.segmentValue)?.label ?? enrichment.segmentValue)
-      : null
-  const businessUnitLabel = record.businessUnit
-    ? (resolveOption(snapshot, "business_unit", record.businessUnit)?.label ?? record.businessUnit)
-    : enrichment
-      ? (resolveOption(snapshot, "business_unit", enrichment.businessUnitValue)?.label ?? enrichment.businessUnitValue)
-      : null
-  const billingCurrencyLabel = enrichment
-    ? (resolveOption(snapshot, "currency", enrichment.billingCurrencyCode)?.label ?? enrichment.billingCurrencyCode)
-    : null
+  const brandName = resolveBrandName(record, enrichment)
+  const resolveLabel = (listKey: "country" | "industry" | "segment" | "business_unit" | "currency", code: string | null) =>
+    code ? (resolveOption(snapshot, listKey, code)?.label ?? code) : null
+  const countryLabel = resolveLabel("country", resolveCountryCode(record, enrichment))
+  const industryLabel = resolveLabel("industry", resolveIndustryCode(record, enrichment))
+  const segmentLabel = resolveLabel("segment", resolveSegmentCode(record, enrichment))
+  const businessUnitLabel = resolveLabel("business_unit", resolveBusinessUnitCode(record, enrichment))
+  const billingCurrencyLabel = resolveLabel("currency", resolveBillingCurrencyCode(enrichment))
 
   return (
     <div className="flex flex-1 flex-col">
@@ -109,6 +106,7 @@ function CustomerMasterDetail({
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTab value="overview">Overview</TabsTab>
+            <TabsTab value="activity">Activity</TabsTab>
             <TabsTab value="details">Customer Details</TabsTab>
             <TabsTab value="tax">Tax &amp; Registration</TabsTab>
             <TabsTab value="commercials">Commercials</TabsTab>
@@ -145,6 +143,10 @@ function CustomerMasterDetail({
                 <DeleteCustomerPanel customerId={record.id} customerKey={record.key} />
               </section>
             ) : null}
+          </TabsPanel>
+
+          <TabsPanel value="activity" className="flex flex-col gap-4 pt-4">
+            <CustomerActivityTimeline events={activityEvents} />
           </TabsPanel>
 
           <TabsPanel value="details" className="flex flex-col gap-4 pt-4">

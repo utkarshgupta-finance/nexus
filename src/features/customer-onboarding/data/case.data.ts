@@ -89,6 +89,14 @@ async function getCaseByRequestId(requestId: string): Promise<CustomerOnboarding
   return data
 }
 
+/** The one onboarding case that became this Customer Master (`customer_id` is set only once, atomically, by `approve_customer_onboarding_case`): the Customer Activity timeline's "how did this customer come to exist" event. */
+async function getCaseByCustomerId(customerId: string): Promise<CustomerOnboardingCaseRow | null> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("customer_onboarding_cases").select("*").eq("customer_id", customerId).maybeSingle()
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data
+}
+
 /** Every case not yet approved, oldest first: the review queue's data source. */
 async function listCasesAwaitingReview(): Promise<CustomerOnboardingCaseRow[]> {
   const supabase = getSupabaseServiceRoleClient()
@@ -141,6 +149,7 @@ export {
   sendBackCase,
   approveCase,
   getCaseByRequestId,
+  getCaseByCustomerId,
   listCasesAwaitingReview,
   listRevisionsForRequest,
   getLatestRevisionForRequest,

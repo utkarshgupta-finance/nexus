@@ -362,3 +362,38 @@ share one resolver module, `src/features/customers/domain/display-fields.ts`
 ("a real governed value always wins over demo enrichment, which is a
 fallback only for a field that has never been set"), so the list and
 detail page can never drift into two different answers again.
+
+## 8. Customer Activity: IMPLEMENTED
+
+The Customer workspace's new Activity tab
+(`src/features/customers/ui/customer-activity-timeline.tsx`) is one
+readable, newest-first event stream built from data Nexus already
+persists, never raw `audit_log` JSON and never a fabricated feed:
+Customer Onboarding approval (the "how did this customer come to
+exist" event), Customer Field History (every governed field change,
+already plain old/new values), Customer Change Request lifecycle
+transitions (created/sent back/approved/rejected), Commercial
+Configuration Version lifecycle transitions (created/approved/
+rejected), and `customers`' own `is_active` audit trail (deactivated/
+reactivated), read narrowly (only the `is_active` before/after, nothing
+else from that row's audit JSON).
+
+`src/features/customers/domain/activity.ts` is the pure builder (no
+I/O, directly unit-testable); `src/features/customers/server/activity.ts`
+gathers every input in parallel and hands off to it.
+
+This also introduces a genuinely new, small, reusable platform
+capability: `src/platform/audit/server.ts`. `app_users` deliberately
+holds no profile fields (name/email), so resolving an actor id to
+something a human can read required one new helper,
+`resolveActorEmails`, backed by the Supabase Auth admin API
+(`auth.admin.getUserById`), batched once per timeline build rather than
+once per event. `listAuditLogForRow` is a generic, reusable read over
+`audit_log` for any table/row, so a future feature never needs to
+reimplement this query.
+
+Known gap, stated honestly: Commercial Version History
+(`src/features/commercial/ui/version-history-table.tsx`) still renders
+"Approved By" as a raw UUID prefix rather than through this same
+resolver; wiring it through is a small, isolated follow-up, not done in
+this round.

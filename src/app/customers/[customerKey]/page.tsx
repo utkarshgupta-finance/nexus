@@ -1,11 +1,12 @@
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
-import { getCustomerMasterDetailByKey } from "@/features/customers/server"
+import { getCustomerMasterDetailByKey, loadCustomerActivityTimeline } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { listChangeRequestsForCustomer, listCustomerFieldHistory } from "@/features/customer-change/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { hasPermission } from "@/platform/permissions/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+import type { CustomerActivityEvent } from "@/features/customers/server"
 
 /**
  * Customer Master detail: one record, read-only (task spec §15, §18).
@@ -70,6 +71,13 @@ export default async function CustomerMasterDetailRoute({
     commercialConfigurationId = null
   }
 
+  let activityEvents: CustomerActivityEvent[] = []
+  try {
+    activityEvents = await loadCustomerActivityTimeline(detail.record.id)
+  } catch {
+    activityEvents = []
+  }
+
   const [changeRequests, fieldHistory, canDeletePermanently] = await Promise.all([
     listChangeRequestsForCustomer(detail.record.id),
     listCustomerFieldHistory(detail.record.id),
@@ -84,6 +92,7 @@ export default async function CustomerMasterDetailRoute({
       changeRequests={changeRequests}
       fieldHistory={fieldHistory}
       canDeletePermanently={canDeletePermanently}
+      activityEvents={activityEvents}
     />
   )
 }

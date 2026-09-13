@@ -180,6 +180,15 @@ type PersistedOnboardingDocumentMetadata = {
   isCurrent: boolean
 }
 
+/** Thin summary of the one onboarding case that became a given Customer Master: the Customer Activity timeline's "how did this customer come to exist" event (task Phase C). Never the full case (revision data is irrelevant here). */
+type OnboardingOrigin = {
+  requestId: string
+  createdAt: string
+  createdBy: string | null
+  approvedAt: string | null
+  approvedBy: string | null
+}
+
 export type {
   CustomerOnboardingStageKey,
   AppUserId,
@@ -191,4 +200,5 @@ export type {
   OnboardingDocumentType,
   SelectedOnboardingDocument,
   PersistedOnboardingDocumentMetadata,
+  OnboardingOrigin,
 }

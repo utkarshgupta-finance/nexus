@@ -5,7 +5,7 @@ import { toCustomerOnboardingCase } from "../domain/case-mappers"
 import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
-import type { CustomerOnboardingCase } from "../domain/types"
+import type { CustomerOnboardingCase, OnboardingOrigin } from "../domain/types"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
 /**
@@ -158,6 +158,13 @@ async function approveOnboardingCase(requestId: string, actorUserId: string, sna
   return toCustomerOnboardingCase(row, revisions)
 }
 
+/** Customer Activity timeline (task Phase C): the one onboarding case that became this Customer Master, or null for a customer created directly (never through onboarding), e.g. `insertCustomer`'s demo path. */
+async function getOnboardingOriginForCustomer(customerId: string): Promise<OnboardingOrigin | null> {
+  const row = await caseData.getCaseByCustomerId(customerId)
+  if (!row) return null
+  return { requestId: row.request_id, createdAt: row.created_at, createdBy: row.created_by, approvedAt: row.approved_at, approvedBy: row.approved_by }
+}
+
 export {
   getOnboardingCase,
   createOnboardingCase,
@@ -166,5 +173,6 @@ export {
   sendBackOnboardingCase,
   listOnboardingReviewQueue,
   approveOnboardingCase,
+  getOnboardingOriginForCustomer,
 }
 export type { ReviewQueueEntry }
