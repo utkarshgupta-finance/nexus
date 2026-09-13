@@ -1,12 +1,19 @@
 # Customer Lifecycle
 
-Status: **PARTIALLY IMPLEMENTED.** The Onboarding Case lifecycle, its
-atomic approval into a real Customer Master + Commercial Configuration,
-and the Customer Change Request lifecycle (including the Customer
-workspace tabs and Field History) are implemented and persisted.
-Commercial Version 2+ (draft/activate) and Permanent Customer Deletion
-are designed below but not yet built; see each section's own status
-line.
+Status: **IMPLEMENTED.** The Onboarding Case lifecycle, its atomic
+approval into a real Customer Master + Commercial Configuration, the
+Customer Change Request lifecycle (Customer workspace tabs, Field
+History), the governed Commercial Configuration Version 2+ draft/
+activate lifecycle, and Permanent Customer Deletion are all implemented
+and persisted; see each section for exact scope and two known,
+honestly-stated gaps: (1) Version History does not yet surface an
+"Approved By" column for governed versions (§4); (2) the one real human
+account (`utkarsh.gupta@mobisy.com`) currently holds
+`commercial_configuration_viewer` (read-only), not
+`commercial_configuration_admin`, so it cannot yet exercise the new
+Commercial Version 2 write/approve UI through a real session; granting
+it that role was attempted and blocked by this environment's own
+permission safeguard pending explicit user authorization.
 
 ## 1. Onboarding Case lifecycle: IMPLEMENTED
 
@@ -232,6 +239,15 @@ another feature's internals (docs/ARCHITECTURE.md).
 
 "Create New Version" on `/commercials/[configId]` (gated on
 `commercial_configuration.write`) is the new, governed entry point.
+
+Known gap, stated honestly: `src/features/commercial/ui/version-history-table.tsx`
+and `toVersionSummaries` were not extended with an "Approved By" column
+for governed versions (`commercial_configuration_versions.decided_by`);
+Version History today still shows only Version/Status/Category/
+Effective From/To/Billing Currency/FX Snapshot/Created At/Actions,
+exactly as it did before this round. Both real Version 1 and the real
+Version 2 built during this round render correctly through it; only the
+new "who approved this version" fact is not yet surfaced there.
 
 ## 5. Permanent Customer Deletion: IMPLEMENTED
 
