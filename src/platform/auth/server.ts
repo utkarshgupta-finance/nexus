@@ -30,18 +30,38 @@ import type { NexusSession } from "./domain/types"
  * honest degraded state, not a silent fallback to "unauthenticated":
  * callers must not treat the two as equivalent (§13, deny-by-default
  * still applies to both, but the UI message differs).
+ *
+ * Each stage that can fail logs its own safe reason code
+ * (AUTH_CONFIG_MISSING / AUTH_PROVIDER_ERROR / AUTH_RBAC_LOOKUP_FAILED)
+ * before returning `unavailable`, so a real incident is diagnosable from
+ * server logs alone. Only `Error.message` is logged, never the raw
+ * error object, a token, a cookie, or a key: Supabase SDK error messages
+ * describe what failed ("fetch failed", "Invalid API key"), not secret
+ * values themselves.
  */
 async function getCurrentNexusSession(): Promise<NexusSession> {
+  let supabase: Awaited<ReturnType<typeof getSupabaseServerAuthClient>>
   try {
-    const supabase = await getSupabaseServerAuthClient()
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser()
+    supabase = await getSupabaseServerAuthClient()
+  } catch (error) {
+    console.error("[auth] AUTH_CONFIG_MISSING", error instanceof Error ? error.message : "unknown error")
+    return { status: "unavailable" }
+  }
 
-    if (!authUser) {
-      return { status: "unauthenticated" }
-    }
+  let authUser: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"]
+  try {
+    const result = await supabase.auth.getUser()
+    authUser = result.data.user
+  } catch (error) {
+    console.error("[auth] AUTH_PROVIDER_ERROR", error instanceof Error ? error.message : "unknown error")
+    return { status: "unavailable" }
+  }
 
+  if (!authUser) {
+    return { status: "unauthenticated" }
+  }
+
+  try {
     const appUser = await getAppUserById(authUser.id)
     if (!appUser) {
       return { status: "unprovisioned", authUserId: authUser.id, email: authUser.email ?? null }
@@ -62,7 +82,8 @@ async function getCurrentNexusSession(): Promise<NexusSession> {
       roles: roles.map((role) => ({ code: role.code, name: role.name })),
       permissions: permissions.map((permission) => ({ resource: permission.resource, action: permission.action })),
     }
-  } catch {
+  } catch (error) {
+    console.error("[auth] AUTH_RBAC_LOOKUP_FAILED", error instanceof Error ? error.message : "unknown error")
     return { status: "unavailable" }
   }
 }
