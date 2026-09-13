@@ -16,7 +16,9 @@ consistent Previous/Save Draft/Next/Submit footer across all five
 Onboarding stages, a Submitted confirmation screen, an Approve success
 screen linking straight to the new Customer and Commercials, and removal
 of the development-only Commercial Configuration promotion panel from
-the real onboarding flow (§4).
+the real onboarding flow (§4). Customer Search (§7), including former
+legal/brand name resolution through the existing Field History, is also
+implemented.
 
 ## 1. Onboarding Case lifecycle: IMPLEMENTED
 
@@ -315,6 +317,48 @@ Seeded: `customer.create`, `customer.read`, `customer.approve`,
 now gates every requester-side Customer Change Request action
 (create/save/submit); `customer.approve` gates the reviewer-side
 decision (send back/reject/approve), the same role that already gated
-onboarding case approval. `customer.delete_permanent` exists as a
-permission now so the schema and role model are ready for §5 above;
-nothing currently checks it.
+onboarding case approval. `customer.delete_permanent` is enforced
+server-side wherever it matters: `requirePermission("customer",
+"delete_permanent")` gates every Server Action in §5 (eligibility
+check, delete, deactivate), the Customer page resolves the same
+permission server-side to decide whether "More Actions" renders at
+all, and `delete_customer_permanently` itself is only grantable to
+`service_role` (`revoke execute ... from anon, authenticated`), so a
+client cannot call it directly even bypassing the Server Action layer.
+
+## 7. Customer Search: IMPLEMENTED
+
+`/customers` filters server-side by plain query parameters
+(`q`/`segment`/`businessUnit`/`country`/`status`), read by
+`src/app/customers/page.tsx` and applied by the pure
+`filterCustomerMasterEntries` (`src/features/customers/domain/search.ts`):
+substring match on legal entity name, brand, and customer key, plus
+exact-code match on Segment/Business Unit/Country and active/inactive
+status. No fuzzy matching, no search index: the dataset is Nexus's own
+governed customer base, not a general-purpose corpus.
+
+A query that does not match any customer's CURRENT name/brand may still
+match a name it used to carry: `searchFormerCustomerNames`
+(`src/features/customer-change/services/change-request.service.ts`)
+searches `customer_field_history` (the same permanent, field-level
+history the Customer -> History tab already renders, §3a) for a
+`name`/`brand_name` row whose `old_value` matches, and
+`findCustomersByFormerName` (`src/features/customers/server/former-name-search.ts`)
+resolves each match back to its current Customer Master record. The
+Customers page renders these as a separate, clearly annotated group
+("Former legal name: X" / "Former brand: X"), never merged silently into
+the current-name result set, and never shown at all for a customer
+already matched on its current fields. This reuses the existing Field
+History table exactly as it already exists; no second alias/identity
+table was introduced.
+
+Fixed alongside this (Customer Lifecycle V1 journey hardening): the
+Customers list page previously read Brand/Country/Segment/Business
+Unit/Billing Currency only from the legacy demo enrichment fixture,
+never from `customers`' own real governed columns, so every real
+onboarded customer showed blank values in those columns even though the
+Customer detail page already resolved them correctly. Both pages now
+share one resolver module, `src/features/customers/domain/display-fields.ts`
+("a real governed value always wins over demo enrichment, which is a
+fallback only for a field that has never been set"), so the list and
+detail page can never drift into two different answers again.

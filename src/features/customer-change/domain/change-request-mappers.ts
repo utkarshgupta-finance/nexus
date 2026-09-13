@@ -1,5 +1,5 @@
 import type { CustomerChangeRequestRow, CustomerChangeRequestRequirementRow, SubmissionRevisionRow, CustomerFieldHistoryRow } from "../data/change-request-row-types"
-import type { CustomerChangeRequest, CustomerChangeRequirement, CustomerFieldHistoryEntry } from "./types"
+import type { CustomerChangeRequest, CustomerChangeRequirement, CustomerFieldHistoryEntry, FormerNameMatch } from "./types"
 
 /**
  * Pure row -> domain mappers for the persisted Change Request, the
@@ -63,4 +63,9 @@ function toFieldHistoryEntry(row: CustomerFieldHistoryRow): CustomerFieldHistory
   }
 }
 
-export { toCustomerChangeRequest, toProposedValues, toFieldHistoryEntry }
+function toFormerNameMatch(row: CustomerFieldHistoryRow): FormerNameMatch | null {
+  if (!row.old_value) return null
+  return { customerId: row.customer_id, fieldKey: row.field_key, oldValue: row.old_value, changedAt: row.changed_at }
+}
+
+export { toCustomerChangeRequest, toProposedValues, toFieldHistoryEntry, toFormerNameMatch }

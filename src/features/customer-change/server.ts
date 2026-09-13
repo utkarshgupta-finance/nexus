@@ -16,6 +16,7 @@ export {
   listChangeRequestReviewQueue,
   listChangeRequestsForCustomer,
   listCustomerFieldHistory,
+  searchFormerCustomerNames,
   getCurrentGovernedValues,
 } from "./services/change-request.service"
 export type { ReviewQueueEntry } from "./services/change-request.service"

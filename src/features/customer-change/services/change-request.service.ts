@@ -3,10 +3,10 @@ import "server-only"
 import { getCustomerById } from "@/features/customers/server"
 
 import * as changeData from "../data/change-request.data"
-import { toCustomerChangeRequest, toProposedValues, toFieldHistoryEntry } from "../domain/change-request-mappers"
+import { toCustomerChangeRequest, toProposedValues, toFieldHistoryEntry, toFormerNameMatch } from "../domain/change-request-mappers"
 import { evaluateCustomerChangeRequirements, toRequirementRpcRows } from "../domain/workflow-rules"
 import { GOVERNED_FIELD_KEYS } from "../domain/governed-fields"
-import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "../domain/types"
+import type { CustomerChangeRequest, CustomerFieldHistoryEntry, FormerNameMatch } from "../domain/types"
 
 /**
  * Application service for the real, database-backed Customer Change
@@ -124,6 +124,20 @@ async function listCustomerFieldHistory(customerId: string): Promise<CustomerFie
   return rows.map(toFieldHistoryEntry)
 }
 
+/** Customer Search's former-name lookup (task Phase B): one most-recent match per customer, so a customer renamed twice does not show up twice in a search result. */
+async function searchFormerCustomerNames(term: string): Promise<FormerNameMatch[]> {
+  const trimmed = term.trim()
+  if (!trimmed) return []
+  const rows = await changeData.searchFieldHistoryByOldValue(trimmed)
+  const matches = rows.map(toFormerNameMatch).filter((match): match is FormerNameMatch => match !== null)
+  const seen = new Set<string>()
+  return matches.filter((match) => {
+    if (seen.has(match.customerId)) return false
+    seen.add(match.customerId)
+    return true
+  })
+}
+
 export {
   loadChangeRequest,
   createChangeRequest,
@@ -136,6 +150,7 @@ export {
   listChangeRequestReviewQueue,
   listChangeRequestsForCustomer,
   listCustomerFieldHistory,
+  searchFormerCustomerNames,
   getCurrentGovernedValues,
 }
 export type { ReviewQueueEntry }

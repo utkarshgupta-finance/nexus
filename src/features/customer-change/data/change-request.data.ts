@@ -148,6 +148,28 @@ async function listFieldHistoryForCustomer(customerId: string): Promise<Customer
   return data ?? []
 }
 
+/**
+ * Customer Search (task Phase B): finds a former legal/brand name across
+ * every customer's field history, newest first, capped at a small
+ * number of matches since this only ever backs an interactive search
+ * box, never a report. Scoped to `name`/`brand_name` because those are
+ * the only two fields a real customer identity search cares about; a
+ * Segment/BU/Country change is not a "did this customer used to be
+ * called something else" question.
+ */
+async function searchFieldHistoryByOldValue(term: string): Promise<CustomerFieldHistoryRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_field_history")
+    .select("*")
+    .in("field_key", ["name", "brand_name"])
+    .ilike("old_value", `%${term}%`)
+    .order("changed_at", { ascending: false })
+    .limit(20)
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  return data ?? []
+}
+
 export {
   createChangeRequest,
   saveDraft,
@@ -161,5 +183,6 @@ export {
   getLatestRevisionForRequest,
   listRequirementsForRequest,
   listFieldHistoryForCustomer,
+  searchFieldHistoryByOldValue,
 }
 export type { CreateChangeRequestInput, SaveDraftInput, SubmitInput }

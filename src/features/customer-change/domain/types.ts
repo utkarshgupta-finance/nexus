@@ -52,4 +52,12 @@ type CustomerFieldHistoryEntry = {
   changedAt: string
 }
 
-export type { CustomerChangeRequestStatus, CustomerChangeRequirement, CustomerChangeRequest, CustomerFieldHistoryEntry }
+/** One former name/brand match from Customer Search (task Phase B): which customer, which field, and what it used to be called. */
+type FormerNameMatch = {
+  customerId: string
+  fieldKey: string
+  oldValue: string
+  changedAt: string
+}
+
+export type { CustomerChangeRequestStatus, CustomerChangeRequirement, CustomerChangeRequest, CustomerFieldHistoryEntry, FormerNameMatch }
