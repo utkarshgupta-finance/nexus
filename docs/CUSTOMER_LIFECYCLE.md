@@ -448,3 +448,35 @@ its own draft or decision screen depending on status), and Created
 At/Last Changed At. No fabricated metric (MRR, health score, and
 similar) was added: every value here is a real column or a real
 request already persisted elsewhere in this document.
+
+## 11. Commercial Version scheduling: IMPLEMENTED
+
+A version's "is this the customer's real current terms" status is now
+THREE states, derived, never stored (task Phase H):
+`src/features/commercial/read-models/configuration-overview-helpers.ts`'s
+`toVersionSummaries` takes an explicit `today` (ISO date) parameter and
+returns `scheduled` (Components open, i.e. `effectiveTo` null, but
+their own `effectiveDate` has not arrived yet), `active` (open AND
+`effectiveDate` has arrived; at most one at a time), or `superseded`
+(closed). Approving a future-dated Commercial Version no longer makes
+it the customer-facing "current" terms early: it shows as "Approved,
+Scheduled" on both the Customer Commercials header and Version History
+until its own effective date arrives, at which point this same read
+model resolves it as "Active" without any mutation, migration, or
+scheduled job. `today` is always resolved server-side
+(`new Date().toISOString().slice(0, 10)`) and passed down as a plain
+prop, never read from `Date.now()` inside a Client Component, so the
+result is deterministic and testable.
+
+`approve_commercial_configuration_version`
+(`supabase/migrations/20260914090000_commercial_version_effective_date_ordering_guard.sql`)
+gained one new guard: it now rejects an approval whose `effective_date`
+is not strictly after the currently open Components' own
+`effective_from`, raising `COMMERCIAL_VERSION_EFFECTIVE_DATE_OUT_OF_ORDER`
+rather than silently producing an incoherent history. Overlapping
+approved effective periods were already structurally impossible within
+one Commercial Configuration (this RPC always closes every open
+Component before opening a new set, confirmed against real production
+data before this migration shipped); this guard closes the one
+remaining gap, an approval whose own effective date does not respect
+that ordering.

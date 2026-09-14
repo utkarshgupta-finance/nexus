@@ -142,7 +142,7 @@ async function getCommercialConfigurationOverview(
       effectiveDate: change.effectiveDate,
       reason: change.reason,
     })),
-    versions: toVersionSummaries(changes, components),
+    versions: toVersionSummaries(changes, components, undefined, new Date().toISOString().slice(0, 10)),
   }
 }
 

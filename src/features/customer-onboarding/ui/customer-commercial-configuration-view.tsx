@@ -144,9 +144,15 @@ function CustomerCommercialConfigurationHeader({
             <h1 className="text-base font-semibold text-foreground">{customerName}</h1>
             <Badge
               variant="ghost"
-              className={version?.status === "active" ? "bg-success/10 text-success dark:bg-success/15" : "bg-muted text-muted-foreground"}
+              className={
+                version?.status === "active"
+                  ? "bg-success/10 text-success dark:bg-success/15"
+                  : version?.status === "scheduled"
+                    ? "bg-warning/10 text-warning"
+                    : "bg-muted text-muted-foreground"
+              }
             >
-              {version?.status === "active" ? "Active" : "Superseded"}
+              {version?.status === "active" ? "Active" : version?.status === "scheduled" ? "Approved, Scheduled" : "Superseded"}
             </Badge>
           </div>
           <p className="font-mono text-[0.7rem] text-muted-foreground">{configuration.key}</p>
@@ -181,6 +187,7 @@ function CustomerCommercialConfigurationView({
   snapshot,
   canCreateVersion = false,
   approvedByChangeId,
+  today,
 }: {
   customerName: string
   configuration: CommercialConfiguration
@@ -191,8 +198,10 @@ function CustomerCommercialConfigurationView({
   canCreateVersion?: boolean
   /** changeId -> approving actor, sourced from commercial_configuration_versions.decided_by for versions created through the governed lifecycle; omitted (or missing an entry) simply leaves that version's Approved By blank, never fabricated. */
   approvedByChangeId?: Map<string, string | null>
+  /** ISO date (`YYYY-MM-DD`), resolved server-side (task Phase H): which version counts as "active" right now depends on this, never the browser's clock, so this must come from the page, not from inside this Client Component. */
+  today: string
 }) {
-  const versions = useMemo(() => toVersionSummaries(changes, components, approvedByChangeId), [changes, components, approvedByChangeId])
+  const versions = useMemo(() => toVersionSummaries(changes, components, approvedByChangeId, today), [changes, components, approvedByChangeId, today])
   const activeVersion = versions.find((version) => version.status === "active") ?? versions[versions.length - 1] ?? null
   const [selectedVersionNumber, setSelectedVersionNumber] = useState<number | null>(activeVersion?.versionNumber ?? null)
   const selectedVersion = versions.find((version) => version.versionNumber === selectedVersionNumber) ?? activeVersion
@@ -228,7 +237,12 @@ function CustomerCommercialConfigurationView({
         {selectedVersion ? (
           <p className="px-6 text-xs text-muted-foreground">
             Showing Version {selectedVersion.versionNumber}
-            {selectedVersion.status === "active" ? " (current)" : " (historical, read-only)"}.
+            {selectedVersion.status === "active"
+              ? " (current)"
+              : selectedVersion.status === "scheduled"
+                ? ` (approved, takes effect ${selectedVersion.effectiveDate})`
+                : " (historical, read-only)"}
+            .
           </p>
         ) : null}
 

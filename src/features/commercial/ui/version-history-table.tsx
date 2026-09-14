@@ -56,8 +56,17 @@ function VersionHistoryTable({
                 <TableRow key={version.changeId} data-selected={version.versionNumber === selectedVersionNumber}>
                   <TableCell className="font-medium text-foreground">Version {version.versionNumber}</TableCell>
                   <TableCell>
-                    <Badge variant="ghost" className={version.status === "active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
-                      {version.status === "active" ? "Active" : "Superseded"}
+                    <Badge
+                      variant="ghost"
+                      className={
+                        version.status === "active"
+                          ? "bg-success/10 text-success"
+                          : version.status === "scheduled"
+                            ? "bg-warning/10 text-warning"
+                            : "bg-muted text-muted-foreground"
+                      }
+                    >
+                      {version.status === "active" ? "Active" : version.status === "scheduled" ? "Approved, Scheduled" : "Superseded"}
                     </Badge>
                   </TableCell>
                   <TableCell>{commercialChangeCategoryLabel(version.category)}</TableCell>

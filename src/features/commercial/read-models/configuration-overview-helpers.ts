@@ -98,23 +98,33 @@ function groupCommitmentSummaries(commitments: CommercialCommitment[]): {
  * same Commercial Change, numbered in effective-date order (a display
  * convenience, never a stored column, see this migration's own comment:
  * supabase/migrations/20260912210000_commercial_configuration_persistence.sql).
- * `status` is derived, never stored: 'active' means every Component this
- * Change created is still open (`effectiveTo` null); a new Change always
- * closes the entire prior open set in one transaction
- * (`create_commercial_change_for_configuration`), so a version can only
- * ever be fully open or fully closed, never a mix. `billingCurrency`/
- * `fxSnapshotRate` are read straight from this version's own Components,
- * never the current Reference Master rate: an already-created version's
- * FX snapshot is frozen, by construction, at the moment its Components
- * were inserted.
+ * `status` is derived, never stored, and is one of THREE states, not two
+ * (task Phase H): 'superseded' means every Component this Change created
+ * has been closed (`effectiveTo` set) by a later Change; 'scheduled'
+ * means the Change's Components are still open (`effectiveTo` null) but
+ * their own `effectiveDate` has not arrived yet, so this version has been
+ * approved but is not yet the customer's real current terms; 'active'
+ * means open AND its effective date has already arrived, at most one
+ * version at a time. A new Change always closes the entire prior open
+ * set in one transaction (`create_commercial_change_for_configuration`
+ * for the legacy path, `approve_commercial_configuration_version` for
+ * the governed path), so a version can only ever be fully open or fully
+ * closed, never a mix; approving a future-dated version does not by
+ * itself make it "active" here, only "scheduled", until `today` catches
+ * up to its `effectiveDate`. `billingCurrency`/`fxSnapshotRate` are read
+ * straight from this version's own Components, never the current
+ * Reference Master rate: an already-created version's FX snapshot is
+ * frozen, by construction, at the moment its Components were inserted.
  */
+type VersionStatus = "scheduled" | "active" | "superseded"
+
 type VersionSummary = {
   versionNumber: number
   changeId: string
   category: CommercialChange["category"]
   effectiveDate: string
   effectiveTo: string | null
-  status: "active" | "superseded"
+  status: VersionStatus
   billingCurrency: string | null
   fxSnapshotRate: number | null
   reason: string | null
@@ -125,23 +135,34 @@ type VersionSummary = {
   componentIds: string[]
 }
 
-/** Groups components by their originating Change into version summaries, ordered oldest first. `approvedByChangeId` is an optional changeId -> actor lookup sourced from commercial_configuration_versions.decided_by, entirely additive: omitting it leaves every approvedBy null, exactly as before this field existed. */
+/**
+ * Groups components by their originating Change into version summaries,
+ * ordered oldest first. `approvedByChangeId` is an optional changeId ->
+ * approving actor lookup sourced from commercial_configuration_versions.
+ * decided_by, entirely additive: omitting it leaves every approvedBy
+ * null, exactly as before this field existed. `today` (ISO date,
+ * `YYYY-MM-DD`) is an explicit parameter, never read from the system
+ * clock inside this pure function, so "is this version active yet" stays
+ * deterministic and unit-testable; callers pass the real current date.
+ */
 function toVersionSummaries(
   changes: CommercialChange[],
   components: CommercialComponent[],
-  approvedByChangeId?: Map<string, string | null>
+  approvedByChangeId: Map<string, string | null> | undefined,
+  today: string
 ): VersionSummary[] {
   const orderedChanges = [...changes].sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
   return orderedChanges.map((change, index) => {
     const versionComponents = components.filter((component) => component.commercialChangeId === change.id)
     const effectiveTo = versionComponents.length > 0 ? versionComponents[0].effectiveTo : null
+    const status: VersionStatus = effectiveTo !== null ? "superseded" : change.effectiveDate > today ? "scheduled" : "active"
     return {
       versionNumber: index + 1,
       changeId: change.id,
       category: change.category,
       effectiveDate: change.effectiveDate,
       effectiveTo,
-      status: effectiveTo === null ? "active" : "superseded",
+      status,
       billingCurrency: versionComponents[0]?.transactionCurrency ?? null,
       fxSnapshotRate: versionComponents[0]?.fxSnapshotRate ?? null,
       reason: change.reason,
@@ -154,4 +175,4 @@ function toVersionSummaries(
 }
 
 export { toCommitmentSummary, groupCommitmentSummaries, toVersionSummaries }
-export type { CommitmentSummary, VersionSummary }
+export type { CommitmentSummary, VersionSummary, VersionStatus }

@@ -90,6 +90,7 @@ export default async function CommercialConfigurationPage({ params }: { params: 
           snapshot={snapshot}
           canCreateVersion={canCreateVersion}
           approvedByChangeId={approvedByChangeId}
+          today={new Date().toISOString().slice(0, 10)}
         />
       ) : (
         notFound()
