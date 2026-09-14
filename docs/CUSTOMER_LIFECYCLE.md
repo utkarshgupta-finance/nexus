@@ -1247,3 +1247,39 @@ Reference Master list backing it (the onboarding form uses a small,
 locally-hardcoded choice set, not a governed one), so `GovernedFieldsForm`
 renders it as free text for now rather than a select; this matches the
 registry's own `editor: { kind: "text" }` for that field, not a bug.
+
+## 30. Unified Change Customer experience: IMPLEMENTED (Platform Operating Expansion, Phase I)
+
+The Customer detail screen's "Create Change Request" button is now
+"Change Customer" (`/customers/[customerKey]/change/new`), a picker
+presenting Customer Details / Commercials / Both, gated by whichever of
+`customer.change_request`/`commercial_configuration.write` the viewer
+actually holds. Backend truth stays exactly as governed and separated as
+before: Customer Details still creates one Customer Change Request,
+Commercials still creates one Commercial Configuration Version draft;
+this task only unifies the DISCOVERY of two previously disconnected
+entry points, never the records themselves. A real, pre-existing gap
+this closes in passing: `/commercials/[configId]/versions/new` (the
+"Create New Version" route) has existed since Commercial Version's own
+build but had no link pointing to it anywhere in the app; it is now
+reachable.
+
+"Both" (`/customers/[customerKey]/change/new/both`) creates one Customer
+Change Request and one Commercial Configuration Version together and
+lands on a page showing both as a coordinated pair, each with its own
+"Continue" link into its own real screen.
+
+**Scope boundary, honestly recorded, per the task's own framing
+("evaluate a lightweight parent Change Initiative if useful")**: no
+persisted Change Initiative parent record was built. The two child
+records created by "Both" have no database link to each other today;
+they are coordinated only by this landing page having created both in
+one request. Each keeps its own independent status, review, and
+approval, exactly as if a requester had visited the two single-choice
+paths back to back, which is what the task explicitly allows ("each
+stays a separate governed record"). If a future need emerges to track
+"these two changes belong to the same customer initiative" as queryable
+state (for example, a combined approval view, or "3 of 5 initiatives
+still have an open commercials change"), that is the trigger to add the
+parent record; nothing here should be read as having decided against it
+permanently.

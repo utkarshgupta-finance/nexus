@@ -44,8 +44,9 @@ import type { OnboardingOrigin } from "@/features/customer-onboarding/server"
  * Customer workspace (Customer Lifecycle V1, task §3): Overview, Customer
  * Details, Tax & Registration, Commercials, Documents, Change Requests,
  * History tabs. Approved Customer Master stays strictly read-only: there
- * is no direct Edit action anywhere on this screen, only "Create Change
- * Request" (governed, see /customers/[customerKey]/change-requests/new).
+ * is no direct Edit action anywhere on this screen, only "Change
+ * Customer" (task Phase I: one entry point, then a choice of Customer
+ * Details / Commercials / Both, see /customers/[customerKey]/change/new).
  *
  * `detail.enrichment`/`detail.documents` remain demo/fixture data
  * (../domain/demo-enrichment.ts's header), used only as a fallback when
@@ -123,8 +124,8 @@ function CustomerMasterDetail({
                 Commercials
               </Button>
             ) : null}
-            <Button variant="outline" size="sm" render={<Link href={`/customers/${record.key}/change-requests/new`} />}>
-              Create Change Request
+            <Button variant="outline" size="sm" render={<Link href={`/customers/${record.key}/change/new`} />}>
+              Change Customer
             </Button>
           </div>
         }
