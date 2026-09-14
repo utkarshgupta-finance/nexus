@@ -43,6 +43,22 @@ function actorLabel(actorId: string | null, actorLabels: Map<string, string | nu
   return actorLabels.get(actorId) ?? null
 }
 
+/**
+ * Program 4 Hardening: historical actor identity fallback chain for an
+ * `audit_log`-sourced event specifically, the one place a point-in-time
+ * snapshot actually exists today. Order matches the permanent rule
+ * exactly: the name as it was at the time, then the actor's current
+ * name (covers rows written before the snapshot columns existed), then
+ * an email (snapshot preferred, current as a last resort), never a raw
+ * id.
+ */
+function auditRowActorLabel(row: AuditLogRow, actorLabels: Map<string, string | null>): string | null {
+  if (row.actor_display_name_snapshot) return row.actor_display_name_snapshot
+  const currentLabel = actorLabel(row.actor_user_id, actorLabels)
+  if (currentLabel) return currentLabel
+  return row.actor_email_snapshot ?? null
+}
+
 function fieldChangeEvents(
   entries: CustomerFieldHistoryEntry[],
   actorLabels: Map<string, string | null>,
@@ -142,7 +158,7 @@ function statusChangeEvents(auditRows: AuditLogRow[], actorLabels: Map<string, s
     events.push({
       id: `status-${row.id}`,
       occurredAt: row.occurred_at,
-      actorEmail: actorLabel(row.actor_user_id, actorLabels),
+      actorEmail: auditRowActorLabel(row, actorLabels),
       summary: reason ? `${after ? "Customer reactivated" : "Customer deactivated"}: ${reason}` : after ? "Customer reactivated" : "Customer deactivated",
       relatedRequestId: row.request_id,
     })

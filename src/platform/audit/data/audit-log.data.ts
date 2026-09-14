@@ -19,6 +19,10 @@ type AuditLogRow = {
   actor_user_id: string | null
   request_id: string | null
   actor_context: Record<string, unknown> | null
+  /** Program 4 Hardening: app_users.display_name AS IT WAS at this event, captured by fn_audit_row(). Null for rows written before this column existed. */
+  actor_display_name_snapshot: string | null
+  /** Program 4 Hardening: auth.users.email AS IT WAS at this event, captured by fn_audit_row(). Null for rows written before this column existed. */
+  actor_email_snapshot: string | null
 }
 
 /** Most recent 500 audit_log rows for one table row, oldest first (unbounded until Platform Scale Closure, Phase O: a row with a long enough audit history would otherwise be an unbounded read). Fetched newest-first so the cap keeps the most recent history, then reversed back to the ascending order every caller expects. 500 is a generous ceiling for what is normally a handful of lifecycle events per row; revisit only if a real row is found approaching it. */

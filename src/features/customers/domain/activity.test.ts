@@ -93,6 +93,8 @@ const STATUS_AUDIT_ROWS: AuditLogRow[] = [
     actor_user_id: "actor-approver",
     request_id: null,
     actor_context: null,
+    actor_display_name_snapshot: null,
+    actor_email_snapshot: null,
   },
 ]
 
@@ -145,6 +147,47 @@ describe("buildCustomerActivityTimeline", () => {
       referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline[0].summary).toBe("Customer deactivated: Customer requested account closure")
+  })
+
+  it("prefers the historical actor_display_name_snapshot over the actor's current live-resolved name (Program 4 Hardening)", () => {
+    const snapshotRow: AuditLogRow = { ...STATUS_AUDIT_ROWS[0], actor_display_name_snapshot: "Priya Shah (as of the event)" }
+    const timeline = buildCustomerActivityTimeline({
+      onboardingOrigin: null,
+      changeRequests: [],
+      fieldHistory: [],
+      commercialVersions: [],
+      statusAuditRows: [snapshotRow],
+      actorLabels: ACTOR_EMAILS,
+      referenceMasterSnapshot: emptySnapshot(),
+    })
+    expect(timeline[0].actorEmail).toBe("Priya Shah (as of the event)")
+  })
+
+  it("falls back to the actor's current live-resolved name when no snapshot exists (a row written before this column existed)", () => {
+    const timeline = buildCustomerActivityTimeline({
+      onboardingOrigin: null,
+      changeRequests: [],
+      fieldHistory: [],
+      commercialVersions: [],
+      statusAuditRows: [STATUS_AUDIT_ROWS[0]],
+      actorLabels: ACTOR_EMAILS,
+      referenceMasterSnapshot: emptySnapshot(),
+    })
+    expect(timeline[0].actorEmail).toBe("approver@example.com")
+  })
+
+  it("falls back to the actor_email_snapshot when neither a name snapshot nor a live-resolved name is available", () => {
+    const row: AuditLogRow = { ...STATUS_AUDIT_ROWS[0], actor_email_snapshot: "priya@example.com" }
+    const timeline = buildCustomerActivityTimeline({
+      onboardingOrigin: null,
+      changeRequests: [],
+      fieldHistory: [],
+      commercialVersions: [],
+      statusAuditRows: [row],
+      actorLabels: new Map(),
+      referenceMasterSnapshot: emptySnapshot(),
+    })
+    expect(timeline[0].actorEmail).toBe("priya@example.com")
   })
 
   it("ignores an audit row where is_active did not actually change", () => {
