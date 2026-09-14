@@ -3,6 +3,9 @@ import "server-only"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { withLoggedOperation } from "@/platform/observability/server"
+import { resolveActorEmails } from "@/platform/audit/server"
+import type { RequestTimelineEvent } from "@/components/product/request-timeline"
+import { buildCommercialVersionTimeline, collectCommercialVersionTimelineActorIds } from "../domain/commercial-version-timeline"
 
 import * as versionData from "../data/commercial-version.data"
 import { toCommercialConfigurationVersion } from "../domain/commercial-version-mappers"
@@ -124,6 +127,36 @@ async function approveVersion(requestId: string, actorUserId: string, snapshot: 
   )
 }
 
+/**
+ * One Commercial Configuration Version's own Timeline (Platform Scale
+ * Program, Phase I): unlike Onboarding/Customer Change, there is only
+ * ever one revision (no send-back/resubmit cycle exists for a Commercial
+ * Version, see ../domain/commercial-version-timeline.ts's own header),
+ * so this reads straight off the version's own row plus its one
+ * submission_revisions row, never a history table.
+ */
+async function loadCommercialVersionTimeline(requestId: string): Promise<RequestTimelineEvent[]> {
+  const version = await loadVersion(requestId)
+  if (!version) return []
+
+  const revision = await versionData.getLatestRevisionForRequest(requestId)
+  const decisionStatus = version.status === "approved" || version.status === "rejected" ? version.status : null
+
+  const input = {
+    createdAt: version.createdAt,
+    createdBy: version.createdBy,
+    submittedAt: revision?.submitted_at ?? null,
+    submittedBy: revision?.submitted_by ?? null,
+    decidedAt: version.decidedAt,
+    decidedBy: version.decidedBy,
+    decisionStatus,
+    decisionReason: version.decisionReason,
+  }
+
+  const actorEmails = await resolveActorEmails(collectCommercialVersionTimelineActorIds(input))
+  return buildCommercialVersionTimeline({ ...input, actorEmails })
+}
+
 type ReviewQueueEntry = {
   requestId: string
   /** Human-Friendly ID (task Phase L): render with `formatCommercialVersionId`. */
@@ -192,5 +225,6 @@ export {
   listVersionReviewQueue,
   listAllVersionEntries,
   listVersionsForConfiguration,
+  loadCommercialVersionTimeline,
 }
 export type { ReviewQueueEntry }

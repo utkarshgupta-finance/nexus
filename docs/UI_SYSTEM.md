@@ -52,6 +52,20 @@ minimalism means restraint and clarity, not emptiness.
 - **Familiarity over novelty.** Repeated-use software rewards consistency.
   Don't invent a new interaction pattern when an existing one already fits.
 
+### Permanent rule: a user never has to remember where Nexus moved their work
+
+[LOCKED, Platform Scale Program] A user should never need to remember
+where Nexus moved their work. Every actionable item (a request, a
+review, a task) must have: a discoverable home (a page it always shows
+up on, not only reachable by a known URL), a visible state (a status
+that reads honestly, never a raw internal code), a clear current owner
+(who needs to act on it right now, computed from real data per
+`docs/PLATFORM_ARCHITECTURE.md` §11, never left for the user to infer),
+an obvious next action (one clear primary action, §11 below), an
+understandable history (a Timeline, never raw audit JSON), and a
+recovery path (what to do if something goes wrong, stated in the error
+itself, never just "something went wrong").
+
 ## 3. Colour philosophy
 
 Nexus is **primarily monochrome**. Colour exists to communicate meaning, not

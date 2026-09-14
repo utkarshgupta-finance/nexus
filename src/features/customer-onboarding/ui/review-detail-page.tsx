@@ -26,7 +26,7 @@ import { COMMENTABLE_ONBOARDING_FIELD_KEYS, labelForOnboardingField } from "../d
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import { approveOnboardingCaseAction, sendBackOnboardingCaseAction } from "../actions"
 import { OnboardingEvidenceList } from "./onboarding-evidence-list"
-import { OnboardingTimeline } from "./onboarding-timeline"
+import { RequestTimeline } from "@/components/product/request-timeline"
 import type { OnboardingTimelineEvent } from "../domain/timeline"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
@@ -197,7 +197,7 @@ function ReviewDetailPage({
           <OnboardingEvidenceList documents={documents} />
         </section>
 
-        <OnboardingTimeline events={timeline} />
+        <RequestTimeline events={timeline} />
 
         {approvalResult ? (
           <section className="flex flex-col items-center gap-3 rounded-lg border bg-card p-4 text-center shadow-sm sm:p-6">

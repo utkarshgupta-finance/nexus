@@ -13,6 +13,8 @@ import { approveChangeRequestAction, rejectChangeRequestAction, sendBackChangeRe
 import type { CustomerChangeRequest } from "../domain/types"
 import { formatChangeRequestId } from "../domain/types"
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { RequestTimeline } from "@/components/product/request-timeline"
+import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import { FieldDiffTable } from "./field-diff-table"
 import { RequirementsPreview } from "./requirements-preview"
 
@@ -31,6 +33,7 @@ function ChangeRequestReviewPage({
   currentValues,
   changeRequest,
   canDecide,
+  timeline = [],
 }: {
   requestId: string
   customerName: string
@@ -38,6 +41,7 @@ function ChangeRequestReviewPage({
   currentValues: Record<string, unknown>
   changeRequest: CustomerChangeRequest
   canDecide: boolean
+  timeline?: RequestTimelineEvent[]
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<"idle" | "send_back" | "reject">("idle")
@@ -127,6 +131,8 @@ function ChangeRequestReviewPage({
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Required Approvals / Evidence</h2>
           <RequirementsPreview requirements={changeRequest.requirements} />
         </section>
+
+        <RequestTimeline events={timeline} />
 
         {changeRequest.sentBack ? (
           <section className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/5 p-4 text-xs">

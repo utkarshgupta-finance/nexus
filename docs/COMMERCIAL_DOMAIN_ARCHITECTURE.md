@@ -572,6 +572,18 @@ and similar) found exactly one defining module. Any new consumer
 (the Commercial Version diff view, a future API, a future import) must
 import from this module, never re-derive a formula inline.
 
+## 18c. Permanent rule: reproducible business history
+
+[LOCKED, Platform Scale Program] Business history and approved
+financial/commercial truth must be reproducible. For any past decision,
+Nexus must be able to explain: what was true, when it was true, who
+changed it, why it changed, who approved it, and what evidence
+supported it. This is not a new principle so much as a name for what
+§7 (Commercial Change), §17 (Effective dating), and
+`docs/DATA_ARCHITECTURE.md` §9 (audit) already jointly guarantee;
+recorded explicitly here as a standing test any new Commercial Domain
+capability must pass before being considered complete.
+
 ## 19. Scenario tests (retained, re-checked against the final positions)
 
 Fictional data only. All scenarios remain valid under the final, locked

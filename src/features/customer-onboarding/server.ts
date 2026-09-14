@@ -31,6 +31,7 @@ export {
   listAllVersionEntries,
   listVersionsForConfiguration,
   getCommercialVersionDiff,
+  loadCommercialVersionTimeline,
 } from "./services/commercial-version.service"
 export type { ReviewQueueEntry as CommercialVersionReviewQueueEntry } from "./services/commercial-version.service"
 export type { CommercialConfigurationVersion } from "./domain/commercial-version-types"

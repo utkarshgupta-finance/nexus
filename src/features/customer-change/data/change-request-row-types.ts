@@ -69,4 +69,14 @@ type CustomerFieldHistoryRow = {
   changed_at: string
 }
 
-export type { CustomerChangeRequestRow, CustomerChangeRequestRequirementRow, SubmissionRevisionRow, CustomerFieldHistoryRow }
+/** Raw shape of a customer_change_send_backs row (append-only history, one per send-back), mirroring customer_onboarding_send_backs. */
+type CustomerChangeSendBackRow = {
+  id: string
+  request_id: string
+  revision_number: number
+  reason: string
+  sent_back_by: string | null
+  sent_back_at: string
+}
+
+export type { CustomerChangeRequestRow, CustomerChangeRequestRequirementRow, SubmissionRevisionRow, CustomerFieldHistoryRow, CustomerChangeSendBackRow }

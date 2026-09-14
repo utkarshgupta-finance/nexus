@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { loadChangeRequest, getCurrentGovernedValues } from "@/features/customer-change/server"
+import { loadChangeRequest, getCurrentGovernedValues, loadChangeRequestTimeline } from "@/features/customer-change/server"
 import { ChangeRequestReviewPage } from "@/features/customer-change/ui/change-request-review-page"
 import { getCustomerById } from "@/features/customers/server"
 
@@ -28,6 +28,7 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
 
   const currentValues = await getCurrentGovernedValues(customer.id)
   const canDecide = await hasPermission("customer", "approve")
+  const timeline = await loadChangeRequestTimeline(requestId)
 
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/change-requests/${requestId}`}>
@@ -38,6 +39,7 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
         currentValues={currentValues}
         changeRequest={changeRequest}
         canDecide={canDecide}
+        timeline={timeline}
       />
     </AuthGate>
   )

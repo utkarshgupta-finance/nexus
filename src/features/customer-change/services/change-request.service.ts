@@ -107,6 +107,24 @@ async function approveChangeRequest(requestId: string, actorUserId: string): Pro
   )
 }
 
+type ChangeRequestSendBackEntry = { revisionNumber: number; reason: string; sentBackBy: string | null; sentBackAt: string }
+
+/** Oldest first: the Timeline reads chronologically, and `.length` is the requester-facing Send Back count (never a manually incremented counter). */
+async function listChangeRequestSendBacks(requestId: string): Promise<ChangeRequestSendBackEntry[]> {
+  const rows = await changeData.listSendBacksForRequest(requestId)
+  return rows.map((row) => ({ revisionNumber: row.revision_number, reason: row.reason, sentBackBy: row.sent_back_by, sentBackAt: row.sent_back_at }))
+}
+
+async function getChangeRequestSendBackCount(requestId: string): Promise<number> {
+  return (await listChangeRequestSendBacks(requestId)).length
+}
+
+/** Revision-level submit/resubmit facts the Timeline needs, oldest first (unlike loadChangeRequest, which only ever reads the current revision). */
+async function listChangeRequestRevisionSummaries(requestId: string): Promise<{ revisionNumber: number; submittedAt: string | null; submittedBy: string | null }[]> {
+  const rows = await changeData.listRevisionsForRequest(requestId)
+  return rows.map((row) => ({ revisionNumber: row.revision_number, submittedAt: row.submitted_at, submittedBy: row.submitted_by }))
+}
+
 type ReviewQueueEntry = {
   requestId: string
   /** Human-Friendly ID (task Phase L): render with `formatChangeRequestId`. */
@@ -189,5 +207,8 @@ export {
   listCustomerFieldHistory,
   searchFormerCustomerNames,
   getCurrentGovernedValues,
+  listChangeRequestSendBacks,
+  getChangeRequestSendBackCount,
+  listChangeRequestRevisionSummaries,
 }
-export type { ReviewQueueEntry }
+export type { ReviewQueueEntry, ChangeRequestSendBackEntry }

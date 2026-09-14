@@ -1,7 +1,7 @@
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/server-client"
 
 import { ChangeRequestOperationError, parseChangeError } from "../domain/change-errors"
-import type { CustomerChangeRequestRow, CustomerChangeRequestRequirementRow, SubmissionRevisionRow, CustomerFieldHistoryRow } from "./change-request-row-types"
+import type { CustomerChangeRequestRow, CustomerChangeRequestRequirementRow, SubmissionRevisionRow, CustomerFieldHistoryRow, CustomerChangeSendBackRow } from "./change-request-row-types"
 
 /**
  * Repository for customer_change_requests and the submission_revisions/
@@ -124,6 +124,30 @@ async function listChangeRequestsForCustomer(customerId: string): Promise<Custom
   return data ?? []
 }
 
+/** Every revision, oldest first: the Timeline's data source for submit/resubmit facts (unlike getLatestRevisionForRequest, which only returns the current one). */
+async function listRevisionsForRequest(requestId: string): Promise<SubmissionRevisionRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("submission_revisions")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("revision_number", { ascending: true })
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  return data ?? []
+}
+
+/** Every send-back for this request, oldest first: the Timeline's data source, and `.length` is the authoritative Send Back count (never a manually incremented counter). */
+async function listSendBacksForRequest(requestId: string): Promise<CustomerChangeSendBackRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_change_send_backs")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("sent_back_at", { ascending: true })
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  return data ?? []
+}
+
 async function getLatestRevisionForRequest(requestId: string): Promise<SubmissionRevisionRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase
@@ -194,6 +218,8 @@ export {
   listAllChangeRequests,
   listChangeRequestsForCustomer,
   getLatestRevisionForRequest,
+  listRevisionsForRequest,
+  listSendBacksForRequest,
   listRequirementsForRequest,
   listFieldHistoryForCustomer,
   searchFieldHistoryByOldValue,

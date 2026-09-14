@@ -121,6 +121,21 @@ feature's `domain/` or `components/`, not into the page itself.
 5. Reuse existing `components/ui/` and `components/product/` components
    before creating new ones.
 
+## 7a. Permanent rule: interface-independence
+
+[LOCKED, Platform Scale Program] All material Nexus business capabilities
+must be interface-independent. The UI, Server Actions, a future public or
+internal API, an import job, a scheduled automation, and a webhook
+handler must all invoke the same application/domain services and the
+same governance rules (authorization, audit, effective dating,
+idempotency guards). No material business rule may exist only in UI
+code. Nexus's own stable identities (a `resource_id`, a `customers.id`)
+remain authoritative; an external system's own identifier for the same
+record is a mapping, never a Nexus primary key (see
+`docs/API_INTEGRATION_ARCHITECTURE.md` §4). A database row shape is an
+implementation detail, not an external contract: an API response is a
+DTO the application owns, never a raw table row (§3 above).
+
 ## 8. Non-goals for this document
 
 This file does not cover: visual design system, database schema, specific

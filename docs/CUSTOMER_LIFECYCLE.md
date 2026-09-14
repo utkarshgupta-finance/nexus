@@ -793,3 +793,49 @@ segments", "All statuses", ...); no leak found.
 | 24 | Visiting `/forms/customer-onboarding` twice in a row | `draft` (unchanged) | Same request, never a second one created | N/A | Continue | Yes | Unchanged | Unchanged | Unchanged |
 | 25 | Final submit blocked without Commercial Rate complete | `draft` or `sent_back` | Submit blocked, stays editable | N/A (never reaches Approvals) | Continue | Yes | No transition | (none) | Not shown |
 
+
+## 19. Timeline parity across all three governed lifecycles: IMPLEMENTED (Platform Scale Program, Phase I)
+
+§18 built a real Timeline, Send Back history, and field comments for
+Onboarding only. A CFO-lens review of the other two lifecycles found a
+real six-months-later explainability gap: Customer Change and Commercial
+Version had no Timeline at all, and Customer Change's Send Back
+information was overwritten on every send-back (`sent_back_reason`/
+`sent_back_by`/`sent_back_at` columns, latest-only), the exact gap
+Onboarding had before §18 fixed it.
+
+**Customer Change** (mirrors Onboarding's shape closely, since it has
+the same send-back/resubmit cycle): a new append-only
+`customer_change_send_backs` table
+(`supabase/migrations/20260914160000_customer_change_send_back_history.sql`)
+backs both the Send Back count and the Timeline
+(`src/features/customer-change/domain/timeline.ts`,
+`server/timeline.ts`). Unlike the earlier Onboarding fix, this migration
+extended `send_back_customer_change_request` with the exact same
+parameter list (no new parameter added), so `create or replace function`
+safely replaced it in place with zero overload risk, the precise
+lesson learned from the bug §18 had to correct for.
+
+**Commercial Version** (does not mirror Onboarding, because it is
+architecturally different): a Commercial Version has no send-back state
+at all, only a terminal Reject (status: draft/submitted/approved/
+rejected, no "resubmitted"), and only ever one revision. No new table
+was needed; its Timeline
+(`src/features/customer-onboarding/domain/commercial-version-timeline.ts`)
+is a pure read-model composition over the version's own row plus its
+one `submission_revisions` row.
+
+**Shared rendering, feature-specific event building.** The actual
+Timeline UI (`src/components/product/request-timeline.tsx`,
+`RequestTimeline`/`RequestTimelineEvent`) is promoted to a genuinely
+shared `components/product` primitive (`docs/UI_SYSTEM.md` §19's
+`WorkflowTimeline`), since the event shape
+(`id`/`occurredAt`/`actorEmail`/`summary`) was already fully
+domain-agnostic; only where it lived was Onboarding-specific. Building
+the event list itself stays in each feature's own `domain/timeline.ts`:
+what counts as an event genuinely differs per lifecycle (Onboarding has
+field comments and multiple revisions; Customer Change has requirements
+but no field comments; Commercial Version has neither), so this was not
+generalized into one shared engine, matching the Chief-Architect-lens
+conclusion that a universal workflow engine is not yet justified
+(`docs/WORKFLOW_ENGINE_ARCHITECTURE.md` remains design-draft, correctly).

@@ -292,6 +292,20 @@ the platform wherever practical, rather than relying on a person
 remembering the process. This principle governs every section below and
 every future feature.
 
+**Permanent rule: diagnosable operational failures [LOCKED, Platform
+Scale Program].** Operational failures must be diagnosable without
+reproducing them manually. Every material server operation should carry
+enough structured context to determine what failed, where, for which
+resource, at what time, and with what error class, without exposing a
+secret. This is now real, not aspirational: `src/platform/observability/`
+(structured JSON log lines, a fixed narrow field set so no field is wide
+enough to accidentally carry a secret, a per-operation correlation id) and
+`src/platform/errors/` (a restrained, shared `NexusErrorCode` vocabulary,
+distinct from and complementary to each feature's own richer error
+parsing) implement this for the highest-stakes operations (the three
+approval paths) today; extending it to more operations is additive, not
+a redesign.
+
 These are two different mechanisms and must not be confused:
 
 - **Audit** is a database-enforced record of *mutation*: who changed which

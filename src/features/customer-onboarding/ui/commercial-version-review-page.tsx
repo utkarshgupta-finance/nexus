@@ -17,6 +17,8 @@ import type { CommercialComponentDraft } from "../domain/commercial-rate"
 import type { CommercialConfigurationVersion } from "../domain/commercial-version-types"
 import { formatCommercialVersionId } from "../domain/commercial-version-types"
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { RequestTimeline } from "@/components/product/request-timeline"
+import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
@@ -44,6 +46,7 @@ function CommercialVersionReviewPage({
   version,
   canDecide,
   diff,
+  timeline = [],
 }: {
   requestId: string
   configId: string
@@ -51,6 +54,7 @@ function CommercialVersionReviewPage({
   canDecide: boolean
   /** Current vs Proposed (task Phase G); null only when there is nothing yet to compare (no active prior Commercial Components, or no draft saved). */
   diff: CommercialRateDiff | null
+  timeline?: RequestTimelineEvent[]
 }) {
   const router = useRouter()
   const snapshot = useReferenceMasterSnapshot()
@@ -160,6 +164,8 @@ function CommercialVersionReviewPage({
           })}
         </section>
         )}
+
+        <RequestTimeline events={timeline} />
 
         {isDecidable ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
