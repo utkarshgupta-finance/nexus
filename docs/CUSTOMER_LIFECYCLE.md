@@ -1623,3 +1623,29 @@ ever performs it and no live UI creates a `form_versions` draft today
 (all existing rows are migration-seeded). This is an inert, currently
 unreachable capability, not a live gap; revisit only once a real Form
 Builder admin surface exists to create these rows through the app.
+
+## 39. Document platform reuse: NOT APPLICABLE this program (Platform Operating Expansion, Phase W)
+
+Checked against what this program actually built (User Access, Team
+Master, Workflow Builder), not against Phases Q-T's undesigned domains
+(§37's descope): none of the three needs file upload or document
+evidence. User Access and Team Master are pure RBAC/roster CRUD; the
+Workflow Builder persists a graph, never a file. There is nothing for
+either to "reuse" from the document platform, and forcing a connection
+that does not exist would be inventing integration surface area for its
+own sake.
+
+The document upload capability itself remains exactly where the
+Platform Scale Closure's Phase R left it: feature-local inside
+`features/customer-onboarding` (`services/documents.service.ts`), with
+its upload input already shaped browser-independently
+(`DocumentUploadInput`, a plain `{name, mimeType, size, bytes}`, not a
+DOM `File`) specifically so a second consumer could adopt it without a
+rewrite. `docs/PLATFORM_ARCHITECTURE.md` §4 names `attachments` as a
+target shared platform capability, but per this codebase's own rule
+(`CLAUDE.md`: "move into `platform/` once it's actually needed by more
+than one feature"), extracting it now, with exactly one consumer, would
+be a premature abstraction the codebase deliberately avoids elsewhere.
+Extract it into `platform/attachments/` the same session a second real
+consumer needs document evidence, most plausibly Agreement lifecycle
+(§37's Phase S) once that domain has a real product brief.
