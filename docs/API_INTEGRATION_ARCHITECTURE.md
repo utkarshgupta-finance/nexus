@@ -82,7 +82,7 @@ Human-Friendly ID yet** (`customers.id` is a raw UUID with no display
 formatter); this would need to exist before a `customerNumber`-shaped DTO
 field like the example above could be real (see `docs/TECH_DEBT.md`).
 
-## 4. External system identity model: FUTURE (design only)
+## 4. External system identity model: DESIGNED / IMPLEMENTATION DEFERRED [Platform Scale Closure, Phase D]
 
 Nexus's own id (`customers.id`, a UUID minted once, never reused for a
 different business identity) is the only authoritative identity a future
@@ -116,6 +116,10 @@ external_resource_references
 Recording this shape now (not building it) is what lets the first real
 integration adopt it directly rather than inventing a competing one.
 
+**Trigger to implement**: the first real external system integration
+that needs Nexus to remember its identifier for a Nexus record. Not
+before: no storage/table/code exists for this today, by design.
+
 ## 5. Idempotency: IMPLEMENTED FOUNDATION at the database layer, no key-based layer yet
 
 Every approve/submit RPC already guards against being invoked twice with
@@ -137,12 +141,19 @@ explicitly deferred until the first external integration that needs it
 exists. Building it speculatively now would guess at a shape with no real
 caller to validate it against.
 
-**Gap found, not yet closed**: none of the guards above have a
-corresponding TypeScript test (unit or otherwise) that calls approve/submit
-twice and asserts a single effect; the guard is proven only by reading the
-SQL. See `docs/TECH_DEBT.md`.
+**Partially closed (Platform Scale Closure, Phase C)**: `case.data.test.ts`
+now calls `approveCase` twice against a mocked idempotent-replay response
+and asserts a single effect (no second customer linkage), and
+`customers.data.test.ts` does the same for `set_customer_active`, which
+gained its own idempotent-replay guard this round
+(`20260914170000_fix_set_customer_active_idempotency.sql`, previously the
+one decision-style RPC without one). `submit_customer_change_request`/
+`submit_commercial_configuration_version`'s own guards are still proven
+only by reading the SQL, and none of these are proven yet at the RPC
+level against a real database, only against a mocked Supabase client.
+See `docs/TECH_DEBT.md`.
 
-## 6. Domain events: FUTURE (design only, no code)
+## 6. Domain events: DESIGNED / IMPLEMENTATION DEFERRED [Platform Scale Closure, Phase E]
 
 No event table, emission call, or event type exists in Nexus today.
 `docs/PLATFORM_ARCHITECTURE.md` §7 already distinguishes `audit_log`
@@ -177,7 +188,17 @@ governed mutation already runs inside a service function that could emit
 an event at the same point it currently returns, and every business
 record already has a `resources.resource_id` to anchor the event to.
 
-## 7. Machine / service identity: FUTURE (design only, no code)
+**Trigger to implement**: the first real asynchronous consumer (a
+webhook subscriber, a downstream sync job, a notification service) that
+needs to react to a Nexus event without polling. At that point, emit
+via a transactional outbox (an `event_outbox` row inserted in the same
+transaction as the business mutation, published by a separate worker),
+never a direct in-transaction call to an external system: that keeps
+"the mutation committed" and "the event was reliably queued" atomic,
+without needing a distributed transaction. Not before: no consumer
+exists to validate the envelope shape above against.
+
+## 7. Machine / service identity: DESIGNED / IMPLEMENTATION DEFERRED [Platform Scale Closure, Phase F]
 
 Human Supabase Auth sessions (`docs/AUTHORIZATION_MODEL.md` §10-12) are
 the only identity model that exists today; nothing in Nexus currently
@@ -194,6 +215,10 @@ for how the credential itself is issued and verified (an API key, mTLS, a
 signed JWT) has been done; that evaluation is required before building
 this, matching `docs/PLATFORM_ARCHITECTURE.md` §1's library-first
 principle.
+
+**Trigger to implement**: the first real system-to-system integration
+that needs to authenticate as something other than a human. Not
+before, and never as a DIY API-key scheme built ahead of that need.
 
 ## 8. Webhooks, imports, documents: FUTURE / partially real
 
