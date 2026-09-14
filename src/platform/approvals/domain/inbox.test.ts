@@ -21,6 +21,10 @@ describe("bucketForStatus", () => {
   it("excludes draft entirely: it is nobody else's concern yet", () => {
     expect(bucketForStatus("draft")).toBeNull()
   })
+
+  it("excludes cancelled entirely: a withdrawn draft is nobody else's concern either", () => {
+    expect(bucketForStatus("cancelled")).toBeNull()
+  })
 })
 
 function item(overrides: Partial<ApprovalInboxItem>): ApprovalInboxItem {

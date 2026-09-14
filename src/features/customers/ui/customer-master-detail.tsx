@@ -392,7 +392,7 @@ function CustomerMasterDetail({
                           <td className="py-2 pr-3 font-mono text-[0.7rem] text-muted-foreground">{formatChangeRequestId(changeRequest.requestNumber)}</td>
                           <td className="py-2 pr-3">
                             <Badge variant="ghost" className="bg-muted text-muted-foreground">
-                              {changeRequest.status}
+                              {statusLabel(changeRequest.status)}
                             </Badge>
                           </td>
                           <td className="py-2 pr-3 text-foreground">{changeRequest.reason || "-"}</td>
