@@ -142,6 +142,53 @@ history.
   condition concurrent edits are likely under. It is not required for
   reference or configuration tables with low write contention.
 
+### 5a. Actual concurrency mechanism per table [Platform Scale Closure, Phase Q]
+
+The design intent above (a checked `version` column) is not what every
+table below actually implements. This corrects the record honestly,
+table by table, rather than leaving a column that looks like protection
+where it is not wired up:
+
+- **`customers`**: real optimistic lock. `row_version` is bumped by
+  `fn_bump_row_version` on every UPDATE and compared by
+  `approve_customer_change_request` against the value the Change Request
+  captured at its own creation time (`base_customer_row_version`), a
+  genuine cross-transaction staleness check.
+- **`submission_revisions`**: the `row_version`/`p_expected_row_version`
+  mechanism in `submit_revision` exists and is structurally real, but as
+  called today by all three `submit_*` RPCs (onboarding, change request,
+  commercial version) the "expected" value is read from the same row in
+  the same transaction moments before the call, so the comparison always
+  succeeds by construction. It protects nothing today beyond what the
+  outer lock (below) already protects; it would only become meaningful if
+  a caller ever threaded a value the *client* had held since an earlier
+  page load, which none currently does.
+- **`customer_onboarding_cases`, `customer_change_requests`,
+  `commercial_configuration_versions`**: each carries a `row_version`
+  column, but no trigger on any of the three ever increments it and no
+  RPC ever reads or compares it. It is not wired to anything. The real
+  protection for these three tables is different and already correct:
+  every decision RPC (`submit_*`/`send_back_*`/`reject_*`/`approve_*`)
+  opens with `select * from <table> where request_id = p_request_id for
+  update`, a pessimistic lock that serializes two concurrent calls on the
+  same row, followed by a plain status-text guard. A second, concurrent
+  decision call blocks until the first commits, then re-reads the
+  now-changed status and either idempotently no-ops or raises, exactly
+  the "reject stale state" requirement a `row_version` comparison would
+  otherwise exist to provide. These three columns are left in place
+  (dropping a column is a one-way schema change not worth the risk for a
+  column that is at least harmless, only unused) but are explicitly
+  **not** a concurrency mechanism; treat any future code that starts
+  reading them for that purpose as a bug, not a restoration of intended
+  behavior.
+- **Draft autosave** (`save_customer_onboarding_draft` and its two
+  siblings): a blind `UPDATE`, no version check at all. Accepted as-is:
+  a draft on these three request types has exactly one editor (the
+  requester), so last-write-wins is the correct, simplest semantics, not
+  a gap. This is the "reference or configuration tables with low write
+  contention" case the design principle above already carves out, applied
+  to single-owner drafts specifically.
+
 ## 6. Reference and master data
 
 Extensible lists a feature selects from (statuses, categories, reasons)
