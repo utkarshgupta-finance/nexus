@@ -95,6 +95,11 @@ describe("toInr (FX calculations, task correction §17, §19-20)", () => {
   it("is null when the currency has no configured rate, never a fabricated conversion", () => {
     expect(toInr(REFERENCE_MASTER_FIXTURES, 100, "IDR")).toBeNull()
   })
+
+  it("rounds to 2 decimal places explicitly, never leaving raw floating-point noise (Platform Scale Program, Phase G / Money Policy)", () => {
+    const snapshot = { ...REFERENCE_MASTER_FIXTURES, currency: [...REFERENCE_MASTER_FIXTURES.currency, { value: "AED", label: "AED", active: true, inrConversionRate: 91.333333333 }] }
+    expect(toInr(snapshot, 1, "AED")).toBe(91.33)
+  })
 })
 
 describe("currentFxSnapshot (task correction §16: the historical FX snapshot contract)", () => {

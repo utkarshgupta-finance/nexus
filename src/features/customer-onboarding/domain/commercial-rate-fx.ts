@@ -37,12 +37,23 @@ function isForeignCurrency(currencyCode: string | null): currencyCode is string 
  * when either the amount or the rate is unavailable. Never a fallback
  * rate of 1 for a foreign currency: a missing rate must read as missing
  * (see `isFxRateMissing`), not silently as "no conversion needed."
+ *
+ * Rounded to 2 decimal places here, explicitly, rather than left as a raw
+ * `amount * rate` float (Platform Scale Program, Phase G / Money Policy,
+ * `docs/TECH_DEBT.md`): this is display-only, never a persisted
+ * authoritative figure (the real, persisted `fx_snapshot_rate` is
+ * captured separately at Commercial Configuration promotion time), but
+ * "display-only" is not a reason to leave its own rounding to whatever a
+ * caller's formatter happens to default to. Two different rounding
+ * disciplines for the same kind of value in the same feature is exactly
+ * the inconsistency a Finance platform must not have, even in a display
+ * hint.
  */
 function toInr(snapshot: ReferenceMasterSnapshot, amount: number | null, currencyCode: string | null): number | null {
   if (amount === null) return null
   const rate = inrConversionRateFor(snapshot, currencyCode)
   if (rate === null) return null
-  return amount * rate
+  return Math.round(amount * rate * 100) / 100
 }
 
 /**

@@ -526,6 +526,52 @@ ever overwrites the original transaction-currency amount. Any converted
 amount must carry its own provenance (rate, policy/version, rate
 date/period, purpose).
 
+## 18a. Money Policy [IMPLEMENTED] (Platform Scale Program, Phase G)
+
+A concrete precision/rounding policy, closing the honest gap
+`docs/TECH_DEBT.md` recorded: "two different rounding disciplines in the
+same feature is exactly the CFO's nightmare scenario."
+
+- **Database representation**: every monetary/quantity column across the
+  Commercial schema is Postgres `numeric` (never `float`/`double
+  precision`), confirmed across every migration. This is correct and
+  unchanged by this section.
+- **Authoritative calculations** (anything whose result is persisted as
+  business truth, e.g. a component's contracted rate, a recorded usage
+  fact, a billing calculation): computed once, in the one canonical
+  calculation module (`src/features/customer-onboarding/domain/commercial-rate.ts`,
+  §18b below), and stored as `numeric`. No JS-side rounding boundary is
+  imposed on these beyond what the calculation functions themselves
+  already validate (e.g. rejecting a negative milestone percentage).
+- **Display-only derived values** (an INR-equivalent hint shown alongside
+  a foreign-currency amount, a formatted summary line): may use plain
+  JavaScript `number` arithmetic, but must round to a fixed, explicit
+  precision (2 decimal places for a monetary amount) at the point the
+  value is produced, never left as a raw, unrounded `amount * rate` and
+  never left to whatever a caller's own formatter happens to default to.
+  `commercial-rate-fx.ts`'s `toInr` is the reference implementation of
+  this rule.
+- **Never mix the two disciplines for the same kind of value.** If two
+  screens can show the same conceptual number (a component's rate, its
+  INR equivalent), they must derive it from the same function, not two
+  independent computations that happen to agree today.
+
+## 18b. Canonical commercial calculation engine [IMPLEMENTED]
+
+`src/features/customer-onboarding/domain/commercial-rate.ts` is the one
+authoritative implementation of every pricing formula: Per Unit, Flat
+Fee, Slab Whole Quantity, Slab Progressive, Designation Based, MUG, and
+Milestone-based recognition. `commercial-rate-summary.ts` (summary/
+display lines) and the Commercial Configuration promotion mapper
+(`commercial-configuration-promotion.ts`, the path that turns a
+submitted draft into persisted `commercial_components` rows) both
+**import and reuse these functions directly**; neither reimplements a
+formula. Verified this round: a repo-wide search for every calculation
+function name (`calculateSlabAmountForQuantity`, `calculateMugValue`,
+and similar) found exactly one defining module. Any new consumer
+(the Commercial Version diff view, a future API, a future import) must
+import from this module, never re-derive a formula inline.
+
 ## 19. Scenario tests (retained, re-checked against the final positions)
 
 Fictional data only. All scenarios remain valid under the final, locked

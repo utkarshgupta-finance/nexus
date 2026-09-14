@@ -122,20 +122,15 @@ into a second backlog.
   `formatCurrency`/`formatFxSnapshot`). Not incorrect anywhere found, just
   repetitive; a future date-format standard change would need edits in
   13+ files instead of one.
-- **JS-side floating-point arithmetic for monetary calculations.**
-  Database columns are correctly `numeric` everywhere (never `float`), but
-  the actual multiplication/aggregation for Commercial Rate components
-  happens in TypeScript `number` (float64) before being persisted as the
-  RPC's `numeric` input parameter. Some call sites already round for
-  display (`commercial-rate-summary.ts`, `commercial-rate.ts`'s own
-  "without leaving float noise" comment), but the FX conversion path
-  (`commercial-rate-fx.ts`'s `toInr`) does not round at all, and there is
-  no single documented rounding-boundary rule. Establish one explicitly:
-  display-only derived values may use plain float math; anything that
-  becomes a persisted, authoritative monetary figure should round to a
-  fixed precision at the point of persistence. No evidence of an actual
-  observed discrepancy yet; this is a "before it becomes a customer-facing
-  number mismatch" fix, not an active bug.
+- ~~JS-side floating-point arithmetic for monetary calculations~~ — **closed
+  (Platform Scale Program, Phase G)**. `commercial-rate-fx.ts`'s `toInr`
+  now rounds explicitly to 2 decimal places instead of leaving a raw
+  `amount * rate`. The Money Policy is now documented explicitly
+  (`docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §18a): authoritative
+  calculations round in the one canonical calculation module (§18b);
+  display-only derived values round to a fixed precision at the point
+  they are produced. No evidence of an actual observed discrepancy was
+  ever found; this closed the policy gap before it could become one.
 
 ## Later (explicit trigger points, do not build early)
 
