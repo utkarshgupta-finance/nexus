@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { buildMyWorkItems } from "./my-work"
+import { buildMyWorkItems, buildDraftWorkItems } from "./my-work"
 import type { ApprovalInboxItem } from "./types"
 
 const NOW = new Date("2026-01-10T00:00:00.000Z")
@@ -45,6 +45,19 @@ describe("buildMyWorkItems", () => {
     expect(withApprove[0].reason).toBe("pending_my_approval")
   })
 
+  it("shows a requester their own submitted item as waiting_on_others when they cannot decide it themselves", () => {
+    const items = [item({ bucket: "needs_action", status: "submitted", createdBy: "actor-requester" })]
+    const result = buildMyWorkItems(items, "actor-requester", false, NOW)
+    expect(result).toHaveLength(1)
+    expect(result[0].reason).toBe("waiting_on_others")
+  })
+
+  it("prefers pending_my_approval over waiting_on_others when the requester can also decide their own item", () => {
+    const items = [item({ bucket: "needs_action", status: "submitted", createdBy: "actor-requester" })]
+    const result = buildMyWorkItems(items, "actor-requester", true, NOW)
+    expect(result[0].reason).toBe("pending_my_approval")
+  })
+
   it("computes age in whole days from updatedAt", () => {
     const items = [item({ updatedAt: "2026-01-08T00:00:00.000Z" })]
     const result = buildMyWorkItems(items, "actor-requester", false, NOW)
@@ -58,5 +71,39 @@ describe("buildMyWorkItems", () => {
     ]
     const result = buildMyWorkItems(items, "actor-requester", false, NOW)
     expect(result.map((r) => r.requestId)).toEqual(["req-b", "req-a"])
+  })
+})
+
+describe("buildDraftWorkItems (Platform Scale Closure, Phase K)", () => {
+  it("shapes a draft entry with a finish-and-submit action and the draft_to_continue reason", () => {
+    const result = buildDraftWorkItems(
+      [
+        {
+          type: "change_request",
+          requestId: "cr-1",
+          displayId: "CCR-000001",
+          customerName: "Acme",
+          status: "draft",
+          href: "/customers/acme/change-requests/cr-1",
+          updatedAt: "2026-01-08T00:00:00.000Z",
+        },
+      ],
+      NOW
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].reason).toBe("draft_to_continue")
+    expect(result[0].whatINeedToDo).toBe("Finish and submit this draft Customer Change Request")
+    expect(result[0].ageDays).toBe(2)
+  })
+
+  it("sorts oldest first, same as every other My Work section", () => {
+    const result = buildDraftWorkItems(
+      [
+        { type: "commercial_version", requestId: "v-a", displayId: "CC-000001", customerName: "Acme", status: "draft", href: "/a", updatedAt: "2026-01-09T00:00:00.000Z" },
+        { type: "commercial_version", requestId: "v-b", displayId: "CC-000002", customerName: "Acme", status: "draft", href: "/b", updatedAt: "2026-01-05T00:00:00.000Z" },
+      ],
+      NOW
+    )
+    expect(result.map((r) => r.requestId)).toEqual(["v-b", "v-a"])
   })
 })

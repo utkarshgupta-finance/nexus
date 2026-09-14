@@ -7,7 +7,7 @@ import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorEmails } from "@/platform/audit/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
-import { buildMyWorkItems } from "./domain/my-work"
+import { buildMyWorkItems, buildDraftWorkItems } from "./domain/my-work"
 import type { ApprovalInboxItem } from "./domain/types"
 import type { MyWorkItem } from "./domain/my-work"
 
@@ -113,6 +113,60 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
 }
 
 /**
+ * "Drafts I should continue" (Platform Scale Closure, Phase K): only for
+ * Customer Change and Commercial Version, which have no other home for a
+ * draft (unlike Onboarding, whose own My Requests page already covers
+ * this, so it is deliberately not duplicated here, per the "no
+ * duplicates" rule). Refetches listAllChangeRequestEntries/
+ * listAllVersionEntries rather than reusing loadApprovalInbox's own
+ * fetch, since that composer's own contract deliberately excludes drafts
+ * entirely; accepted as a small, known extra pair of queries on a
+ * personal, low-traffic page rather than widening ApprovalInboxBucket's
+ * type (and its documented "a draft never appears here" invariant) just
+ * to save it.
+ */
+async function loadMyDraftsToContinue(appUserId: string): Promise<MyWorkItem[]> {
+  const [changeRequestEntries, versionEntries] = await Promise.all([listAllChangeRequestEntries(), listAllVersionEntries()])
+  const myChangeRequestDrafts = changeRequestEntries.filter((entry) => entry.status === "draft" && entry.createdBy === appUserId)
+  const myVersionDrafts = versionEntries.filter((entry) => entry.status === "draft" && entry.createdBy === appUserId)
+
+  const versionConfigurations = await Promise.all(
+    myVersionDrafts.map((entry) => commercialConfigurationService.getCommercialConfiguration(entry.commercialConfigurationId))
+  )
+  const customerIds = [
+    ...myChangeRequestDrafts.map((entry) => entry.customerId),
+    ...versionConfigurations.map((configuration) => configuration?.customerId).filter((id): id is string => Boolean(id)),
+  ]
+  const customersById = new Map((await getCustomersByIds([...new Set(customerIds)])).map((customer) => [customer.id, customer]))
+
+  const draftSources = [
+    ...myChangeRequestDrafts.map((entry) => ({
+      type: "change_request" as const,
+      requestId: entry.requestId,
+      displayId: formatChangeRequestId(entry.requestNumber),
+      customerName: customersById.get(entry.customerId)?.name ?? "(unknown customer)",
+      status: entry.status,
+      href: `/customers/${customersById.get(entry.customerId)?.key ?? ""}/change-requests/${entry.requestId}`,
+      updatedAt: entry.updatedAt,
+    })),
+    ...myVersionDrafts.map((entry, index) => ({
+      type: "commercial_version" as const,
+      requestId: entry.requestId,
+      displayId: formatCommercialVersionId(entry.versionNumber),
+      customerName: (() => {
+        const configuration = versionConfigurations[index]
+        return (configuration ? customersById.get(configuration.customerId)?.name : null) ?? "(unknown customer)"
+      })(),
+      status: entry.status,
+      href: `/commercials/${entry.commercialConfigurationId}/versions/${entry.requestId}`,
+      updatedAt: entry.updatedAt,
+    })),
+  ]
+
+  return buildDraftWorkItems(draftSources, new Date())
+}
+
+/**
  * My Work (task spec): a personal, actionable summary for the current
  * user, scoped server-side to their own `appUserId` (never a
  * client-supplied id). Re-scopes the same Approvals inbox items, never a
@@ -120,8 +174,8 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
  * header for the exact scoping rules).
  */
 async function loadMyWork(appUserId: string, canApprove: boolean): Promise<MyWorkItem[]> {
-  const items = await loadApprovalInbox()
-  return buildMyWorkItems(items, appUserId, canApprove, new Date())
+  const [items, drafts] = await Promise.all([loadApprovalInbox(), loadMyDraftsToContinue(appUserId)])
+  return [...buildMyWorkItems(items, appUserId, canApprove, new Date()), ...drafts]
 }
 
 export { loadApprovalInbox, loadMyWork }

@@ -903,3 +903,42 @@ existing `router.push` already lands on immediately, itself showing
 the change now applied. Building a redundant intermediate success
 screen for these two would not answer "what changed/what's current"
 any more clearly than the destination they already redirect to.
+
+## 21. My Work maturity: two new sections added, two evaluated and deferred (Platform Scale Closure, Phase K)
+
+§18 built My Work's original two sections (Sent Back to Me, Pending My
+Approval), both re-scoped from the same Approvals inbox fetch, never a
+duplicated read. This round evaluated the remaining candidates from
+`docs/UI_SYSTEM.md`'s own permanent UX rule ("a user never has to
+remember where Nexus moved their work") against real, reliably
+derivable data, not fabricated ones:
+
+- **Added: "Drafts to Continue"**, for Customer Change and Commercial
+  Version only. Both had a real, previously undocumented gap: a draft
+  has no other home anywhere in the product (unlike Onboarding, whose
+  own My Requests page already lists a requester's drafts, so it is
+  deliberately not duplicated here). Built from the same
+  `listAllChangeRequestEntries`/`listAllVersionEntries` reads the
+  Approvals inbox already makes, filtered to `status = 'draft'` and
+  `created_by = ` the current user (`platform/approvals/server.ts`'s
+  `loadMyDraftsToContinue`). This does mean My Work now makes two more
+  read calls than strictly necessary on that one page (Approvals inbox's
+  own contract deliberately excludes drafts, so they cannot be reused
+  from its result); accepted rather than widening
+  `ApprovalInboxBucket`'s type, and its documented "a draft never
+  appears here" invariant, just to save two queries on a personal,
+  low-traffic page.
+- **Added: "Waiting on Others"**, the flip side of "Sent Back to Me":
+  an item the current user created that is awaiting a decision they
+  cannot make themselves. Reliably derivable from data already in hand
+  (`bucket === "needs_action" && createdBy === appUserId`, checked only
+  after "Pending My Approval" so a request its own creator can also
+  approve shows as actionable, not merely as waiting).
+- **Evaluated and deferred: "Recently Completed."** Technically
+  derivable (`bucket === "completed" && createdBy === appUserId`), but
+  judged not to earn its place yet: every approve/reject action already
+  redirects the requester straight to the record showing the outcome
+  (§20), and the Approvals inbox's own "Completed" tab already covers
+  this same view for anyone who wants to look it up. Adding a third
+  place to see the same information would be noise, not a real gap;
+  revisit only if a real user asks where their old requests went.
