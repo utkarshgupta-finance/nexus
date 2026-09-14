@@ -186,6 +186,10 @@ function ReviewDetailPage({
         ) : canApprove && (onboardingCase.status === "submitted" || onboardingCase.status === "resubmitted") ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Decision</h2>
+            <p className="text-xs text-muted-foreground">
+              Approving creates the Customer Master, Commercial Configuration, and Commercial Version 1 in one step. Send Back returns this case
+              to the requester with your reason; there is no separate Reject for Onboarding.
+            </p>
 
             {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
 

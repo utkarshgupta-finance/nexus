@@ -163,6 +163,11 @@ function CommercialVersionReviewPage({
         {isDecidable ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Decision</h2>
+            <p className="text-xs text-muted-foreground">
+              Approving closes the prior Commercial Version&apos;s effective period and materializes this one. If Effective Date is today or
+              earlier it becomes the customer&apos;s current terms immediately; if it is in the future, it shows as Approved, Scheduled until
+              that date arrives. Reject is terminal and never changes the Commercial Configuration.
+            </p>
 
             {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
 

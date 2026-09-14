@@ -137,6 +137,10 @@ function ChangeRequestReviewPage({
         {isDecidable ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Decision</h2>
+            <p className="text-xs text-muted-foreground">
+              Approving applies these field changes to the Customer Master and records them permanently in Customer History. Send Back returns
+              this request to the requester for revision; Reject is terminal and never touches the Customer Master.
+            </p>
 
             {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
 

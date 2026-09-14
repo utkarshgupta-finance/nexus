@@ -528,3 +528,27 @@ the raw integer into its prefixed, zero-padded display form. Wired
 into the Approvals inbox, all three Reviews list/detail screens, the
 Onboarding Submitted confirmation screen, and the Customer workspace's
 Change Requests tab.
+
+## 14. Approval UX standardization: IMPLEMENTED (partially, honestly scoped)
+
+Audited all three review screens against one checklist (task Phase F):
+what is being requested, what changed, what evidence exists, what
+requirements were triggered, who else must approve, what happens after
+approval. Send Back/Reject already required a reason on every screen
+(no change needed). Current vs Proposed already existed for Customer
+Change Request (`FieldDiffTable`) and now exists for Commercial Version
+(§4/§14, task Phase G); Onboarding has no equivalent "prior version" to
+diff against, since a resubmission simply replaces the same evidence
+under review. "Who else must approve" only ever applied to Customer
+Change Request's own Workflow rule requirements (§3b), correctly absent
+from the other two. Each screen's Review Decision section now states
+plainly, in its own real governed vocabulary, what Approve/Send Back/
+Reject actually does before the reviewer clicks anything.
+
+Known gap, stated honestly: "what evidence exists" could not be added
+for Customer Onboarding, because uploaded tax/company documents are
+not persisted anywhere yet (`domain/documents.ts`'s own header:
+"There is no upload to Supabase Storage yet... currently held only as
+local, in-session state"). A reviewer cannot see evidence that was
+never saved. This is Customer Documents' own gap (task Phase D), not
+an approval-UX gap, and is not solved by this round.
