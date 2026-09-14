@@ -215,3 +215,55 @@ intentionally excluded: they are not built.
 | 87 | Reloading mid-draft does not lose already-saved progress | | |
 | 88 | Double-clicking a submit/approve button does not create a duplicate submission/decision | | |
 | 89 | Navigating away and back to a list page shows up-to-date data, not a stale cached view | | |
+
+## Go Live
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 90 | A recurring line item with no Go Live request shows "Pending" status and a "Create Go Live" action | | |
+| 91 | An On-Demand line item shows "Go Live: Not Required" in its own section, never a misleading "No Go Live" | | |
+| 92 | Creating a Go Live request locks the Commercial context (component, pricing model, MUG, version) and only allows editing Go Live Date and Prorate First Month | | |
+| 93 | Prorate First Month defaults to No/unchecked | | |
+| 94 | Saving a Go Live draft, then reloading the page, shows the saved date and prorate value | | |
+| 95 | Submitting a Go Live request before customer confirmation is marked Confirmed succeeds (submission is not gated on confirmation) | | |
+| 96 | Approving a Go Live request while customer confirmation is still Pending is blocked with an honest message | | |
+| 97 | Uploading a Customer Confirmation Email or a Signed UAT Document, then marking confirmation Confirmed, unblocks Approve | | |
+| 98 | Approving a request the current user submitted themselves is blocked (self-approval) | | |
+| 99 | Send Back requires a reason and moves the request to Sent Back, then Resubmitted after the maker resubmits | | |
+| 100 | Cancelling a draft Go Live request is only available to its own creator, and only while still in draft | | |
+| 101 | An approved Go Live request shows in My Work / Approvals for anyone with `go_live.approve`, and in My Requests style "drafts to continue" for its own creator while still draft | | |
+
+## Entitlement Ledger: allocation anchoring
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 102 | Recording an Invoice Entitlement (source) for a recurring line item succeeds even before that line item has an approved Go Live request | | |
+| 103 | Generating a schedule for that same source is blocked with an honest message until the line item's Go Live request is approved | | |
+| 104 | Once Go Live is approved, previewing a new schedule anchors the first month at the Go Live month, never the invoice date | | |
+| 105 | An uneven division (for example 1,000 over 3 months) places the rounding remainder in the final month, never dropping a unit | | |
+| 106 | Previewing an "Add To Existing Entitlement Period" schedule anchors at one month after the latest month the existing schedule already covers | | |
+| 107 | Previewing a schedule that overlaps existing months shows an explicit overlap warning and still requires a conscious confirm click | | |
+
+## Entitlement Ledger: MUG consumption
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 108 | Usage above entitlement (with a MUG below entitlement) caps consumption at entitlement and puts the excess in Unbilled | | |
+| 109 | Usage below entitlement with MUG equal to entitlement results in zero Unbilled and zero Unearned | | |
+| 110 | Usage below entitlement with no MUG results in the shortfall landing entirely in Unearned | | |
+| 111 | Actual usage shown on the ledger always matches what was submitted, never silently overwritten by the consumption calculation | | |
+| 112 | A Slab/Progressive/Designation-based pricing model's ledger row shows actual usage but leaves consumption/Unbilled/Unearned at zero with a "Pending MRR Recognition" label | | |
+| 113 | An October Unbilled entry and a November Unearned entry for the same component both remain visible and open; neither is netted against the other | | |
+
+## Entitlement Ledger: usage, additional invoices, settlement
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 114 | Submitting Monthly Usage for a recurring line item before its Go Live month is blocked with an honest message | | |
+| 115 | Submitting Monthly Usage for an On-Demand line item succeeds with no Go Live check at all | | |
+| 116 | An On-Demand line item with usage submitted, but no entitlement source ever created, shows that full usage quantity as Unbilled | | |
+| 117 | Finalizing a draft Monthly Usage row is only available to a user with `usage.finalize`, a distinct permission from submitting it | | |
+| 118 | A finalized Monthly Usage row can no longer be edited; a correction requires a new submission that supersedes it as current | | |
+| 119 | Recording a second Invoice Entitlement for the same component (an additional invoice) and choosing "Add To Existing" extends the schedule without duplicating already-allocated months | | |
+| 120 | Recording a settlement against an open Unbilled entry with a quantity less than the total moves it to Partially Settled, not Settled | | |
+| 121 | Recording a settlement that brings the cumulative settled quantity to the entry's full total moves it to Settled | | |

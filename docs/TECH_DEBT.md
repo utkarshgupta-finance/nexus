@@ -150,6 +150,28 @@ into a second backlog.
   search, reference snapshot) fail with no user-visible indication at all,
   unlike the third catch in the same file which does surface a message.
 
+- **My Work's `canApprove` imprecision now spans a fourth request type.**
+  `/my-work` ORs `customer.approve` with `go_live.approve` into one
+  boolean, same pre-existing approximation already accepted for
+  `commercial_configuration.approve` (`src/app/my-work/page.tsx`).
+  "Pending my approval" is still an approximation across every request
+  type until per-type routing exists; not made worse by Go Live, just
+  extended to it.
+- **Entitlement scheduling has no formal "Entitlement Period" table.**
+  `ADD_TO_EXISTING_ENTITLEMENT_PERIOD` and `CREATE_NEW_ENTITLEMENT_PERIOD`
+  are both just "insert more `entitlement_schedule_months` rows"; there is
+  no row that represents a period as its own entity, only the schedule
+  rows it produced (`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.3). Fine
+  today, since nothing needs to list, name, or reason about a "period" as
+  a first-class object; revisit if that need appears.
+- **MRR Recognition is only an integration boundary, not a module.**
+  `monthly_entitlement_ledger.recognition_status = 'pending_mrr_recognition'`
+  rows accumulate for Slab/Progressive/Designation-based pricing with no
+  process yet to resolve them into a real recognized outcome (`docs/
+  GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.7). Expected and explicitly
+  scoped out of this program; revisit once MRR Recognition itself is
+  designed.
+
 ## Soon (real, but not urgent; revisit within the next few feature rounds)
 
 - **Customer Master has no Human-Friendly ID.** Every other governed

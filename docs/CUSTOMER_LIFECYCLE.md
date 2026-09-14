@@ -1678,3 +1678,18 @@ plus re-verifies a third. Full accounts in
   fix; if anything, zero users currently hold `user_access.write`,
   `team.write`, or `workflow_definition.write` at all, an operational
   bootstrapping gap already named in §18, now concretely confirmed.
+
+## 41. Go Live and Entitlement Ledger: IMPLEMENTED (NEXUS GO LIVE + ENTITLEMENT LEDGER program)
+
+A recurring Commercial line item now goes through a governed Go Live
+request (`draft -> submitted/resubmitted -> approved | sent_back |
+cancelled`, same shape as Onboarding and Commercial Version) before its
+Monthly Entitlement Allocation may begin, and every month's usage,
+consumption, Unbilled, and Unearned quantity is tracked against it. This
+is a large, self-contained domain with its own authoritative document:
+see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` for the full business
+rules, data model, and what is deliberately not built (MRR Recognition,
+Accounts Receivable, ERP integration). It reuses the self-approval and
+actor-identity-snapshot rules from Program 4 Hardening (§40) unchanged,
+and is the first business domain to consume the Workflow Builder (§36)
+as a display-only execution boundary rather than only an authoring tool.

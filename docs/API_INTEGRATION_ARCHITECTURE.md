@@ -31,6 +31,17 @@ and every Settings mutation. A future `/api/v1` route handler would call
 the exact same service functions these actions already call; it would not
 duplicate a single business rule.
 
+**A second real domain confirms this pattern, with the computation layer
+made explicit.** The Entitlement Ledger (NEXUS GO LIVE + ENTITLEMENT
+LEDGER program) goes one step further: allocation, MUG consumption, and
+pricing-recognition classification each live as pure, directly unit-
+tested TypeScript functions with no I/O (`src/features/entitlement/
+domain/*.ts`), called by `entitlement.service.ts` before any RPC runs.
+The RPCs only ever persist already-computed values. Manual Finance entry
+today and a future API/import integration (`source_type`/`source` already
+reserve `API`/`IMPORT` alongside `MANUAL`) call the exact same service
+functions; see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.1.
+
 **One gap found and not yet closed**: `case.service.ts`'s
 `checkForDuplicateCustomersAction` and `customer-change/actions.ts`'s
 `createChangeRequestAction` each do a small amount of business branching

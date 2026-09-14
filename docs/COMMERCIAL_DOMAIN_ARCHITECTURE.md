@@ -1395,12 +1395,29 @@ promotion write derives the authenticated user server-side, requires
 into every RPC as the real audit actor; see
 `src/features/customer-onboarding/actions.ts`.
 
+## 22b. Stable cross-version component identity [IMPLEMENTED, NEXUS GO LIVE + ENTITLEMENT LEDGER program]
+
+§4 already locked that a new Commercial Version mints a fresh
+`commercial_components.id` per component: "the Users component" is really
+a chain of superseded rows, not one continuing row. Go Live and the
+Entitlement Ledger need one continuing identity across that chain, so
+`stable_component_key` (new, additive column) now persists it: minted
+fresh when a component is first created by onboarding, carried forward
+unchanged from the prior version's own key on every later Version
+approval. Purely additive: no existing RPC signature changed, and the
+Current-vs-Proposed diff (§17) still matches by the transient `id`,
+unaffected. `fn_protect_commercial_component_lifecycle` was extended to
+allow this one column to be set once from null, exactly like the
+pre-existing `effective_to` allowance. Full detail in `docs/
+GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §5.
+
 ## 23. What this document is not
 
 Not a database schema. Not an implementation. Not a decision on Flowable,
-approval workflow mechanics, Entitlement Ledger implementation,
-Earned/Unbilled implementation, Invoicing, or Wallet. Every `[LOCKED]`
-statement above is available for the next, separate stage (Commercial
+approval workflow mechanics, Invoicing, or Wallet. Entitlement Ledger and
+Unbilled/Unearned implementation is now covered by `docs/
+GO_LIVE_ENTITLEMENT_ARCHITECTURE.md`, not by this document. Every
+`[LOCKED]` statement above is available for the next, separate stage (Commercial
 Database Design) to translate into tables; every remaining
 `[PROVISIONAL]`/`[DATABASE DESIGN QUESTION]` item in §20 must remain a
 real, open choice in that design, not silently resolved by a schema

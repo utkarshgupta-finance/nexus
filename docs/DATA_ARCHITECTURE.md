@@ -561,6 +561,16 @@ disclosure of historical values must remain possible once Customer
 Master attributes exist. Nothing described in this section is
 implemented; no such table exists yet.
 
+A narrower version of this same "stable id, not a current attribute
+value" principle is now implemented for a different entity:
+`commercial_components.stable_component_key` (NEXUS GO LIVE +
+ENTITLEMENT LEDGER program) gives one continuing identity across a
+Commercial Component's chain of superseded per-Version rows, so Go Live
+and Entitlement Ledger history survive a Commercial Version change. See
+`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §5. Customer Master's own
+stable-identity/historical-attribute resolution, described above, remains
+unimplemented.
+
 ## 15. Customer Master Change Request (future, not yet implemented)
 
 Once Customer Master exists (§14), an edit to it is never a direct

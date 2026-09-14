@@ -593,3 +593,19 @@ should grant `user_access_admin` (or, narrower, exactly the roles
 needed) to the account that should administer Settings, via
 `grant_user_role` once any account holds it, or directly via SQL for
 the very first grant.
+
+## 23. Go Live + Entitlement Ledger permissions (NEXUS GO LIVE + ENTITLEMENT LEDGER program): IMPLEMENTED
+
+New permissions: `go_live.read`/`create`/`submit`/`approve`,
+`entitlement.read`/`write`, `usage.read`/`write`/`finalize`,
+`entitlement_settlement.read`/`write`. `usage.write` and `usage.finalize`
+are deliberately separate, so an organization can let more people submit
+monthly usage than can finalize it into an immutable record. New roles:
+`go_live_admin`, `finance_admin`. The existing `maker` role additively
+gained `go_live.read/create/submit`; `checker` additively gained the full
+`go_live.*` set including `approve`. `approve_go_live_request` and
+`send_back_go_live_request` both enforce the §20 self-approval rule
+(`SELF_APPROVAL_NOT_ALLOWED` if the acting user created the request), and
+every mutation on the new tables is captured by the same `fn_audit_row`
+trigger and actor-identity snapshot as §21. Full business context in
+`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §6.5, §9.
