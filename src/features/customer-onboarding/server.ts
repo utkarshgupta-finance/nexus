@@ -25,3 +25,5 @@ export type { ReviewQueueEntry as CommercialVersionReviewQueueEntry } from "./se
 export type { CommercialConfigurationVersion } from "./domain/commercial-version-types"
 export { formatCommercialVersionId } from "./domain/commercial-version-types"
 export type { CommercialRateDiff, ComponentDiff, SlabRowDiff, DesignationRowDiff, MilestoneDiff, DiffRowStatus } from "./domain/commercial-rate-diff"
+export { listOnboardingDocuments } from "./services/documents.service"
+export type { PersistedOnboardingDocumentMetadata, OnboardingDocumentType } from "./domain/types"

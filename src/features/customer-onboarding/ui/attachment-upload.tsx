@@ -12,27 +12,36 @@ import {
   MAX_ATTACHMENT_SIZE_LABEL,
   validateAttachmentFile,
 } from "../domain/documents"
+import { uploadOnboardingDocumentAction } from "../actions"
 import type { OnboardingDocumentType, SelectedOnboardingDocument } from "../domain/types"
 
 type SelectedAttachmentFile = { file: File; metadata: SelectedOnboardingDocument }
 
+type UploadStatus = "idle" | "uploading" | "uploaded" | "error"
+
 /**
  * A real browser file picker with immediate client-side validation: a
- * file is checked the moment it is selected, never deferred to Submit,
- * and a rejected file never enters `value`. `value` is the SELECTED
- * LOCAL FILE only, never uploaded anywhere from this Client Component;
- * see ../domain/types.ts's `PersistedOnboardingDocumentMetadata` for the
- * documented future persisted shape. Shared by every attachment across
- * all five Customer Onboarding stages (Tax & Registration, Commercial
- * Documents, Agreement & Approval), one policy, one component.
+ * file is checked the moment it is selected, never deferred to Submit.
+ * A valid selection previews instantly from the local File AND uploads
+ * in the background to real, persistent Storage (task Phase D:
+ * `uploadOnboardingDocumentAction`), so the evidence survives a closed
+ * tab or a later review, closing the gap
+ * ../domain/documents.ts's own header used to document as missing.
+ * Shared by every attachment across all five Customer Onboarding stages
+ * (Tax & Registration, Commercial Documents, Agreement & Approval), one
+ * policy, one component.
  */
 function AttachmentUpload({
+  requestId,
+  category,
   documentType,
   label,
   helpText,
   value,
   onChange,
 }: {
+  requestId: string
+  category: "tax" | "commercial" | "agreement"
   documentType: OnboardingDocumentType
   label: string
   /** Extra guidance shown under the label, for a document whose exact name varies (task spec: Company Registration / Incorporation Document). */
@@ -43,6 +52,7 @@ function AttachmentUpload({
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewerOpen, setViewerOpen] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle")
   const inputId = useId()
 
   // Derived, not stored in state: recomputes only when the selected file
@@ -57,7 +67,7 @@ function AttachmentUpload({
     }
   }, [previewUrl])
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     // Reset so choosing the same file again after removal still fires onChange.
     event.target.value = ""
@@ -75,11 +85,19 @@ function AttachmentUpload({
       file,
       metadata: { documentType, fileName: file.name, mimeType: file.type, sizeBytes: file.size },
     })
+
+    setUploadStatus("uploading")
+    const formData = new FormData()
+    formData.set("file", file)
+    const uploadResult = await uploadOnboardingDocumentAction(requestId, category, documentType, formData)
+    setUploadStatus(uploadResult.ok ? "uploaded" : "error")
+    if (!uploadResult.ok) setError(uploadResult.error)
   }
 
   function handleRemove() {
     setError(null)
     setViewerOpen(false)
+    setUploadStatus("idle")
     onChange(null)
   }
 
@@ -130,6 +148,7 @@ function AttachmentUpload({
             <span className="text-[0.7rem] text-muted-foreground">
               {value.metadata.mimeType === "application/pdf" ? "PDF" : "JPEG"} &middot;{" "}
               {formatFileSize(value.metadata.sizeBytes)}
+              {uploadStatus === "uploading" ? " · Saving..." : uploadStatus === "uploaded" ? " · Saved" : ""}
             </span>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">

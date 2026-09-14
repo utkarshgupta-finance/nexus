@@ -545,10 +545,52 @@ from the other two. Each screen's Review Decision section now states
 plainly, in its own real governed vocabulary, what Approve/Send Back/
 Reject actually does before the reviewer clicks anything.
 
-Known gap, stated honestly: "what evidence exists" could not be added
-for Customer Onboarding, because uploaded tax/company documents are
-not persisted anywhere yet (`domain/documents.ts`'s own header:
-"There is no upload to Supabase Storage yet... currently held only as
-local, in-session state"). A reviewer cannot see evidence that was
-never saved. This is Customer Documents' own gap (task Phase D), not
-an approval-UX gap, and is not solved by this round.
+Known gap noted here, closed in §15 below: "what evidence exists"
+could not be added for Customer Onboarding in this pass, because
+uploaded tax/company documents were not persisted anywhere yet
+(`domain/documents.ts`'s own header: "There is no upload to Supabase
+Storage yet... currently held only as local, in-session state"). A
+reviewer cannot see evidence that was never saved. This is Customer
+Documents' own gap (task Phase D), not an approval-UX gap; it is
+closed for Onboarding immediately below, in the same round.
+
+## 15. Customer Documents (Onboarding slice): IMPLEMENTED
+
+Closes the exact gap §14 just found: every Customer Onboarding
+attachment (GST/PAN/TAN, Tax Registration, Company Registration, every
+Commercial Document, the Signed Agreement) now really persists, not
+only local browser state. Implements exactly the shape already
+documented for this in `domain/types.ts`'s
+`PersistedOnboardingDocumentMetadata`: a private Supabase Storage
+bucket (`customer-onboarding-documents`,
+`supabase/migrations/20260914110000_customer_onboarding_documents.sql`),
+an opaque `{requestId}/{category}/{documentType}/{documentId}.
+{extension}` path (never a customer name/GST/PAN/TAN in the path
+itself, `domain/document-paths.ts`, pure, unit-tested), and
+`customer_onboarding_documents` holding only metadata, never file
+bytes. No RLS policy is granted to anon/authenticated on this bucket;
+every read/write goes through a Server Action using the service_role
+client, the same trust boundary this whole project already relies on.
+
+Re-uploading the same document type on the same request (a real
+scenario after Send Back) never deletes or overwrites prior evidence:
+the old row's `is_current` flips to false and a new row is inserted,
+enforced by a protection trigger that permits ONLY that one column to
+ever change after insert, mirroring `customers`' own
+`fn_protect_customer_lifecycle` pattern. A document survives
+permanently even once superseded.
+
+`AttachmentUpload` (shared by all eight attachment slots across three
+Onboarding stages) previews the local file instantly, exactly as
+before, and now also uploads it in the background via
+`uploadOnboardingDocumentAction`, showing "Saving..." then "Saved"
+inline. The Onboarding review screen (§14) gained a real Evidence
+section (`OnboardingEvidenceList`): a reviewer can View or Download
+every current document, each via a signed URL generated on demand
+(5-minute expiry, never a long-lived or public link).
+
+Known gap, stated honestly: this closes Onboarding's own evidence gap
+only. The broader cross-cutting "Customer Documents" surface (task
+Phase D's full vision: Registration/Tax/Commercial/Agreement/Change
+Request Evidence all in one place on the Customer workspace) is not
+built in this round.

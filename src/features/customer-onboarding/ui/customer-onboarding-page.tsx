@@ -478,18 +478,24 @@ function CustomerOnboardingPage({
                 {isIndia ? (
                   <>
                     <AttachmentUpload
+                      requestId={requestId}
+                      category="tax"
                       documentType="gst_certificate"
                       label="GST Registration Document"
                       value={taxDocuments.gst}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, gst: next }))}
                     />
                     <AttachmentUpload
+                      requestId={requestId}
+                      category="tax"
                       documentType="pan_card"
                       label="PAN Document"
                       value={taxDocuments.pan}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, pan: next }))}
                     />
                     <AttachmentUpload
+                      requestId={requestId}
+                      category="tax"
                       documentType="tan_card"
                       label="TAN Document"
                       value={taxDocuments.tan}
@@ -499,12 +505,16 @@ function CustomerOnboardingPage({
                 ) : (
                   <>
                     <AttachmentUpload
+                      requestId={requestId}
+                      category="tax"
                       documentType="tax_registration"
                       label="Tax Registration Document"
                       value={taxDocuments.taxRegistration}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, taxRegistration: next }))}
                     />
                     <AttachmentUpload
+                      requestId={requestId}
+                      category="tax"
                       documentType="company_registration"
                       label="Company Registration / Incorporation Document"
                       helpText="Upload a document that confirms the registered legal entity/company name."
@@ -524,6 +534,8 @@ function CustomerOnboardingPage({
                 {COMMERCIAL_DOCUMENT_DEFINITIONS.map((definition) => (
                   <AttachmentUpload
                     key={definition.documentType}
+                    requestId={requestId}
+                    category="commercial"
                     documentType={definition.documentType}
                     label={definition.label}
                     helpText={definition.helpText}
@@ -552,6 +564,8 @@ function CustomerOnboardingPage({
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Agreement</span>
                 <div className="max-w-md">
                   <AttachmentUpload
+                    requestId={requestId}
+                    category="agreement"
                     documentType="signed_agreement"
                     label="Signed Agreement"
                     value={signedAgreement}

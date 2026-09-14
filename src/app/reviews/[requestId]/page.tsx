@@ -3,11 +3,12 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { getOnboardingCase } from "@/features/customer-onboarding/server"
+import { getOnboardingCase, listOnboardingDocuments } from "@/features/customer-onboarding/server"
 import { ReviewDetailPage } from "@/features/customer-onboarding/ui/review-detail-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+import type { PersistedOnboardingDocumentMetadata } from "@/features/customer-onboarding/server"
 
 export const dynamic = "force-dynamic"
 
@@ -31,10 +32,17 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
 
   const canApprove = await hasPermission("customer", "approve")
 
+  let documents: PersistedOnboardingDocumentMetadata[] = []
+  try {
+    documents = await listOnboardingDocuments(requestId)
+  } catch {
+    documents = []
+  }
+
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/${requestId}`}>
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-        <ReviewDetailPage requestId={requestId} onboardingCase={onboardingCase} canApprove={canApprove} />
+        <ReviewDetailPage requestId={requestId} onboardingCase={onboardingCase} canApprove={canApprove} documents={documents} />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>
   )

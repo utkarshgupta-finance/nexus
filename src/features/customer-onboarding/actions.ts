@@ -20,9 +20,10 @@ import {
   rejectVersion,
   approveVersion,
 } from "./services/commercial-version.service"
+import { uploadOnboardingDocument, getOnboardingDocumentDownloadUrl } from "./services/documents.service"
 import { findPotentialDuplicates } from "./domain/duplicate-detection"
 import type { CommercialRateDraft } from "./domain/commercial-rate"
-import type { CustomerOnboardingCase } from "./domain/types"
+import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata, OnboardingDocumentType } from "./domain/types"
 import type { CommercialConfigurationVersion, CommercialVersionChangeCategory } from "./domain/commercial-version-types"
 import type { DuplicateCandidate, DuplicateMatch, ExistingCustomerIdentity } from "./domain/duplicate-detection"
 
@@ -209,6 +210,48 @@ async function checkForDuplicateCustomersAction(candidate: DuplicateCandidate): 
   }
 }
 
+type UploadDocumentActionResult = { ok: true; document: PersistedOnboardingDocumentMetadata } | { ok: false; error: string }
+
+/**
+ * Customer Documents (task Phase D): the real persistence path this
+ * onboarding evidence never had before. Gated on `customer.create`, the
+ * same permission Save Draft/Submit already require: uploading evidence
+ * is part of filling in the case, not a separate reviewer capability.
+ */
+async function uploadOnboardingDocumentAction(
+  requestId: string,
+  category: "tax" | "commercial" | "agreement",
+  documentType: OnboardingDocumentType,
+  formData: FormData
+): Promise<UploadDocumentActionResult> {
+  try {
+    const actor = await requirePermission("customer", "create")
+    const file = formData.get("file")
+    if (!(file instanceof File)) return { ok: false, error: "No file was received." }
+    const document = await uploadOnboardingDocument({ requestId, category, documentType, file, actorUserId: actor.appUserId })
+    return { ok: true, document }
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    if (error instanceof Error) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while uploading this document." }
+  }
+}
+
+type DownloadUrlActionResult = { ok: true; url: string } | { ok: false; error: string }
+
+async function getOnboardingDocumentDownloadUrlAction(documentId: string): Promise<DownloadUrlActionResult> {
+  try {
+    await requirePermission("customer", "read")
+    const url = await getOnboardingDocumentDownloadUrl(documentId)
+    if (!url) return { ok: false, error: "Document not found." }
+    return { ok: true, url }
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    if (error instanceof Error) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while creating a download link." }
+  }
+}
+
 export {
   createOnboardingCaseAction,
   saveOnboardingDraftAction,
@@ -221,5 +264,7 @@ export {
   rejectCommercialVersionAction,
   approveCommercialVersionAction,
   checkForDuplicateCustomersAction,
+  uploadOnboardingDocumentAction,
+  getOnboardingDocumentDownloadUrlAction,
 }
-export type { CaseActionResult, ApproveCaseActionResult, CommercialVersionActionResult, DuplicateCheckActionResult }
+export type { CaseActionResult, ApproveCaseActionResult, CommercialVersionActionResult, DuplicateCheckActionResult, UploadDocumentActionResult, DownloadUrlActionResult }

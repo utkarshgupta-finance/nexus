@@ -16,10 +16,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapshot-context"
 import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft, CommercialRateDraft } from "../domain/commercial-rate"
-import type { CustomerOnboardingCase } from "../domain/types"
+import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata } from "../domain/types"
 import { formatOnboardingCaseId } from "../domain/types"
 import { CUSTOMER_ONBOARDING_FIELD_KEYS } from "../forms/customer-onboarding-form-definition"
 import { approveOnboardingCaseAction, sendBackOnboardingCaseAction } from "../actions"
+import { OnboardingEvidenceList } from "./onboarding-evidence-list"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
 
@@ -44,10 +45,12 @@ function ReviewDetailPage({
   requestId,
   onboardingCase,
   canApprove,
+  documents,
 }: {
   requestId: string
   onboardingCase: CustomerOnboardingCase
   canApprove: boolean
+  documents: PersistedOnboardingDocumentMetadata[]
 }) {
   const router = useRouter()
   const snapshot = useReferenceMasterSnapshot()
@@ -159,6 +162,11 @@ function ReviewDetailPage({
               </div>
             )
           })}
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Evidence</h2>
+          <OnboardingEvidenceList documents={documents} />
         </section>
 
         {approvalResult ? (
