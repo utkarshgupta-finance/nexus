@@ -117,14 +117,16 @@ into a second backlog.
   email resolution in the same two places, both one round trip per
   item/actor concurrently rather than a single `.in()`/bulk call; today's
   volume does not justify it, see `docs/PLATFORM_ARCHITECTURE.md` §12a.
-- **Three orphaned list routes**: `/reviews`, `/reviews/change-requests`,
-  `/reviews/commercial-versions` are superseded by `/approvals` (per their
-  own code comments) and have no inbound link from the sidebar or any
-  other page, but their *detail* routes (`/reviews/[id]`, etc.) are still
-  live and linked from Approvals. Not removed this round (still
-  functional, and removing a route is a one-way door not worth taking
-  without confirming nothing external links to it); worth a deliberate
-  decision to delete or re-link later, not indefinite limbo.
+- ~~Three orphaned list routes: `/reviews`, `/reviews/change-requests`,
+  `/reviews/commercial-versions`~~ — **closed (Platform Scale Closure,
+  Phase X)**. Confirmed zero inbound links from anywhere (sidebar, any
+  other page, or code) before removing; the three post-decision
+  redirects that used to point at them (Phase J) were already moved to
+  `/approvals` in the same program. Their *detail* routes (`/reviews/[id]`,
+  etc.) are untouched: still live, still linked from Approvals.
+- ~~`formatCurrency` in `src/lib/format.ts` had zero importers anywhere
+  in `src`~~ — **closed (Platform Scale Closure, Phase X)**. Removed;
+  `formatFxSnapshot` in the same file is real and unaffected.
 - ~~Sidebar had four placeholder nav items with no backing route~~ —
   **closed (Platform Scale Program, Phase M)**. Go-Live, Ledger,
   Suspensions, and Legal (`app-shell.tsx`) were removed from navigation
