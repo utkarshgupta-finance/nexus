@@ -15,13 +15,16 @@ type CommercialConfigurationVersionRow = {
   version_number: number
   commercial_configuration_id: string
   change_category: "renewal" | "amendment" | "correction" | "other"
-  status: "draft" | "submitted" | "approved" | "rejected"
+  status: "draft" | "submitted" | "approved" | "rejected" | "cancelled"
   reason: string | null
   effective_date: string | null
   commercial_change_id: string | null
   decided_by: string | null
   decided_at: string | null
   decision_reason: string | null
+  cancelled_by: string | null
+  cancelled_at: string | null
+  cancelled_reason: string | null
   row_version: number
   created_at: string
   created_by: string | null

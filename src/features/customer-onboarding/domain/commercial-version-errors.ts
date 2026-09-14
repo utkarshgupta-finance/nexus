@@ -16,6 +16,8 @@ type CommercialVersionErrorKind =
   | "commercial_version_not_submittable"
   | "commercial_version_not_approvable"
   | "commercial_version_not_rejectable"
+  | "commercial_version_not_cancellable"
+  | "commercial_version_cancel_not_owner"
   | "commercial_version_no_draft_revision"
   | "commercial_version_reject_reason_required"
   | "invalid_input"
@@ -40,6 +42,8 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   COMMERCIAL_VERSION_NOT_REJECTABLE: "commercial_version_not_rejectable",
   COMMERCIAL_VERSION_NO_DRAFT_REVISION: "commercial_version_no_draft_revision",
   COMMERCIAL_VERSION_REJECT_REASON_REQUIRED: "commercial_version_reject_reason_required",
+  COMMERCIAL_VERSION_NOT_CANCELLABLE: "commercial_version_not_cancellable",
+  COMMERCIAL_VERSION_CANCEL_NOT_OWNER: "commercial_version_cancel_not_owner",
 }
 
 const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {

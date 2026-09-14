@@ -8,7 +8,7 @@ import type { CommercialRateDraft } from "./commercial-rate"
  * both already do.
  */
 
-type CommercialVersionStatus = "draft" | "submitted" | "approved" | "rejected"
+type CommercialVersionStatus = "draft" | "submitted" | "approved" | "rejected" | "cancelled"
 type CommercialVersionChangeCategory = "renewal" | "amendment" | "correction" | "other"
 
 type CommercialConfigurationVersion = {
@@ -25,6 +25,10 @@ type CommercialConfigurationVersion = {
   decidedBy: string | null
   decidedAt: string | null
   decisionReason: string | null
+  /** Set only once, when a draft is cancelled (task Phase C); a cancelled version is terminal and never re-enters review. */
+  cancelledBy: string | null
+  cancelledAt: string | null
+  cancelledReason: string | null
   /** The draft's proposed Commercial Rate (billing currency + components); undefined until a draft has ever been saved. */
   commercialRate: CommercialRateDraft | null
   createdBy: string | null

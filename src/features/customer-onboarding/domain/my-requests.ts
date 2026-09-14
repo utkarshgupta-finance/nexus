@@ -37,6 +37,8 @@ function reviewState(status: CustomerOnboardingCaseStatus, stageKey: CustomerOnb
       return "Needs Your Attention"
     case "approved":
       return "Completed"
+    case "cancelled":
+      return "Cancelled"
     default:
       return ""
   }
@@ -59,7 +61,7 @@ function primaryAction(row: MyRequestRow): { label: string; href: string } {
 }
 
 /** Draft and Sent Back need action now; Submitted/Resubmitted are waiting; Approved is done. Lower sorts first (task spec: "default prioritizes actionable/in-progress work"). */
-const STATUS_PRIORITY: Record<string, number> = { sent_back: 0, draft: 1, submitted: 2, resubmitted: 2, approved: 3 }
+const STATUS_PRIORITY: Record<string, number> = { sent_back: 0, draft: 1, submitted: 2, resubmitted: 2, approved: 3, cancelled: 4 }
 
 /** My Requests' default ordering: actionable work first, ties broken by most recently updated. Never mutates the input array. */
 function sortMyRequestRows(rows: MyRequestRow[]): MyRequestRow[] {

@@ -81,6 +81,15 @@ async function approveChangeRequest(requestId: string, actorUserId: string): Pro
   })
 }
 
+/** Only a draft may be cancelled, and only by its creator (cancel_customer_change_request enforces both server-side). */
+async function cancelChangeRequest(requestId: string, reason: string | null, actorUserId: string): Promise<CustomerChangeRequestRow> {
+  return callSingleRowRpc<CustomerChangeRequestRow>("cancel_customer_change_request", {
+    p_request_id: requestId,
+    p_reason: reason,
+    p_actor_user_id: actorUserId,
+  })
+}
+
 async function getChangeRequestByRequestId(requestId: string): Promise<CustomerChangeRequestRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.from("customer_change_requests").select("*").eq("request_id", requestId).maybeSingle()
@@ -262,6 +271,7 @@ export {
   sendBackChangeRequest,
   rejectChangeRequest,
   approveChangeRequest,
+  cancelChangeRequest,
   getChangeRequestByRequestId,
   listChangeRequestsAwaitingReview,
   listAllChangeRequests,

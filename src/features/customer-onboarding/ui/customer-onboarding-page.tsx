@@ -10,6 +10,7 @@ import "./geography-combobox-question"
 import { useSurveyModel } from "@/platform/forms/use-survey-model"
 import type { SurveyFormMode } from "@/platform/forms/types"
 import { PageHeader } from "@/components/product/page-header"
+import { PendingButton } from "@/components/product/pending-button"
 import { ProcessJourney } from "@/components/product/process-journey"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,7 +35,7 @@ import type { CustomerOnboardingCase } from "../domain/types"
 import type { OnboardingFieldCommentEntry } from "../services/case.service"
 import { formatOnboardingCaseId } from "../domain/types"
 import { isEligibleForCompletion } from "../domain/completion"
-import { saveOnboardingDraftAction, submitOnboardingCaseAction, checkForDuplicateCustomersAction } from "../actions"
+import { saveOnboardingDraftAction, submitOnboardingCaseAction, checkForDuplicateCustomersAction, cancelOnboardingCaseAction } from "../actions"
 import { hasHardDuplicateMatch, FIELD_LABELS } from "../domain/duplicate-detection"
 import type { DuplicateMatch } from "../domain/duplicate-detection"
 import { fetchStatesForCountry } from "../domain/geography-client"
@@ -181,6 +182,9 @@ function CustomerOnboardingPage({
     () => (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate] as CommercialRateDraft | undefined) ?? createEmptyCommercialRateDraft()
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[]>([])
   const [duplicateWarningAcknowledged, setDuplicateWarningAcknowledged] = useState(false)
   /**
@@ -413,6 +417,20 @@ function CustomerOnboardingPage({
     }
   }
 
+  /** Task Phase C: only reachable while status is exactly "draft" (see the footer's canCancel gate); the RPC re-checks this server-side regardless. */
+  async function handleCancelDraft() {
+    setPendingAction("cancel")
+    setCancelError(null)
+    const result = await cancelOnboardingCaseAction(requestId, cancelReason.trim() || null)
+    setPendingAction(null)
+    if (result.ok) {
+      setOnboardingCase(result.onboardingCase)
+      setIsCancelling(false)
+    } else {
+      setCancelError(result.error)
+    }
+  }
+
   const isIndia = country === DEFAULT_COUNTRY_CODE
   const isSurveyStage =
     (CUSTOMER_ONBOARDING_STAGES.find((stage) => stage.key === activeStageKey)?.order ?? 0) <= SURVEY_STAGE_ORDER_LIMIT
@@ -452,6 +470,24 @@ function CustomerOnboardingPage({
   // no idea what to do next). The underlying business rule is unchanged:
   // a submitted case is never a Customer Master, so this never claims
   // otherwise. "View Request" swaps to the read-only survey below.
+  if (onboardingCase.status === "cancelled") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <PageHeader title="Customer Onboarding" description={formatOnboardingCaseId(onboardingCase.caseNumber)} />
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-10 sm:px-6">
+          <Badge variant="ghost" className="w-fit bg-muted text-muted-foreground">
+            Cancelled
+          </Badge>
+          <p className="text-sm text-foreground">This onboarding request was cancelled and is no longer actionable.</p>
+          {onboardingCase.cancelledReason ? <p className="text-xs text-muted-foreground">Reason: {onboardingCase.cancelledReason}</p> : null}
+          <Button variant="outline" size="sm" className="w-fit" render={<Link href="/forms/customer-onboarding" />}>
+            Back to Customer Onboarding
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if ((onboardingCase.status === "submitted" || onboardingCase.status === "resubmitted") && submittedViewMode === "confirmation") {
     const legalName = (onboardingCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName] as string) || "This customer"
     return (
@@ -715,23 +751,55 @@ function CustomerOnboardingPage({
             <>
               <Separator />
               {draftSaved ? <p className="text-[0.7rem] text-muted-foreground">Draft saved.</p> : null}
-              <OnboardingStageFooter
-                isFirstStage={isFirstStage}
-                isLastStage={isLastStage}
-                pendingAction={pendingAction}
-                // eslint-disable-next-line react-hooks/immutability -- goToStage's own SurveyJS Model mutation is already justified at its definition; this closure just forwards to it.
-                onPrevious={() => {
-                  const previous = adjacentOnboardingStage(currentStageMeta?.order ?? 1, "previous")
-                  if (previous) goToStage(previous.key)
-                }}
-                onSaveDraft={handleSaveDraft}
-                // eslint-disable-next-line react-hooks/immutability -- handleNext's eventual goToStage call is already justified at its definition; this closure just forwards to it.
-                onNext={() => {
-                  const next = adjacentOnboardingStage(currentStageMeta?.order ?? 1, "next")
-                  if (next) handleNext(next.key)
-                }}
-                onSubmit={handleSubmit}
-              />
+
+              {isCancelling ? (
+                <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <label className="text-xs font-medium text-foreground" htmlFor="cancel-draft-reason">
+                    Cancel this draft? This cannot be undone. Reason (optional)
+                  </label>
+                  <textarea
+                    id="cancel-draft-reason"
+                    className="min-h-16 rounded-md border bg-transparent px-3 py-2 text-sm"
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                  />
+                  {cancelError ? <p className="text-xs text-destructive">{cancelError}</p> : null}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsCancelling(false)} disabled={pendingAction !== null}>
+                      Never mind
+                    </Button>
+                    <PendingButton
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCancelDraft}
+                      pending={pendingAction === "cancel"}
+                      pendingLabel="Cancelling..."
+                    >
+                      Confirm Cancel
+                    </PendingButton>
+                  </div>
+                </div>
+              ) : (
+                <OnboardingStageFooter
+                  isFirstStage={isFirstStage}
+                  isLastStage={isLastStage}
+                  pendingAction={pendingAction}
+                  canCancel={onboardingCase.status === "draft"}
+                  // eslint-disable-next-line react-hooks/immutability -- goToStage's own SurveyJS Model mutation is already justified at its definition; this closure just forwards to it.
+                  onPrevious={() => {
+                    const previous = adjacentOnboardingStage(currentStageMeta?.order ?? 1, "previous")
+                    if (previous) goToStage(previous.key)
+                  }}
+                  onSaveDraft={handleSaveDraft}
+                  // eslint-disable-next-line react-hooks/immutability -- handleNext's eventual goToStage call is already justified at its definition; this closure just forwards to it.
+                  onNext={() => {
+                    const next = adjacentOnboardingStage(currentStageMeta?.order ?? 1, "next")
+                    if (next) handleNext(next.key)
+                  }}
+                  onSubmit={handleSubmit}
+                  onCancelClick={() => setIsCancelling(true)}
+                />
+              )}
             </>
           ) : null}
         </div>

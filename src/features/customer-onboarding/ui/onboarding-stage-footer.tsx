@@ -3,7 +3,7 @@
 import { PendingButton } from "@/components/product/pending-button"
 import { Button } from "@/components/ui/button"
 
-type OnboardingStageFooterAction = "save" | "next" | "submit" | null
+type OnboardingStageFooterAction = "save" | "next" | "submit" | "cancel" | null
 
 /**
  * The one consistent bottom navigation footer for every Customer
@@ -19,30 +19,40 @@ function OnboardingStageFooter({
   isFirstStage,
   isLastStage,
   pendingAction,
+  canCancel = false,
   onPrevious,
   onSaveDraft,
   onNext,
   onSubmit,
+  onCancelClick,
 }: {
   isFirstStage: boolean
   isLastStage: boolean
   pendingAction: OnboardingStageFooterAction
+  /** Task Phase C: only a draft (never sent_back, submitted, or resubmitted) may be discarded. */
+  canCancel?: boolean
   onPrevious: () => void
   onSaveDraft: () => void
   onNext: () => void
   onSubmit: () => void
+  onCancelClick?: () => void
 }) {
   const isBusy = pendingAction !== null
 
   return (
     <div className="flex items-center justify-between gap-2">
-      {isFirstStage ? (
-        <span />
-      ) : (
-        <Button variant="outline" size="sm" onClick={onPrevious} disabled={isBusy}>
-          Previous
-        </Button>
-      )}
+      <div className="flex items-center gap-2">
+        {isFirstStage ? null : (
+          <Button variant="outline" size="sm" onClick={onPrevious} disabled={isBusy}>
+            Previous
+          </Button>
+        )}
+        {canCancel && onCancelClick ? (
+          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onCancelClick} disabled={isBusy}>
+            Cancel Draft
+          </Button>
+        ) : null}
+      </div>
       <div className="flex items-center gap-2">
         <PendingButton
           variant="outline"

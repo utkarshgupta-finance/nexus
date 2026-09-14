@@ -1096,3 +1096,49 @@ generic category subtitle ("Tax & Registration"/"Commercial
 Documents"), and shows "Uploaded by {name}, {timestamp}" underneath,
 resolved server-side the same way every other actor display in the app
 resolves an uploader identity.
+
+## 27. Draft cancel/discard: IMPLEMENTED (Platform Operating Expansion, Phase C/G)
+
+Customer Onboarding, Customer Change Request, and Commercial
+Configuration Version each gained a governed `cancelled` terminal
+status, added by `supabase/migrations/20260916010000_draft_cancel_discard.sql`
+alongside `cancelled_by`/`cancelled_at`/`cancelled_reason` columns on
+all three tables, following the exact shape `sent_back_by`/`sent_back_at`/
+`sent_back_reason` already established. A draft moves to `cancelled`
+through one new RPC per domain (`cancel_customer_onboarding_case`,
+`cancel_customer_change_request`, `cancel_commercial_configuration_version`),
+never a physical delete, so a cancelled item remains historically
+visible and reconstructible, matching every other governed lifecycle's
+audit posture in this codebase.
+
+Deliberately scoped to status `draft` only, in all three domains: a
+case/request/version that has ever been submitted has real
+reviewer-facing history (comments, a submitted revision, a live
+approval queue entry in Commercial Version's case), so withdrawing
+something already in flight is a materially bigger decision, left to
+the system-wide cancel/withdraw audit (task Phase V). Each RPC also
+verifies the caller is the record's own creator, server-side, before
+allowing the transition, not only in the calling Server Action: "only
+creator/authorized user may cancel" (task spec) holds even if a future
+caller reaches the RPC directly.
+
+A cancelled item is automatically excluded from the unified Approvals
+inbox and My Work (`bucketForStatus` in
+`src/platform/approvals/domain/inbox.ts` already returned `null` for
+any status it does not explicitly recognize, so no code change was
+needed there) but remains visible in the requester's own My Requests
+list, labeled "Cancelled", sorted last, matching "historically visible,
+not shown in default My Work" from the task spec exactly.
+
+UI: each editor (`customer-onboarding-page.tsx`'s stage footer,
+`change-request-page.tsx`, `commercial-version-page.tsx`) gained a
+"Cancel Draft" control, visible only while status is exactly `draft`,
+which reveals an inline optional-reason confirm panel before calling
+the new Server Action (matching the existing Send Back inline-reveal
+pattern already used on the review screens, rather than introducing a
+new modal/dialog primitive). The onboarding editor shows a dedicated
+"This onboarding request was cancelled" screen when reopened after
+cancellation; Customer Change and Commercial Version reuse their
+existing generic "already been {status} and can no longer be edited"
+locked message, since it already reads correctly for `cancelled`
+without a special case.

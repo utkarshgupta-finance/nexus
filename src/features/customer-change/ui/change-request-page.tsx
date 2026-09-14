@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/product/page-header"
 import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
-import { saveChangeDraftAction, submitChangeRequestAction } from "../actions"
+import { saveChangeDraftAction, submitChangeRequestAction, cancelChangeRequestAction } from "../actions"
 import { evaluateCustomerChangeRequirements } from "../domain/workflow-rules"
 import { formatChangeRequestId } from "../domain/types"
 import type { CustomerChangeRequest } from "../domain/types"
@@ -39,11 +40,12 @@ function ChangeRequestPage({
   initialChangeRequest: CustomerChangeRequest
 }) {
   const router = useRouter()
-  const isLocked = initialChangeRequest.status !== "draft" && initialChangeRequest.status !== "sent_back"
+  const [changeRequest, setChangeRequest] = useState(initialChangeRequest)
+  const isLocked = changeRequest.status !== "draft" && changeRequest.status !== "sent_back"
 
   const initialFormValues = useMemo(() => {
     const merged: Record<string, string | null> = { ...currentValues }
-    for (const [key, value] of Object.entries(initialChangeRequest.proposedValues)) {
+    for (const [key, value] of Object.entries(changeRequest.proposedValues)) {
       merged[key] = value === null || value === undefined ? null : String(value)
     }
     return merged
@@ -51,10 +53,12 @@ function ChangeRequestPage({
   }, [])
 
   const [formValues, setFormValues] = useState<Record<string, string | null>>(initialFormValues)
-  const [reason, setReason] = useState(initialChangeRequest.reason ?? "")
-  const [effectiveDate, setEffectiveDate] = useState(initialChangeRequest.effectiveDate ?? new Date().toISOString().slice(0, 10))
-  const [pendingAction, setPendingAction] = useState<"save" | "submit" | null>(null)
+  const [reason, setReason] = useState(changeRequest.reason ?? "")
+  const [effectiveDate, setEffectiveDate] = useState(changeRequest.effectiveDate ?? new Date().toISOString().slice(0, 10))
+  const [pendingAction, setPendingAction] = useState<"save" | "submit" | "cancel" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
 
   const requirements = useMemo(() => evaluateCustomerChangeRequirements(currentValues, formValues), [currentValues, formValues])
 
@@ -84,30 +88,44 @@ function ChangeRequestPage({
     }
   }
 
+  /** Task Phase G: only reachable while status is exactly "draft" (see the Cancel Draft control's gate below); the RPC re-checks this server-side regardless. */
+  async function handleCancelDraft() {
+    setActionError(null)
+    setPendingAction("cancel")
+    const result = await cancelChangeRequestAction(requestId, cancelReason.trim() || null)
+    setPendingAction(null)
+    if (result.ok) {
+      setChangeRequest(result.changeRequest)
+      setIsCancelling(false)
+    } else {
+      setActionError(result.error)
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
         title={`Change Request: ${customerName}`}
-        description={formatChangeRequestId(initialChangeRequest.requestNumber)}
+        description={formatChangeRequestId(changeRequest.requestNumber)}
         actions={
           <Badge variant="ghost" className="bg-muted text-muted-foreground">
-            {labelForCaseStatus(initialChangeRequest.status)}
+            {labelForCaseStatus(changeRequest.status)}
           </Badge>
         }
       />
 
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6">
-        {initialChangeRequest.status === "sent_back" && initialChangeRequest.sentBack ? (
+        {changeRequest.status === "sent_back" && changeRequest.sentBack ? (
           <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Sent back for revision: </span>
-            {initialChangeRequest.sentBack.reason}
+            {changeRequest.sentBack.reason}
           </div>
         ) : null}
 
         <section className="flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Proposed Values</h2>
           {isLocked ? (
-            <p className="text-xs text-muted-foreground">This Change Request has already been {initialChangeRequest.status} and can no longer be edited.</p>
+            <p className="text-xs text-muted-foreground">This Change Request has already been {changeRequest.status} and can no longer be edited.</p>
           ) : (
             <GovernedFieldsForm values={formValues} onChange={handleFieldChange} />
           )}
@@ -158,7 +176,40 @@ function ChangeRequestPage({
               <PendingButton size="sm" onClick={handleSubmit} pending={pendingAction === "submit"} pendingLabel="Submitting..." disabled={pendingAction === "save"}>
                 Submit
               </PendingButton>
+              {changeRequest.status === "draft" && !isCancelling ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setIsCancelling(true)}
+                  disabled={pendingAction !== null}
+                >
+                  Cancel Draft
+                </Button>
+              ) : null}
             </div>
+
+            {isCancelling ? (
+              <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                <label className="text-xs font-medium text-foreground" htmlFor="cancel-draft-reason">
+                  Cancel this draft? This cannot be undone. Reason (optional)
+                </label>
+                <textarea
+                  id="cancel-draft-reason"
+                  className="min-h-16 rounded-md border bg-transparent px-3 py-2 text-sm"
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsCancelling(false)} disabled={pendingAction !== null}>
+                    Never mind
+                  </Button>
+                  <PendingButton variant="destructive" size="sm" onClick={handleCancelDraft} pending={pendingAction === "cancel"} pendingLabel="Cancelling...">
+                    Confirm Cancel
+                  </PendingButton>
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
       </div>

@@ -10,7 +10,7 @@ type CustomerChangeRequestRow = {
   /** Human-Friendly ID (task Phase L), rendered "CCR-######". Immutable once assigned. */
   request_number: number
   customer_id: string
-  status: "draft" | "submitted" | "sent_back" | "resubmitted" | "approved" | "rejected"
+  status: "draft" | "submitted" | "sent_back" | "resubmitted" | "approved" | "rejected" | "cancelled"
   reason: string | null
   effective_date: string | null
   base_customer_row_version: number
@@ -20,6 +20,9 @@ type CustomerChangeRequestRow = {
   decided_by: string | null
   decided_at: string | null
   decision_reason: string | null
+  cancelled_by: string | null
+  cancelled_at: string | null
+  cancelled_reason: string | null
   row_version: number
   created_at: string
   created_by: string | null

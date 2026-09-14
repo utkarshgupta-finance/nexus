@@ -88,6 +88,14 @@ async function rejectVersion(requestId: string, reason: string, actorUserId: str
   return version
 }
 
+/** Task Phase C: only a draft version may be discarded, and only by its own creator (both enforced server-side by cancel_commercial_configuration_version, not only here). */
+async function cancelVersion(requestId: string, reason: string | null, actorUserId: string): Promise<CommercialConfigurationVersion> {
+  await versionData.cancelVersion(requestId, reason, actorUserId)
+  const version = await loadVersion(requestId)
+  if (!version) throw new Error(`Commercial Configuration Version ${requestId} not found after cancelling.`)
+  return version
+}
+
 /** The atomic apply/activate: maps the version's submitted Commercial Rate draft through the exact same promotion mapper used everywhere else, then calls the single atomic approve_commercial_configuration_version RPC, which closes the prior version's Components and materializes every new one in one transaction. Logged (Platform Scale Program, Phase A): this is the one operation that revalues a customer's live commercial terms, so a failure here must be traceable without reproducing it manually. */
 async function approveVersion(requestId: string, actorUserId: string, snapshot: ReferenceMasterSnapshot): Promise<CommercialConfigurationVersion> {
   return withLoggedOperation(
@@ -226,6 +234,7 @@ export {
   submitVersion,
   rejectVersion,
   approveVersion,
+  cancelVersion,
   listVersionReviewQueue,
   listAllVersionEntries,
   listVersionsForConfiguration,

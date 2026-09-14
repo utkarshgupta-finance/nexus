@@ -91,6 +91,15 @@ async function approveCase(input: ApproveCaseInput): Promise<CustomerOnboardingC
   })
 }
 
+/** Only a draft may be cancelled, and only by its creator (cancel_customer_onboarding_case enforces both server-side). */
+async function cancelCase(requestId: string, reason: string | null, actorUserId: string): Promise<CustomerOnboardingCaseRow> {
+  return callSingleRowRpc<CustomerOnboardingCaseRow>("cancel_customer_onboarding_case", {
+    p_request_id: requestId,
+    p_reason: reason,
+    p_actor_user_id: actorUserId,
+  })
+}
+
 async function getCaseByRequestId(requestId: string): Promise<CustomerOnboardingCaseRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.from("customer_onboarding_cases").select("*").eq("request_id", requestId).maybeSingle()
@@ -240,6 +249,7 @@ export {
   submitCase,
   sendBackCase,
   approveCase,
+  cancelCase,
   getCaseByRequestId,
   getCaseByCustomerId,
   listCasesAwaitingReview,

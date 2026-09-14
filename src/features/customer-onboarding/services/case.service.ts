@@ -79,6 +79,13 @@ async function sendBackOnboardingCase(
   return toCustomerOnboardingCase(row, revisions)
 }
 
+/** Task Phase C: only a draft may be discarded, and only by its own creator (both enforced server-side by cancel_customer_onboarding_case, not only here). A cancelled case is terminal: it never re-enters My Work or the Approvals inbox. */
+async function cancelOnboardingCase(requestId: string, reason: string | null, actorUserId: string): Promise<CustomerOnboardingCase> {
+  const row = await caseData.cancelCase(requestId, reason, actorUserId)
+  const revisions = await caseData.listRevisionsForRequest(requestId)
+  return toCustomerOnboardingCase(row, revisions)
+}
+
 /** My Requests (task spec): every case this requester created, including drafts, unlike the shared Approvals inbox which deliberately excludes drafts (see platform/approvals/domain/inbox.ts's bucketForStatus). Revisions for every case are resolved in one batched query, not one round trip per case. */
 async function listOnboardingCasesCreatedBy(appUserId: string): Promise<CustomerOnboardingCase[]> {
   const rows = await caseData.listCasesCreatedBy(appUserId)
@@ -320,6 +327,7 @@ export {
   saveOnboardingDraft,
   submitOnboardingCase,
   sendBackOnboardingCase,
+  cancelOnboardingCase,
   listOnboardingReviewQueue,
   listAllOnboardingEntries,
   listOnboardingCasesCreatedBy,

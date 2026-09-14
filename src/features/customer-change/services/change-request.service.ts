@@ -94,6 +94,14 @@ async function rejectChangeRequest(requestId: string, reason: string, actorUserI
   return changeRequest
 }
 
+/** Task Phase G: only a draft may be discarded, and only by its own creator (both enforced server-side by cancel_customer_change_request, not only here). */
+async function cancelChangeRequest(requestId: string, reason: string | null, actorUserId: string): Promise<CustomerChangeRequest> {
+  await changeData.cancelChangeRequest(requestId, reason, actorUserId)
+  const changeRequest = await loadChangeRequest(requestId)
+  if (!changeRequest) throw new Error(`Change Request ${requestId} not found after cancelling.`)
+  return changeRequest
+}
+
 /** The atomic apply: approve_customer_change_request re-verifies the customer's row_version itself (staleness/concurrency) and writes customer_field_history inside the same transaction; this service adds no logic on top beyond reloading the result. Logged (Platform Scale Program, Phase A): an approval failure here is exactly the class of operation a CFO/CTO needs traceable without reproducing it manually. */
 async function approveChangeRequest(requestId: string, actorUserId: string): Promise<CustomerChangeRequest> {
   return withLoggedOperation(
@@ -216,6 +224,7 @@ export {
   sendBackChangeRequest,
   rejectChangeRequest,
   approveChangeRequest,
+  cancelChangeRequest,
   listChangeRequestReviewQueue,
   listAllChangeRequestEntries,
   listChangeRequestsForCustomer,

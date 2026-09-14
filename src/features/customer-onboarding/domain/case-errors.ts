@@ -14,6 +14,8 @@ type CaseErrorKind =
   | "onboarding_case_not_submittable"
   | "onboarding_case_not_sendbackable"
   | "onboarding_case_not_approvable"
+  | "onboarding_case_not_cancellable"
+  | "onboarding_case_cancel_not_owner"
   | "onboarding_no_draft_revision"
   | "onboarding_no_submitted_revision"
   | "onboarding_send_back_reason_required"
@@ -38,6 +40,8 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   ONBOARDING_NO_DRAFT_REVISION: "onboarding_no_draft_revision",
   ONBOARDING_NO_SUBMITTED_REVISION: "onboarding_no_submitted_revision",
   ONBOARDING_SEND_BACK_REASON_REQUIRED: "onboarding_send_back_reason_required",
+  ONBOARDING_CASE_NOT_CANCELLABLE: "onboarding_case_not_cancellable",
+  ONBOARDING_CASE_CANCEL_NOT_OWNER: "onboarding_case_cancel_not_owner",
 }
 
 const SQLSTATE_KINDS: Record<string, CaseErrorKind> = {

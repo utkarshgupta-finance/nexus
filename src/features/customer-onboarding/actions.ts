@@ -14,6 +14,7 @@ import {
   submitOnboardingCase,
   sendBackOnboardingCase,
   approveOnboardingCase,
+  cancelOnboardingCase,
   listApprovedCaseTaxIdentity,
 } from "./services/case.service"
 import {
@@ -22,6 +23,7 @@ import {
   submitVersion,
   rejectVersion,
   approveVersion,
+  cancelVersion,
 } from "./services/commercial-version.service"
 import { uploadOnboardingDocument, getOnboardingDocumentDownloadUrl } from "./services/documents.service"
 import { findPotentialDuplicates } from "./domain/duplicate-detection"
@@ -122,6 +124,17 @@ async function approveOnboardingCaseAction(requestId: string, effectiveDate: str
   }
 }
 
+/** Task Phase C: only a draft may be discarded, gated the same as create/save/submit since discarding one's own draft is a creation-time decision, not a reviewer one. */
+async function cancelOnboardingCaseAction(requestId: string, reason: string | null): Promise<CaseActionResult> {
+  try {
+    const actor = await requirePermission("customer", "create")
+    const onboardingCase = await cancelOnboardingCase(requestId, reason, actor.appUserId)
+    return { ok: true, onboardingCase }
+  } catch (error) {
+    return toCaseActionError(error)
+  }
+}
+
 /**
  * Real, database-backed Commercial Configuration Version lifecycle
  * actions (Customer Lifecycle V1, Phase 10-13), mirroring the Customer
@@ -190,6 +203,17 @@ async function approveCommercialVersionAction(requestId: string): Promise<Commer
     const actor = await requirePermission("commercial_configuration", "approve")
     const snapshot = await loadReferenceMasterSnapshot()
     const version = await approveVersion(requestId, actor.appUserId, snapshot)
+    return { ok: true, version }
+  } catch (error) {
+    return toCommercialVersionActionError(error)
+  }
+}
+
+/** Task Phase C: only a draft version may be discarded, gated the same as create/save/submit. */
+async function cancelCommercialVersionAction(requestId: string, reason: string | null): Promise<CommercialVersionActionResult> {
+  try {
+    const actor = await requirePermission("commercial_configuration", "write")
+    const version = await cancelVersion(requestId, reason, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
     return toCommercialVersionActionError(error)
@@ -284,11 +308,13 @@ export {
   submitOnboardingCaseAction,
   sendBackOnboardingCaseAction,
   approveOnboardingCaseAction,
+  cancelOnboardingCaseAction,
   createCommercialVersionAction,
   saveCommercialVersionDraftAction,
   submitCommercialVersionAction,
   rejectCommercialVersionAction,
   approveCommercialVersionAction,
+  cancelCommercialVersionAction,
   checkForDuplicateCustomersAction,
   uploadOnboardingDocumentAction,
   getOnboardingDocumentDownloadUrlAction,

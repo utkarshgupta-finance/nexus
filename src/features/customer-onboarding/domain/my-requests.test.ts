@@ -37,6 +37,10 @@ describe("reviewState", () => {
   it("shows Completed for approved", () => {
     expect(reviewState("approved", "agreement_approval")).toBe("Completed")
   })
+
+  it("shows Cancelled for a discarded draft (task Phase C)", () => {
+    expect(reviewState("cancelled", "customer_details")).toBe("Cancelled")
+  })
 })
 
 describe("primaryAction", () => {
@@ -59,6 +63,10 @@ describe("primaryAction", () => {
 
   it("falls back to View for an approved request whose customer key could not be resolved", () => {
     expect(primaryAction(row({ status: "approved", customerKey: null }))).toEqual({ label: "View", href: "/forms/customer-onboarding/req-1" })
+  })
+
+  it("is View, read-only, for a cancelled draft (task Phase C: historically visible, never re-editable)", () => {
+    expect(primaryAction(row({ status: "cancelled" }))).toEqual({ label: "View", href: "/forms/customer-onboarding/req-1" })
   })
 })
 

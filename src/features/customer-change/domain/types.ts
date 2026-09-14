@@ -11,7 +11,7 @@
  * country, industry: see ./governed-fields.ts), never display labels.
  */
 
-type CustomerChangeRequestStatus = "draft" | "submitted" | "sent_back" | "resubmitted" | "approved" | "rejected"
+type CustomerChangeRequestStatus = "draft" | "submitted" | "sent_back" | "resubmitted" | "approved" | "rejected" | "cancelled"
 
 type CustomerChangeRequirement = {
   kind: "approval" | "evidence"
@@ -37,6 +37,10 @@ type CustomerChangeRequest = {
   decidedBy: string | null
   decidedAt: string | null
   decisionReason: string | null
+  /** Set only once, when a draft is cancelled (task Phase G); a cancelled request is terminal and never re-enters review. */
+  cancelledBy: string | null
+  cancelledAt: string | null
+  cancelledReason: string | null
   createdBy: string | null
   createdAt: string
   updatedAt: string

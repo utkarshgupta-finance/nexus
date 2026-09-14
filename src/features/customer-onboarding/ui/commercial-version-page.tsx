@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
-import { saveCommercialVersionDraftAction, submitCommercialVersionAction } from "../actions"
+import { saveCommercialVersionDraftAction, submitCommercialVersionAction, cancelCommercialVersionAction } from "../actions"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import { formatCommercialVersionId } from "../domain/commercial-version-types"
@@ -43,8 +43,10 @@ function CommercialVersionPage({
   const [showSubmitPanel, setShowSubmitPanel] = useState(false)
   const [reason, setReason] = useState(initialVersion.reason ?? "")
   const [effectiveDate, setEffectiveDate] = useState(initialVersion.effectiveDate ?? new Date().toISOString().slice(0, 10))
-  const [pendingAction, setPendingAction] = useState<"save" | "submit" | null>(null)
+  const [pendingAction, setPendingAction] = useState<"save" | "submit" | "cancel" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
 
   async function handleSaveDraft() {
     setActionError(null)
@@ -59,6 +61,20 @@ function CommercialVersionPage({
     setPendingAction("submit")
     await saveCommercialVersionDraftAction(requestId, commercialRate)
     const result = await submitCommercialVersionAction(requestId, reason, effectiveDate)
+    setPendingAction(null)
+    if (result.ok) {
+      router.push(`/commercials/${configId}`)
+      router.refresh()
+    } else {
+      setActionError(result.error)
+    }
+  }
+
+  /** Task Phase C: only reachable while status is exactly "draft" (see the Cancel Draft control's gate below); the RPC re-checks this server-side regardless. */
+  async function handleCancelDraft() {
+    setActionError(null)
+    setPendingAction("cancel")
+    const result = await cancelCommercialVersionAction(requestId, cancelReason.trim() || null)
     setPendingAction(null)
     if (result.ok) {
       router.push(`/commercials/${configId}`)
@@ -90,9 +106,22 @@ function CommercialVersionPage({
             <Separator />
 
             <div className="flex items-center justify-between gap-2">
-              <Button variant="outline" size="sm" onClick={() => router.push(`/commercials/${configId}`)} disabled={pendingAction !== null}>
-                Previous
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => router.push(`/commercials/${configId}`)} disabled={pendingAction !== null}>
+                  Previous
+                </Button>
+                {initialVersion.status === "draft" && !isCancelling ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setIsCancelling(true)}
+                    disabled={pendingAction !== null}
+                  >
+                    Cancel Draft
+                  </Button>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2">
                 <PendingButton
                   variant="outline"
@@ -109,6 +138,29 @@ function CommercialVersionPage({
                 </Button>
               </div>
             </div>
+
+            {isCancelling ? (
+              <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                <label className="text-xs font-medium text-foreground" htmlFor="cancel-version-reason">
+                  Cancel this draft? This cannot be undone. Reason (optional)
+                </label>
+                <textarea
+                  id="cancel-version-reason"
+                  className="min-h-16 rounded-md border bg-transparent px-3 py-2 text-sm"
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                />
+                {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsCancelling(false)} disabled={pendingAction !== null}>
+                    Never mind
+                  </Button>
+                  <PendingButton variant="destructive" size="sm" onClick={handleCancelDraft} pending={pendingAction === "cancel"} pendingLabel="Cancelling...">
+                    Confirm Cancel
+                  </PendingButton>
+                </div>
+              </div>
+            ) : null}
 
             {showSubmitPanel ? (
               <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">

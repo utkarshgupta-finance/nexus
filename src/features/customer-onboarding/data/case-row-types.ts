@@ -3,7 +3,7 @@ type CustomerOnboardingCaseRow = {
   request_id: string
   /** Human-Friendly ID (task Phase L), rendered "CO-######" (see domain/human-ids.ts). Immutable once assigned. */
   case_number: number
-  status: "draft" | "submitted" | "sent_back" | "resubmitted" | "approved"
+  status: "draft" | "submitted" | "sent_back" | "resubmitted" | "approved" | "cancelled"
   current_stage_key: "customer_details" | "tax_registration" | "commercial_documents" | "commercial_rate" | "agreement_approval"
   sent_back_reason: string | null
   sent_back_by: string | null
@@ -11,6 +11,9 @@ type CustomerOnboardingCaseRow = {
   sent_back_target_stage_key: CustomerOnboardingCaseRow["current_stage_key"] | null
   approved_by: string | null
   approved_at: string | null
+  cancelled_by: string | null
+  cancelled_at: string | null
+  cancelled_reason: string | null
   customer_id: string | null
   commercial_configuration_id: string | null
   row_version: number

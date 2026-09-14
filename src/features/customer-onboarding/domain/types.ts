@@ -75,7 +75,7 @@ type CustomerOnboardingRevision = {
 // Case: the onboarding request as a whole, across its revision history
 // =============================================================================
 
-type CustomerOnboardingCaseStatus = "draft" | "submitted" | "sent_back" | "resubmitted" | "approved"
+type CustomerOnboardingCaseStatus = "draft" | "submitted" | "sent_back" | "resubmitted" | "approved" | "cancelled"
 
 type CustomerOnboardingSentBack = {
   reason: string
@@ -104,6 +104,10 @@ type CustomerOnboardingCase = {
   sentBack: CustomerOnboardingSentBack | null
   approvedBy: AppUserId | null
   approvedAt: string | null
+  /** Set only once, when a draft is cancelled (task Phase C); a cancelled case is terminal, historical, and never actionable again. */
+  cancelledBy: AppUserId | null
+  cancelledAt: string | null
+  cancelledReason: string | null
   /** Set only once, atomically, by approve_customer_onboarding_case; null until then. */
   customerId: string | null
   /** Set only once, atomically, by approve_customer_onboarding_case; null until then. */

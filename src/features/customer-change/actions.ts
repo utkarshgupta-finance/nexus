@@ -13,6 +13,7 @@ import {
   sendBackChangeRequest,
   rejectChangeRequest,
   approveChangeRequest,
+  cancelChangeRequest,
 } from "./services/change-request.service"
 import type { CustomerChangeRequest } from "./domain/types"
 
@@ -105,6 +106,17 @@ async function approveChangeRequestAction(requestId: string): Promise<ChangeRequ
   }
 }
 
+/** Task Phase G: only a draft Change Request may be discarded, gated the same as create/save/submit since discarding one's own draft is a creation-time decision, not a reviewer one. */
+async function cancelChangeRequestAction(requestId: string, reason: string | null): Promise<ChangeRequestActionResult> {
+  try {
+    const actor = await requirePermission("customer", "change_request")
+    const changeRequest = await cancelChangeRequest(requestId, reason, actor.appUserId)
+    return { ok: true, changeRequest }
+  } catch (error) {
+    return toActionError(error)
+  }
+}
+
 export {
   createChangeRequestAction,
   saveChangeDraftAction,
@@ -112,5 +124,6 @@ export {
   sendBackChangeRequestAction,
   rejectChangeRequestAction,
   approveChangeRequestAction,
+  cancelChangeRequestAction,
 }
 export type { ChangeRequestActionResult }

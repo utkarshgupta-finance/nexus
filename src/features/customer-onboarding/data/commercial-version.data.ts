@@ -73,6 +73,15 @@ async function approveVersion(requestId: string, components: Record<string, unkn
   })
 }
 
+/** Only a draft may be cancelled, and only by its creator (cancel_commercial_configuration_version enforces both server-side). */
+async function cancelVersion(requestId: string, reason: string | null, actorUserId: string): Promise<CommercialConfigurationVersionRow> {
+  return callSingleRowRpc<CommercialConfigurationVersionRow>("cancel_commercial_configuration_version", {
+    p_request_id: requestId,
+    p_reason: reason,
+    p_actor_user_id: actorUserId,
+  })
+}
+
 async function getVersionByRequestId(requestId: string): Promise<CommercialConfigurationVersionRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.from("commercial_configuration_versions").select("*").eq("request_id", requestId).maybeSingle()
@@ -152,6 +161,7 @@ export {
   submitVersion,
   rejectVersion,
   approveVersion,
+  cancelVersion,
   getVersionByRequestId,
   listVersionsAwaitingReview,
   listAllVersions,
