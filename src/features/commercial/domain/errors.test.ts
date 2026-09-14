@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { defaultMessageForCode } from "@/platform/errors"
 import { parseCommercialError } from "./errors"
 
 describe("parseCommercialError", () => {
@@ -41,11 +42,12 @@ describe("parseCommercialError", () => {
     expect(result.kind).toBe("invalid_input")
   })
 
-  it("falls back to unknown for anything unrecognized", () => {
+  it("falls back to unknown for anything unrecognized, never surfacing the raw message to a user (Platform Scale Closure, Phase T)", () => {
     const result = parseCommercialError({ message: "connection reset by peer", code: undefined })
 
     expect(result.kind).toBe("unknown")
-    expect(result.message).toBe("connection reset by peer")
+    expect(result.message).toBe(defaultMessageForCode("UNEXPECTED"))
+    expect(result.cause).toBe("connection reset by peer")
   })
 
   it("does not misread an ordinary message containing a colon as a token", () => {

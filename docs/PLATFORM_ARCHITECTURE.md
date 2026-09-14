@@ -306,6 +306,21 @@ parsing) implement this for the highest-stakes operations (the three
 approval paths) today; extending it to more operations is additive, not
 a redesign.
 
+The human-facing half of this rule closed this round (Platform Scale
+Closure, Phase T): every feature's own error parser
+(`case-errors.ts`/`change-errors.ts`/`commercial-version-errors.ts`/
+`commercial/domain/errors.ts`/`customers/domain/errors.ts`/
+`deletion-errors.ts`/`reference-data/domain/errors.ts`) previously let an
+unrecognized ("unknown"-kind) failure's raw Postgres/RPC message reach
+the user verbatim, several of these files' own doc comments already
+promised otherwise. Every one of the seven now substitutes the shared
+safe default (`defaultMessageForCode("UNEXPECTED")`) for that case,
+keeping the raw detail only in each error's own `cause` field for logs.
+`withLoggedOperation` attaches its correlation id to the error it
+rethrows, so the three approval actions can append "Reference: NX-..."
+to an unexpected failure specifically, never to an expected,
+already-actionable business-rule rejection.
+
 These are two different mechanisms and must not be confused:
 
 - **Audit** is a database-enforced record of *mutation*: who changed which

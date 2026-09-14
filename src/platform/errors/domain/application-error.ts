@@ -44,5 +44,23 @@ function toUnexpectedErrorResponse(correlationId: string | null): ApplicationErr
   return { code: "UNEXPECTED", message: defaultMessageForCode("UNEXPECTED"), correlationId }
 }
 
-export { ApplicationError, toApplicationErrorResponse, toUnexpectedErrorResponse }
+/**
+ * Appends "Reference: NX-..." to a message, for a Server Action's
+ * plain-string error contract (unlike the API layer's structured
+ * ApplicationErrorResponse, a Server Action returns `{ ok: false, error:
+ * string }`, so the correlation id has nowhere else to go). Only meant
+ * for an already-safe, already-generic message (an "unknown"-kind
+ * failure); a specific, already-actionable business-rule message does
+ * not need a support reference cluttering it (Platform Scale Closure,
+ * Phase T: "do not clutter normal success/expected-failure paths").
+ * `withLoggedOperation` (`platform/observability/server.ts`) is what
+ * attaches `correlationId` to the error in the first place; this is a
+ * no-op if that never ran (the id is simply absent).
+ */
+function withCorrelationReference(message: string, error: unknown): string {
+  const correlationId = error instanceof Error ? (error as Error & { correlationId?: string }).correlationId : undefined
+  return correlationId ? `${message} Reference: ${correlationId}` : message
+}
+
+export { ApplicationError, toApplicationErrorResponse, toUnexpectedErrorResponse, withCorrelationReference }
 export type { ApplicationErrorResponse }

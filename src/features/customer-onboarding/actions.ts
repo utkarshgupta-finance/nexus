@@ -2,6 +2,9 @@
 
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
+import { withCorrelationReference } from "@/platform/errors"
+import { CaseOperationError } from "./domain/case-errors"
+import { CommercialVersionOperationError } from "./domain/commercial-version-errors"
 import { loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { getCustomerById, listCustomerMaster } from "@/features/customers/server"
 
@@ -42,6 +45,12 @@ type CaseActionResult = { ok: true; onboardingCase: CustomerOnboardingCase } | {
 
 function toCaseActionError(error: unknown): { ok: false; error: string } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  // An "unknown"-kind CaseOperationError already carries a safe generic
+  // message (case-errors.ts, Phase T); attaching the correlation id here
+  // is what makes it actionable for support instead of just reassuring.
+  if (error instanceof CaseOperationError && error.caseError.kind === "unknown") {
+    return { ok: false, error: withCorrelationReference(error.message, error) }
+  }
   if (error instanceof Error) return { ok: false, error: error.message }
   return { ok: false, error: "An unexpected error occurred while updating this Customer Onboarding case." }
 }
@@ -129,6 +138,9 @@ type CommercialVersionActionResult = { ok: true; version: CommercialConfiguratio
 
 function toCommercialVersionActionError(error: unknown): CommercialVersionActionResult {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof CommercialVersionOperationError && error.commercialVersionError.kind === "unknown") {
+    return { ok: false, error: withCorrelationReference(error.message, error) }
+  }
   if (error instanceof Error) return { ok: false, error: error.message }
   return { ok: false, error: "An unexpected error occurred while updating this Commercial Configuration Version." }
 }

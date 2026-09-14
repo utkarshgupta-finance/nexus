@@ -56,6 +56,12 @@ async function withLoggedOperation<T>(
       correlationId,
       errorCode,
     })
+    // Platform Scale Closure, Phase T: the correlation id is otherwise
+    // only ever visible in the server log; attaching it to the rethrown
+    // error is what lets a Server Action surface "Reference: NX-..." back
+    // to the user on an unexpected failure, so support can find the
+    // matching log line without asking them to reproduce it.
+    if (error instanceof Error) (error as Error & { correlationId?: string }).correlationId = correlationId
     throw error
   }
 }

@@ -1,3 +1,5 @@
+import { defaultMessageForCode } from "@/platform/errors"
+
 /**
  * Typed Customer Change Request error model, mirroring
  * src/features/customer-onboarding/domain/case-errors.ts's own shape
@@ -79,7 +81,9 @@ function parseChangeError(error: PostgrestLikeError): ChangeError {
     return { kind: SQLSTATE_KINDS[sqlState], message: rawMessage, sqlState, cause: rawMessage }
   }
 
-  return { kind: "unknown", message: rawMessage || "An unexpected error occurred.", sqlState, cause: rawMessage }
+  // Platform Scale Closure, Phase T: never surface raw Postgres/RPC detail
+  // to a user; `cause` keeps it for logs/support.
+  return { kind: "unknown", message: defaultMessageForCode("UNEXPECTED"), sqlState, cause: rawMessage }
 }
 
 class ChangeRequestOperationError extends Error {

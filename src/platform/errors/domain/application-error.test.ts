@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { ApplicationError, toApplicationErrorResponse, toUnexpectedErrorResponse } from "./application-error"
+import { ApplicationError, toApplicationErrorResponse, toUnexpectedErrorResponse, withCorrelationReference } from "./application-error"
 
 describe("ApplicationError", () => {
   it("uses the code's own default message when none is given", () => {
@@ -36,5 +36,17 @@ describe("toUnexpectedErrorResponse", () => {
     expect(response.code).toBe("UNEXPECTED")
     expect(response.message).toBe("An unexpected error occurred.")
     expect(response.correlationId).toBe("NX-99998888")
+  })
+})
+
+describe("withCorrelationReference (Platform Scale Closure, Phase T)", () => {
+  it("appends a support reference when the error carries a correlation id", () => {
+    const error = Object.assign(new Error("boom"), { correlationId: "NX-ABCD1234" })
+    expect(withCorrelationReference("An unexpected error occurred.", error)).toBe("An unexpected error occurred. Reference: NX-ABCD1234")
+  })
+
+  it("leaves the message untouched when there is no correlation id, never inventing one", () => {
+    expect(withCorrelationReference("Some message.", new Error("boom"))).toBe("Some message.")
+    expect(withCorrelationReference("Some message.", "not even an error")).toBe("Some message.")
   })
 })

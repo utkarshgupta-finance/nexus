@@ -43,11 +43,11 @@ const DEFAULT_ERROR_MESSAGES: Record<NexusErrorCode, string> = {
   AUTH_PERMISSION_DENIED: "You do not have permission to do this.",
   VALIDATION_FAILED: "Some information is missing or invalid.",
   RESOURCE_NOT_FOUND: "That record could not be found.",
-  STALE_VERSION: "Another change was made after you loaded this record. Refresh and try again.",
+  STALE_VERSION: "Another change was made after you opened this request. Refresh and review the latest version before continuing.",
   CONFLICT: "This action could not be completed because of a conflicting state.",
   DOCUMENT_UPLOAD_INVALID: "This file cannot be uploaded.",
   DOCUMENT_UPLOAD_FAILED: "The document could not be uploaded. Try again.",
-  DATABASE_UNAVAILABLE: "Nexus could not reach the database right now.",
+  DATABASE_UNAVAILABLE: "Nexus cannot reach the database right now. Try again shortly.",
   COMMERCIAL_EFFECTIVE_DATE_CONFLICT: "This effective date conflicts with an existing commercial period.",
   UNEXPECTED: "An unexpected error occurred.",
 }

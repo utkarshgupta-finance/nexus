@@ -1,3 +1,5 @@
+import { defaultMessageForCode } from "@/platform/errors"
+
 /**
  * Typed Customer Onboarding Case error model, mirroring
  * src/features/commercial/domain/errors.ts's own shape exactly: every new
@@ -69,7 +71,11 @@ function parseCaseError(error: PostgrestLikeError): CaseError {
     return { kind: SQLSTATE_KINDS[sqlState], message: rawMessage, sqlState, cause: rawMessage }
   }
 
-  return { kind: "unknown", message: rawMessage || "An unexpected error occurred.", sqlState, cause: rawMessage }
+  // Platform Scale Closure, Phase T: an unrecognized error never carries a
+  // curated message, so rawMessage here is raw Postgres/RPC detail (a
+  // SQLSTATE, a function name, sometimes a stack fragment). Never surface
+  // it to a user; `cause` keeps it for logs/support.
+  return { kind: "unknown", message: defaultMessageForCode("UNEXPECTED"), sqlState, cause: rawMessage }
 }
 
 class CaseOperationError extends Error {

@@ -1,3 +1,5 @@
+import { defaultMessageForCode } from "@/platform/errors"
+
 /**
  * Reference Master error model, same shape as
  * `src/features/customers/domain/errors.ts`: `reference_options` has no
@@ -16,20 +18,25 @@ type PostgrestLikeError = {
 function parseReferenceMasterError(error: PostgrestLikeError): {
   kind: ReferenceMasterOperationErrorKind
   message: string
+  rawCause?: string
 } {
   const code = error.code ?? null
   if (code === "23505") return { kind: "conflict", message: error.message }
   if (code === "23514" || code === "23502") return { kind: "invalid_input", message: error.message }
-  return { kind: "unknown", message: error.message || "An unexpected error occurred." }
+  // Platform Scale Closure, Phase T: never surface raw Postgres detail to
+  // a user; `rawCause` keeps it for logs/support.
+  return { kind: "unknown", message: defaultMessageForCode("UNEXPECTED"), rawCause: error.message }
 }
 
 class ReferenceMasterOperationError extends Error {
   readonly kind: ReferenceMasterOperationErrorKind
+  readonly rawCause?: string
 
-  constructor(parsed: { kind: ReferenceMasterOperationErrorKind; message: string }) {
+  constructor(parsed: { kind: ReferenceMasterOperationErrorKind; message: string; rawCause?: string }) {
     super(parsed.message)
     this.name = "ReferenceMasterOperationError"
     this.kind = parsed.kind
+    this.rawCause = parsed.rawCause
   }
 }
 

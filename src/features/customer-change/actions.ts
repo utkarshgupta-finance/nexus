@@ -2,7 +2,9 @@
 
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
+import { withCorrelationReference } from "@/platform/errors"
 import { getCustomerById } from "@/features/customers/server"
+import { ChangeRequestOperationError } from "./domain/change-errors"
 
 import {
   createChangeRequest,
@@ -30,6 +32,9 @@ type ChangeRequestActionResult = { ok: true; changeRequest: CustomerChangeReques
 
 function toActionError(error: unknown): ChangeRequestActionResult {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof ChangeRequestOperationError && error.changeError.kind === "unknown") {
+    return { ok: false, error: withCorrelationReference(error.message, error) }
+  }
   if (error instanceof Error) return { ok: false, error: error.message }
   return { ok: false, error: "An unexpected error occurred while updating this Customer Change Request." }
 }

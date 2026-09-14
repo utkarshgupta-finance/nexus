@@ -1,3 +1,5 @@
+import { defaultMessageForCode } from "@/platform/errors"
+
 /**
  * Typed Commercial error model.
  *
@@ -126,7 +128,11 @@ function parseCommercialError(error: PostgrestLikeError): CommercialError {
     return { kind: SQLSTATE_KINDS[sqlState], message: rawMessage, sqlState, cause: rawMessage }
   }
 
-  return { kind: "unknown", message: rawMessage || "An unexpected error occurred.", sqlState, cause: rawMessage }
+  // Platform Scale Closure, Phase T: never surface raw Postgres/RPC detail
+  // to a user, closing the gap in this file's own documented guarantee
+  // above ("never a raw Postgres error string or SQLSTATE"); `cause`
+  // keeps it for logs/support.
+  return { kind: "unknown", message: defaultMessageForCode("UNEXPECTED"), sqlState, cause: rawMessage }
 }
 
 /** Thrown by the data/service layers so callers can `catch` a single, typed error class. */
