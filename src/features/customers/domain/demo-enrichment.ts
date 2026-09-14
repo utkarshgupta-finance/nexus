@@ -1,21 +1,21 @@
 /**
  * Demo Customer Master enrichment: NOT backend truth.
  *
- * The real `customers` table (./types.ts's `CustomerMasterRecord`) has
- * no country, industry, segment, business unit, contact, tax, or billing
- * currency column (`docs/MASTER_DATA_FOUNDATION_DESIGN.md` §5.2, §3:
- * "Customer Master is not a CRM"). This module is a clearly-labeled,
- * fixture-only enrichment layer that lets the Customer Master detail
- * screen show what a fully populated record would eventually look like,
- * keyed by the same `customers.key` the real backend row uses, without
- * pretending any of it is persisted. Every consumer of this module must
- * carry `source: "demo"` through to the UI (see
- * ../read-models/customer-master-detail.ts): nothing here is presented
- * as backend truth.
- *
- * Only one entry exists: the single fictional demo customer this task
- * creates. This is not a general Customer Master enrichment mechanism;
- * it does not scale to real customers, and is not meant to.
+ * Every field this module illustrates (country, industry, segment,
+ * business unit, contact, tax, billing currency) is now a REAL,
+ * governed `customers` column (task Phase H,
+ * supabase/migrations/20260916020000_customer_master_governed_fields.sql).
+ * This module survives only as a fallback for the one legacy fixture
+ * customer created before that migration existed, whose row genuinely
+ * has no value in those columns; `../domain/display-fields.ts`'s
+ * resolvers always prefer a real value first. It is not a general
+ * Customer Master enrichment mechanism, does not scale to real
+ * customers (every customer created through Onboarding Approval or
+ * updated through a Customer Change Request already has real values),
+ * and is not meant to. Every consumer of this module must carry
+ * `source: "demo"` through to the UI (see
+ * ../read-models/customer-master-mapping.ts): nothing here is
+ * presented as backend truth.
  */
 
 const DEMO_CUSTOMER_KEY = "demo-northstar-consumer-products"

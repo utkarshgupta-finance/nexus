@@ -151,7 +151,7 @@ function CustomersPage({
                     </TableCell>
                     <TableCell className="hidden text-foreground sm:table-cell">
                       {(() => {
-                        const code = resolveBillingCurrencyCode(enrichment)
+                        const code = resolveBillingCurrencyCode(record, enrichment)
                         return code ? (resolveOption(snapshot, "currency", code)?.label ?? code) : "-"
                       })()}
                     </TableCell>

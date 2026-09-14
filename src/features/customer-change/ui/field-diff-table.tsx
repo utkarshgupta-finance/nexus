@@ -12,14 +12,19 @@ import { GOVERNED_FIELDS } from "../domain/governed-fields"
 /**
  * Current vs Proposed table (task spec §14-15): hides unchanged fields
  * by default, "Show All" reveals every governed field regardless of
- * whether this Change Request touches it. Resolves Reference Master
- * codes (segment/business_unit/country/industry) to their real display
- * label when one exists, falling back to the raw code otherwise; Legal
- * Entity Name and Brand Name have no Reference Master list, so they
- * render as-is.
+ * whether this Change Request touches it. Resolves a Reference Master
+ * code to its real display label when the field's own registry entry
+ * says it is one (task Phase H: driven by each field's `editor`
+ * metadata, never a second locally-guessed list of "which fields are
+ * codes"); every other field renders as-is.
  */
 
-const REFERENCE_LIST_FIELD_KEYS = new Set<string>(GOVERNED_FIELDS.filter((field) => field.key !== "name" && field.key !== "brand_name").map((field) => field.key))
+const REFERENCE_SELECT_LIST_KEYS = new Map<string, Parameters<typeof getActiveOptions>[1]>(
+  GOVERNED_FIELDS.filter((field) => field.editor.kind === "reference_select").map((field) => [
+    field.key,
+    (field.editor as Extract<typeof field.editor, { kind: "reference_select" }>).listKey,
+  ])
+)
 
 function FieldDiffTable({ currentValues, proposedValues }: { currentValues: Record<string, unknown>; proposedValues: Record<string, unknown> }) {
   const snapshot = useReferenceMasterSnapshot()
@@ -29,8 +34,9 @@ function FieldDiffTable({ currentValues, proposedValues }: { currentValues: Reco
 
   function displayValue(key: string, value: unknown): string {
     if (value === null || value === undefined || value === "") return "-"
-    if (REFERENCE_LIST_FIELD_KEYS.has(key)) {
-      return resolveOption(snapshot, key as Parameters<typeof getActiveOptions>[1], String(value))?.label ?? String(value)
+    const listKey = REFERENCE_SELECT_LIST_KEYS.get(key)
+    if (listKey) {
+      return resolveOption(snapshot, listKey, String(value))?.label ?? String(value)
     }
     return String(value)
   }

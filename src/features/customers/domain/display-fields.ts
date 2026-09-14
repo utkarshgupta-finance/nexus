@@ -30,9 +30,42 @@ function resolveBusinessUnitCode(record: CustomerMasterRecord, enrichment: DemoC
   return record.businessUnit ?? enrichment?.businessUnitValue ?? null
 }
 
-/** Billing currency has no real governed column on `customers` yet, so it is demo-enrichment-only until one exists. */
-function resolveBillingCurrencyCode(enrichment: DemoCustomerEnrichment | null): string | null {
-  return enrichment?.billingCurrencyCode ?? null
+/** Task Phase H: billing_currency is now a real governed column; the demo fixture only fills in for the one legacy customer that predates it. */
+function resolveBillingCurrencyCode(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.billingCurrency ?? enrichment?.billingCurrencyCode ?? null
+}
+
+function resolveState(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.state ?? enrichment?.stateName ?? null
+}
+
+function resolveCity(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.city ?? enrichment?.cityName ?? null
+}
+
+function resolvePrimaryContactName(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.primaryContactName ?? enrichment?.primaryContactName ?? null
+}
+
+function resolvePrimaryContactEmail(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.primaryContactEmail ?? enrichment?.primaryContactEmail ?? null
+}
+
+function resolvePrimaryContactDesignation(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.primaryContactDesignation ?? enrichment?.primaryContactDesignation ?? null
+}
+
+/** GST/PAN/TAN are India-only identifiers; the demo fixture only ever illustrates the India branch, so a non-India real customer correctly shows "Not available" here with no enrichment fallback attempted. */
+function resolveGstNumber(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.gstNumber ?? enrichment?.gstin ?? null
+}
+
+function resolvePan(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.pan ?? enrichment?.pan ?? null
+}
+
+function resolveTan(record: CustomerMasterRecord, enrichment: DemoCustomerEnrichment | null): string | null {
+  return record.tan ?? enrichment?.tan ?? null
 }
 
 export {
@@ -42,4 +75,12 @@ export {
   resolveSegmentCode,
   resolveBusinessUnitCode,
   resolveBillingCurrencyCode,
+  resolveState,
+  resolveCity,
+  resolvePrimaryContactName,
+  resolvePrimaryContactEmail,
+  resolvePrimaryContactDesignation,
+  resolveGstNumber,
+  resolvePan,
+  resolveTan,
 }

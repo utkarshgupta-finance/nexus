@@ -70,6 +70,21 @@ only ever reads through each feature's own public `server.ts` barrel
 platform capability is granted the same exception without being documented
 here first.
 
+**`customers` is the one named exception to "features must not import
+another feature."** `customer-onboarding` and `customer-change` both read
+and write Customer Master through `customers`' own public barrels
+(`server.ts` for server-only reads/writes, `index.ts` for client-safe
+types and the governed-field registry, task Phase H): a Customer
+Onboarding approval creates a `customers` row, and a Customer Change
+Request proposes changes to one, so both features necessarily depend on
+what a Customer Master field actually is. `customers` is correct as the
+one place this schema-shaped knowledge lives (the governed-field
+registry, `CustomerMasterRecord`, `getCustomerById`), rather than each
+consuming feature re-declaring its own copy. The same rule as the
+platform composer exception above applies: only `customers`' own public
+barrels may be imported, never its `domain/`/`data/`/`ui/` internals
+directly, and this is the only feature granted this exception.
+
 If you find yourself importing "up" this chain, that's a signal the code is
 in the wrong place.
 

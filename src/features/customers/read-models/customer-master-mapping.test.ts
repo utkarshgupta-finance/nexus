@@ -7,6 +7,28 @@ import type { CustomerRow } from "../data/row-types"
 import { toCustomerMasterDetail, toCustomerMasterListEntry } from "./customer-master-mapping"
 import { REFERENCE_MASTER_FIXTURES } from "@/features/reference-data/domain/fixtures"
 
+const GOVERNED_FIELD_DEFAULTS = {
+  address: null,
+  state: null,
+  city: null,
+  postal_code: null,
+  website: null,
+  primary_contact_name: null,
+  primary_contact_email: null,
+  primary_contact_phone_country_code: null,
+  primary_contact_phone_number: null,
+  primary_contact_designation: null,
+  gst_number: null,
+  pan: null,
+  tan: null,
+  tax_identifier_type: null,
+  tax_identifier_name: null,
+  tax_registration_number: null,
+  company_document_type: null,
+  company_document_type_other: null,
+  billing_currency: null,
+}
+
 const DEMO_ROW: CustomerRow = {
   id: "11111111-1111-4111-8111-111111111111",
   key: DEMO_CUSTOMER_KEY,
@@ -16,6 +38,7 @@ const DEMO_ROW: CustomerRow = {
   country: null,
   industry: null,
   brand_name: null,
+  ...GOVERNED_FIELD_DEFAULTS,
   is_active: true,
   row_version: 1,
   created_at: "2026-09-01T00:00:00.000Z",
@@ -33,6 +56,7 @@ const OTHER_ROW: CustomerRow = {
   country: null,
   industry: null,
   brand_name: null,
+  ...GOVERNED_FIELD_DEFAULTS,
   is_active: true,
   row_version: 1,
   created_at: "2026-09-02T00:00:00.000Z",

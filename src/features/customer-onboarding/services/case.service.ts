@@ -6,6 +6,7 @@ import { countSendBacksByRequestId } from "../domain/my-requests"
 import { withLoggedOperation } from "@/platform/observability/server"
 import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
+import { extractGovernedCustomerFieldsFromOnboarding } from "../domain/onboarding-customer-field-mapping"
 import { getBusinessDateYear } from "@/lib/date"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import type { CustomerOnboardingCase, OnboardingOrigin } from "../domain/types"
@@ -277,6 +278,7 @@ async function approveOnboardingCase(requestId: string, actorUserId: string, sna
         components,
         effectiveDate,
         actorUserId,
+        customerFields: extractGovernedCustomerFieldsFromOnboarding(values, commercialRate),
       })
       const revisions = await caseData.listRevisionsForRequest(requestId)
       return toCustomerOnboardingCase(row, revisions)

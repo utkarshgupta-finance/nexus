@@ -6,17 +6,18 @@ import { GOVERNED_FIELDS } from "../domain/governed-fields"
 import type { GovernedFieldKey } from "../domain/governed-fields"
 
 /**
- * Editable form for the six governed Customer Master fields a Change
- * Request may propose (task spec: "user edits only proposed values").
- * `values` is always initialized from the customer's real current
- * values (see ui/change-request-page.tsx), so every field the requester
- * does not touch stays identical to today's Customer Master, and
+ * Editable form for every governed Customer Master field a Change
+ * Request may propose (task spec: "user edits only proposed values";
+ * task Phase H: now the full registry, not a fixed six). `values` is
+ * always initialized from the customer's real current values (see
+ * ui/change-request-page.tsx), so every field the requester does not
+ * touch stays identical to today's Customer Master, and
  * approve_customer_change_request's own equality check already treats an
- * untouched field as a no-op (no history row, no write).
+ * untouched field as a no-op (no history row, no write). Which editor
+ * renders (plain text vs a Reference Master select) comes from each
+ * field's own `editor` metadata in the shared registry, never a second,
+ * locally-duplicated list of "which fields are selects."
  */
-
-const SELECT_FIELD_KEYS = new Set<GovernedFieldKey>(["segment", "business_unit", "country", "industry"])
-
 function GovernedFieldsForm({ values, onChange }: { values: Record<string, string | null>; onChange: (key: GovernedFieldKey, value: string) => void }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -25,12 +26,8 @@ function GovernedFieldsForm({ values, onChange }: { values: Record<string, strin
           <label className="text-xs font-medium text-foreground" htmlFor={`governed-field-${field.key}`}>
             {field.label}
           </label>
-          {SELECT_FIELD_KEYS.has(field.key) ? (
-            <OptionSelect
-              listKey={field.key as "segment" | "business_unit" | "country" | "industry"}
-              value={values[field.key] ?? null}
-              onChange={(value) => onChange(field.key, value)}
-            />
+          {field.editor.kind === "reference_select" ? (
+            <OptionSelect listKey={field.editor.listKey} value={values[field.key] ?? null} onChange={(value) => onChange(field.key, value)} />
           ) : (
             <Input
               id={`governed-field-${field.key}`}

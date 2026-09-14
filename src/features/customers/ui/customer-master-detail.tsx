@@ -24,6 +24,14 @@ import {
   resolveSegmentCode,
   resolveBusinessUnitCode,
   resolveBillingCurrencyCode,
+  resolveState,
+  resolveCity,
+  resolvePrimaryContactName,
+  resolvePrimaryContactEmail,
+  resolvePrimaryContactDesignation,
+  resolveGstNumber,
+  resolvePan,
+  resolveTan,
 } from "../domain/display-fields"
 import { DeleteCustomerPanel } from "./delete-customer-panel"
 import { CustomerStatusPanel } from "./customer-status-panel"
@@ -88,7 +96,15 @@ function CustomerMasterDetail({
   const industryLabel = resolveLabel("industry", resolveIndustryCode(record, enrichment))
   const segmentLabel = resolveLabel("segment", resolveSegmentCode(record, enrichment))
   const businessUnitLabel = resolveLabel("business_unit", resolveBusinessUnitCode(record, enrichment))
-  const billingCurrencyLabel = resolveLabel("currency", resolveBillingCurrencyCode(enrichment))
+  const billingCurrencyLabel = resolveLabel("currency", resolveBillingCurrencyCode(record, enrichment))
+  const stateName = resolveState(record, enrichment)
+  const cityName = resolveCity(record, enrichment)
+  const primaryContactName = resolvePrimaryContactName(record, enrichment)
+  const primaryContactEmail = resolvePrimaryContactEmail(record, enrichment)
+  const primaryContactDesignation = resolvePrimaryContactDesignation(record, enrichment)
+  const gstNumber = resolveGstNumber(record, enrichment)
+  const pan = resolvePan(record, enrichment)
+  const tan = resolveTan(record, enrichment)
   const statusLabel = labelForCaseStatus
   const latestChangeRequest = [...changeRequests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] ?? null
 
@@ -210,11 +226,26 @@ function CustomerMasterDetail({
                 columns={3}
                 items={[
                   { label: "Country", value: countryLabel ?? "Not available" },
-                  { label: "State", value: enrichment?.stateName ?? "Not available" },
-                  { label: "City", value: enrichment?.cityName ?? "Not available" },
+                  { label: "State", value: stateName ?? "Not available" },
+                  { label: "City", value: cityName ?? "Not available" },
+                  { label: "Address", value: record.address ?? "Not available" },
+                  { label: "Postal Code", value: record.postalCode ?? "Not available" },
+                  { label: "Website", value: record.website ?? "Not available" },
                   { label: "Industry", value: industryLabel ?? "Not available" },
                   { label: "Segment", value: segmentLabel ?? "Not available" },
                   { label: "Business Unit", value: businessUnitLabel ?? "Not available" },
+                ]}
+              />
+            </section>
+            <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Primary Contact</h2>
+              <KeyValueGrid
+                columns={3}
+                items={[
+                  { label: "Name", value: primaryContactName ?? "Not available" },
+                  { label: "Email", value: primaryContactEmail ?? "Not available" },
+                  { label: "Phone", value: record.primaryContactPhoneNumber ?? "Not available" },
+                  { label: "Designation", value: primaryContactDesignation ?? "Not available" },
                 ]}
               />
             </section>
@@ -226,9 +257,12 @@ function CustomerMasterDetail({
               <KeyValueGrid
                 columns={3}
                 items={[
-                  { label: "GSTIN", value: enrichment?.gstin ?? "Not available" },
-                  { label: "PAN", value: enrichment?.pan ?? "Not available" },
-                  { label: "TAN", value: enrichment?.tan ?? "Not available" },
+                  { label: "GSTIN", value: gstNumber ?? "Not available" },
+                  { label: "PAN", value: pan ?? "Not available" },
+                  { label: "TAN", value: tan ?? "Not available" },
+                  { label: "Tax Identifier Type", value: record.taxIdentifierType ?? "Not available" },
+                  { label: "Tax Identifier Name", value: record.taxIdentifierName ?? "Not available" },
+                  { label: "Tax Registration Number", value: record.taxRegistrationNumber ?? "Not available" },
                 ]}
               />
             </section>

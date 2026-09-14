@@ -44,6 +44,7 @@ describe("approveCase idempotency", () => {
       components: [],
       effectiveDate: "2026-01-01",
       actorUserId: "actor-1",
+      customerFields: {},
     }
     const approvedRow = { request_id: "r1", status: "approved", customer_id: "cust-1" }
     rpcMock.mockResolvedValue({ data: approvedRow, error: null })

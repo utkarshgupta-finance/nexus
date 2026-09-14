@@ -11,3 +11,5 @@ export { DEMO_CUSTOMER_KEY, DEMO_CUSTOMER_ENRICHMENT } from "./domain/demo-enric
 export type { DemoCustomerEnrichment } from "./domain/demo-enrichment"
 export { DEMO_DOCUMENTS, DEMO_CUSTOMER_NAME } from "./domain/demo-documents"
 export type { DemoDocumentType, DemoDocumentDefinition } from "./domain/demo-documents"
+export { GOVERNED_FIELDS, GOVERNED_FIELD_KEYS, labelForGovernedField, governedFieldByKey } from "./domain/governed-field-registry"
+export type { GovernedField, GovernedFieldEditor } from "./domain/governed-field-registry"

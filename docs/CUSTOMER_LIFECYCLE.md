@@ -1185,3 +1185,65 @@ domain/service/data layers are unit tested), so this change is verified
 by `tsc`/`eslint`/full `vitest`/production build passing clean, not by
 a new render-level test, consistent with the rest of this feature's
 existing test coverage boundary.
+
+## 29. Full Customer Master governed field registry: IMPLEMENTED (Platform Operating Expansion, Phase H)
+
+`customers` gained 19 new real columns
+(`supabase/migrations/20260916020000_customer_master_governed_fields.sql`):
+address/state/city/postal_code/website, the five primary-contact fields,
+GST/PAN/TAN, tax_identifier_type/name, tax_registration_number,
+company_document_type(_other), and billing_currency. Every one of these
+was already collected by the Customer Onboarding form but silently
+dropped on the floor at approval time, a real gap this closes:
+`approve_customer_onboarding_case` now populates them (plus `brand_name`,
+which the original approval RPC had also never written despite that
+column existing since Platform Scale Closure), and
+`approve_customer_change_request`'s governed-field loop grew from six
+fields to all twenty-five, so any of them can now be proposed through a
+governed Customer Change Request exactly like Segment or Country already
+could.
+
+**One authoritative registry**, `src/features/customers/domain/governed-field-registry.ts`
+(exported client-safely through `src/features/customers/index.ts`, since
+`server.ts` carries a `server-only` guard the Customer Change UI's client
+components cannot import through): every field's key/label/editor
+(plain text vs a Reference Master select, with the exact `ReferenceListKey`
+to resolve against) lives here once. `src/features/customer-change/domain/governed-fields.ts`
+now re-exports this registry instead of maintaining its own six-field
+copy; `GovernedFieldsForm`, `FieldDiffTable`, and `diff.ts` all read the
+registry generically (no field-specific branches to update per new
+field), and `getCurrentGovernedValues` (change-request.service.ts)
+already read `customer[key]` generically per `GOVERNED_FIELD_KEYS`, so
+it picked up every new field with no code change of its own. This is a
+new, intentional cross-feature import (`customer-change` -> `customers`),
+matching the same established pattern `customer-change` and
+`customer-onboarding` already use for `getCustomerById`/`listCustomerMaster`
+(`src/features/customers/server.ts`); `customers` is where the governed
+schema this registry describes actually lives, so it is the correct
+owner, not a duplicate list re-declared per consumer.
+
+The onboarding-form-field-key -> `customers`-column-key translation
+(mostly 1:1, except `pincode` -> `postal_code`, and Billing Currency
+reading from the Commercial Rate draft rather than the form's own
+vestigial, never-rendered `billing_currency` field key) lives in a new,
+separately-tested pure mapper,
+`src/features/customer-onboarding/domain/onboarding-customer-field-mapping.ts`:
+this is deliberately NOT part of the shared registry, since it is
+onboarding's own promotion concern (how a NEW customer gets its initial
+values), not a fact about what Customer Master's governed fields are.
+
+`src/features/customers/domain/display-fields.ts` gained resolvers for
+every new field (`resolveState`, `resolveGstNumber`, etc.), all following
+the existing "a real value on `record` always wins over demo enrichment"
+rule; the Customer Master detail screen's Business Classification, new
+Primary Contact section, and Tax & Registration tabs now read real
+values first. `demo-enrichment.ts`'s header is corrected: every field it
+illustrates is now a real governed column, so it survives only as a
+fallback for the one legacy fixture customer that predates this
+migration, not as a description of a permanent schema gap.
+
+**Scope boundary, honestly recorded**: `company_document_type` has no
+Reference Master list backing it (the onboarding form uses a small,
+locally-hardcoded choice set, not a governed one), so `GovernedFieldsForm`
+renders it as free text for now rather than a select; this matches the
+registry's own `editor: { kind: "text" }` for that field, not a bug.
