@@ -81,9 +81,20 @@ function GoLiveListPage({ customerKey, canCreate, lineItems }: { customerKey: st
                       </TableCell>
                       <TableCell className="text-right">
                         {item.currentRequest ? (
-                          <Button variant="outline" size="sm" render={<Link href={`/customers/${customerKey}/go-live/${item.currentRequest.id}`} />}>
-                            View
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" render={<Link href={`/customers/${customerKey}/go-live/${item.currentRequest.id}`} />}>
+                              View
+                            </Button>
+                            {item.currentRequest.status === "approved" ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                render={<Link href={`/customers/${customerKey}/entitlement/${item.stableComponentKey}`} />}
+                              >
+                                Entitlement
+                              </Button>
+                            ) : null}
+                          </div>
                         ) : canCreate ? (
                           <Button
                             variant="outline"
@@ -118,6 +129,7 @@ function GoLiveListPage({ customerKey, canCreate, lineItems }: { customerKey: st
                     <TableHead>Version</TableHead>
                     <TableHead>Commercial Effective From</TableHead>
                     <TableHead>Go Live</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -128,6 +140,11 @@ function GoLiveListPage({ customerKey, canCreate, lineItems }: { customerKey: st
                       <TableCell className="text-muted-foreground">Version {item.versionNumber}</TableCell>
                       <TableCell className="text-muted-foreground">{formatBusinessDate(item.effectiveFrom)}</TableCell>
                       <TableCell className="text-muted-foreground">Not Required</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" render={<Link href={`/customers/${customerKey}/entitlement/${item.stableComponentKey}`} />}>
+                          Usage
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

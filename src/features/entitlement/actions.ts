@@ -7,14 +7,16 @@ import { EntitlementOperationError } from "./domain/entitlement-errors"
 import {
   createEntitlementSource,
   cancelEntitlementSource,
+  previewAllocationSchedule,
   generateScheduleForSource,
   submitMonthlyUsage,
   finalizeMonthlyUsage,
   recordSettlement,
 } from "./services/entitlement.service"
-import type { EntitlementSource, MonthlyUsage, SettlementRecord } from "./domain/types"
+import type { EntitlementSource, MonthlyUsage, SettlementRecord, AllocationTreatment } from "./domain/types"
 import type { CreateEntitlementSourceInput } from "./data/entitlement.data"
 import type { MonthlyAllocationEntry } from "./domain/allocation"
+import type { AllocationPreview } from "./services/entitlement.service"
 
 /**
  * Real, database-backed Entitlement Ledger Server Actions. Each derives
@@ -54,6 +56,24 @@ async function cancelEntitlementSourceAction(id: string, reason: string): Promis
     return { ok: true, source }
   } catch (error) {
     return toEntitlementActionError(error, "An unexpected error occurred while cancelling this Entitlement Source.")
+  }
+}
+
+type AllocationPreviewActionResult = { ok: true; preview: AllocationPreview } | { ok: false; error: string }
+
+async function previewAllocationScheduleAction(input: {
+  stableComponentKey: string
+  invoiceQuantity: number
+  durationMonths: number
+  treatment: AllocationTreatment
+  goLiveMonth: string
+}): Promise<AllocationPreviewActionResult> {
+  try {
+    await requirePermission("entitlement", "write")
+    const preview = await previewAllocationSchedule(input)
+    return { ok: true, preview }
+  } catch (error) {
+    return toEntitlementActionError(error, "An unexpected error occurred while previewing the allocation schedule.")
   }
 }
 
@@ -119,9 +139,16 @@ async function recordSettlementAction(
 export {
   createEntitlementSourceAction,
   cancelEntitlementSourceAction,
+  previewAllocationScheduleAction,
   generateScheduleForSourceAction,
   submitMonthlyUsageAction,
   finalizeMonthlyUsageAction,
   recordSettlementAction,
 }
-export type { EntitlementSourceActionResult, GenerateScheduleActionResult, SubmitMonthlyUsageActionResult, RecordSettlementActionResult }
+export type {
+  EntitlementSourceActionResult,
+  AllocationPreviewActionResult,
+  GenerateScheduleActionResult,
+  SubmitMonthlyUsageActionResult,
+  RecordSettlementActionResult,
+}
