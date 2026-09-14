@@ -3,6 +3,7 @@ import "server-only"
 import * as caseData from "../data/case.data"
 import { toCustomerOnboardingCase, groupRevisionsByRequestId } from "../domain/case-mappers"
 import { countSendBacksByRequestId } from "../domain/my-requests"
+import { withLoggedOperation } from "@/platform/observability/server"
 import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
@@ -220,54 +221,59 @@ async function listAllOnboardingEntries(): Promise<ReviewQueueEntry[]> {
  * 1, and every Component in one transaction.
  */
 async function approveOnboardingCase(requestId: string, actorUserId: string, snapshot: ReferenceMasterSnapshot, effectiveDate: string): Promise<CustomerOnboardingCase> {
-  const latest = await caseData.getLatestRevisionForRequest(requestId)
-  if (!latest || latest.status !== "submitted" || !latest.effective_data) {
-    throw new Error("Cannot approve a case with no submitted revision.")
-  }
+  return withLoggedOperation(
+    { eventCode: "onboarding.approve", operation: "approveOnboardingCase", resourceType: "customer_onboarding_case", resourceId: requestId, actorUserId },
+    async () => {
+      const latest = await caseData.getLatestRevisionForRequest(requestId)
+      if (!latest || latest.status !== "submitted" || !latest.effective_data) {
+        throw new Error("Cannot approve a case with no submitted revision.")
+      }
 
-  const values = latest.effective_data.values
-  const legalName = typeof values[CUSTOMER_LEGAL_NAME_FIELD] === "string" ? (values[CUSTOMER_LEGAL_NAME_FIELD] as string) : null
-  if (!legalName) {
-    throw new Error("Cannot approve a case with no Legal Entity Name recorded.")
-  }
+      const values = latest.effective_data.values
+      const legalName = typeof values[CUSTOMER_LEGAL_NAME_FIELD] === "string" ? (values[CUSTOMER_LEGAL_NAME_FIELD] as string) : null
+      if (!legalName) {
+        throw new Error("Cannot approve a case with no Legal Entity Name recorded.")
+      }
 
-  const commercialRate = values[COMMERCIAL_RATE_FIELD] as CommercialRateDraft | undefined
-  if (!commercialRate || !commercialRate.billingCurrency || commercialRate.components.length === 0) {
-    throw new Error("Cannot approve a case with no complete Commercial Rate recorded.")
-  }
+      const commercialRate = values[COMMERCIAL_RATE_FIELD] as CommercialRateDraft | undefined
+      if (!commercialRate || !commercialRate.billingCurrency || commercialRate.components.length === 0) {
+        throw new Error("Cannot approve a case with no complete Commercial Rate recorded.")
+      }
 
-  const customerKey = slugify(legalName)
-  const configurationKey = `${customerKey}-${new Date(effectiveDate).getFullYear()}`
+      const customerKey = slugify(legalName)
+      const configurationKey = `${customerKey}-${new Date(effectiveDate).getFullYear()}`
 
-  const components = commercialRate.components.map((component) => {
-    const mapped = mapOnboardingComponentToCommercialComponentInsert(component, snapshot, commercialRate.billingCurrency as string, effectiveDate)
-    return {
-      is_recurring: mapped.isRecurring,
-      pricing_rule_kind: mapped.pricingRuleKind,
-      pricing_rule_parameters: mapped.pricingRuleParameters,
-      billing_cadence: mapped.billingCadence,
-      billing_timing: mapped.billingTiming,
-      billing_quantity_basis: mapped.billingQuantityBasis,
-      reconciliation_cadence: mapped.reconciliationCadence,
-      transaction_currency: mapped.transactionCurrency,
-      fx_snapshot_rate: mapped.fxSnapshotRate,
-      effective_from: mapped.effectiveFrom,
-      mug_threshold_value: mapped.mugThresholdValue,
+      const components = commercialRate.components.map((component) => {
+        const mapped = mapOnboardingComponentToCommercialComponentInsert(component, snapshot, commercialRate.billingCurrency as string, effectiveDate)
+        return {
+          is_recurring: mapped.isRecurring,
+          pricing_rule_kind: mapped.pricingRuleKind,
+          pricing_rule_parameters: mapped.pricingRuleParameters,
+          billing_cadence: mapped.billingCadence,
+          billing_timing: mapped.billingTiming,
+          billing_quantity_basis: mapped.billingQuantityBasis,
+          reconciliation_cadence: mapped.reconciliationCadence,
+          transaction_currency: mapped.transactionCurrency,
+          fx_snapshot_rate: mapped.fxSnapshotRate,
+          effective_from: mapped.effectiveFrom,
+          mug_threshold_value: mapped.mugThresholdValue,
+        }
+      })
+
+      const row = await caseData.approveCase({
+        requestId,
+        customerKey,
+        customerName: legalName,
+        commercialConfigurationKey: configurationKey,
+        commercialConfigurationName: legalName,
+        components,
+        effectiveDate,
+        actorUserId,
+      })
+      const revisions = await caseData.listRevisionsForRequest(requestId)
+      return toCustomerOnboardingCase(row, revisions)
     }
-  })
-
-  const row = await caseData.approveCase({
-    requestId,
-    customerKey,
-    customerName: legalName,
-    commercialConfigurationKey: configurationKey,
-    commercialConfigurationName: legalName,
-    components,
-    effectiveDate,
-    actorUserId,
-  })
-  const revisions = await caseData.listRevisionsForRequest(requestId)
-  return toCustomerOnboardingCase(row, revisions)
+  )
 }
 
 /** Customer Activity timeline (task Phase C): the one onboarding case that became this Customer Master, or null for a customer created directly (never through onboarding), e.g. `insertCustomer`'s demo path. */

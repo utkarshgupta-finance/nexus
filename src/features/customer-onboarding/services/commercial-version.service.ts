@@ -2,6 +2,7 @@ import "server-only"
 
 import { commercialConfigurationService } from "@/features/commercial/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+import { withLoggedOperation } from "@/platform/observability/server"
 
 import * as versionData from "../data/commercial-version.data"
 import { toCommercialConfigurationVersion } from "../domain/commercial-version-mappers"
@@ -84,38 +85,43 @@ async function rejectVersion(requestId: string, reason: string, actorUserId: str
   return version
 }
 
-/** The atomic apply/activate: maps the version's submitted Commercial Rate draft through the exact same promotion mapper used everywhere else, then calls the single atomic approve_commercial_configuration_version RPC, which closes the prior version's Components and materializes every new one in one transaction. */
+/** The atomic apply/activate: maps the version's submitted Commercial Rate draft through the exact same promotion mapper used everywhere else, then calls the single atomic approve_commercial_configuration_version RPC, which closes the prior version's Components and materializes every new one in one transaction. Logged (Platform Scale Program, Phase A): this is the one operation that revalues a customer's live commercial terms, so a failure here must be traceable without reproducing it manually. */
 async function approveVersion(requestId: string, actorUserId: string, snapshot: ReferenceMasterSnapshot): Promise<CommercialConfigurationVersion> {
-  const version = await loadVersion(requestId)
-  if (!version) throw new Error(`Commercial Configuration Version ${requestId} not found.`)
-  if (!version.effectiveDate) throw new Error("Cannot approve a version with no effective date recorded.")
+  return withLoggedOperation(
+    { eventCode: "commercial.version_approve", operation: "approveVersion", resourceType: "commercial_configuration_version", resourceId: requestId, actorUserId },
+    async () => {
+      const version = await loadVersion(requestId)
+      if (!version) throw new Error(`Commercial Configuration Version ${requestId} not found.`)
+      if (!version.effectiveDate) throw new Error("Cannot approve a version with no effective date recorded.")
 
-  const draft = version.commercialRate
-  if (!draft || !isCommercialRateDraftComplete(snapshot, draft) || !draft.billingCurrency) {
-    throw new Error("Cannot approve a version with no complete Commercial Rate recorded.")
-  }
+      const draft = version.commercialRate
+      if (!draft || !isCommercialRateDraftComplete(snapshot, draft) || !draft.billingCurrency) {
+        throw new Error("Cannot approve a version with no complete Commercial Rate recorded.")
+      }
 
-  const components = draft.components.map((component) => {
-    const mapped = mapOnboardingComponentToCommercialComponentInsert(component, snapshot, draft.billingCurrency as string, version.effectiveDate as string)
-    return {
-      is_recurring: mapped.isRecurring,
-      pricing_rule_kind: mapped.pricingRuleKind,
-      pricing_rule_parameters: mapped.pricingRuleParameters,
-      billing_cadence: mapped.billingCadence,
-      billing_timing: mapped.billingTiming,
-      billing_quantity_basis: mapped.billingQuantityBasis,
-      reconciliation_cadence: mapped.reconciliationCadence,
-      transaction_currency: mapped.transactionCurrency,
-      fx_snapshot_rate: mapped.fxSnapshotRate,
-      effective_from: mapped.effectiveFrom,
-      mug_threshold_value: mapped.mugThresholdValue,
+      const components = draft.components.map((component) => {
+        const mapped = mapOnboardingComponentToCommercialComponentInsert(component, snapshot, draft.billingCurrency as string, version.effectiveDate as string)
+        return {
+          is_recurring: mapped.isRecurring,
+          pricing_rule_kind: mapped.pricingRuleKind,
+          pricing_rule_parameters: mapped.pricingRuleParameters,
+          billing_cadence: mapped.billingCadence,
+          billing_timing: mapped.billingTiming,
+          billing_quantity_basis: mapped.billingQuantityBasis,
+          reconciliation_cadence: mapped.reconciliationCadence,
+          transaction_currency: mapped.transactionCurrency,
+          fx_snapshot_rate: mapped.fxSnapshotRate,
+          effective_from: mapped.effectiveFrom,
+          mug_threshold_value: mapped.mugThresholdValue,
+        }
+      })
+
+      await versionData.approveVersion(requestId, components, actorUserId)
+      const approved = await loadVersion(requestId)
+      if (!approved) throw new Error(`Commercial Configuration Version ${requestId} not found after approving.`)
+      return approved
     }
-  })
-
-  await versionData.approveVersion(requestId, components, actorUserId)
-  const approved = await loadVersion(requestId)
-  if (!approved) throw new Error(`Commercial Configuration Version ${requestId} not found after approving.`)
-  return approved
+  )
 }
 
 type ReviewQueueEntry = {
