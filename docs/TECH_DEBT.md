@@ -17,12 +17,21 @@ into a second backlog.
   either capability (a future API adapter, per
   `docs/API_INTEGRATION_ARCHITECTURE.md` §1) would either duplicate the
   branch or have to know it lives in the wrong layer.
-- **No test proves idempotency of approve/submit.** The SQL-level guards
-  are real (`docs/API_INTEGRATION_ARCHITECTURE.md` §5), but no
+- **Partially closed: idempotency guard tests (Platform Scale Program,
+  Phase U).** `case.test.ts` now explicitly covers "rejects approving an
+  already-approved case" and "rejects sending back an already-approved
+  case" at the pure domain layer (`case.ts`'s own guards, the same
+  `status !== 'submitted' && status !== 'resubmitted'` check the RPC's
+  own idempotent-replay short-circuit mirrors). Still open: no
   `*.service.ts` file has a test file at all
-  (`case.service.ts`/`change-request.service.ts`/`commercial-version.service.ts`
-  are all untested). A regression that deleted a `status = 'approved'`
-  short-circuit would not be caught today.
+  (`case.service.ts`/`change-request.service.ts`/`commercial-version.service.ts`),
+  so the actual RPC-level idempotent-replay behavior (SQL `if status =
+  'approved' then return` short-circuits) is proven only by reading the
+  migration, not by a test invoking it. `customer_change_requests`/
+  `commercial_configuration_versions` have no equivalent pure domain
+  module to test against at all (their transition logic lives only in
+  SQL), so the same domain-level test cannot be added there without
+  building one first.
 - **No test proves cross-revision data integrity after send-back/resubmit.**
   `case.test.ts` proves non-mutation within one function call; nothing
   proves revision 1's stored data is still byte-for-byte intact after a

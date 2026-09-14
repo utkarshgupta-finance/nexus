@@ -149,4 +149,16 @@ describe("customer onboarding case lifecycle", () => {
     const sentBack = sendBackCase(submitted, "reason", "user-b", T3, null)
     expect(() => approveCase(sentBack, "user-c", T4)).toThrow()
   })
+
+  it("rejects approving an already-approved case (idempotency guard, Platform Scale Program Phase U): a second approve call must never silently re-apply", () => {
+    const submitted = submitCase(createCase("REQ-00124", T1, "user-a"), T2, "user-a")
+    const approved = approveCase(submitted, "user-c", T3)
+    expect(() => approveCase(approved, "user-c", T4)).toThrow()
+  })
+
+  it("rejects sending back an already-approved case: approval is terminal, never reopenable through Send Back", () => {
+    const submitted = submitCase(createCase("REQ-00124", T1, "user-a"), T2, "user-a")
+    const approved = approveCase(submitted, "user-c", T3)
+    expect(() => sendBackCase(approved, "reason", "user-b", T4, null)).toThrow()
+  })
 })
