@@ -3,7 +3,8 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { getOnboardingCase, listOnboardingFieldComments } from "@/features/customer-onboarding/server"
+import { getOnboardingCase, listOnboardingFieldComments, listOnboardingDocumentsForEditor } from "@/features/customer-onboarding/server"
+import type { PersistedOnboardingDocumentView } from "@/features/customer-onboarding/server"
 import { CustomerOnboardingPage } from "@/features/customer-onboarding/ui/customer-onboarding-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
@@ -35,6 +36,16 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
 
   const fieldComments = await listOnboardingFieldComments(requestId)
 
+  let initialDocuments: PersistedOnboardingDocumentView[] = []
+  try {
+    initialDocuments = await listOnboardingDocumentsForEditor(requestId)
+  } catch {
+    // A read failure here should not block reopening the form itself;
+    // the requester simply sees empty slots, same as before this fix,
+    // rather than a broken page.
+    initialDocuments = []
+  }
+
   let snapshot: ReferenceMasterSnapshot
   let snapshotUnavailable = false
   try {
@@ -55,6 +66,7 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
           snapshotUnavailable={snapshotUnavailable}
           canReview={canReview}
           fieldComments={fieldComments}
+          initialDocuments={initialDocuments}
         />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>

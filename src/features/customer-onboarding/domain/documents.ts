@@ -70,6 +70,26 @@ function validateAttachmentFile(
   return { valid: true }
 }
 
+/**
+ * The core of the attachment-continuity fix (Platform Operating
+ * Expansion, Phase A): finds the currently-persisted document, if any,
+ * for one attachment slot. `documents` is already scoped to one request
+ * and already filtered to `isCurrent` by the caller
+ * (`listOnboardingDocumentsForEditor`), so this only needs to match by
+ * type; it never decides currency itself.
+ */
+function findPersistedDocument<T extends { documentType: OnboardingDocumentTypeLike }>(
+  documents: T[],
+  documentType: OnboardingDocumentTypeLike
+): T | null {
+  return documents.find((document) => document.documentType === documentType) ?? null
+}
+
+// Kept as a loose string type here (not importing OnboardingDocumentType
+// from ./types) so this module never needs to know the full closed set;
+// callers already have a real OnboardingDocumentType to pass in.
+type OnboardingDocumentTypeLike = string
+
 export {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENT_SIZE_LABEL,
@@ -78,5 +98,6 @@ export {
   ALLOWED_ATTACHMENT_HELP_TEXT,
   formatFileSize,
   validateAttachmentFile,
+  findPersistedDocument,
 }
 export type { AttachmentValidationResult }

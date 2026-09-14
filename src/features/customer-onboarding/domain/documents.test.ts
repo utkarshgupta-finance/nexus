@@ -5,6 +5,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENT_SIZE_LABEL,
   validateAttachmentFile,
+  findPersistedDocument,
 } from "./documents"
 
 describe("attachment validation", () => {
@@ -154,6 +155,26 @@ describe("Commercial Documents and Agreement attachments reuse the same shared v
       "Signed Agreement"
     )
     expect(result.valid).toBe(false)
+  })
+})
+
+describe("findPersistedDocument (Platform Operating Expansion, Phase A: attachment continuity)", () => {
+  const documents = [
+    { documentType: "gst_certificate", documentId: "doc-1" },
+    { documentType: "pan_card", documentId: "doc-2" },
+  ]
+
+  it("finds the document already persisted for a given attachment slot, so reopening a form can pre-populate it", () => {
+    expect(findPersistedDocument(documents, "gst_certificate")).toEqual({ documentType: "gst_certificate", documentId: "doc-1" })
+    expect(findPersistedDocument(documents, "pan_card")).toEqual({ documentType: "pan_card", documentId: "doc-2" })
+  })
+
+  it("returns null for a slot nothing has ever been uploaded to, never a wrong match", () => {
+    expect(findPersistedDocument(documents, "tan_card")).toBeNull()
+  })
+
+  it("returns null against an empty document list", () => {
+    expect(findPersistedDocument([], "gst_certificate")).toBeNull()
   })
 })
 

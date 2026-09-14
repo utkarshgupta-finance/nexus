@@ -187,6 +187,18 @@ type PersistedOnboardingDocumentMetadata = {
   isCurrent: boolean
 }
 
+/**
+ * `PersistedOnboardingDocumentMetadata` plus a display-ready uploader
+ * label (Platform Operating Expansion, Phase A): the raw metadata alone
+ * forces every consumer to re-resolve `uploadedBy` itself, so the one
+ * server composer that already resolves actor emails
+ * (`services/documents.service.ts`'s `listOnboardingDocumentsForEditor`)
+ * does it once and hands callers a ready-to-render string.
+ */
+type PersistedOnboardingDocumentView = PersistedOnboardingDocumentMetadata & {
+  uploadedByLabel: string | null
+}
+
 /** Thin summary of the one onboarding case that became a given Customer Master: the Customer Activity timeline's "how did this customer come to exist" event (task Phase C). Never the full case (revision data is irrelevant here). */
 type OnboardingOrigin = {
   requestId: string
@@ -212,6 +224,7 @@ export type {
   OnboardingDocumentType,
   SelectedOnboardingDocument,
   PersistedOnboardingDocumentMetadata,
+  PersistedOnboardingDocumentView,
   OnboardingOrigin,
 }
 export { formatOnboardingCaseId }

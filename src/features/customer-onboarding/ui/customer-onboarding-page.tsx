@@ -52,7 +52,9 @@ import {
   fieldKeysToClearOnCountryChange,
 } from "../forms/customer-onboarding-form-definition"
 import { AttachmentUpload } from "./attachment-upload"
-import type { SelectedAttachmentFile } from "./attachment-upload"
+import type { AttachmentValue } from "./attachment-upload"
+import { findPersistedDocument } from "../domain/documents"
+import type { PersistedOnboardingDocumentView, OnboardingDocumentType } from "../domain/types"
 import { CommercialRateSection } from "./commercial-rate-section"
 import { OnboardingStageFooter } from "./onboarding-stage-footer"
 import type { OnboardingStageFooterAction } from "./onboarding-stage-footer"
@@ -83,6 +85,24 @@ const COMMERCIAL_DOCUMENT_STATE_KEYS = {
   pi_copy: "piCopy",
 } as const
 
+/** Seeds one attachment slot's initial state from whatever is already persisted for this request (Platform Operating Expansion, Phase A). Returns null (an empty slot) when nothing has been uploaded for this document type yet. */
+function toPersistedAttachmentValue(
+  documents: PersistedOnboardingDocumentView[],
+  documentType: OnboardingDocumentType
+): AttachmentValue | null {
+  const document = findPersistedDocument(documents, documentType)
+  if (!document) return null
+  return {
+    kind: "persisted",
+    documentId: document.documentId,
+    fileName: document.originalFileName,
+    mimeType: document.mimeType,
+    sizeBytes: document.sizeBytes,
+    uploadedByLabel: document.uploadedByLabel,
+    uploadedAt: document.uploadedAt,
+  }
+}
+
 /**
  * Customer Onboarding: Customer Details, Tax & Registration, Commercial
  * Documents, Commercial Rate, Agreement & Approval. Creation access is
@@ -101,6 +121,7 @@ function CustomerOnboardingPage({
   snapshotUnavailable = false,
   canReview = false,
   fieldComments = [],
+  initialDocuments = [],
 }: {
   /** The real, persisted onboarding case identity (customer_onboarding_cases.request_id). */
   requestId: string
@@ -111,6 +132,15 @@ function CustomerOnboardingPage({
   canReview?: boolean
   /** Every field comment ever left on this request, across every revision (task spec: Requester Form Feedback). Only the ones left against the revision that was just sent back are shown inline; older ones stay visible in the Timeline instead of cluttering the open form. */
   fieldComments?: OnboardingFieldCommentEntry[]
+  /**
+   * Every currently-current attachment already persisted for this
+   * request (Platform Operating Expansion, Phase A). Reopening a Sent
+   * Back case previously showed every attachment slot as empty even
+   * though the document was still there; this seeds each slot's initial
+   * state so a requester never has to remember to re-upload evidence
+   * they already provided.
+   */
+  initialDocuments?: PersistedOnboardingDocumentView[]
 }) {
   const snapshot = useReferenceMasterSnapshot()
   const [onboardingCase, setOnboardingCase] = useState(initialCase)
@@ -122,18 +152,30 @@ function CustomerOnboardingPage({
     (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.country] as string | undefined) ?? DEFAULT_COUNTRY_CODE
   )
   const [taxDocuments, setTaxDocuments] = useState<{
-    gst: SelectedAttachmentFile | null
-    pan: SelectedAttachmentFile | null
-    tan: SelectedAttachmentFile | null
-    taxRegistration: SelectedAttachmentFile | null
-    companyRegistration: SelectedAttachmentFile | null
-  }>({ gst: null, pan: null, tan: null, taxRegistration: null, companyRegistration: null })
+    gst: AttachmentValue | null
+    pan: AttachmentValue | null
+    tan: AttachmentValue | null
+    taxRegistration: AttachmentValue | null
+    companyRegistration: AttachmentValue | null
+  }>(() => ({
+    gst: toPersistedAttachmentValue(initialDocuments, "gst_certificate"),
+    pan: toPersistedAttachmentValue(initialDocuments, "pan_card"),
+    tan: toPersistedAttachmentValue(initialDocuments, "tan_card"),
+    taxRegistration: toPersistedAttachmentValue(initialDocuments, "tax_registration"),
+    companyRegistration: toPersistedAttachmentValue(initialDocuments, "company_registration"),
+  }))
   const [commercialDocuments, setCommercialDocuments] = useState<{
-    proposal: SelectedAttachmentFile | null
-    customerPo: SelectedAttachmentFile | null
-    piCopy: SelectedAttachmentFile | null
-  }>({ proposal: null, customerPo: null, piCopy: null })
-  const [signedAgreement, setSignedAgreement] = useState<SelectedAttachmentFile | null>(null)
+    proposal: AttachmentValue | null
+    customerPo: AttachmentValue | null
+    piCopy: AttachmentValue | null
+  }>(() => ({
+    proposal: toPersistedAttachmentValue(initialDocuments, "proposal_document"),
+    customerPo: toPersistedAttachmentValue(initialDocuments, "customer_po"),
+    piCopy: toPersistedAttachmentValue(initialDocuments, "pi_copy"),
+  }))
+  const [signedAgreement, setSignedAgreement] = useState<AttachmentValue | null>(() =>
+    toPersistedAttachmentValue(initialDocuments, "signed_agreement")
+  )
   const [commercialRate, setCommercialRate] = useState<CommercialRateDraft>(
     () => (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate] as CommercialRateDraft | undefined) ?? createEmptyCommercialRateDraft()
   )

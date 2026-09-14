@@ -12,10 +12,31 @@ import {
   MAX_ATTACHMENT_SIZE_LABEL,
   validateAttachmentFile,
 } from "../domain/documents"
-import { uploadOnboardingDocumentAction } from "../actions"
+import { uploadOnboardingDocumentAction, getOnboardingDocumentDownloadUrlAction } from "../actions"
+import { formatTimestamp } from "@/lib/date"
 import type { OnboardingDocumentType, SelectedOnboardingDocument } from "../domain/types"
 
-type SelectedAttachmentFile = { file: File; metadata: SelectedOnboardingDocument }
+type SelectedAttachmentFile = { kind: "selected"; file: File; metadata: SelectedOnboardingDocument }
+
+/**
+ * An attachment already persisted from an earlier save (Platform
+ * Operating Expansion, Phase A): closes the real defect where reopening
+ * a Sent Back request showed every attachment slot as empty even though
+ * the document was still there. Carries no `File`/bytes (nothing local
+ * to preview from); viewing it fetches a signed URL on demand, the same
+ * mechanism the reviewer-facing Evidence list already uses.
+ */
+type PersistedAttachmentValue = {
+  kind: "persisted"
+  documentId: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  uploadedByLabel: string | null
+  uploadedAt: string
+}
+
+type AttachmentValue = SelectedAttachmentFile | PersistedAttachmentValue
 
 type UploadStatus = "idle" | "uploading" | "uploaded" | "error"
 
@@ -46,21 +67,25 @@ function AttachmentUpload({
   label: string
   /** Extra guidance shown under the label, for a document whose exact name varies (task spec: Company Registration / Incorporation Document). */
   helpText?: string
-  value: SelectedAttachmentFile | null
-  onChange: (next: SelectedAttachmentFile | null) => void
+  value: AttachmentValue | null
+  onChange: (next: AttachmentValue | null) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewerOpen, setViewerOpen] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle")
+  const [persistedViewerUrl, setPersistedViewerUrl] = useState<string | null>(null)
+  const [resolvingViewerUrl, setResolvingViewerUrl] = useState(false)
   const inputId = useId()
 
   // Derived, not stored in state: recomputes only when the selected file
   // itself changes. The cleanup-only effect below revokes the previous
   // object URL once it stops being the current one (on Replace, Remove,
   // or unmount), so nothing holds a browser resource open longer than the
-  // file it points to is actually selected.
-  const previewUrl = useMemo(() => (value ? URL.createObjectURL(value.file) : null), [value])
+  // file it points to is actually selected. A persisted value has no
+  // local File to preview from at all; its own view path fetches a
+  // signed URL on demand instead (handleView below).
+  const previewUrl = useMemo(() => (value?.kind === "selected" ? URL.createObjectURL(value.file) : null), [value])
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -81,7 +106,9 @@ function AttachmentUpload({
     }
 
     setError(null)
+    setPersistedViewerUrl(null)
     onChange({
+      kind: "selected",
       file,
       metadata: { documentType, fileName: file.name, mimeType: file.type, sizeBytes: file.size },
     })
@@ -99,6 +126,22 @@ function AttachmentUpload({
     setViewerOpen(false)
     setUploadStatus("idle")
     onChange(null)
+  }
+
+  async function handleView() {
+    if (value?.kind !== "persisted") {
+      setViewerOpen(true)
+      return
+    }
+    setResolvingViewerUrl(true)
+    const result = await getOnboardingDocumentDownloadUrlAction(value.documentId)
+    setResolvingViewerUrl(false)
+    if (result.ok) {
+      setPersistedViewerUrl(result.url)
+      setViewerOpen(true)
+    } else {
+      setError(result.error)
+    }
   }
 
   return (
@@ -144,30 +187,36 @@ function AttachmentUpload({
         <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
           <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-xs font-medium text-foreground">{value.metadata.fileName}</span>
+            <span className="truncate text-xs font-medium text-foreground">
+              {value.kind === "selected" ? value.metadata.fileName : value.fileName}
+            </span>
             <span className="text-[0.7rem] text-muted-foreground">
-              {value.metadata.mimeType === "application/pdf" ? "PDF" : "JPEG"} &middot;{" "}
-              {formatFileSize(value.metadata.sizeBytes)}
-              {uploadStatus === "uploading" ? " · Saving..." : uploadStatus === "uploaded" ? " · Saved" : ""}
+              {value.kind === "selected" ? (
+                <>
+                  {value.metadata.mimeType === "application/pdf" ? "PDF" : "JPEG"} &middot;{" "}
+                  {formatFileSize(value.metadata.sizeBytes)}
+                  {uploadStatus === "uploading" ? " · Saving..." : uploadStatus === "uploaded" ? " · Saved" : ""}
+                </>
+              ) : (
+                <>
+                  Uploaded{value.uploadedByLabel ? ` by ${value.uploadedByLabel}` : ""}, {formatTimestamp(value.uploadedAt)}
+                </>
+              )}
             </span>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <Button type="button" variant="outline" size="sm" onClick={() => setViewerOpen(true)}>
+            <Button type="button" variant="outline" size="sm" onClick={handleView} disabled={resolvingViewerUrl}>
               <EyeIcon data-icon="inline-start" className="size-3.5" />
-              View
+              {resolvingViewerUrl ? "Opening..." : "View"}
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
               Replace
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Remove ${label}`}
-              onClick={handleRemove}
-            >
-              <XIcon className="size-3.5" />
-            </Button>
+            {value.kind === "selected" ? (
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${label}`} onClick={handleRemove}>
+                <XIcon className="size-3.5" />
+              </Button>
+            ) : null}
           </div>
         </div>
       )}
@@ -182,9 +231,9 @@ function AttachmentUpload({
         <DocumentViewer
           open={viewerOpen}
           onOpenChange={setViewerOpen}
-          documentName={value.metadata.fileName}
-          mimeType={value.metadata.mimeType}
-          url={previewUrl}
+          documentName={value.kind === "selected" ? value.metadata.fileName : value.fileName}
+          mimeType={value.kind === "selected" ? value.metadata.mimeType : value.mimeType}
+          url={value.kind === "selected" ? previewUrl : persistedViewerUrl}
         />
       ) : null}
     </div>
@@ -192,4 +241,4 @@ function AttachmentUpload({
 }
 
 export { AttachmentUpload }
-export type { SelectedAttachmentFile }
+export type { SelectedAttachmentFile, PersistedAttachmentValue, AttachmentValue }

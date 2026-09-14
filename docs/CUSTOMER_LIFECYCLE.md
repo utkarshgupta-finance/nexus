@@ -1002,3 +1002,49 @@ behind `requirePermission`, matching every other governed mutation).
 Not built, and not needed for this: a streaming upload path (files are
 small, evidence documents capped by `validateAttachmentFile`'s own size
 limit).
+
+## 24. Onboarding attachment continuity: IMPLEMENTED (Platform Operating Expansion, Phase A)
+
+Real reported defect: reopening a Sent Back onboarding request showed
+every attachment slot empty, even though the requester had already
+uploaded evidence. Root cause was narrower than it looked: the
+persistence layer (`customer_onboarding_documents`, request-scoped,
+`is_current`-flagged, append-only) and the reviewer-facing
+`/reviews/[requestId]` route were already correct; the requester-facing
+edit route (`/forms/customer-onboarding/[requestId]`) simply never
+fetched existing documents at all, so `AttachmentUpload`'s local state
+always started empty regardless of what was persisted.
+
+Fixed by adding a real "already persisted" state to `AttachmentUpload`
+(`PersistedAttachmentValue`, distinct from `SelectedAttachmentFile`,
+which wraps a live browser `File` a persisted document never has):
+`listOnboardingDocumentsForEditor` (a new service function, resolving
+uploader display labels via the same `resolveActorEmails` every other
+actor display uses) seeds each slot's initial state on reopen. Viewing
+a persisted attachment fetches a signed URL on demand, the same
+mechanism the reviewer's Evidence list already used; a persisted
+attachment has no Remove action (documents are append-only, only
+Replace is a real operation), matching the existing architecture rather
+than inventing an "un-upload."
+
+**Historical revision evidence, reconstructible without byte
+duplication.** `customer_onboarding_documents` has no revision number
+(by design: a re-upload supersedes, it does not duplicate), so nothing
+previously recorded which specific document backed a given historical
+revision's submission once a later revision replaced one attachment.
+New table `customer_onboarding_revision_documents` is a thin, append-
+only snapshot (one row per request/revision/document type, referencing
+the existing document row, never copying bytes or metadata), populated
+by `submit_customer_onboarding_case` at the moment of each submission
+(same exact RPC signature, no overload risk). `listOnboardingDocumentsForRevision`
+reconstructs a specific revision's exact evidence set from this
+snapshot, independent of what is currently `is_current`.
+
+**Scope boundary, honestly recorded**: the snapshot's data and service
+layer are real and tested; a dedicated "browse an older revision's
+evidence" UI is not built, since no lifecycle in this app has a
+historical-revision browser today and the review screen already shows
+the current revision's evidence correctly (the only case the snapshot
+diverges from "current" is an already-decided, older revision whose
+attachment was later replaced during a subsequent send-back cycle, a
+genuine but rare need). Revisit if a real reviewer asks to see it.

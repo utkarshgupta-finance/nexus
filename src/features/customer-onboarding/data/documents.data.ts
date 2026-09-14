@@ -92,6 +92,31 @@ async function getDocumentById(documentId: string): Promise<CustomerOnboardingDo
   return data
 }
 
+/**
+ * Reconstructs exactly which document backed each attachment type at
+ * the moment one specific revision was submitted (Platform Operating
+ * Expansion, Phase A), via `customer_onboarding_revision_documents`
+ * (populated by `submit_customer_onboarding_case` at submit time).
+ * Independent of whether that document is still `is_current`: a later
+ * revision replacing an attachment must never change what an earlier,
+ * already-decided revision is shown to have had.
+ */
+async function listDocumentsForRevision(requestId: string, revisionNumber: number): Promise<CustomerOnboardingDocumentRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data: snapshotRows, error: snapshotError } = await supabase
+    .from("customer_onboarding_revision_documents")
+    .select("document_id")
+    .eq("request_id", requestId)
+    .eq("revision_number", revisionNumber)
+  if (snapshotError) throw new DocumentOperationError(`Failed to load the evidence snapshot for revision ${revisionNumber}: ${snapshotError.message}`)
+  const documentIds = (snapshotRows ?? []).map((row) => row.document_id)
+  if (documentIds.length === 0) return []
+
+  const { data: documents, error: documentsError } = await supabase.from("customer_onboarding_documents").select("*").in("document_id", documentIds)
+  if (documentsError) throw new DocumentOperationError(`Failed to load documents for revision ${revisionNumber}: ${documentsError.message}`)
+  return documents ?? []
+}
+
 /** Short-lived signed URL: this bucket is private, so there is no public URL for any document ever (task Phase D). */
 async function createSignedDownloadUrl(storagePath: string): Promise<string> {
   const supabase = getSupabaseServiceRoleClient()
@@ -106,6 +131,7 @@ export {
   insertDocumentMetadata,
   listCurrentDocumentsForRequest,
   getDocumentById,
+  listDocumentsForRevision,
   createSignedDownloadUrl,
   DocumentOperationError,
   BUCKET,
