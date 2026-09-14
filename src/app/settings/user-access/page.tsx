@@ -5,6 +5,7 @@ import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
 import { sessionHasPermission } from "@/platform/permissions"
 import { listUserAccessEntries, listAssignableRoles } from "@/platform/user-access/server"
+import { listActiveTeams } from "@/platform/team/server"
 import { UserAccessPage } from "@/platform/user-access/ui/user-access-page"
 
 /**
@@ -23,19 +24,25 @@ export default async function UserAccessRoute() {
 
   let entries: Awaited<ReturnType<typeof listUserAccessEntries>> = []
   let assignableRoles: Awaited<ReturnType<typeof listAssignableRoles>> = []
+  let assignableTeams: Awaited<ReturnType<typeof listActiveTeams>> = []
   let unavailable = false
   try {
-    ;[entries, assignableRoles] = await Promise.all([listUserAccessEntries(), listAssignableRoles()])
+    ;[entries, assignableRoles, assignableTeams] = await Promise.all([listUserAccessEntries(), listAssignableRoles(), listActiveTeams()])
   } catch {
     unavailable = true
   }
 
   const canWrite = await hasPermission("user_access", "write")
+  const canManageTeams = await hasPermission("team", "write")
 
-  const navItems: SettingsNavItem[] = [{ href: "/settings/user-access", label: "User Access" }]
+  const navItems: SettingsNavItem[] = []
   if (sessionHasPermission(session, "reference_master", "read")) {
-    navItems.unshift({ href: "/settings/customer-onboarding", label: "Reference Master" })
+    navItems.push({ href: "/settings/customer-onboarding", label: "Reference Master" })
   }
+  if (sessionHasPermission(session, "team", "read")) {
+    navItems.push({ href: "/settings/teams", label: "Team Master" })
+  }
+  navItems.push({ href: "/settings/user-access", label: "User Access" })
 
   return (
     <AuthGate session={session} requiredPermission={USER_ACCESS_READ} loginRedirectTo="/settings/user-access">
@@ -45,7 +52,13 @@ export default async function UserAccessRoute() {
           <p className="p-6 text-xs text-muted-foreground">User Access could not be read right now. Please try again shortly.</p>
         </div>
       ) : (
-        <UserAccessPage entries={entries} assignableRoles={assignableRoles} canWrite={canWrite} />
+        <UserAccessPage
+          entries={entries}
+          assignableRoles={assignableRoles}
+          assignableTeams={assignableTeams}
+          canWrite={canWrite}
+          canManageTeams={canManageTeams}
+        />
       )}
     </AuthGate>
   )

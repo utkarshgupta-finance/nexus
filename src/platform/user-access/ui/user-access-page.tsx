@@ -19,6 +19,8 @@ import {
   grantUserRoleAction,
   revokeUserRoleAction,
 } from "../actions"
+import { assignUserToTeamAction, removeUserFromTeamAction } from "@/platform/team/actions"
+import type { TeamRow } from "@/platform/team/server"
 import { labelForUserAccessEntry } from "../domain/user-access"
 import type { UserAccessEntry } from "../domain/user-access"
 import type { AssignableRole } from "../services/user-access.service"
@@ -32,20 +34,25 @@ import type { AssignableRole } from "../services/user-access.service"
  * than hand-updating local state, so what renders always matches the
  * real, just-written database row, never an optimistic guess.
  *
- * Team and Access Profile columns from the task spec are not shown yet:
- * neither concept exists in this schema until Team Master (task Phase K)
- * and the Maker/Checker capability layer (task Phase L) are built. This
- * page is designed to grow those columns in place once that data exists,
- * not to fake them now.
+ * Team column (task Phase K) follows the exact same assign/remove
+ * pattern as Roles, gated on its own `canManageTeams` (`team.write`),
+ * separate from `canWrite` (`user_access.write`): an admin may hold one
+ * without the other. Access Profile is still not shown: that concept
+ * does not exist until the Maker/Checker capability layer (task Phase L)
+ * is built.
  */
 function UserAccessPage({
   entries,
   assignableRoles,
+  assignableTeams,
   canWrite,
+  canManageTeams,
 }: {
   entries: UserAccessEntry[]
   assignableRoles: AssignableRole[]
+  assignableTeams: TeamRow[]
   canWrite: boolean
+  canManageTeams: boolean
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -53,6 +60,7 @@ function UserAccessPage({
   const [editingDisplayNameFor, setEditingDisplayNameFor] = useState<string | null>(null)
   const [displayNameDraft, setDisplayNameDraft] = useState("")
   const [roleDraftByUser, setRoleDraftByUser] = useState<Record<string, string>>({})
+  const [teamDraftByUser, setTeamDraftByUser] = useState<Record<string, string>>({})
   const [actionError, setActionError] = useState<string | null>(null)
 
   function runAction(authUserId: string, action: () => Promise<{ ok: boolean; error?: string }>) {
@@ -84,6 +92,7 @@ function UserAccessPage({
                 <TableHead>Display Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Team</TableHead>
                 <TableHead>Roles</TableHead>
                 <TableHead>Last Updated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -94,6 +103,8 @@ function UserAccessPage({
                 const rowBusy = isPending && pendingAuthUserId === entry.authUserId
                 const roleDraft = roleDraftByUser[entry.authUserId] ?? ""
                 const assignableForRow = assignableRoles.filter((role) => !entry.roles.some((granted) => granted.roleId === role.id))
+                const teamDraft = teamDraftByUser[entry.authUserId] ?? ""
+                const assignableTeamsForRow = assignableTeams.filter((team) => !entry.teams.some((granted) => granted.teamId === team.id))
 
                 return (
                   <TableRow key={entry.authUserId}>
@@ -148,6 +159,66 @@ function UserAccessPage({
                         <Badge variant="ghost" className={entry.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
                           {entry.isActive ? "Active" : "Inactive"}
                         </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {!entry.isProvisioned ? (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      ) : (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-wrap gap-1">
+                            {entry.teams.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">No team assigned</span>
+                            ) : (
+                              entry.teams.map((team) => (
+                                <Badge key={team.userTeamId} variant="ghost" className="gap-1 bg-muted text-muted-foreground">
+                                  {team.teamName}
+                                  {team.isPrimary ? <span className="text-[0.65rem] text-muted-foreground">(Primary)</span> : null}
+                                  {canManageTeams ? (
+                                    <button
+                                      type="button"
+                                      aria-label={`Remove ${team.teamName}`}
+                                      disabled={rowBusy}
+                                      onClick={() => runAction(entry.authUserId, () => removeUserFromTeamAction(team.userTeamId))}
+                                    >
+                                      <XIcon className="size-3" />
+                                    </button>
+                                  ) : null}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                          {canManageTeams && assignableTeamsForRow.length > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              <Select
+                                value={teamDraft}
+                                onValueChange={(value) => setTeamDraftByUser((current) => ({ ...current, [entry.authUserId]: String(value) }))}
+                              >
+                                <SelectTrigger size="sm" className="h-7 w-40 text-xs">
+                                  <SelectValue placeholder="Assign a team..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {assignableTeamsForRow.map((team) => (
+                                    <SelectItem key={team.id} value={team.id}>
+                                      {team.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!teamDraft || rowBusy}
+                                onClick={() =>
+                                  entry.appUserId &&
+                                  runAction(entry.authUserId, () => assignUserToTeamAction(entry.appUserId as string, teamDraft, entry.teams.length === 0))
+                                }
+                              >
+                                Add
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>

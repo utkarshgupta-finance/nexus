@@ -1380,3 +1380,43 @@ Master (task Phase K) and the Maker/Checker capability layer (task Phase
 L). This page is deliberately structured to grow those columns and role-
 assignment affordances in place once that data exists, not to fake them
 with placeholder values now.
+
+## 33. Team Master: IMPLEMENTED (Platform Operating Expansion, Phase K)
+
+Settings gained a third page, Team Master (`/settings/teams`): a
+governed `teams` catalog (code/name/description/is_active), mirroring
+`roles`' exact shape
+(`supabase/migrations/20260916060000_team_master_foundation.sql`), no
+hardcoded example teams seeded. `user_teams` is the many-to-many
+assignment table the task spec asked to "assess" and then "prefer if it
+stays simple": a user may hold more than one active team, with at most
+one marked primary (`uq_user_teams_one_active_primary`, a partial unique
+index, not application-level logic). Org hierarchy stays explicitly out
+of V1.
+
+Team assignment follows the exact same historical-grant-record shape
+`user_roles` already established: `fn_protect_team_grant` enforces that
+an assignment always begins active, `revoked_at` can only move from NULL
+to a value once, and no other column may change afterward. Removing a
+user from a team is a `revoked_at` UPDATE, never a row delete, so "who
+was on which team, and when" (task Phase M's own test scenario) stays
+permanently reconstructible even though the list only ever shows active
+assignments.
+
+The User Access page (task Phase J) now shows the Team column it was
+deliberately left without: each row lists active team memberships
+(primary marked), with its own assign/remove affordance gated on
+`team.write` (`canManageTeams`), kept separate from `user_access.write`
+since an admin may hold one permission without the other. This is the
+first extension proving that page's own stated design intent ("grow
+these columns in place once that data exists") for real, not merely in
+a comment.
+
+Same permission-seeding pattern as `user_access`/`reference_master`:
+`team.read`/`team.write` and an illustrative `team_admin` role, granted
+to nobody by this migration (the same established, documented
+bootstrapping convention every permission-gated feature in this app
+already requires).
+
+**Scope boundary, honestly recorded**: Access Profile (Maker/Checker,
+task Phase L) still does not exist and is not shown anywhere yet.

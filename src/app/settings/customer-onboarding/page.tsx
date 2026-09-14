@@ -44,6 +44,9 @@ export default async function CustomerOnboardingSettingsPage() {
   const canWrite = sessionHasPermission(session, "reference_master", "write")
 
   const navItems: SettingsNavItem[] = [{ href: "/settings/customer-onboarding", label: "Reference Master" }]
+  if (sessionHasPermission(session, "team", "read")) {
+    navItems.push({ href: "/settings/teams", label: "Team Master" })
+  }
   if (sessionHasPermission(session, "user_access", "read")) {
     navItems.push({ href: "/settings/user-access", label: "User Access" })
   }

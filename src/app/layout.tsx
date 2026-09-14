@@ -44,7 +44,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       ? null
       : {
           email: "email" in session ? session.email : null,
-          canReadSettings: sessionHasPermission(session, "reference_master", "read") || sessionHasPermission(session, "user_access", "read"),
+          canReadSettings:
+            sessionHasPermission(session, "reference_master", "read") ||
+            sessionHasPermission(session, "user_access", "read") ||
+            sessionHasPermission(session, "team", "read"),
         }
 
   return (

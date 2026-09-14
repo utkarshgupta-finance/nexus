@@ -14,6 +14,7 @@ describe("buildUserAccessEntries", () => {
         isActive: null,
         isProvisioned: false,
         roles: [],
+        teams: [],
         updatedAt: null,
       },
     ])
@@ -40,6 +41,30 @@ describe("buildUserAccessEntries", () => {
     )
     expect(entries[0].roles).toEqual([])
   })
+
+  it("attaches every active team assignment (task Phase K), marking which one is primary", () => {
+    const entries = buildUserAccessEntries(
+      [{ id: "auth-1", email: "utkarsh@example.com" }],
+      [{ id: "auth-1", is_active: true, display_name: null, created_at: "2026-09-01T00:00:00.000Z", updated_at: "2026-09-01T00:00:00.000Z" }],
+      [],
+      [],
+      [{ id: "team-1", code: "finance", name: "Finance", description: null, is_active: true, updated_at: "2026-09-01T00:00:00.000Z" }],
+      [{ id: "grant-1", user_id: "auth-1", team_id: "team-1", is_primary: true }]
+    )
+    expect(entries[0].teams).toEqual([{ userTeamId: "grant-1", teamId: "team-1", teamCode: "finance", teamName: "Finance", isPrimary: true }])
+  })
+
+  it("never attaches a team grant referencing a team that no longer exists", () => {
+    const entries = buildUserAccessEntries(
+      [{ id: "auth-1", email: "utkarsh@example.com" }],
+      [{ id: "auth-1", is_active: true, display_name: null, created_at: "2026-09-01T00:00:00.000Z", updated_at: "2026-09-01T00:00:00.000Z" }],
+      [],
+      [],
+      [],
+      [{ id: "grant-1", user_id: "auth-1", team_id: "deleted-team", is_primary: false }]
+    )
+    expect(entries[0].teams).toEqual([])
+  })
 })
 
 describe("labelForUserAccessEntry", () => {
@@ -53,6 +78,7 @@ describe("labelForUserAccessEntry", () => {
         isActive: true,
         isProvisioned: true,
         roles: [],
+        teams: [],
         updatedAt: null,
       })
     ).toBe("Utkarsh Gupta")
@@ -60,10 +86,20 @@ describe("labelForUserAccessEntry", () => {
 
   it("falls back to email, then the raw auth user id, never blank", () => {
     expect(
-      labelForUserAccessEntry({ authUserId: "auth-1", email: "utkarsh@example.com", appUserId: null, displayName: null, isActive: null, isProvisioned: false, roles: [], updatedAt: null })
+      labelForUserAccessEntry({
+        authUserId: "auth-1",
+        email: "utkarsh@example.com",
+        appUserId: null,
+        displayName: null,
+        isActive: null,
+        isProvisioned: false,
+        roles: [],
+        teams: [],
+        updatedAt: null,
+      })
     ).toBe("utkarsh@example.com")
     expect(
-      labelForUserAccessEntry({ authUserId: "auth-1", email: null, appUserId: null, displayName: null, isActive: null, isProvisioned: false, roles: [], updatedAt: null })
+      labelForUserAccessEntry({ authUserId: "auth-1", email: null, appUserId: null, displayName: null, isActive: null, isProvisioned: false, roles: [], teams: [], updatedAt: null })
     ).toBe("auth-1")
   })
 })

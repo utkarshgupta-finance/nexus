@@ -1,4 +1,5 @@
 import type { AuthUserRow, AppUserRow, RoleRow, UserRoleGrantRow } from "../data/user-access.data"
+import type { TeamRow, UserTeamGrantRow } from "@/platform/team/data/team.data"
 
 /**
  * Pure composition of the User Access list (task Phase J): merges
@@ -9,6 +10,9 @@ import type { AuthUserRow, AppUserRow, RoleRow, UserRoleGrantRow } from "../data
  */
 type UserAccessRoleGrant = { userRoleId: string; roleId: string; roleCode: string; roleName: string }
 
+/** Task Phase K: a user's active team memberships, same shape/idea as UserAccessRoleGrant. */
+type UserAccessTeamGrant = { userTeamId: string; teamId: string; teamCode: string; teamName: string; isPrimary: boolean }
+
 type UserAccessEntry = {
   authUserId: string
   email: string | null
@@ -17,6 +21,7 @@ type UserAccessEntry = {
   isActive: boolean | null
   isProvisioned: boolean
   roles: UserAccessRoleGrant[]
+  teams: UserAccessTeamGrant[]
   updatedAt: string | null
 }
 
@@ -24,7 +29,9 @@ function buildUserAccessEntries(
   authUsers: AuthUserRow[],
   appUsers: AppUserRow[],
   roles: RoleRow[],
-  grants: UserRoleGrantRow[]
+  grants: UserRoleGrantRow[],
+  teams: TeamRow[] = [],
+  teamGrants: UserTeamGrantRow[] = []
 ): UserAccessEntry[] {
   const appUserById = new Map(appUsers.map((row) => [row.id, row]))
   const roleById = new Map(roles.map((role) => [role.id, role]))
@@ -33,6 +40,14 @@ function buildUserAccessEntries(
     const existing = grantsByUserId.get(grant.user_id)
     if (existing) existing.push(grant)
     else grantsByUserId.set(grant.user_id, [grant])
+  }
+
+  const teamById = new Map(teams.map((team) => [team.id, team]))
+  const teamGrantsByUserId = new Map<string, UserTeamGrantRow[]>()
+  for (const grant of teamGrants) {
+    const existing = teamGrantsByUserId.get(grant.user_id)
+    if (existing) existing.push(grant)
+    else teamGrantsByUserId.set(grant.user_id, [grant])
   }
 
   return authUsers.map((authUser) => {
@@ -45,6 +60,14 @@ function buildUserAccessEntries(
       })
       .filter((entry): entry is UserAccessRoleGrant => entry !== null)
 
+    const userTeamGrants = teamGrantsByUserId.get(authUser.id) ?? []
+    const teamGrantEntries: UserAccessTeamGrant[] = userTeamGrants
+      .map((grant) => {
+        const team = teamById.get(grant.team_id)
+        return team ? { userTeamId: grant.id, teamId: team.id, teamCode: team.code, teamName: team.name, isPrimary: grant.is_primary } : null
+      })
+      .filter((entry): entry is UserAccessTeamGrant => entry !== null)
+
     return {
       authUserId: authUser.id,
       email: authUser.email,
@@ -53,6 +76,7 @@ function buildUserAccessEntries(
       isActive: appUser?.is_active ?? null,
       isProvisioned: appUser !== null,
       roles: roleGrants,
+      teams: teamGrantEntries,
       updatedAt: appUser?.updated_at ?? null,
     }
   })
@@ -64,4 +88,4 @@ function labelForUserAccessEntry(entry: UserAccessEntry): string {
 }
 
 export { buildUserAccessEntries, labelForUserAccessEntry }
-export type { UserAccessEntry, UserAccessRoleGrant }
+export type { UserAccessEntry, UserAccessRoleGrant, UserAccessTeamGrant }
