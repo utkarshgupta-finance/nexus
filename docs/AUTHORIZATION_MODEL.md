@@ -390,6 +390,31 @@ UI" limitation, below), never relaxing `canReadSettings`'s own check.
   (bypassing RLS) is still the only path that reaches them, gated by the
   application-service checks in §13-14/§16, exactly the layering §6
   already specified.
+- **§7's maker/checker workflow-level rule ("a user cannot check their
+  own submission") is not yet built anywhere.** A security audit
+  (Platform Operating Expansion, Phase X) confirmed no self-approval
+  guard exists in `approve_customer_onboarding_case` or
+  `approve_customer_change_request`, nor in the calling application
+  services: both gate only on `requirePermission("customer", "approve")`,
+  never on comparing the approver against the record's own
+  `created_by`/submitter. This predates the §19 `checker` role entirely;
+  `customer_lifecycle_admin` (seeded with the original Customer Lifecycle
+  foundation) already bundled create and approve permissions together, so
+  self-approval was already reachable for any single-role holder before
+  Maker/Checker existed. §19's role bundling does not add this gap, and
+  does not close it either. Building the actual workflow-level check
+  belongs with a real requirement to enforce segregation of duties, not
+  invented speculatively here.
+- **`user_access.write` can grant any catalog role, including to
+  oneself, with no further restriction.** Confirmed by the same Phase X
+  audit: `grant_user_role` takes any `p_role_id` for any `p_user_id`,
+  gated only on the caller already holding `user_access.write`. This is
+  the intended design, not a gap: per this section's own description,
+  `user_access.write` is the single, fully-trusted "manage all user
+  access" capability, and no comparable role-granting mechanism anywhere
+  in this codebase restricts grantable roles to a subset the granter
+  already holds. Recorded here only so a future reader does not
+  rediscover and re-litigate it as if it were new.
 
 ## 19. Maker/Checker (Platform Operating Expansion, Phase L): IMPLEMENTED as roles, Access Profile DESIGN DRAFT
 
