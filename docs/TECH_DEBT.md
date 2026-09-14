@@ -79,11 +79,11 @@ into a second backlog.
   functional, and removing a route is a one-way door not worth taking
   without confirming nothing external links to it); worth a deliberate
   decision to delete or re-link later, not indefinite limbo.
-- **Sidebar has three placeholder nav items with no backing route**:
-  Go-Live, Ledger, Suspensions (`app-shell.tsx`), plus Legal under
-  Governance. These render as dead links today. Either build a minimal
-  landing page for each or remove the nav entry until the feature exists;
-  a nav item that 404s is worse for trust than no nav item.
+- ~~Sidebar had four placeholder nav items with no backing route~~ —
+  **closed (Platform Scale Program, Phase M)**. Go-Live, Ledger,
+  Suspensions, and Legal (`app-shell.tsx`) were removed from navigation
+  entirely rather than left 404ing; add each back only in the same
+  change that adds its real route.
 - **A few raw-status/raw-id UI spots were fixed this round** (Commercial
   Version and Customer Change requester/reviewer screens showed raw
   `sent_back`-style codes and raw UUIDs in page descriptions instead of

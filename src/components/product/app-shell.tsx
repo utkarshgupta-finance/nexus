@@ -5,11 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   ListChecksIcon,
   Building2Icon,
-  RocketIcon,
-  BookOpenIcon,
-  PauseCircleIcon,
   ShieldCheckIcon,
-  ScaleIcon,
   SettingsIcon,
   UserPlusIcon,
   LogOutIcon,
@@ -60,23 +56,25 @@ type AppShellSession = {
   canReadSettings: boolean
 } | null
 
+/**
+ * Platform Scale Program, Phase M: no primary nav item may 404. Go-Live,
+ * Ledger, Suspensions, and Legal were previously listed here with no
+ * backing route under src/app/ at all; removed until each is a real
+ * page, per the "prefer removal until useful" rule
+ * (docs/TECH_DEBT.md). Add a nav entry back only in the same change that
+ * adds its route.
+ */
 const OPERATIONS_SECTION: NavSection = {
   label: "Operations",
   items: [
     { label: "Customer Onboarding", href: "/forms/customer-onboarding", icon: UserPlusIcon },
     { label: "Customers", href: "/customers", icon: Building2Icon },
-    { label: "Go-Live", href: "/go-live", icon: RocketIcon },
-    { label: "Ledger", href: "/ledger", icon: BookOpenIcon },
-    { label: "Suspensions", href: "/suspensions", icon: PauseCircleIcon },
   ],
 }
 
 const GOVERNANCE_SECTION: NavSection = {
   label: "Governance",
-  items: [
-    { label: "Approvals", href: "/approvals", icon: ShieldCheckIcon },
-    { label: "Legal", href: "/legal", icon: ScaleIcon },
-  ],
+  items: [{ label: "Approvals", href: "/approvals", icon: ShieldCheckIcon }],
 }
 
 function buildNavSections(canReadSettings: boolean): NavSection[] {

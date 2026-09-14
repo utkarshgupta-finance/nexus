@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { CheckCircle2Icon, CircleSlashIcon, PlusIcon, SearchIcon } from "lucide-react"
 
 import { PageHeader } from "@/components/product/page-header"
+import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -607,23 +608,25 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
                           unchanged.
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <Button variant="destructive" size="sm" disabled={isSaving} onClick={() => confirmDeactivate(option.value)}>
+                          <PendingButton variant="destructive" size="sm" pending={isSaving} pendingLabel="Deactivating..." onClick={() => confirmDeactivate(option.value)}>
                             Confirm
-                          </Button>
+                          </PendingButton>
                           <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => setConfirmingDeactivateValue(null)}>
                             Cancel
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <Button
+                      <PendingButton
                         variant="outline"
                         size="sm"
-                        disabled={isSaving || snapshotUnavailable}
+                        pending={isSaving}
+                        pendingLabel={option.active ? "Deactivating..." : "Activating..."}
+                        disabled={snapshotUnavailable}
                         onClick={() => (option.active ? requestDeactivate(option.value) : activate(option.value))}
                       >
                         {option.active ? "Deactivate" : "Activate"}
-                      </Button>
+                      </PendingButton>
                     )}
                   </TableCell>
                 </TableRow>
@@ -678,10 +681,10 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
                   className="w-full font-mono sm:w-40"
                 />
               </div>
-              <Button variant="outline" size="sm" disabled={isSaving || snapshotUnavailable} onClick={handleAddStandard} className="sm:w-auto">
+              <PendingButton variant="outline" size="sm" pending={isSaving} pendingLabel="Adding..." disabled={snapshotUnavailable} onClick={handleAddStandard} className="sm:w-auto">
                 <PlusIcon data-icon="inline-start" />
                 Add
-              </Button>
+              </PendingButton>
             </div>
             {addError ? <p className="text-[0.7rem] text-destructive">{addError}</p> : null}
           </div>
@@ -717,10 +720,10 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
                   className="w-full sm:w-56"
                 />
               </div>
-              <Button variant="outline" size="sm" disabled={isSaving || snapshotUnavailable} onClick={handleAddCurrency} className="sm:w-auto">
+              <PendingButton variant="outline" size="sm" pending={isSaving} pendingLabel="Adding..." disabled={snapshotUnavailable} onClick={handleAddCurrency} className="sm:w-auto">
                 <PlusIcon data-icon="inline-start" />
                 Add
-              </Button>
+              </PendingButton>
             </div>
             {addError ? <p className="text-[0.7rem] text-destructive">{addError}</p> : null}
           </div>
@@ -759,10 +762,10 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
                   className="w-full sm:w-28"
                 />
               </div>
-              <Button variant="outline" size="sm" disabled={isSaving || snapshotUnavailable} onClick={handleAddInvoiceFrequency} className="sm:w-auto">
+              <PendingButton variant="outline" size="sm" pending={isSaving} pendingLabel="Adding..." disabled={snapshotUnavailable} onClick={handleAddInvoiceFrequency} className="sm:w-auto">
                 <PlusIcon data-icon="inline-start" />
                 Add
-              </Button>
+              </PendingButton>
             </div>
             {addError ? <p className="text-[0.7rem] text-destructive">{addError}</p> : null}
           </div>
