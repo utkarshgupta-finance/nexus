@@ -20,6 +20,10 @@ export {
   resolveApprovalStepForGoLiveRequest,
   resolveGoLiveActorLabels,
 } from "./services/go-live.service"
+export { listCurrentLineItemsForCustomer } from "./services/line-items.service"
+export type { GoLiveLineItem } from "./domain/line-items"
+export { listGoLiveDocuments } from "./services/documents.service"
+export { buildGoLiveTimeline } from "./domain/timeline"
 export type {
   GoLiveRequest,
   GoLiveRequestStatus,

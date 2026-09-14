@@ -97,6 +97,7 @@ describe("toCommercialComponent", () => {
       fx_snapshot_rate: 91,
       effective_from: "2026-01-01",
       effective_to: null,
+      stable_component_key: "comp-1",
     })
 
     expect(result.billingTiming).toBe("arrears")

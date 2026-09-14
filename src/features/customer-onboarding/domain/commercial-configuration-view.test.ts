@@ -32,6 +32,7 @@ function baseComponent(overrides: Partial<CommercialComponent>): CommercialCompo
     fxSnapshotRate: null,
     effectiveFrom: "2026-09-01",
     effectiveTo: null,
+    stableComponentKey: "comp-1",
     ...overrides,
   }
 }

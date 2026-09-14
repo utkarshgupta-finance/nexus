@@ -1,6 +1,7 @@
 import "server-only"
 
 import * as documentsData from "../data/documents.data"
+import { listDocumentsForGoLiveRequest } from "../data/go-live.data"
 import { validateAttachmentFile } from "@/features/customer-onboarding/domain/documents"
 import type { PersistedGoLiveDocumentMetadata, GoLiveDocumentType } from "../domain/types"
 import type { GoLiveDocumentRow } from "../data/go-live-row-types"
@@ -79,5 +80,10 @@ async function getGoLiveDocumentDownloadUrl(documentId: string): Promise<string 
   return documentsData.createSignedDownloadUrl(row.storage_path)
 }
 
-export { uploadGoLiveDocument, getGoLiveDocumentDownloadUrl, toPersistedGoLiveDocumentMetadata, InvalidGoLiveDocumentError }
+async function listGoLiveDocuments(goLiveRequestId: string): Promise<PersistedGoLiveDocumentMetadata[]> {
+  const rows = await listDocumentsForGoLiveRequest(goLiveRequestId)
+  return rows.map(toPersistedGoLiveDocumentMetadata)
+}
+
+export { uploadGoLiveDocument, getGoLiveDocumentDownloadUrl, listGoLiveDocuments, toPersistedGoLiveDocumentMetadata, InvalidGoLiveDocumentError }
 export type { DocumentUploadInput }

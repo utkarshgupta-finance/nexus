@@ -38,6 +38,8 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       effectiveFrom: "2025-01-01",
       effectiveTo: "2025-12-31",
       supersedesComponentId: null,
+      isRecurring: true,
+      stableComponentKey: "comp-platform",
       commitments: [],
     },
     {
@@ -53,6 +55,8 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       effectiveFrom: "2026-01-01",
       effectiveTo: null,
       supersedesComponentId: "comp-platform-v1",
+      isRecurring: true,
+      stableComponentKey: "comp-platform",
       commitments: [],
     },
     {
@@ -68,6 +72,8 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       effectiveFrom: "2025-01-01",
       effectiveTo: null,
       supersedesComponentId: null,
+      isRecurring: true,
+      stableComponentKey: "comp-api",
       commitments: [
         {
           kind: "quantity",
@@ -95,6 +101,8 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       effectiveFrom: "2025-04-01",
       effectiveTo: null,
       supersedesComponentId: null,
+      isRecurring: true,
+      stableComponentKey: "comp-storage",
       commitments: [],
     },
     {
@@ -110,6 +118,8 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       effectiveFrom: "2025-07-01",
       effectiveTo: null,
       supersedesComponentId: null,
+      isRecurring: true,
+      stableComponentKey: "comp-support",
       commitments: [
         {
           kind: "spend",
@@ -137,6 +147,8 @@ const FIXTURE_COMMERCIAL_CONFIGURATION_OVERVIEW: CommercialConfigurationOverview
       effectiveFrom: "2025-07-01",
       effectiveTo: null,
       supersedesComponentId: null,
+      isRecurring: false,
+      stableComponentKey: "comp-onboarding",
       commitments: [
         {
           kind: "spend",

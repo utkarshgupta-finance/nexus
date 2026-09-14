@@ -3,7 +3,7 @@ type GoLiveRequestRow = {
   request_number: number
   customer_id: string
   commercial_configuration_id: string
-  commercial_version_id: string
+  commercial_version_id: string | null
   stable_component_key: string
   go_live_date: string
   prorate_first_month: boolean

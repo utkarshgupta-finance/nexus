@@ -179,6 +179,8 @@ type CommercialComponent = {
   effectiveFrom: string
   /** Null while the Component remains open-ended. */
   effectiveTo: string | null
+  /** Go Live + Entitlement Ledger: the identity that persists across Commercial Versions for the same continuing commercial line item, distinct from `id` (minted fresh on every version approval). */
+  stableComponentKey: string
 }
 
 // =============================================================================

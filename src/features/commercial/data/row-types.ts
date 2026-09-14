@@ -74,6 +74,8 @@ type CommercialComponentRow = {
   fx_snapshot_rate: number | null
   effective_from: string
   effective_to: string | null
+  /** Go Live + Entitlement Ledger: the identity that persists across Commercial Versions for the same continuing commercial line item, distinct from id (minted fresh on every version approval). */
+  stable_component_key: string
 }
 
 type CommercialCommitmentRow = {

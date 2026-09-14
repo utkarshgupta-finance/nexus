@@ -98,6 +98,7 @@ function toCommercialComponent(row: CommercialComponentRow): CommercialComponent
     fxSnapshotRate: row.fx_snapshot_rate,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
+    stableComponentKey: row.stable_component_key,
   }
 }
 

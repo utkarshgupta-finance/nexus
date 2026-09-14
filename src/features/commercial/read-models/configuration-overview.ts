@@ -29,6 +29,9 @@ type ComponentSummary = {
   effectiveTo: string | null
   /** Points at the Component this one's terms replaced, when this is a renewal/amendment. */
   supersedesComponentId: string | null
+  isRecurring: boolean
+  /** Go Live + Entitlement Ledger: the identity that persists across Commercial Versions for the same continuing commercial line item. */
+  stableComponentKey: string
   /**
    * Commitments that apply to this Component: its own quantity
    * commitment (if any) plus every spend commitment it is a member of.
@@ -83,6 +86,8 @@ function toComponentSummary(
     effectiveFrom: component.effectiveFrom,
     effectiveTo: component.effectiveTo,
     supersedesComponentId: component.supersedesComponentId,
+    isRecurring: component.isRecurring,
+    stableComponentKey: component.stableComponentKey,
     commitments: commitmentSummariesByComponentId.get(component.id) ?? [],
   }
 }

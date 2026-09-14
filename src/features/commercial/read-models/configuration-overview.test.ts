@@ -30,6 +30,7 @@ function component(overrides: Partial<CommercialComponent> & Pick<CommercialComp
     transactionCurrency: "INR",
     fxSnapshotRate: null,
     effectiveFrom: "2026-01-01",
+    stableComponentKey: overrides.id,
     ...overrides,
   }
 }

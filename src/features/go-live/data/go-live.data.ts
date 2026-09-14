@@ -21,7 +21,7 @@ type CreateGoLiveRequestInput = {
   id: string
   customerId: string
   commercialConfigurationId: string
-  commercialVersionId: string
+  commercialVersionId: string | null
   stableComponentKey: string
   goLiveDate: string
   prorateFirstMonth: boolean

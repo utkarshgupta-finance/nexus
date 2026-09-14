@@ -130,6 +130,9 @@ function CustomerMasterDetail({
             <Button variant="outline" size="sm" render={<Link href={`/customers/${record.key}/change/new`} />}>
               Change Customer
             </Button>
+            <Button variant="outline" size="sm" render={<Link href={`/customers/${record.key}/go-live`} />}>
+              Go Live
+            </Button>
           </div>
         }
       />

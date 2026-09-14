@@ -26,7 +26,8 @@ type GoLiveRequest = {
   requestNumber: number
   customerId: string
   commercialConfigurationId: string
-  commercialVersionId: string
+  /** Null when the line item's commercial terms have never been through a Version 2+ approval cycle (still the original onboarding-created setup, which has no commercial_configuration_versions row at all). */
+  commercialVersionId: string | null
   stableComponentKey: string
   goLiveDate: string
   prorateFirstMonth: boolean
