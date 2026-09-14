@@ -1,6 +1,8 @@
 /** Raw shape of a customer_onboarding_cases row, matching the migration column-for-column. */
 type CustomerOnboardingCaseRow = {
   request_id: string
+  /** Human-Friendly ID (task Phase L), rendered "CO-######" (see domain/human-ids.ts). Immutable once assigned. */
+  case_number: number
   status: "draft" | "submitted" | "sent_back" | "resubmitted" | "approved"
   current_stage_key: "customer_details" | "tax_registration" | "commercial_documents" | "commercial_rate" | "agreement_approval"
   sent_back_reason: string | null

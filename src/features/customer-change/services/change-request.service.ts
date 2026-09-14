@@ -103,6 +103,8 @@ async function approveChangeRequest(requestId: string, actorUserId: string): Pro
 
 type ReviewQueueEntry = {
   requestId: string
+  /** Human-Friendly ID (task Phase L): render with `formatChangeRequestId`. */
+  requestNumber: number
   customerId: string
   status: CustomerChangeRequest["status"]
   createdBy: string | null
@@ -110,8 +112,24 @@ type ReviewQueueEntry = {
   updatedAt: string
 }
 
-function toReviewQueueEntry(row: { request_id: string; customer_id: string; status: CustomerChangeRequest["status"]; created_by: string | null; created_at: string; updated_at: string }): ReviewQueueEntry {
-  return { requestId: row.request_id, customerId: row.customer_id, status: row.status, createdBy: row.created_by, createdAt: row.created_at, updatedAt: row.updated_at }
+function toReviewQueueEntry(row: {
+  request_id: string
+  request_number: number
+  customer_id: string
+  status: CustomerChangeRequest["status"]
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}): ReviewQueueEntry {
+  return {
+    requestId: row.request_id,
+    requestNumber: row.request_number,
+    customerId: row.customer_id,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
 }
 
 async function listChangeRequestReviewQueue(): Promise<ReviewQueueEntry[]> {

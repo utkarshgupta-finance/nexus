@@ -11,6 +11,8 @@
 
 type CommercialConfigurationVersionRow = {
   request_id: string
+  /** Human-Friendly ID (task Phase L), rendered "CC-######". Immutable once assigned; distinct from this row's own business-facing "Version N" ordinal. */
+  version_number: number
   commercial_configuration_id: string
   change_category: "renewal" | "amendment" | "correction" | "other"
   status: "draft" | "submitted" | "approved" | "rejected"

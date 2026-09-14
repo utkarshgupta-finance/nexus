@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 
 import { approveChangeRequestAction, rejectChangeRequestAction, sendBackChangeRequestAction } from "../actions"
 import type { CustomerChangeRequest } from "../domain/types"
+import { formatChangeRequestId } from "../domain/types"
 import { FieldDiffTable } from "./field-diff-table"
 import { RequirementsPreview } from "./requirements-preview"
 
@@ -96,7 +97,7 @@ function ChangeRequestReviewPage({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title={`Change Request: ${customerName}`}
-        description={`Request ${requestId}`}
+        description={formatChangeRequestId(changeRequest.requestNumber)}
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="ghost" className="bg-muted text-muted-foreground">

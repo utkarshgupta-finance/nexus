@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/product/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getCurrentNexusSession } from "@/platform/auth/server"
-import { listVersionReviewQueue } from "@/features/customer-onboarding/server"
+import { listVersionReviewQueue, formatCommercialVersionId } from "@/features/customer-onboarding/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { getCustomerById } from "@/features/customers/server"
 
@@ -61,7 +61,7 @@ export default async function CommercialVersionReviewsRoute() {
                 <TableBody>
                   {withCustomers.map((entry) => (
                     <TableRow key={entry.requestId}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{entry.requestId.slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{formatCommercialVersionId(entry.versionNumber)}</TableCell>
                       <TableCell className="font-medium text-foreground">{entry.customerName}</TableCell>
                       <TableCell>
                         <Badge variant="ghost" className="bg-muted text-muted-foreground">

@@ -32,6 +32,7 @@ function toCustomerChangeRequest(
 ): CustomerChangeRequest {
   return {
     requestId: row.request_id,
+    requestNumber: row.request_number,
     customerId: row.customer_id,
     status: row.status,
     reason: row.reason,

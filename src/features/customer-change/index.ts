@@ -6,6 +6,7 @@
  */
 
 export type { CustomerChangeRequestStatus, CustomerChangeRequirement, CustomerChangeRequest, CustomerFieldHistoryEntry } from "./domain/types"
+export { formatChangeRequestId } from "./domain/types"
 export { GOVERNED_FIELDS, GOVERNED_FIELD_KEYS, labelForGovernedField } from "./domain/governed-fields"
 export type { GovernedFieldKey } from "./domain/governed-fields"
 export { buildFieldDiff } from "./domain/diff"

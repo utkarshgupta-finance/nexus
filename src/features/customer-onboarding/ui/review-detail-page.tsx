@@ -17,6 +17,7 @@ import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapsho
 import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft, CommercialRateDraft } from "../domain/commercial-rate"
 import type { CustomerOnboardingCase } from "../domain/types"
+import { formatOnboardingCaseId } from "../domain/types"
 import { CUSTOMER_ONBOARDING_FIELD_KEYS } from "../forms/customer-onboarding-form-definition"
 import { approveOnboardingCaseAction, sendBackOnboardingCaseAction } from "../actions"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
@@ -95,7 +96,7 @@ function ReviewDetailPage({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title={(values[CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName] as string) || "Customer Onboarding Review"}
-        description={`Request ${requestId}, Revision ${onboardingCase.currentRevision.revisionNumber}`}
+        description={`${formatOnboardingCaseId(onboardingCase.caseNumber)}, Revision ${onboardingCase.currentRevision.revisionNumber}`}
         actions={
           <Badge variant="ghost" className="bg-muted text-muted-foreground">
             {onboardingCase.status}

@@ -29,6 +29,11 @@ import type { CustomerOnboardingCase, CustomerOnboardingRevision, CustomerOnboar
 function createCase(requestId: string, now: string, createdBy: AppUserId | null): CustomerOnboardingCase {
   return {
     requestId,
+    // This module has no persistence (its own docstring above), so there is no real
+    // database-assigned Human-Friendly ID (task Phase L) to put here; the real case
+    // creation path (services/case.service.ts's createOnboardingCase) always reads
+    // the real case_number back from the database row.
+    caseNumber: 0,
     status: "draft",
     currentStageKey: "customer_details",
     currentRevision: createDraftRevision(1, now, createdBy),

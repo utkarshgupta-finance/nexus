@@ -120,6 +120,8 @@ async function approveVersion(requestId: string, actorUserId: string, snapshot: 
 
 type ReviewQueueEntry = {
   requestId: string
+  /** Human-Friendly ID (task Phase L): render with `formatCommercialVersionId`. */
+  versionNumber: number
   commercialConfigurationId: string
   status: CommercialConfigurationVersion["status"]
   createdBy: string | null
@@ -127,9 +129,18 @@ type ReviewQueueEntry = {
   updatedAt: string
 }
 
-function toReviewQueueEntry(row: { request_id: string; commercial_configuration_id: string; status: CommercialConfigurationVersion["status"]; created_by: string | null; created_at: string; updated_at: string }): ReviewQueueEntry {
+function toReviewQueueEntry(row: {
+  request_id: string
+  version_number: number
+  commercial_configuration_id: string
+  status: CommercialConfigurationVersion["status"]
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}): ReviewQueueEntry {
   return {
     requestId: row.request_id,
+    versionNumber: row.version_number,
     commercialConfigurationId: row.commercial_configuration_id,
     status: row.status,
     createdBy: row.created_by,

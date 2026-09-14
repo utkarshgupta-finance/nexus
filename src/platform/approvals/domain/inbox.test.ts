@@ -27,6 +27,7 @@ function item(overrides: Partial<ApprovalInboxItem>): ApprovalInboxItem {
   return {
     type: "onboarding",
     requestId: "r1",
+    displayId: "CO-000001",
     status: "submitted",
     bucket: "needs_action",
     customerName: "Aurora Consumer Labs Pvt Ltd",

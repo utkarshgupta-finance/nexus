@@ -15,6 +15,7 @@ import type { CustomerOnboardingCaseRow, SubmissionRevisionRow } from "../data/c
 function baseCaseRow(overrides: Partial<CustomerOnboardingCaseRow> = {}): CustomerOnboardingCaseRow {
   return {
     request_id: "req-1",
+    case_number: 1,
     status: "draft",
     current_stage_key: "customer_details",
     sent_back_reason: null,

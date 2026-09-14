@@ -14,6 +14,8 @@ type ApprovalInboxBucket = "needs_action" | "sent_back" | "completed"
 type ApprovalInboxItem = {
   type: ApprovalInboxItemType
   requestId: string
+  /** Human-Friendly ID (task Phase L): "CO-000123" / "CCR-000045" / "CC-000078", already formatted. Never the raw UUID. */
+  displayId: string
   status: string
   bucket: ApprovalInboxBucket
   customerName: string

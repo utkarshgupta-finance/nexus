@@ -35,6 +35,7 @@ const FIELD_HISTORY: CustomerFieldHistoryEntry[] = [
 const CHANGE_REQUESTS: CustomerChangeRequest[] = [
   {
     requestId: "req-change-1",
+    requestNumber: 1,
     customerId: "customer-1",
     status: "approved",
     reason: null,
@@ -55,6 +56,7 @@ const CHANGE_REQUESTS: CustomerChangeRequest[] = [
 const COMMERCIAL_VERSIONS: CommercialConfigurationVersion[] = [
   {
     requestId: "req-version-2",
+    versionNumber: 2,
     commercialConfigurationId: "config-1",
     changeCategory: "amendment",
     status: "approved",

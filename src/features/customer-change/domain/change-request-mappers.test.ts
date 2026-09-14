@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import { toCustomerChangeRequest, toProposedValues } from "./change-request-mappers"
+import { formatChangeRequestId } from "./types"
 import type { CustomerChangeRequestRow, CustomerChangeRequestRequirementRow, SubmissionRevisionRow } from "../data/change-request-row-types"
 
 const BASE_ROW: CustomerChangeRequestRow = {
   request_id: "req-1",
+  request_number: 1,
   customer_id: "cust-1",
   status: "submitted",
   reason: "Segment realignment",
@@ -102,5 +104,11 @@ describe("toCustomerChangeRequest", () => {
         matchedRuleKeys: ["segment_change_requires_finance_approval"],
       },
     ])
+  })
+})
+
+describe("formatChangeRequestId (task Phase L)", () => {
+  it("formats a Customer Change Request number as CCR-000045", () => {
+    expect(formatChangeRequestId(45)).toBe("CCR-000045")
   })
 })

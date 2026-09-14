@@ -17,6 +17,7 @@ function toCommercialRateDraft(revision: SubmissionRevisionRow | null): Commerci
 function toCommercialConfigurationVersion(row: CommercialConfigurationVersionRow, latestRevision: SubmissionRevisionRow | null): CommercialConfigurationVersion {
   return {
     requestId: row.request_id,
+    versionNumber: row.version_number,
     commercialConfigurationId: row.commercial_configuration_id,
     changeCategory: row.change_category,
     status: row.status,

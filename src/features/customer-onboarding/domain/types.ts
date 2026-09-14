@@ -95,6 +95,8 @@ type CustomerOnboardingSentBack = {
  */
 type CustomerOnboardingCase = {
   requestId: string
+  /** Human-Friendly ID (task Phase L): render with `formatOnboardingCaseId`, never this raw number alone. */
+  caseNumber: number
   status: CustomerOnboardingCaseStatus
   /** Which stage the submitter was last working in, for the Onboarding Cases list (task spec §6). */
   currentStageKey: CustomerOnboardingStageKey
@@ -189,6 +191,11 @@ type OnboardingOrigin = {
   approvedBy: string | null
 }
 
+/** Human-Friendly ID (task Phase L): "CO-000123". Never renumbered; the underlying `requestId` UUID remains the real identity everywhere. */
+function formatOnboardingCaseId(caseNumber: number): string {
+  return `CO-${String(caseNumber).padStart(6, "0")}`
+}
+
 export type {
   CustomerOnboardingStageKey,
   AppUserId,
@@ -202,3 +209,4 @@ export type {
   PersistedOnboardingDocumentMetadata,
   OnboardingOrigin,
 }
+export { formatOnboardingCaseId }

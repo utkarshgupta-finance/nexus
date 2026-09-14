@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { listChangeRequestReviewQueue } from "@/features/customer-change/server"
+import { formatChangeRequestId } from "@/features/customer-change"
 import { getCustomerById } from "@/features/customers/server"
 
 /**
@@ -56,7 +57,7 @@ export default async function ChangeRequestReviewsRoute() {
                 <TableBody>
                   {withCustomers.map((entry) => (
                     <TableRow key={entry.requestId}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{entry.requestId.slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{formatChangeRequestId(entry.requestNumber)}</TableCell>
                       <TableCell className="font-medium text-foreground">{entry.customer?.name ?? "(unknown customer)"}</TableCell>
                       <TableCell>
                         <Badge variant="ghost" className="bg-muted text-muted-foreground">

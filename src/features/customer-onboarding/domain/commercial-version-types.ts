@@ -13,6 +13,8 @@ type CommercialVersionChangeCategory = "renewal" | "amendment" | "correction" | 
 
 type CommercialConfigurationVersion = {
   requestId: string
+  /** Human-Friendly ID (task Phase L): render with `formatCommercialVersionId`, never this raw number alone. Distinct from the business-facing "Version N" ordinal (per-configuration, computed in commercial/read-models). */
+  versionNumber: number
   commercialConfigurationId: string
   changeCategory: CommercialVersionChangeCategory
   status: CommercialVersionStatus
@@ -30,4 +32,10 @@ type CommercialConfigurationVersion = {
   updatedAt: string
 }
 
+/** Human-Friendly ID (task Phase L): "CC-000078". Never renumbered; the underlying `requestId` UUID remains the real identity everywhere. */
+function formatCommercialVersionId(versionNumber: number): string {
+  return `CC-${String(versionNumber).padStart(6, "0")}`
+}
+
 export type { CommercialVersionStatus, CommercialVersionChangeCategory, CommercialConfigurationVersion }
+export { formatCommercialVersionId }

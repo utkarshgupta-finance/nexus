@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { resolveOption } from "@/features/reference-data"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
-import { labelForGovernedField } from "@/features/customer-change"
+import { labelForGovernedField, formatChangeRequestId } from "@/features/customer-change"
 import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-models/customer-master"
 import {
   resolveBrandName,
@@ -344,7 +344,7 @@ function CustomerMasterDetail({
                     <tbody>
                       {changeRequests.map((changeRequest) => (
                         <tr key={changeRequest.requestId} className="border-b last:border-0">
-                          <td className="py-2 pr-3 font-mono text-[0.7rem] text-muted-foreground">{changeRequest.requestId.slice(0, 8)}</td>
+                          <td className="py-2 pr-3 font-mono text-[0.7rem] text-muted-foreground">{formatChangeRequestId(changeRequest.requestNumber)}</td>
                           <td className="py-2 pr-3">
                             <Badge variant="ghost" className="bg-muted text-muted-foreground">
                               {changeRequest.status}

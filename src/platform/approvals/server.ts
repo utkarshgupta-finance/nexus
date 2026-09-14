@@ -1,7 +1,8 @@
 import "server-only"
 
-import { listAllOnboardingEntries, listAllVersionEntries } from "@/features/customer-onboarding/server"
+import { listAllOnboardingEntries, listAllVersionEntries, formatOnboardingCaseId, formatCommercialVersionId } from "@/features/customer-onboarding/server"
 import { listAllChangeRequestEntries } from "@/features/customer-change/server"
+import { formatChangeRequestId } from "@/features/customer-change"
 import { getCustomerById } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorEmails } from "@/platform/audit/server"
@@ -47,6 +48,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     items.push({
       type: "onboarding",
       requestId: entry.requestId,
+      displayId: formatOnboardingCaseId(entry.caseNumber),
       status: entry.status,
       bucket,
       customerName: entry.customerLegalName,
@@ -65,6 +67,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     items.push({
       type: "change_request",
       requestId: entry.requestId,
+      displayId: formatChangeRequestId(entry.requestNumber),
       status: entry.status,
       bucket,
       customerName: customer?.name ?? "(unknown customer)",
@@ -83,6 +86,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     items.push({
       type: "commercial_version",
       requestId: entry.requestId,
+      displayId: formatCommercialVersionId(entry.versionNumber),
       status: entry.status,
       bucket,
       customerName: customer?.name ?? "(unknown customer)",

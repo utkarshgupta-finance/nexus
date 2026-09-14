@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/product/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getCurrentNexusSession } from "@/platform/auth/server"
-import { listOnboardingReviewQueue } from "@/features/customer-onboarding/server"
+import { listOnboardingReviewQueue, formatOnboardingCaseId } from "@/features/customer-onboarding/server"
 
 /**
  * Review queue (Customer Lifecycle V1, task §7): every Customer
@@ -60,7 +60,7 @@ export default async function ReviewsRoute() {
                 <TableBody>
                   {entries.map((entry) => (
                     <TableRow key={entry.requestId}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{entry.requestId.slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{formatOnboardingCaseId(entry.caseNumber)}</TableCell>
                       <TableCell className="font-medium text-foreground">{entry.customerLegalName}</TableCell>
                       <TableCell>
                         <Badge variant="ghost" className="bg-muted text-muted-foreground">

@@ -76,6 +76,8 @@ async function sendBackOnboardingCase(
 
 type ReviewQueueEntry = {
   requestId: string
+  /** Human-Friendly ID (task Phase L): render with `formatOnboardingCaseId`. */
+  caseNumber: number
   status: CustomerOnboardingCase["status"]
   customerLegalName: string
   currentRevisionNumber: number
@@ -91,6 +93,7 @@ async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.lis
     const values = latest?.status === "submitted" && latest.effective_data ? latest.effective_data.values : (latest?.raw_data ?? {})
     entries.push({
       requestId: row.request_id,
+      caseNumber: row.case_number,
       status: row.status,
       customerLegalName: typeof values[CUSTOMER_LEGAL_NAME_FIELD] === "string" ? (values[CUSTOMER_LEGAL_NAME_FIELD] as string) : "(untitled)",
       currentRevisionNumber: latest?.revision_number ?? 1,

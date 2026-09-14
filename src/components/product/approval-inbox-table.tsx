@@ -55,6 +55,7 @@ function ApprovalInboxTable({ items }: { items: ApprovalInboxItem[] }) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
+                <TableHead>Request</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Requested By</TableHead>
@@ -66,6 +67,7 @@ function ApprovalInboxTable({ items }: { items: ApprovalInboxItem[] }) {
             <TableBody>
               {visible.map((item) => (
                 <TableRow key={`${item.type}-${item.requestId}`} className="hover:bg-transparent">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{item.displayId}</TableCell>
                   <TableCell className="text-foreground">{labelForItemType(item.type)}</TableCell>
                   <TableCell className="font-medium text-foreground">{item.customerName}</TableCell>
                   <TableCell className="text-muted-foreground">{item.requestedByEmail ?? "-"}</TableCell>

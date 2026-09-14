@@ -33,6 +33,7 @@ function toCustomerOnboardingCase(row: CustomerOnboardingCaseRow, revisions: Sub
   const latest = revisions[revisions.length - 1]
   return {
     requestId: row.request_id,
+    caseNumber: row.case_number,
     status: row.status,
     currentStageKey: row.current_stage_key,
     currentRevision: toRevision(latest),

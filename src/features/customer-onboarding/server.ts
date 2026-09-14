@@ -13,6 +13,7 @@ import "server-only"
 export { getOnboardingCase, listOnboardingReviewQueue, listAllOnboardingEntries, getOnboardingOriginForCustomer } from "./services/case.service"
 export type { ReviewQueueEntry } from "./services/case.service"
 export type { OnboardingOrigin } from "./domain/types"
+export { formatOnboardingCaseId } from "./domain/types"
 export {
   loadVersion,
   listVersionReviewQueue,
@@ -22,4 +23,5 @@ export {
 } from "./services/commercial-version.service"
 export type { ReviewQueueEntry as CommercialVersionReviewQueueEntry } from "./services/commercial-version.service"
 export type { CommercialConfigurationVersion } from "./domain/commercial-version-types"
+export { formatCommercialVersionId } from "./domain/commercial-version-types"
 export type { CommercialRateDiff, ComponentDiff, SlabRowDiff, DesignationRowDiff, MilestoneDiff, DiffRowStatus } from "./domain/commercial-rate-diff"

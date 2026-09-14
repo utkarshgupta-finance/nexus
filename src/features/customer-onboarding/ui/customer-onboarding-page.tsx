@@ -30,6 +30,7 @@ import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import { setCurrentStage } from "../domain/case"
 import type { CustomerOnboardingCase } from "../domain/types"
+import { formatOnboardingCaseId } from "../domain/types"
 import { isEligibleForCompletion } from "../domain/completion"
 import { saveOnboardingDraftAction, submitOnboardingCaseAction, checkForDuplicateCustomersAction } from "../actions"
 import { hasHardDuplicateMatch, FIELD_LABELS } from "../domain/duplicate-detection"
@@ -387,10 +388,11 @@ function CustomerOnboardingPage({
     const legalName = (onboardingCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName] as string) || "This customer"
     return (
       <div className="flex flex-1 flex-col">
-        <PageHeader title="Customer Onboarding" description={`Request ${requestId}`} />
+        <PageHeader title="Customer Onboarding" description={formatOnboardingCaseId(onboardingCase.caseNumber)} />
         <OnboardingSubmittedScreen
           legalName={legalName}
           requestId={requestId}
+          caseNumber={onboardingCase.caseNumber}
           submittedAt={onboardingCase.currentRevision.submittedAt}
           revisionNumber={onboardingCase.currentRevision.revisionNumber}
           canReview={canReview}
@@ -404,7 +406,7 @@ function CustomerOnboardingPage({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title="Customer Onboarding"
-        description={`Request ${requestId}`}
+        description={formatOnboardingCaseId(onboardingCase.caseNumber)}
         actions={
           isLocked ? (
             <div className="flex items-center gap-2">

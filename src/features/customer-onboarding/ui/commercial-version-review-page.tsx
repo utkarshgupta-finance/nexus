@@ -15,6 +15,7 @@ import { rejectCommercialVersionAction, approveCommercialVersionAction } from ".
 import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft } from "../domain/commercial-rate"
 import type { CommercialConfigurationVersion } from "../domain/commercial-version-types"
+import { formatCommercialVersionId } from "../domain/commercial-version-types"
 import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
@@ -94,7 +95,7 @@ function CommercialVersionReviewPage({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title="Commercial Configuration Version Review"
-        description={`Request ${requestId}, ${version.changeCategory}`}
+        description={`${formatCommercialVersionId(version.versionNumber)}, ${version.changeCategory}`}
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="ghost" className="bg-muted text-muted-foreground">

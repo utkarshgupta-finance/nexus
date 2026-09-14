@@ -3,6 +3,7 @@ import { CheckCircle2Icon } from "lucide-react"
 
 import { KeyValueGrid } from "@/components/product/key-value-grid"
 import { Button } from "@/components/ui/button"
+import { formatOnboardingCaseId } from "../domain/types"
 
 /**
  * The Submitted confirmation screen (Customer Lifecycle V1 UX pass,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button"
 function OnboardingSubmittedScreen({
   legalName,
   requestId,
+  caseNumber,
   submittedAt,
   revisionNumber,
   canReview,
@@ -24,6 +26,7 @@ function OnboardingSubmittedScreen({
 }: {
   legalName: string
   requestId: string
+  caseNumber: number
   submittedAt: string | null
   revisionNumber: number
   canReview: boolean
@@ -46,7 +49,7 @@ function OnboardingSubmittedScreen({
           columns={2}
           items={[
             { label: "Customer", value: legalName },
-            { label: "Request ID", value: requestId },
+            { label: "Request ID", value: formatOnboardingCaseId(caseNumber) },
             { label: "Status", value: "Submitted" },
             { label: "Submitted At", value: submittedAt ? new Date(submittedAt).toLocaleString() : "-" },
             { label: "Current Revision", value: revisionNumber },

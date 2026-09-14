@@ -503,3 +503,28 @@ Legal Entity Name/Brand are read from the real, current `customers`
 row instead (more authoritative than a stale onboarding snapshot,
 since a Change Request may have renamed the customer since it was
 onboarded).
+
+## 13. Human-Friendly IDs: IMPLEMENTED
+
+Users no longer primarily see raw UUID prefixes as their reference for
+a request. Every governed request-extension table gained one integer
+column, backed by its own Postgres sequence
+(`supabase/migrations/20260914100000_human_friendly_request_ids.sql`):
+`customer_onboarding_cases.case_number` ("CO-000123"),
+`customer_change_requests.request_number` ("CCR-000045"),
+`commercial_configuration_versions.version_number` ("CC-000078",
+distinct from that row's own business-facing "Version N" ordinal,
+which stays per-configuration). A `not null default nextval(...)`
+column added via `alter table` is evaluated once per already-existing
+row at migration time, so every historical record got a real, never-
+reassigned number too, confirmed empirically after applying.
+
+Each number is purely a display/search convenience: `request_id`
+remains the real, internal stable identity everywhere a join or
+governed RPC call happens. Three tiny, colocated pure formatters
+(`formatOnboardingCaseId`, `formatChangeRequestId`,
+`formatCommercialVersionId`, each next to its own domain type) turn
+the raw integer into its prefixed, zero-padded display form. Wired
+into the Approvals inbox, all three Reviews list/detail screens, the
+Onboarding Submitted confirmation screen, and the Customer workspace's
+Change Requests tab.

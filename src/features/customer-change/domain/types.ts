@@ -24,6 +24,8 @@ type CustomerChangeRequirement = {
 
 type CustomerChangeRequest = {
   requestId: string
+  /** Human-Friendly ID (task Phase L): render with `formatChangeRequestId`, never this raw number alone. */
+  requestNumber: number
   customerId: string
   status: CustomerChangeRequestStatus
   reason: string | null
@@ -60,4 +62,10 @@ type FormerNameMatch = {
   changedAt: string
 }
 
+/** Human-Friendly ID (task Phase L): "CCR-000045". Never renumbered; the underlying `requestId` UUID remains the real identity everywhere. */
+function formatChangeRequestId(requestNumber: number): string {
+  return `CCR-${String(requestNumber).padStart(6, "0")}`
+}
+
 export type { CustomerChangeRequestStatus, CustomerChangeRequirement, CustomerChangeRequest, CustomerFieldHistoryEntry, FormerNameMatch }
+export { formatChangeRequestId }
