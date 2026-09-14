@@ -20,6 +20,8 @@ import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 
 const CUSTOMER_LEGAL_NAME_FIELD = "customer_legal_entity_name"
 const COMMERCIAL_RATE_FIELD = "commercial_rate"
+const GST_NUMBER_FIELD = "gst_number"
+const PAN_FIELD = "pan"
 
 /** URL/key-safe slug: lowercase, non-alphanumeric runs collapsed to one hyphen, no leading/trailing hyphen. */
 function slugify(value: string): string {
@@ -177,6 +179,34 @@ async function getOnboardingOriginForCustomer(customerId: string): Promise<Onboa
   return { requestId: row.request_id, createdAt: row.created_at, createdBy: row.created_by, approvedAt: row.approved_at, approvedBy: row.approved_by }
 }
 
+type ApprovedCaseTaxIdentity = { customerId: string; gstNumber: string | null; pan: string | null }
+
+/**
+ * Customer Duplicate Prevention (task Phase K): GST and PAN are never
+ * promoted onto `customers` itself (only name/brand/segment/business_unit/
+ * country/industry are, see docs/CUSTOMER_LIFECYCLE.md §3), so a
+ * duplicate check against them has to read every approved case's own
+ * submitted revision, the same place `listOnboardingReviewQueue` already
+ * reads a case's field values from. Legal name/brand are read from the
+ * real `customers` row instead (more authoritative post-approval than a
+ * stale onboarding snapshot), by the caller, not here.
+ */
+async function listApprovedCaseTaxIdentity(): Promise<ApprovedCaseTaxIdentity[]> {
+  const rows = await caseData.listApprovedCases()
+  const identities: ApprovedCaseTaxIdentity[] = []
+  for (const row of rows) {
+    if (!row.customer_id) continue
+    const latest = await caseData.getLatestRevisionForRequest(row.request_id)
+    const values = latest?.status === "submitted" && latest.effective_data ? latest.effective_data.values : (latest?.raw_data ?? {})
+    identities.push({
+      customerId: row.customer_id,
+      gstNumber: typeof values[GST_NUMBER_FIELD] === "string" ? (values[GST_NUMBER_FIELD] as string) : null,
+      pan: typeof values[PAN_FIELD] === "string" ? (values[PAN_FIELD] as string) : null,
+    })
+  }
+  return identities
+}
+
 export {
   getOnboardingCase,
   createOnboardingCase,
@@ -187,5 +217,6 @@ export {
   listAllOnboardingEntries,
   approveOnboardingCase,
   getOnboardingOriginForCustomer,
+  listApprovedCaseTaxIdentity,
 }
-export type { ReviewQueueEntry }
+export type { ReviewQueueEntry, ApprovedCaseTaxIdentity }

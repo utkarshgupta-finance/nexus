@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Survey } from "survey-react-ui"
 import { CheckCircle2Icon, ClockIcon } from "lucide-react"
 
@@ -30,7 +31,9 @@ import type { CommercialRateDraft } from "../domain/commercial-rate"
 import { setCurrentStage } from "../domain/case"
 import type { CustomerOnboardingCase } from "../domain/types"
 import { isEligibleForCompletion } from "../domain/completion"
-import { saveOnboardingDraftAction, submitOnboardingCaseAction } from "../actions"
+import { saveOnboardingDraftAction, submitOnboardingCaseAction, checkForDuplicateCustomersAction } from "../actions"
+import { hasHardDuplicateMatch, FIELD_LABELS } from "../domain/duplicate-detection"
+import type { DuplicateMatch } from "../domain/duplicate-detection"
 import { fetchStatesForCountry } from "../domain/geography-client"
 import {
   evaluateAgreementApprovalStatus,
@@ -130,6 +133,8 @@ function CustomerOnboardingPage({
     () => (initialCase.currentRevision.data[CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate] as CommercialRateDraft | undefined) ?? createEmptyCommercialRateDraft()
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[]>([])
+  const [duplicateWarningAcknowledged, setDuplicateWarningAcknowledged] = useState(false)
   /**
    * Bumped on every SurveyJS `onValueChanged` event (see the effect below),
    * for no reason other than to make this component re-render: `survey`
@@ -204,6 +209,18 @@ function CustomerOnboardingPage({
         }
       } else if (options.name === CUSTOMER_ONBOARDING_FIELD_KEYS.state) {
         survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.city, undefined)
+      }
+      const duplicateCheckFields: string[] = [
+        CUSTOMER_ONBOARDING_FIELD_KEYS.gstNumber,
+        CUSTOMER_ONBOARDING_FIELD_KEYS.pan,
+        CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName,
+        CUSTOMER_ONBOARDING_FIELD_KEYS.brandName,
+      ]
+      if (duplicateCheckFields.includes(options.name)) {
+        // A previously-acknowledged soft match must never silently ride along after the
+        // identifying value itself changes: re-check fresh on the next Submit click.
+        setDuplicateWarningAcknowledged(false)
+        setDuplicateMatches([])
       }
       forceRerenderOnFieldChange((count) => count + 1)
     }
@@ -289,6 +306,24 @@ function CustomerOnboardingPage({
     setSubmitError(documentErrorMessages.length > 0 ? documentErrorMessages.join(" ") : null)
 
     if (!fieldsValid || documentErrorMessages.length > 0) return
+
+    if (!duplicateWarningAcknowledged) {
+      setPendingAction("submit")
+      const duplicateResult = await checkForDuplicateCustomersAction({
+        gstNumber: (survey.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.gstNumber) as string | undefined) ?? null,
+        pan: (survey.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.pan) as string | undefined) ?? null,
+        legalEntityName: (survey.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName) as string | undefined) ?? null,
+        brandName: (survey.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.brandName) as string | undefined) ?? null,
+      })
+      setPendingAction(null)
+      if (duplicateResult.ok && duplicateResult.matches.length > 0) {
+        setDuplicateMatches(duplicateResult.matches)
+        if (hasHardDuplicateMatch(duplicateResult.matches)) return
+        setDuplicateWarningAcknowledged(true)
+        return
+      }
+      setDuplicateMatches([])
+    }
 
     setPendingAction("submit")
     setDraftSaved(false)
@@ -556,6 +591,35 @@ function CustomerOnboardingPage({
             <p role="alert" className="text-xs text-destructive">
               {submitError}
             </p>
+          ) : null}
+
+          {duplicateMatches.length > 0 ? (
+            <div
+              className={`flex flex-col gap-2 rounded-md border px-3 py-2.5 ${
+                hasHardDuplicateMatch(duplicateMatches) ? "border-destructive/30 bg-destructive/5" : "border-warning/30 bg-warning/5"
+              }`}
+            >
+              <p className="text-xs font-medium text-foreground">Potential existing customer</p>
+              {duplicateMatches.map((match) => (
+                <p key={`${match.fieldKey}-${match.customerId}`} className="text-xs text-muted-foreground">
+                  {FIELD_LABELS[match.fieldKey]} &quot;{match.matchedValue}&quot; already belongs to{" "}
+                  <Link href={`/customers/${match.customerKey}`} className="font-medium text-foreground underline underline-offset-2">
+                    {match.customerName}
+                  </Link>
+                  .
+                </p>
+              ))}
+              {hasHardDuplicateMatch(duplicateMatches) ? (
+                <p className="text-xs text-muted-foreground">
+                  This GST or PAN already belongs to an existing customer. Correct the value above, or contact your administrator if this is
+                  genuinely a different legal entity.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  This looks similar to an existing customer. If this is genuinely a different business, click Submit again to continue.
+                </p>
+              )}
+            </div>
           ) : null}
 
           {!isLocked ? (

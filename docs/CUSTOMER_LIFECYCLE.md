@@ -480,3 +480,26 @@ Component before opening a new set, confirmed against real production
 data before this migration shipped); this guard closes the one
 remaining gap, an approval whose own effective date does not respect
 that ordering.
+
+## 12. Customer Duplicate Prevention: IMPLEMENTED
+
+Checked once, at Submit (never at Save Draft, since a draft is not yet
+a claim to a real identity): `checkForDuplicateCustomersAction`
+(`src/features/customer-onboarding/actions.ts`) compares the draft's
+GST/PAN/Legal Entity Name/Brand against every approved customer, using
+only deterministic exact matches, never fuzzy/AI matching as an
+authoritative blocker (`domain/duplicate-detection.ts`, pure,
+unit-tested). GST and PAN are hard identifiers: any match blocks
+Submit outright, re-checked on every attempt, with no override in this
+V1. Legal Entity Name and Brand are soft signals: a match warns
+("Potential existing customer", linking straight to the existing
+Customer) but Submit proceeds on a second click, since two different
+real businesses can legitimately share a name or brand.
+
+GST/PAN are never promoted onto `customers` itself (docs §3), so the
+check reads every approved case's own submitted revision
+(`listApprovedCaseTaxIdentity`) for those two fields specifically;
+Legal Entity Name/Brand are read from the real, current `customers`
+row instead (more authoritative than a stale onboarding snapshot,
+since a Change Request may have renamed the customer since it was
+onboarded).

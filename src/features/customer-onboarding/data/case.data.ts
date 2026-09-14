@@ -97,6 +97,18 @@ async function getCaseByCustomerId(customerId: string): Promise<CustomerOnboardi
   return data
 }
 
+/** Every approved case that became a real Customer Master, for Customer Duplicate Prevention (task Phase K): checked against a new onboarding's own GST/PAN/legal name/brand before Submit. Capped since this only ever backs an interactive check, never a report. */
+async function listApprovedCases(): Promise<CustomerOnboardingCaseRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_onboarding_cases")
+    .select("*")
+    .eq("status", "approved")
+    .limit(500)
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return (data ?? []).filter((row: CustomerOnboardingCaseRow) => row.customer_id !== null)
+}
+
 /** Every case not yet approved, oldest first: the review queue's data source. */
 async function listCasesAwaitingReview(): Promise<CustomerOnboardingCaseRow[]> {
   const supabase = getSupabaseServiceRoleClient()
@@ -164,6 +176,7 @@ export {
   getCaseByCustomerId,
   listCasesAwaitingReview,
   listAllCases,
+  listApprovedCases,
   listRevisionsForRequest,
   getLatestRevisionForRequest,
   createNextRevision,

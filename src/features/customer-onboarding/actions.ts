@@ -3,7 +3,7 @@
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import { loadReferenceMasterSnapshot } from "@/features/reference-data/server"
-import { getCustomerById } from "@/features/customers/server"
+import { getCustomerById, listCustomerMaster } from "@/features/customers/server"
 
 import {
   createOnboardingCase,
@@ -11,6 +11,7 @@ import {
   submitOnboardingCase,
   sendBackOnboardingCase,
   approveOnboardingCase,
+  listApprovedCaseTaxIdentity,
 } from "./services/case.service"
 import {
   createVersionFromActive,
@@ -19,9 +20,11 @@ import {
   rejectVersion,
   approveVersion,
 } from "./services/commercial-version.service"
+import { findPotentialDuplicates } from "./domain/duplicate-detection"
 import type { CommercialRateDraft } from "./domain/commercial-rate"
 import type { CustomerOnboardingCase } from "./domain/types"
 import type { CommercialConfigurationVersion, CommercialVersionChangeCategory } from "./domain/commercial-version-types"
+import type { DuplicateCandidate, DuplicateMatch, ExistingCustomerIdentity } from "./domain/duplicate-detection"
 
 /**
  * Real, database-backed Customer Onboarding Case lifecycle actions
@@ -175,6 +178,37 @@ async function approveCommercialVersionAction(requestId: string): Promise<Commer
   }
 }
 
+type DuplicateCheckActionResult = { ok: true; matches: DuplicateMatch[] } | { ok: false; error: string }
+
+/**
+ * Customer Duplicate Prevention (task Phase K): checked at Submit, never
+ * at Save Draft (a draft is not a claim to a real identity yet). Gated
+ * on `customer.create`, the same permission Submit itself requires: this
+ * is informational for whoever is about to onboard a customer, not a
+ * separate reviewer capability.
+ */
+async function checkForDuplicateCustomersAction(candidate: DuplicateCandidate): Promise<DuplicateCheckActionResult> {
+  try {
+    await requirePermission("customer", "create")
+    const [taxIdentities, customers] = await Promise.all([listApprovedCaseTaxIdentity(), listCustomerMaster()])
+    const taxByCustomerId = new Map(taxIdentities.map((identity) => [identity.customerId, identity]))
+    const existingCustomers: ExistingCustomerIdentity[] = customers.map(({ record }) => ({
+      customerId: record.id,
+      customerKey: record.key,
+      customerName: record.name,
+      gstNumber: taxByCustomerId.get(record.id)?.gstNumber ?? null,
+      pan: taxByCustomerId.get(record.id)?.pan ?? null,
+      legalEntityName: record.name,
+      brandName: record.brandName,
+    }))
+    return { ok: true, matches: findPotentialDuplicates(candidate, existingCustomers) }
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    if (error instanceof Error) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while checking for duplicate customers." }
+  }
+}
+
 export {
   createOnboardingCaseAction,
   saveOnboardingDraftAction,
@@ -186,5 +220,6 @@ export {
   submitCommercialVersionAction,
   rejectCommercialVersionAction,
   approveCommercialVersionAction,
+  checkForDuplicateCustomersAction,
 }
-export type { CaseActionResult, ApproveCaseActionResult, CommercialVersionActionResult }
+export type { CaseActionResult, ApproveCaseActionResult, CommercialVersionActionResult, DuplicateCheckActionResult }
