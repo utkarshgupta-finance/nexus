@@ -53,9 +53,13 @@ function DeleteCustomerPanel({ customerId, customerKey }: { customerId: string; 
   }
 
   async function handleDeactivate() {
+    if (!reason.trim()) {
+      setActionError("A reason is required to deactivate this customer.")
+      return
+    }
     setActionError(null)
     setIsSubmitting(true)
-    const result = await deactivateCustomerAction(customerId)
+    const result = await deactivateCustomerAction(customerId, reason)
     setIsSubmitting(false)
     if (result.ok) {
       router.refresh()
@@ -121,7 +125,26 @@ function DeleteCustomerPanel({ customerId, customerKey }: { customerId: string; 
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">You can deactivate this customer instead: it stays fully intact, just marked inactive.</p>
-          <PendingButton size="sm" variant="outline" className="w-fit" onClick={handleDeactivate} pending={isSubmitting} pendingLabel="Deactivating...">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-foreground" htmlFor="deactivate-reason">
+              Reason
+            </label>
+            <textarea
+              id="deactivate-reason"
+              className="min-h-16 rounded-md border bg-transparent px-3 py-2 text-sm"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </div>
+          <PendingButton
+            size="sm"
+            variant="outline"
+            className="w-fit"
+            onClick={handleDeactivate}
+            pending={isSubmitting}
+            pendingLabel="Deactivating..."
+            disabled={!reason.trim()}
+          >
             Deactivate Instead
           </PendingButton>
         </div>

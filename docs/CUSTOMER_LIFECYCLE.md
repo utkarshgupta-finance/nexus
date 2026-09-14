@@ -594,3 +594,36 @@ only. The broader cross-cutting "Customer Documents" surface (task
 Phase D's full vision: Registration/Tax/Commercial/Agreement/Change
 Request Evidence all in one place on the Customer workspace) is not
 built in this round.
+
+## 16. Customer Deactivation lifecycle: IMPLEMENTED
+
+Found and fixed a real audit gap while auditing this phase: Deactivate
+was a plain PostgREST `.update()` call
+(`src/features/customers/data/customers.data.ts`'s own `setCustomerActive`),
+which never called `set_config('app.current_user_id', ...)` first, so
+`fn_audit_row`'s trigger (which reads that session setting, not the
+row's own `updated_by` column) recorded every deactivate/reactivate
+with a NULL actor in `audit_log`, even though `updated_by` itself was
+correct. The Customer Activity timeline's own status-change events
+(§10) read `audit_log.actor_user_id` directly, so this was a real,
+silently-blank "who did this" every time, not a hypothetical one.
+
+`set_customer_active`
+(`supabase/migrations/20260914120000_customer_status_lifecycle.sql`)
+replaces it: a real governed RPC requiring a non-empty reason, which it
+persists into that same `audit_log` row's `actor_context` (now also
+surfaced in the Activity timeline's summary text). Deactivate and
+Reactivate are gated on `customer.approve` (not the narrower
+`customer.delete_permanent` this previously, incorrectly, reused,
+which stays reserved for irreversible deletion) and available as a
+standalone "More Actions" entry (`CustomerStatusPanel`), independent of
+Permanent Delete's own "Deactivate Instead" fallback (which now also
+requires a reason). An inactive customer remains fully searchable
+(Customer Search, §7) and stays intact; creating a new Customer Change
+Request against one is blocked with a clear message directing the user
+to reactivate first.
+
+Known gap, stated honestly: only Customer Change Request creation is
+blocked for an inactive customer in this round; creating a new
+Commercial Configuration Version against an inactive customer is not
+yet blocked.

@@ -117,11 +117,12 @@ function statusChangeEvents(auditRows: AuditLogRow[], actorEmails: Map<string, s
     const before = row.before_value.is_active
     const after = row.after_value.is_active
     if (typeof before !== "boolean" || typeof after !== "boolean" || before === after) continue
+    const reason = typeof row.actor_context?.reason === "string" ? row.actor_context.reason : null
     events.push({
       id: `status-${row.id}`,
       occurredAt: row.occurred_at,
       actorEmail: actorLabel(row.actor_user_id, actorEmails),
-      summary: after ? "Customer reactivated" : "Customer deactivated",
+      summary: reason ? `${after ? "Customer reactivated" : "Customer deactivated"}: ${reason}` : after ? "Customer reactivated" : "Customer deactivated",
       relatedRequestId: row.request_id,
     })
   }

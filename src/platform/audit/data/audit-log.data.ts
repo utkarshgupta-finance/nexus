@@ -18,6 +18,7 @@ type AuditLogRow = {
   occurred_at: string
   actor_user_id: string | null
   request_id: string | null
+  actor_context: Record<string, unknown> | null
 }
 
 async function listAuditLogForRow(tableName: string, rowId: string): Promise<AuditLogRow[]> {

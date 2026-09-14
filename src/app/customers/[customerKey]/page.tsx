@@ -80,10 +80,11 @@ export default async function CustomerMasterDetailRoute({
     activityEvents = []
   }
 
-  const [changeRequests, fieldHistory, canDeletePermanently, onboardingOrigin] = await Promise.all([
+  const [changeRequests, fieldHistory, canDeletePermanently, canManageStatus, onboardingOrigin] = await Promise.all([
     listChangeRequestsForCustomer(detail.record.id),
     listCustomerFieldHistory(detail.record.id),
     hasPermission("customer", "delete_permanent"),
+    hasPermission("customer", "approve"),
     getOnboardingOriginForCustomer(detail.record.id).catch((): OnboardingOrigin | null => null),
   ])
 
@@ -95,6 +96,7 @@ export default async function CustomerMasterDetailRoute({
       changeRequests={changeRequests}
       fieldHistory={fieldHistory}
       canDeletePermanently={canDeletePermanently}
+      canManageStatus={canManageStatus}
       activityEvents={activityEvents}
       onboardingOrigin={onboardingOrigin}
     />

@@ -55,11 +55,21 @@ async function deleteCustomerPermanentlyAction(customerId: string, reason: strin
 
 type DeactivateActionResult = { ok: true } | { ok: false; error: string }
 
-/** Offered as the alternative when permanent deletion is blocked by real business history: the customer stays fully intact, just marked inactive. Gated on `customer.delete_permanent` too, since offering it only alongside the delete flow, not as a general customer-editing capability. */
-async function deactivateCustomerAction(customerId: string): Promise<DeactivateActionResult> {
+/**
+ * Customer Deactivation lifecycle (task Phase I): the customer stays
+ * fully intact, just marked inactive, and remains historically
+ * searchable (Customer Search, task Phase B). Requires a reason
+ * (governed by `set_customer_active`, which rejects an empty one) and
+ * `customer.approve`, the same permission that already gates every
+ * other Customer Master lifecycle decision (Change Request/Onboarding
+ * approval) rather than the narrower `customer.delete_permanent` this
+ * previously (incorrectly) reused, which is reserved for irreversible
+ * deletion, not routine churn.
+ */
+async function deactivateCustomerAction(customerId: string, reason: string): Promise<DeactivateActionResult> {
   try {
-    const actor = await requirePermission("customer", "delete_permanent")
-    await setCustomerActive(customerId, false, actor.appUserId)
+    const actor = await requirePermission("customer", "approve")
+    await setCustomerActive(customerId, false, reason, actor.appUserId)
     return { ok: true }
   } catch (error) {
     if (error instanceof AuthorizationError) return { ok: false, error: error.message }
@@ -68,5 +78,18 @@ async function deactivateCustomerAction(customerId: string): Promise<DeactivateA
   }
 }
 
-export { checkCustomerDeletionEligibilityAction, deleteCustomerPermanentlyAction, deactivateCustomerAction }
+/** Symmetric to deactivate: same permission, same reason requirement, same audit mechanism. Never available through Permanent Delete's own panel, only as its own standalone action. */
+async function reactivateCustomerAction(customerId: string, reason: string): Promise<DeactivateActionResult> {
+  try {
+    const actor = await requirePermission("customer", "approve")
+    await setCustomerActive(customerId, true, reason, actor.appUserId)
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    if (error instanceof Error) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while reactivating this customer." }
+  }
+}
+
+export { checkCustomerDeletionEligibilityAction, deleteCustomerPermanentlyAction, deactivateCustomerAction, reactivateCustomerAction }
 export type { EligibilityActionResult, DeletionActionResult, DeactivateActionResult }

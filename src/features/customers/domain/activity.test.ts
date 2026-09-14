@@ -85,6 +85,7 @@ const STATUS_AUDIT_ROWS: AuditLogRow[] = [
     occurred_at: "2026-03-10T00:00:00.000Z",
     actor_user_id: "actor-approver",
     request_id: null,
+    actor_context: null,
   },
 ]
 
@@ -121,6 +122,19 @@ describe("buildCustomerActivityTimeline", () => {
       actorEmails: new Map(),
     })
     expect(timeline).toEqual([])
+  })
+
+  it("includes the deactivation reason in the summary when audit_log carries one (task Phase I)", () => {
+    const rowWithReason: AuditLogRow = { ...STATUS_AUDIT_ROWS[0], actor_context: { reason: "Customer requested account closure" } }
+    const timeline = buildCustomerActivityTimeline({
+      onboardingOrigin: null,
+      changeRequests: [],
+      fieldHistory: [],
+      commercialVersions: [],
+      statusAuditRows: [rowWithReason],
+      actorEmails: ACTOR_EMAILS,
+    })
+    expect(timeline[0].summary).toBe("Customer deactivated: Customer requested account closure")
   })
 
   it("ignores an audit row where is_active did not actually change", () => {

@@ -2,6 +2,7 @@
 
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
+import { getCustomerById } from "@/features/customers/server"
 
 import {
   createChangeRequest,
@@ -33,9 +34,14 @@ function toActionError(error: unknown): ChangeRequestActionResult {
   return { ok: false, error: "An unexpected error occurred while updating this Customer Change Request." }
 }
 
+/** Task Phase I: a new Change Request may not be opened against an inactive customer (churn/inactive is not the same as "no longer real"; a Change Request implies ongoing operational activity). Reactivate first, if this is genuinely still an active relationship. */
 async function createChangeRequestAction(customerId: string): Promise<ChangeRequestActionResult> {
   try {
     const actor = await requirePermission("customer", "change_request")
+    const customer = await getCustomerById(customerId)
+    if (customer && !customer.is_active) {
+      return { ok: false, error: "This customer is inactive. Reactivate the customer before creating a Change Request." }
+    }
     const changeRequest = await createChangeRequest(customerId, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {

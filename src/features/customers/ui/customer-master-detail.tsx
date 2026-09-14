@@ -25,6 +25,7 @@ import {
   resolveBillingCurrencyCode,
 } from "../domain/display-fields"
 import { DeleteCustomerPanel } from "./delete-customer-panel"
+import { CustomerStatusPanel } from "./customer-status-panel"
 import { CustomerActivityTimeline } from "./customer-activity-timeline"
 import type { CustomerActivityEvent } from "../domain/activity"
 import type { OnboardingOrigin } from "@/features/customer-onboarding/server"
@@ -55,6 +56,7 @@ function CustomerMasterDetail({
   changeRequests,
   fieldHistory,
   canDeletePermanently = false,
+  canManageStatus = false,
   activityEvents,
   onboardingOrigin,
 }: {
@@ -66,6 +68,8 @@ function CustomerMasterDetail({
   fieldHistory: CustomerFieldHistoryEntry[]
   /** Gates the "More Actions -> Permanently Delete Customer" entry point (Customer Lifecycle V1, Phase 14-16); resolved server-side from `customer.delete_permanent`. */
   canDeletePermanently?: boolean
+  /** Gates the "More Actions -> Deactivate/Reactivate Customer" entry point (task Phase I); resolved server-side from `customer.approve`. */
+  canManageStatus?: boolean
   /** Customer Activity timeline (task Phase C), resolved server-side. */
   activityEvents: CustomerActivityEvent[]
   /** The onboarding case that created this Customer Master (task Phase N); null for a customer created directly, never through onboarding. */
@@ -184,10 +188,11 @@ function CustomerMasterDetail({
                 </p>
               </div>
             ) : null}
-            {canDeletePermanently ? (
+            {canDeletePermanently || canManageStatus ? (
               <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
                 <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">More Actions</h2>
-                <DeleteCustomerPanel customerId={record.id} customerKey={record.key} />
+                {canManageStatus ? <CustomerStatusPanel customerId={record.id} isActive={record.isActive} /> : null}
+                {canDeletePermanently ? <DeleteCustomerPanel customerId={record.id} customerKey={record.key} /> : null}
               </section>
             ) : null}
           </TabsPanel>

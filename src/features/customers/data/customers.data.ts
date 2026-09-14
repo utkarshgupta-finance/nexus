@@ -58,15 +58,24 @@ async function insertCustomer(input: InsertCustomerInput): Promise<CustomerRow> 
   return data
 }
 
-/** Sets `is_active`, the one column fn_protect_customer_lifecycle already permits to change in either direction. Used by the "Deactivate" offer on a customer whose permanent deletion is blocked by real business history (Customer Lifecycle V1, Phase 14-16). */
-async function setCustomerActive(customerId: string, isActive: boolean, actorUserId: string): Promise<CustomerRow> {
+/**
+ * Sets `is_active` (the one column fn_protect_customer_lifecycle
+ * already permits to change in either direction) through the real,
+ * governed `set_customer_active` RPC (task Phase I), not a plain
+ * PostgREST `.update()`: a plain update never calls `set_config
+ * ('app.current_user_id', ...)`, so `fn_audit_row`'s trigger recorded
+ * every prior deactivate/reactivate with a NULL actor in audit_log,
+ * even though `updated_by` on the row itself was correct. Requires a
+ * reason, persisted into that same audit_log row's `actor_context`.
+ */
+async function setCustomerActive(customerId: string, isActive: boolean, reason: string, actorUserId: string): Promise<CustomerRow> {
   const supabase = getSupabaseServiceRoleClient()
-  const { data, error } = await supabase
-    .from("customers")
-    .update({ is_active: isActive, updated_by: actorUserId })
-    .eq("id", customerId)
-    .select("*")
-    .single()
+  const { data, error } = await supabase.rpc("set_customer_active", {
+    p_customer_id: customerId,
+    p_is_active: isActive,
+    p_reason: reason,
+    p_actor_user_id: actorUserId,
+  })
   if (error) throw new CustomerOperationError(parseCustomerError(error))
   return data
 }
