@@ -17,21 +17,40 @@ into a second backlog.
   either capability (a future API adapter, per
   `docs/API_INTEGRATION_ARCHITECTURE.md` §1) would either duplicate the
   branch or have to know it lives in the wrong layer.
-- **Partially closed: idempotency guard tests (Platform Scale Program,
-  Phase U).** `case.test.ts` now explicitly covers "rejects approving an
-  already-approved case" and "rejects sending back an already-approved
-  case" at the pure domain layer (`case.ts`'s own guards, the same
-  `status !== 'submitted' && status !== 'resubmitted'` check the RPC's
-  own idempotent-replay short-circuit mirrors). Still open: no
-  `*.service.ts` file has a test file at all
-  (`case.service.ts`/`change-request.service.ts`/`commercial-version.service.ts`),
-  so the actual RPC-level idempotent-replay behavior (SQL `if status =
-  'approved' then return` short-circuits) is proven only by reading the
-  migration, not by a test invoking it. `customer_change_requests`/
-  `commercial_configuration_versions` have no equivalent pure domain
-  module to test against at all (their transition logic lives only in
-  SQL), so the same domain-level test cannot be added there without
-  building one first.
+- **Further closed: real data-layer idempotency/retry tests (Platform
+  Scale Closure, Phase C).** `case.test.ts` covers the pure domain guards
+  (previous round). This round adds `case.data.test.ts` and
+  `customers.data.test.ts`, real tests of the RPC-calling data layer
+  itself (mocking only the Supabase client, never the RPC's documented
+  behavior): submit-twice surfaces the RPC's own exception, approve-twice
+  and set-active-twice pass an idempotent-replay response straight
+  through with no extra client-side mutation, and the exact RPC parameter
+  names are asserted so a silent rename can't regress silently (an RPC
+  call is a `Record<string, unknown>`, so TypeScript gives no protection
+  against that class of bug). `set_customer_active` itself gained a real
+  idempotent-replay guard this round
+  (`20260914170000_fix_set_customer_active_idempotency.sql`); previously
+  a redundant deactivate/reactivate call bumped `customers.row_version`
+  unconditionally, which could invalidate an unrelated in-flight Customer
+  Change Request's `base_customer_row_version` for no real reason.
+  Still open, deliberately not fixed: the three `create_*` RPCs (onboarding
+  case, change request, commercial version) rely on a client-minted UUID
+  with no reuse across a retry, so a retried creation currently produces
+  a second, independent row (`case.data.test.ts` locks in this exact
+  behavior so a future change to it is a conscious decision). Building
+  idempotency-key infrastructure to close this is explicitly deferred per
+  the Platform Scale Closure's own guardrail against building that ahead
+  of a real external API caller; the existing mitigation is that
+  creation happens via a single navigation (`/forms/customer-onboarding/new`
+  and its two siblings), not a repeatable in-page button. `*.service.ts`
+  files (`case.service.ts`/`change-request.service.ts`/
+  `commercial-version.service.ts`) still have no test file: their
+  `server-only` guard blocks a direct import, and their business logic
+  (reference snapshot resolution, commercial component mapping) is
+  heavier to mock meaningfully than the thin data-layer wrappers now
+  covered. `customer_change_requests`/`commercial_configuration_versions`
+  still have no pure domain module to test transitions against (their
+  transition logic lives only in SQL).
 - **No test proves cross-revision data integrity after send-back/resubmit.**
   `case.test.ts` proves non-mutation within one function call; nothing
   proves revision 1's stored data is still byte-for-byte intact after a
