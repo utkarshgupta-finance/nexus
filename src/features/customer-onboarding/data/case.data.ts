@@ -179,6 +179,19 @@ async function getLatestRevisionForRequest(requestId: string): Promise<Submissio
   return data
 }
 
+/** Every revision across a batch of requests, in one query, instead of one round trip per request (the review queue, My Requests, and Customer Duplicate Prevention all otherwise looped `getLatestRevisionForRequest` per row). Callers reduce to "latest per request_id" themselves, since a single query already returns every revision cheaply at today's data volume. */
+async function listRevisionsForRequests(requestIds: string[]): Promise<SubmissionRevisionRow[]> {
+  if (requestIds.length === 0) return []
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("submission_revisions")
+    .select("*")
+    .in("request_id", requestIds)
+    .order("revision_number", { ascending: true })
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
 /** create_next_revision (20260907044335_submission_data_foundation.sql): the resubmit-after-send-back path already opens this via send_back_customer_onboarding_case, but a requester restarting after a stale read may need it directly. */
 async function createNextRevision(requestId: string, sourceRevisionId: string, actorUserId: string): Promise<SubmissionRevisionRow> {
   return callSingleRowRpc<SubmissionRevisionRow>("create_next_revision", {
@@ -234,6 +247,7 @@ export {
   listCasesCreatedBy,
   listApprovedCases,
   listRevisionsForRequest,
+  listRevisionsForRequests,
   getLatestRevisionForRequest,
   createNextRevision,
   listSendBacksForRequest,

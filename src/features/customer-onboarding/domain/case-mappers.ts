@@ -51,4 +51,23 @@ function toCustomerOnboardingCase(row: CustomerOnboardingCaseRow, revisions: Sub
   }
 }
 
-export { toRevision, toCustomerOnboardingCase }
+/**
+ * Groups a flat, multi-request revision read (data/case.data.ts's
+ * `listRevisionsForRequests`, one `.in("request_id", ...)` query) back
+ * into oldest-first per-request arrays, the same shape every single-request
+ * caller already expects. Exists so a list of N cases can resolve their
+ * revisions in one query instead of N (the exact N+1 `getLatestRevisionForRequest`
+ * loop `toReviewQueueEntries`/`listOnboardingCasesCreatedBy`/
+ * `listApprovedCaseTaxIdentity` used to run per row).
+ */
+function groupRevisionsByRequestId(revisions: SubmissionRevisionRow[]): Map<string, SubmissionRevisionRow[]> {
+  const grouped = new Map<string, SubmissionRevisionRow[]>()
+  for (const revision of revisions) {
+    const existing = grouped.get(revision.request_id)
+    if (existing) existing.push(revision)
+    else grouped.set(revision.request_id, [revision])
+  }
+  return grouped
+}
+
+export { toRevision, toCustomerOnboardingCase, groupRevisionsByRequestId }

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { approveChangeRequestAction, rejectChangeRequestAction, sendBackChangeRequestAction } from "../actions"
 import type { CustomerChangeRequest } from "../domain/types"
 import { formatChangeRequestId } from "../domain/types"
+import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import { FieldDiffTable } from "./field-diff-table"
 import { RequirementsPreview } from "./requirements-preview"
 
@@ -101,7 +102,7 @@ function ChangeRequestReviewPage({
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="ghost" className="bg-muted text-muted-foreground">
-              {changeRequest.status}
+              {labelForCaseStatus(changeRequest.status)}
             </Badge>
             <Button variant="outline" size="sm" render={<Link href={`/customers/${customerKey}`} />}>
               Customer

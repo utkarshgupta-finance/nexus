@@ -8,8 +8,10 @@ import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 
+import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import { saveChangeDraftAction, submitChangeRequestAction } from "../actions"
 import { evaluateCustomerChangeRequirements } from "../domain/workflow-rules"
+import { formatChangeRequestId } from "../domain/types"
 import type { CustomerChangeRequest } from "../domain/types"
 import type { GovernedFieldKey } from "../domain/governed-fields"
 import { GovernedFieldsForm } from "./governed-fields-form"
@@ -86,10 +88,10 @@ function ChangeRequestPage({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title={`Change Request: ${customerName}`}
-        description={`Request ${requestId}`}
+        description={formatChangeRequestId(initialChangeRequest.requestNumber)}
         actions={
           <Badge variant="ghost" className="bg-muted text-muted-foreground">
-            {initialChangeRequest.status}
+            {labelForCaseStatus(initialChangeRequest.status)}
           </Badge>
         }
       />

@@ -3,7 +3,10 @@ import "server-only"
 import * as documentsData from "../data/documents.data"
 import { toPersistedDocumentMetadata } from "../domain/document-mappers"
 import { buildStoragePath } from "../domain/document-paths"
+import { validateAttachmentFile } from "../domain/documents"
 import type { PersistedOnboardingDocumentMetadata, OnboardingDocumentType } from "../domain/types"
+
+class InvalidDocumentError extends Error {}
 
 /**
  * Application service for Customer Onboarding document evidence (task
@@ -21,8 +24,24 @@ type UploadOnboardingDocumentInput = {
   actorUserId: string | null
 }
 
-/** Uploads file bytes, then supersedes any prior current document of this exact type on this request, then inserts the new metadata row: in that order, so a failed upload never orphans metadata, and a failed supersede/insert never leaves two "current" documents of the same type. */
+/**
+ * Uploads file bytes, then supersedes any prior current document of this
+ * exact type on this request, then inserts the new metadata row: in that
+ * order, so a failed upload never orphans metadata, and a failed
+ * supersede/insert never leaves two "current" documents of the same type.
+ *
+ * Re-validates type/size server-side using the exact same policy the
+ * upload UI already checks (../domain/documents.ts's `validateAttachmentFile`):
+ * the UI check is a convenience for the honest user, never the enforcement
+ * boundary, since a client can always call this Server Action directly
+ * with a crafted request bypassing whatever the browser validated.
+ */
 async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): Promise<PersistedOnboardingDocumentMetadata> {
+  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.type, size: input.file.size }, "This document")
+  if (!validation.valid) {
+    throw new InvalidDocumentError(validation.reason)
+  }
+
   const documentId = crypto.randomUUID()
   const storagePath = buildStoragePath(input.requestId, input.category, input.documentType, documentId, input.file.name)
 
@@ -54,4 +73,4 @@ async function getOnboardingDocumentDownloadUrl(documentId: string): Promise<str
   return documentsData.createSignedDownloadUrl(row.storage_path)
 }
 
-export { uploadOnboardingDocument, listOnboardingDocuments, getOnboardingDocumentDownloadUrl }
+export { uploadOnboardingDocument, listOnboardingDocuments, getOnboardingDocumentDownloadUrl, InvalidDocumentError }

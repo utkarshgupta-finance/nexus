@@ -52,6 +52,24 @@ app  →  features  →  platform  →  lib
   single feature.
 - `app/` may import from anything above it, never the reverse.
 
+**Cross-feature composers are the one named exception to "`platform/` never
+imports from `features/`".** `src/platform/approvals/server.ts` (the
+Approvals inbox / My Work read model) necessarily reads from every feature
+that produces reviewable work (`customer-onboarding`, `customer-change`,
+`customers`, `commercial`), because its entire job is aggregating across
+them. This is architecturally a cross-feature **application-level
+composer**, not a generic platform capability like `workflow`/`audit`/
+`permissions` (§4): it knows what onboarding cases, change requests, and
+commercial versions are, which those capabilities deliberately do not.
+Living under `platform/` (rather than `app/` or its own feature) is still
+correct, because every feature-specific onboarding/change/commercial page
+also needs to read from it (My Work is linked from the shared shell, not
+owned by any one feature). The rule this composer must still follow: it
+only ever reads through each feature's own public `server.ts` barrel
+(never a feature's `domain/`/`data/`/`ui/` internals), and no other
+platform capability is granted the same exception without being documented
+here first.
+
 If you find yourself importing "up" this chain, that's a signal the code is
 in the wrong place.
 

@@ -12,6 +12,7 @@ import type { CommercialChange, CommercialComponent, CommercialConfiguration } f
 import { toVersionSummaries } from "@/features/commercial"
 import { VersionHistoryTable } from "@/features/commercial/ui/version-history-table"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+import { formatFxSnapshot } from "@/lib/format"
 
 import { persistedComponentTableCells } from "../domain/commercial-configuration-view"
 import type { CommercialNature } from "../domain/commercial-rate"
@@ -47,12 +48,6 @@ type NatureRow = { componentId: string; name: string; columns: ColumnKey[]; cell
 
 function buildCellsByColumn(columns: ColumnKey[], cells: ReturnType<typeof persistedComponentTableCells>["cells"]) {
   return columns.map((column) => ({ column, cells }))
-}
-
-function formatFxSnapshot(currencyCode: string | null, rate: number | null): string {
-  if (!currencyCode || currencyCode === "INR") return "INR (no conversion)"
-  if (rate === null) return "-"
-  return `1 ${currencyCode} = INR ${rate.toFixed(2)}`
 }
 
 const NATURE_SECTIONS: { nature: CommercialNature; title: string; emptyMessage: string; columns: ColumnKey[] }[] = [

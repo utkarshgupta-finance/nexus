@@ -16,6 +16,7 @@ import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft } from "../domain/commercial-rate"
 import type { CommercialConfigurationVersion } from "../domain/commercial-version-types"
 import { formatCommercialVersionId } from "../domain/commercial-version-types"
+import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
@@ -99,7 +100,7 @@ function CommercialVersionReviewPage({
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="ghost" className="bg-muted text-muted-foreground">
-              {version.status}
+              {labelForCaseStatus(version.status)}
             </Badge>
             <Button variant="outline" size="sm" render={<Link href={`/commercials/${configId}`} />}>
               Commercial Configuration

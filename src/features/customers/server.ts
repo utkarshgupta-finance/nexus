@@ -21,7 +21,7 @@ import "server-only"
 
 export { listCustomerMaster, getCustomerMasterDetailByKey } from "./read-models/customer-master"
 export type { CustomerMasterListEntry, CustomerMasterDetail } from "./read-models/customer-master"
-export { insertCustomer, getCustomerByKey, getCustomerById, setCustomerActive } from "./data/customers.data"
+export { insertCustomer, getCustomerByKey, getCustomerById, getCustomersByIds, setCustomerActive } from "./data/customers.data"
 export type { InsertCustomerInput } from "./data/customers.data"
 export { getCustomerDeletionEligibility } from "./server/deletion"
 export { findCustomersByFormerName } from "./server/former-name-search"

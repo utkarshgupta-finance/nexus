@@ -3,7 +3,7 @@ import "server-only"
 import { listAllOnboardingEntries, listAllVersionEntries, formatOnboardingCaseId, formatCommercialVersionId } from "@/features/customer-onboarding/server"
 import { listAllChangeRequestEntries } from "@/features/customer-change/server"
 import { formatChangeRequestId } from "@/features/customer-change"
-import { getCustomerById } from "@/features/customers/server"
+import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorEmails } from "@/platform/audit/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
@@ -28,13 +28,19 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     listAllVersionEntries(),
   ])
 
-  const [changeRequestCustomers, versionConfigurations] = await Promise.all([
-    Promise.all(changeRequestEntries.map((entry) => getCustomerById(entry.customerId))),
-    Promise.all(versionEntries.map((entry) => commercialConfigurationService.getCommercialConfiguration(entry.commercialConfigurationId))),
-  ])
-  const versionCustomers = await Promise.all(
-    versionConfigurations.map((configuration) => (configuration ? getCustomerById(configuration.customerId) : null))
+  // Batched, not one round trip per entry: this composer runs on every
+  // Approvals/My Work page load, and its round-trip count previously grew
+  // linearly with the number of onboarding/change-request/version entries.
+  const versionConfigurations = await Promise.all(
+    versionEntries.map((entry) => commercialConfigurationService.getCommercialConfiguration(entry.commercialConfigurationId))
   )
+  const customerIds = [
+    ...changeRequestEntries.map((entry) => entry.customerId),
+    ...versionConfigurations.map((configuration) => configuration?.customerId).filter((id): id is string => Boolean(id)),
+  ]
+  const customersById = new Map((await getCustomersByIds([...new Set(customerIds)])).map((customer) => [customer.id, customer]))
+  const changeRequestCustomers = changeRequestEntries.map((entry) => customersById.get(entry.customerId) ?? null)
+  const versionCustomers = versionConfigurations.map((configuration) => (configuration ? (customersById.get(configuration.customerId) ?? null) : null))
 
   const actorEmails = await resolveActorEmails([
     ...onboardingEntries.map((entry) => entry.createdBy),

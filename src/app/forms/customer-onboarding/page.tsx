@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/product/page-header"
 import { Button } from "@/components/ui/button"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { listMyOnboardingRequests, getSendBackCountsForRequests } from "@/features/customer-onboarding/server"
-import { getCustomerById } from "@/features/customers/server"
+import { getCustomersByIds } from "@/features/customers/server"
 import { MyRequestsTable } from "@/features/customer-onboarding/ui/my-requests-table"
 import { sortMyRequestRows } from "@/features/customer-onboarding/domain/my-requests"
 import type { MyRequestRow } from "@/features/customer-onboarding/domain/my-requests"
@@ -35,9 +35,9 @@ export default async function CustomerOnboardingLandingRoute() {
       const requests = await listMyOnboardingRequests(appUserId)
       const sendBackCounts = await getSendBackCountsForRequests(requests.map((r) => r.requestId))
 
-      const approvedRequests = requests.filter((r) => r.customerId)
-      const customers = await Promise.all(approvedRequests.map((r) => getCustomerById(r.customerId as string)))
-      const customerKeyByCustomerId = new Map(customers.filter(Boolean).map((customer) => [customer!.id, customer!.key]))
+      const approvedCustomerIds = requests.map((r) => r.customerId).filter((id): id is string => Boolean(id))
+      const customers = await getCustomersByIds([...new Set(approvedCustomerIds)])
+      const customerKeyByCustomerId = new Map(customers.map((customer) => [customer.id, customer.key]))
 
       rows = sortMyRequestRows(
         requests.map((request) => ({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { toCustomerOnboardingCase, toRevision } from "./case-mappers"
+import { toCustomerOnboardingCase, toRevision, groupRevisionsByRequestId } from "./case-mappers"
 import type { CustomerOnboardingCaseRow, SubmissionRevisionRow } from "../data/case-row-types"
 
 /**
@@ -139,5 +139,22 @@ describe("toCustomerOnboardingCase", () => {
     )
     expect(afterApproval.customerId).toBe("customer-1")
     expect(afterApproval.commercialConfigurationId).toBe("config-1")
+  })
+})
+
+describe("groupRevisionsByRequestId", () => {
+  it("groups a flat, multi-request read back into oldest-first per-request arrays (the batched replacement for one getLatestRevisionForRequest call per row)", () => {
+    const grouped = groupRevisionsByRequestId([
+      draftRevisionRow({ id: "rev-1a", request_id: "req-1", revision_number: 1 }),
+      draftRevisionRow({ id: "rev-2a", request_id: "req-2", revision_number: 1 }),
+      draftRevisionRow({ id: "rev-1b", request_id: "req-1", revision_number: 2 }),
+    ])
+    expect(grouped.get("req-1")?.map((r) => r.id)).toEqual(["rev-1a", "rev-1b"])
+    expect(grouped.get("req-2")?.map((r) => r.id)).toEqual(["rev-2a"])
+  })
+
+  it("has no entry at all for a request with zero revisions", () => {
+    const grouped = groupRevisionsByRequestId([draftRevisionRow({ request_id: "req-1" })])
+    expect(grouped.has("req-2")).toBe(false)
   })
 })

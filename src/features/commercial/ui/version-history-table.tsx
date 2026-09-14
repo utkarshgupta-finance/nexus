@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { commercialChangeCategoryLabel } from "@/features/commercial"
 import type { VersionSummary } from "@/features/commercial"
+import { formatFxSnapshot } from "@/lib/format"
 
 /**
  * Restrained Version History (task correction §32): Version/Status/
@@ -11,12 +12,6 @@ import type { VersionSummary } from "@/features/commercial"
  * CommercialConfigurationOverview's own component filtering by
  * `versionNumber` for "View details"), never a second fetch.
  */
-
-function formatFxSnapshot(currencyCode: string | null, rate: number | null): string {
-  if (!currencyCode || currencyCode === "INR") return "INR (no conversion)"
-  if (rate === null) return "-"
-  return `1 ${currencyCode} = INR ${rate.toFixed(2)}`
-}
 
 function VersionHistoryTable({
   versions,

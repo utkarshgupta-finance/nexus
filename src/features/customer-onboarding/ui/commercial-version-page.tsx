@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 
+import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import { saveCommercialVersionDraftAction, submitCommercialVersionAction } from "../actions"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
+import { formatCommercialVersionId } from "../domain/commercial-version-types"
 import type { CommercialConfigurationVersion } from "../domain/commercial-version-types"
 import { CommercialRateSection } from "./commercial-rate-section"
 
@@ -70,10 +72,10 @@ function CommercialVersionPage({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title="Commercial Configuration Version"
-        description={`Request ${requestId}, ${initialVersion.changeCategory}`}
+        description={`${formatCommercialVersionId(initialVersion.versionNumber)}, ${initialVersion.changeCategory}`}
         actions={
           <Badge variant="ghost" className="bg-muted text-muted-foreground">
-            {initialVersion.status}
+            {labelForCaseStatus(initialVersion.status)}
           </Badge>
         }
       />

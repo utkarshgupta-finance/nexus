@@ -26,6 +26,15 @@ async function getCustomerById(id: string): Promise<CustomerRow | null> {
   return data
 }
 
+/** Every customer matching a batch of ids, in one query, instead of one round trip per id: the pattern every list-with-customer-name page (Approvals, My Requests, Reviews) otherwise falls into. Order is not guaranteed to match `ids`; callers key results by `.id` themselves. */
+async function getCustomersByIds(ids: string[]): Promise<CustomerRow[]> {
+  if (ids.length === 0) return []
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("customers").select("*").in("id", ids)
+  if (error) throw new CustomerOperationError(parseCustomerError(error))
+  return data ?? []
+}
+
 async function listCustomers(): Promise<CustomerRow[]> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.from("customers").select("*").order("created_at", { ascending: true })
@@ -80,5 +89,5 @@ async function setCustomerActive(customerId: string, isActive: boolean, reason: 
   return data
 }
 
-export { getCustomerByKey, getCustomerById, listCustomers, insertCustomer, setCustomerActive }
+export { getCustomerByKey, getCustomerById, getCustomersByIds, listCustomers, insertCustomer, setCustomerActive }
 export type { InsertCustomerInput }

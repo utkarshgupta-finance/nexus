@@ -33,7 +33,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { signOutAction } from "@/features/auth/actions"
+import { signOutAction } from "@/platform/auth/actions"
 
 type NavItem = {
   label: string

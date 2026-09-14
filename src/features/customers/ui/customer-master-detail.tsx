@@ -15,6 +15,7 @@ import { resolveOption } from "@/features/reference-data"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
 import { labelForGovernedField, formatChangeRequestId } from "@/features/customer-change"
+import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import type { CustomerMasterDetail as CustomerMasterDetailData } from "../read-models/customer-master"
 import {
   resolveBrandName,
@@ -87,7 +88,7 @@ function CustomerMasterDetail({
   const segmentLabel = resolveLabel("segment", resolveSegmentCode(record, enrichment))
   const businessUnitLabel = resolveLabel("business_unit", resolveBusinessUnitCode(record, enrichment))
   const billingCurrencyLabel = resolveLabel("currency", resolveBillingCurrencyCode(enrichment))
-  const statusLabel = (status: string) => status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
+  const statusLabel = labelForCaseStatus
   const latestChangeRequest = [...changeRequests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] ?? null
 
   return (

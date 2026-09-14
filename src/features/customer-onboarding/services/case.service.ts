@@ -1,7 +1,7 @@
 import "server-only"
 
 import * as caseData from "../data/case.data"
-import { toCustomerOnboardingCase } from "../domain/case-mappers"
+import { toCustomerOnboardingCase, groupRevisionsByRequestId } from "../domain/case-mappers"
 import { countSendBacksByRequestId } from "../domain/my-requests"
 import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
@@ -77,12 +77,13 @@ async function sendBackOnboardingCase(
   return toCustomerOnboardingCase(row, revisions)
 }
 
-/** My Requests (task spec): every case this requester created, including drafts, unlike the shared Approvals inbox which deliberately excludes drafts (see platform/approvals/domain/inbox.ts's bucketForStatus). */
+/** My Requests (task spec): every case this requester created, including drafts, unlike the shared Approvals inbox which deliberately excludes drafts (see platform/approvals/domain/inbox.ts's bucketForStatus). Revisions for every case are resolved in one batched query, not one round trip per case. */
 async function listOnboardingCasesCreatedBy(appUserId: string): Promise<CustomerOnboardingCase[]> {
   const rows = await caseData.listCasesCreatedBy(appUserId)
+  const revisionsByRequestId = groupRevisionsByRequestId(await caseData.listRevisionsForRequests(rows.map((row) => row.request_id)))
   const cases: CustomerOnboardingCase[] = []
   for (const row of rows) {
-    const revisions = await caseData.listRevisionsForRequest(row.request_id)
+    const revisions = revisionsByRequestId.get(row.request_id) ?? []
     if (revisions.length === 0) continue
     cases.push(toCustomerOnboardingCase(row, revisions))
   }
@@ -179,9 +180,11 @@ type ReviewQueueEntry = {
 }
 
 async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.listCasesAwaitingReview>>): Promise<ReviewQueueEntry[]> {
+  const revisionsByRequestId = groupRevisionsByRequestId(await caseData.listRevisionsForRequests(rows.map((row) => row.request_id)))
   const entries: ReviewQueueEntry[] = []
   for (const row of rows) {
-    const latest = await caseData.getLatestRevisionForRequest(row.request_id)
+    const revisions = revisionsByRequestId.get(row.request_id) ?? []
+    const latest = revisions[revisions.length - 1]
     const values = latest?.status === "submitted" && latest.effective_data ? latest.effective_data.values : (latest?.raw_data ?? {})
     entries.push({
       requestId: row.request_id,
@@ -288,10 +291,12 @@ type ApprovedCaseTaxIdentity = { customerId: string; gstNumber: string | null; p
  */
 async function listApprovedCaseTaxIdentity(): Promise<ApprovedCaseTaxIdentity[]> {
   const rows = await caseData.listApprovedCases()
+  const revisionsByRequestId = groupRevisionsByRequestId(await caseData.listRevisionsForRequests(rows.map((row) => row.request_id)))
   const identities: ApprovedCaseTaxIdentity[] = []
   for (const row of rows) {
     if (!row.customer_id) continue
-    const latest = await caseData.getLatestRevisionForRequest(row.request_id)
+    const revisions = revisionsByRequestId.get(row.request_id) ?? []
+    const latest = revisions[revisions.length - 1]
     const values = latest?.status === "submitted" && latest.effective_data ? latest.effective_data.values : (latest?.raw_data ?? {})
     identities.push({
       customerId: row.customer_id,
