@@ -11,7 +11,7 @@ import { listAllChangeRequestEntries, getSendBackCountsForRequests as getChangeR
 import { formatChangeRequestId } from "@/features/customer-change"
 import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
-import { resolveActorEmails } from "@/platform/audit/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
 import { buildMyWorkItems, buildDraftWorkItems } from "./domain/my-work"
 import { buildOperationalQueue } from "./domain/operational-queue"
@@ -50,7 +50,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
   const changeRequestCustomers = changeRequestEntries.map((entry) => customersById.get(entry.customerId) ?? null)
   const versionCustomers = versionConfigurations.map((configuration) => (configuration ? (customersById.get(configuration.customerId) ?? null) : null))
 
-  const actorEmails = await resolveActorEmails([
+  const actorLabels = await resolveActorLabels([
     ...onboardingEntries.map((entry) => entry.createdBy),
     ...changeRequestEntries.map((entry) => entry.createdBy),
     ...versionEntries.map((entry) => entry.createdBy),
@@ -70,7 +70,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       customerName: entry.customerLegalName,
       customerKey: null,
       createdBy: entry.createdBy,
-      requestedByEmail: entry.createdBy ? (actorEmails.get(entry.createdBy) ?? null) : null,
+      requestedByEmail: entry.createdBy ? (actorLabels.get(entry.createdBy) ?? null) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/reviews/${entry.requestId}`,
@@ -90,7 +90,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       customerName: customer?.name ?? "(unknown customer)",
       customerKey: customer?.key ?? null,
       createdBy: entry.createdBy,
-      requestedByEmail: entry.createdBy ? (actorEmails.get(entry.createdBy) ?? null) : null,
+      requestedByEmail: entry.createdBy ? (actorLabels.get(entry.createdBy) ?? null) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/reviews/change-requests/${entry.requestId}`,
@@ -110,7 +110,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       customerName: customer?.name ?? "(unknown customer)",
       customerKey: customer?.key ?? null,
       createdBy: entry.createdBy,
-      requestedByEmail: entry.createdBy ? (actorEmails.get(entry.createdBy) ?? null) : null,
+      requestedByEmail: entry.createdBy ? (actorLabels.get(entry.createdBy) ?? null) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/reviews/commercial-versions/${entry.requestId}`,

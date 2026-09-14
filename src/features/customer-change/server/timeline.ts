@@ -1,6 +1,6 @@
 import "server-only"
 
-import { resolveActorEmails } from "@/platform/audit/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import { loadChangeRequest, listChangeRequestSendBacks, listChangeRequestRevisionSummaries } from "../services/change-request.service"
 import { buildChangeRequestTimeline, collectChangeRequestTimelineActorIds } from "../domain/timeline"
@@ -29,8 +29,8 @@ async function loadChangeRequestTimeline(requestId: string): Promise<RequestTime
     sendBacks,
   }
 
-  const actorEmails = await resolveActorEmails(collectChangeRequestTimelineActorIds(input))
-  return buildChangeRequestTimeline({ ...input, actorEmails })
+  const actorLabels = await resolveActorLabels(collectChangeRequestTimelineActorIds(input))
+  return buildChangeRequestTimeline({ ...input, actorLabels })
 }
 
 export { loadChangeRequestTimeline }

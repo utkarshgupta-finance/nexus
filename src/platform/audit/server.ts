@@ -7,6 +7,6 @@ import "server-only"
  * what these return.
  */
 
-export { resolveActorEmails } from "./data/actor-directory.data"
+export { resolveActorEmails, resolveActorLabels } from "./data/actor-directory.data"
 export { listAuditLogForRow } from "./data/audit-log.data"
 export type { AuditLogRow } from "./data/audit-log.data"

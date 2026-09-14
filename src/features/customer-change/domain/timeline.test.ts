@@ -21,7 +21,7 @@ describe("buildChangeRequestTimeline", () => {
         { revisionNumber: 2, submittedAt: "2026-01-05T00:00:00.000Z", submittedBy: "actor-requester" },
       ],
       sendBacks: [{ revisionNumber: 1, reason: "Effective date is missing", sentBackBy: "actor-approver", sentBackAt: "2026-01-03T00:00:00.000Z" }],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
 
     expect(timeline.map((event) => event.summary)).toEqual([
@@ -43,7 +43,7 @@ describe("buildChangeRequestTimeline", () => {
       decisionReason: "Duplicate of an already-approved change",
       revisions: [{ revisionNumber: 1, submittedAt: "2026-01-02T00:00:00.000Z", submittedBy: "actor-requester" }],
       sendBacks: [],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
     expect(timeline.at(-1)?.summary).toBe("Rejected: Duplicate of an already-approved change")
   })
@@ -58,7 +58,7 @@ describe("buildChangeRequestTimeline", () => {
       decisionReason: null,
       revisions: [{ revisionNumber: 1, submittedAt: null, submittedBy: null }],
       sendBacks: [],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
     expect(timeline.map((event) => event.summary)).toEqual(["Change Request created"])
   })

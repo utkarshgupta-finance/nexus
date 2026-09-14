@@ -1,6 +1,6 @@
 import "server-only"
 
-import { resolveActorEmails } from "@/platform/audit/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 import { getOnboardingCase, listOnboardingSendBacks, listOnboardingRevisionSummaries } from "../services/case.service"
 import { buildOnboardingTimeline, collectOnboardingTimelineActorIds } from "../domain/timeline"
 import type { OnboardingTimelineEvent } from "../domain/timeline"
@@ -27,8 +27,8 @@ async function loadOnboardingRequestTimeline(requestId: string): Promise<Onboard
     sendBacks,
   }
 
-  const actorEmails = await resolveActorEmails(collectOnboardingTimelineActorIds(input))
-  return buildOnboardingTimeline({ ...input, actorEmails })
+  const actorLabels = await resolveActorLabels(collectOnboardingTimelineActorIds(input))
+  return buildOnboardingTimeline({ ...input, actorLabels })
 }
 
 /** Requester-facing Send Back count (task spec): the number of times this request has ever been sent back, derived from history, never a manually incremented counter. */

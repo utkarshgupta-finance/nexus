@@ -23,7 +23,7 @@ describe("buildOnboardingTimeline", () => {
         { revisionNumber: 1, reason: "GST number looks incorrect", sentBackBy: "actor-approver", sentBackAt: "2026-01-03T00:00:00.000Z" },
         { revisionNumber: 2, reason: "Registered address is incomplete", sentBackBy: "actor-approver", sentBackAt: "2026-01-06T00:00:00.000Z" },
       ],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
 
     expect(timeline.map((event) => event.summary)).toEqual([
@@ -46,7 +46,7 @@ describe("buildOnboardingTimeline", () => {
       approvedBy: null,
       revisions: [{ revisionNumber: 1, submittedAt: null, submittedBy: null }],
       sendBacks: [],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
 
     expect(timeline.map((event) => event.summary)).toEqual(["Request created"])
@@ -60,7 +60,7 @@ describe("buildOnboardingTimeline", () => {
       approvedBy: null,
       revisions: [],
       sendBacks: [],
-      actorEmails: new Map(),
+      actorLabels: new Map(),
     })
     expect(timeline[0].actorEmail).toBeNull()
   })

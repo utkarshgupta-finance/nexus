@@ -1283,3 +1283,44 @@ state (for example, a combined approval view, or "3 of 5 initiatives
 still have an open commercials change"), that is the trigger to add the
 parent record; nothing here should be read as having decided against it
 permanently.
+
+## 31. Actor Identity permanent rule: PARTIALLY IMPLEMENTED (Platform Operating Expansion, permanent rule)
+
+`app_users` gained its first real profile field, `display_name`
+(`supabase/migrations/20260916040000_app_users_display_name.sql`), an
+admin-maintained human name (task Phase J, User Access, builds the UI
+that sets it). The one canonical actor-display resolver,
+`resolveActorLabels` (`src/platform/audit/data/actor-directory.data.ts`),
+prefers it, falling back to the Supabase Auth email for a user with no
+display_name set yet, exactly matching the rule's own "existing users
+without names fall back to email temporarily." Every existing consumer
+that previously called `resolveActorEmails` for a human-facing display
+(the unified Approvals inbox, all three domains' request Timelines, the
+Customer Activity timeline, onboarding document uploader labels) now
+calls `resolveActorLabels` instead, so setting one admin gets a real
+name showing up everywhere that actor has ever acted, immediately, with
+no per-feature change required.
+
+**IMPLEMENTED**: a real display_name concept exists, is admin-settable
+(Phase J), and every actor display resolves it consistently through one
+function.
+
+**DEFERRED, explicitly, not silently**: the rule's stronger form ("do
+NOT rely only on current app_users.name for historical display since it
+may change later... use current-name resolution as fallback for old
+records only") implies a write-time snapshot
+(`actor_display_name_snapshot`/`actor_email_snapshot`/`acted_at`) captured
+at the moment of each governed action, so a later name change never
+silently rewrites history. That snapshot infrastructure was not built in
+this pass: every `*_by` column in this schema (sent_back_by, approved_by,
+decided_by, cancelled_by, and so on) still stores only an actor id,
+resolved to whatever that user's CURRENT name/email is at read time, on
+every domain this session touched. This is a real, acknowledged gap, not
+an oversight: adding snapshot columns to every governed action across
+Onboarding, Customer Change, and Commercial Version is a schema change of
+comparable size to Phase H's own governed-field migration, and doing it
+well means designing one snapshot shape reused everywhere, not ad hoc
+columns bolted on per table. Trigger to revisit: the first time a
+`display_name` is actually changed on a live record with real historical
+actions against it, and "who approved this in March" needs to show the
+name as it was in March, not today.

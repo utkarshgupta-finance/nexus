@@ -104,7 +104,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: FIELD_HISTORY,
       commercialVersions: COMMERCIAL_VERSIONS,
       statusAuditRows: STATUS_AUDIT_ROWS,
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
     })
 
@@ -127,7 +127,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: [],
       commercialVersions: [],
       statusAuditRows: [],
-      actorEmails: new Map(),
+      actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline).toEqual([])
@@ -141,7 +141,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: [],
       commercialVersions: [],
       statusAuditRows: [rowWithReason],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline[0].summary).toBe("Customer deactivated: Customer requested account closure")
@@ -155,7 +155,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: [],
       commercialVersions: [],
       statusAuditRows: [noOpRow],
-      actorEmails: new Map(),
+      actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline).toEqual([])
@@ -169,7 +169,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: FIELD_HISTORY,
       commercialVersions: [],
       statusAuditRows: [],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: snapshot,
     })
     expect(timeline[0].summary).toBe('Segment changed from "SMB" to "Enterprise"')
@@ -182,7 +182,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: FIELD_HISTORY,
       commercialVersions: [],
       statusAuditRows: [],
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline[0].summary).toBe('Segment changed from "smb" to "enterprise"')
@@ -195,7 +195,7 @@ describe("buildCustomerActivityTimeline", () => {
       fieldHistory: [],
       commercialVersions: [],
       statusAuditRows: [],
-      actorEmails: new Map(),
+      actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline[0].actorEmail).toBeNull()

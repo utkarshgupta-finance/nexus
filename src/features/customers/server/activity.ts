@@ -3,7 +3,7 @@ import "server-only"
 import { listChangeRequestsForCustomer, listCustomerFieldHistory } from "@/features/customer-change/server"
 import { getOnboardingOriginForCustomer, listVersionsForConfiguration } from "@/features/customer-onboarding/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
-import { listAuditLogForRow, resolveActorEmails } from "@/platform/audit/server"
+import { listAuditLogForRow, resolveActorLabels } from "@/platform/audit/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { buildCustomerActivityTimeline, collectActorIds } from "../domain/activity"
 import type { CustomerActivityEvent } from "../domain/activity"
@@ -62,7 +62,7 @@ async function loadCustomerDetailContext(customerId: string): Promise<CustomerDe
  */
 async function buildActivityTimelineFromContext(customerId: string, context: CustomerDetailContext): Promise<CustomerActivityEvent[]> {
   const statusAuditRows = await listAuditLogForRow("customers", customerId)
-  const actorEmails = await resolveActorEmails(
+  const actorLabels = await resolveActorLabels(
     collectActorIds({
       onboardingOrigin: context.onboardingOrigin,
       changeRequests: context.changeRequests,
@@ -72,7 +72,7 @@ async function buildActivityTimelineFromContext(customerId: string, context: Cus
     })
   )
 
-  return buildCustomerActivityTimeline({ ...context, statusAuditRows, actorEmails })
+  return buildCustomerActivityTimeline({ ...context, statusAuditRows, actorLabels })
 }
 
 async function loadCustomerActivityTimeline(customerId: string): Promise<CustomerActivityEvent[]> {

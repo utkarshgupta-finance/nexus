@@ -4,7 +4,7 @@ import * as documentsData from "../data/documents.data"
 import { toPersistedDocumentMetadata } from "../domain/document-mappers"
 import { buildStoragePath } from "../domain/document-paths"
 import { validateAttachmentFile } from "../domain/documents"
-import { resolveActorEmails } from "@/platform/audit/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 import type { PersistedOnboardingDocumentMetadata, PersistedOnboardingDocumentView, OnboardingDocumentType } from "../domain/types"
 
 class InvalidDocumentError extends Error {}
@@ -89,15 +89,15 @@ async function listOnboardingDocuments(requestId: string): Promise<PersistedOnbo
  * reopening a Sent Back request showed every attachment slot as empty,
  * even though the documents were still there. Adds a display-ready
  * uploader label so the editor never has to resolve `uploadedBy` itself,
- * matching the same `resolveActorEmails` pattern every other actor
+ * matching the same `resolveActorLabels` pattern every other actor
  * display in the app already uses.
  */
 async function listOnboardingDocumentsWithUploader(requestId: string): Promise<PersistedOnboardingDocumentView[]> {
   const documents = await listOnboardingDocuments(requestId)
-  const actorEmails = await resolveActorEmails(documents.map((document) => document.uploadedBy))
+  const actorLabels = await resolveActorLabels(documents.map((document) => document.uploadedBy))
   return documents.map((document) => ({
     ...document,
-    uploadedByLabel: document.uploadedBy ? (actorEmails.get(document.uploadedBy) ?? null) : null,
+    uploadedByLabel: document.uploadedBy ? (actorLabels.get(document.uploadedBy) ?? null) : null,
   }))
 }
 

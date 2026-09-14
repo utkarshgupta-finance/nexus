@@ -26,12 +26,12 @@ type BuildOnboardingTimelineInput = {
   approvedBy: string | null
   revisions: OnboardingTimelineRevisionInput[]
   sendBacks: OnboardingTimelineSendBackInput[]
-  actorEmails: Map<string, string | null>
+  actorLabels: Map<string, string | null>
 }
 
-function actorLabel(actorId: string | null, actorEmails: Map<string, string | null>): string | null {
+function actorLabel(actorId: string | null, actorLabels: Map<string, string | null>): string | null {
   if (!actorId) return null
-  return actorEmails.get(actorId) ?? null
+  return actorLabels.get(actorId) ?? null
 }
 
 /** Oldest first: a single request's own history reads naturally top-to-bottom as "what happened, in order", unlike the newest-first Customer Activity feed. */
@@ -40,7 +40,7 @@ function buildOnboardingTimeline(input: BuildOnboardingTimelineInput): Onboardin
     {
       id: "created",
       occurredAt: input.createdAt,
-      actorEmail: actorLabel(input.createdBy, input.actorEmails),
+      actorEmail: actorLabel(input.createdBy, input.actorLabels),
       summary: "Request created",
     },
   ]
@@ -50,7 +50,7 @@ function buildOnboardingTimeline(input: BuildOnboardingTimelineInput): Onboardin
     events.push({
       id: `submitted-${revision.revisionNumber}`,
       occurredAt: revision.submittedAt,
-      actorEmail: actorLabel(revision.submittedBy, input.actorEmails),
+      actorEmail: actorLabel(revision.submittedBy, input.actorLabels),
       summary: revision.revisionNumber === 1 ? "Submitted for review" : `Resubmitted for review (Revision ${revision.revisionNumber})`,
     })
   }
@@ -59,7 +59,7 @@ function buildOnboardingTimeline(input: BuildOnboardingTimelineInput): Onboardin
     events.push({
       id: `sent-back-${sendBack.revisionNumber}-${sendBack.sentBackAt}`,
       occurredAt: sendBack.sentBackAt,
-      actorEmail: actorLabel(sendBack.sentBackBy, input.actorEmails),
+      actorEmail: actorLabel(sendBack.sentBackBy, input.actorLabels),
       summary: `Sent back: ${sendBack.reason}`,
     })
   }
@@ -68,7 +68,7 @@ function buildOnboardingTimeline(input: BuildOnboardingTimelineInput): Onboardin
     events.push({
       id: "approved",
       occurredAt: input.approvedAt,
-      actorEmail: actorLabel(input.approvedBy, input.actorEmails),
+      actorEmail: actorLabel(input.approvedBy, input.actorLabels),
       summary: "Approved",
     })
   }
@@ -77,7 +77,7 @@ function buildOnboardingTimeline(input: BuildOnboardingTimelineInput): Onboardin
 }
 
 /** Every actor id referenced anywhere in the timeline inputs, so the caller can resolve them all in one batched lookup before building the timeline. */
-function collectOnboardingTimelineActorIds(input: Omit<BuildOnboardingTimelineInput, "actorEmails">): (string | null)[] {
+function collectOnboardingTimelineActorIds(input: Omit<BuildOnboardingTimelineInput, "actorLabels">): (string | null)[] {
   const ids: (string | null)[] = [input.createdBy, input.approvedBy]
   for (const revision of input.revisions) ids.push(revision.submittedBy)
   for (const sendBack of input.sendBacks) ids.push(sendBack.sentBackBy)

@@ -19,28 +19,28 @@ type BuildCommercialVersionTimelineInput = {
   decidedBy: string | null
   decisionStatus: "approved" | "rejected" | null
   decisionReason: string | null
-  actorEmails: Map<string, string | null>
+  actorLabels: Map<string, string | null>
 }
 
-function actorLabel(actorId: string | null, actorEmails: Map<string, string | null>): string | null {
+function actorLabel(actorId: string | null, actorLabels: Map<string, string | null>): string | null {
   if (!actorId) return null
-  return actorEmails.get(actorId) ?? null
+  return actorLabels.get(actorId) ?? null
 }
 
 function buildCommercialVersionTimeline(input: BuildCommercialVersionTimelineInput): RequestTimelineEvent[] {
   const events: RequestTimelineEvent[] = [
-    { id: "created", occurredAt: input.createdAt, actorEmail: actorLabel(input.createdBy, input.actorEmails), summary: "Version created" },
+    { id: "created", occurredAt: input.createdAt, actorEmail: actorLabel(input.createdBy, input.actorLabels), summary: "Version created" },
   ]
 
   if (input.submittedAt) {
-    events.push({ id: "submitted", occurredAt: input.submittedAt, actorEmail: actorLabel(input.submittedBy, input.actorEmails), summary: "Submitted for review" })
+    events.push({ id: "submitted", occurredAt: input.submittedAt, actorEmail: actorLabel(input.submittedBy, input.actorLabels), summary: "Submitted for review" })
   }
 
   if (input.decidedAt && input.decisionStatus) {
     events.push({
       id: "decided",
       occurredAt: input.decidedAt,
-      actorEmail: actorLabel(input.decidedBy, input.actorEmails),
+      actorEmail: actorLabel(input.decidedBy, input.actorLabels),
       summary: input.decisionStatus === "approved" ? "Approved" : `Rejected: ${input.decisionReason ?? "no reason given"}`,
     })
   }
@@ -48,7 +48,7 @@ function buildCommercialVersionTimeline(input: BuildCommercialVersionTimelineInp
   return events.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())
 }
 
-function collectCommercialVersionTimelineActorIds(input: Omit<BuildCommercialVersionTimelineInput, "actorEmails">): (string | null)[] {
+function collectCommercialVersionTimelineActorIds(input: Omit<BuildCommercialVersionTimelineInput, "actorLabels">): (string | null)[] {
   return [input.createdBy, input.submittedBy, input.decidedBy]
 }
 

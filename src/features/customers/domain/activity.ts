@@ -38,14 +38,14 @@ type CustomerActivityEvent = {
   relatedRequestId: string | null
 }
 
-function actorLabel(actorId: string | null, actorEmails: Map<string, string | null>): string | null {
+function actorLabel(actorId: string | null, actorLabels: Map<string, string | null>): string | null {
   if (!actorId) return null
-  return actorEmails.get(actorId) ?? null
+  return actorLabels.get(actorId) ?? null
 }
 
 function fieldChangeEvents(
   entries: CustomerFieldHistoryEntry[],
-  actorEmails: Map<string, string | null>,
+  actorLabels: Map<string, string | null>,
   snapshot: ReferenceMasterSnapshot
 ): CustomerActivityEvent[] {
   return entries.map((entry) => {
@@ -55,20 +55,20 @@ function fieldChangeEvents(
     return {
       id: `field-${entry.id}`,
       occurredAt: entry.changedAt,
-      actorEmail: actorLabel(entry.approvedBy, actorEmails),
+      actorEmail: actorLabel(entry.approvedBy, actorLabels),
       summary: `${label} changed from "${from}" to "${to}"`,
       relatedRequestId: entry.changeRequestId,
     }
   })
 }
 
-function changeRequestEvents(requests: CustomerChangeRequest[], actorEmails: Map<string, string | null>): CustomerActivityEvent[] {
+function changeRequestEvents(requests: CustomerChangeRequest[], actorLabels: Map<string, string | null>): CustomerActivityEvent[] {
   const events: CustomerActivityEvent[] = []
   for (const request of requests) {
     events.push({
       id: `cr-created-${request.requestId}`,
       occurredAt: request.createdAt,
-      actorEmail: actorLabel(request.createdBy, actorEmails),
+      actorEmail: actorLabel(request.createdBy, actorLabels),
       summary: "Customer Change Request created",
       relatedRequestId: request.requestId,
     })
@@ -76,7 +76,7 @@ function changeRequestEvents(requests: CustomerChangeRequest[], actorEmails: Map
       events.push({
         id: `cr-sentback-${request.requestId}`,
         occurredAt: request.sentBack.sentBackAt,
-        actorEmail: actorLabel(request.sentBack.sentBackBy, actorEmails),
+        actorEmail: actorLabel(request.sentBack.sentBackBy, actorLabels),
         summary: `Customer Change Request sent back: ${request.sentBack.reason}`,
         relatedRequestId: request.requestId,
       })
@@ -85,7 +85,7 @@ function changeRequestEvents(requests: CustomerChangeRequest[], actorEmails: Map
       events.push({
         id: `cr-decided-${request.requestId}`,
         occurredAt: request.decidedAt,
-        actorEmail: actorLabel(request.decidedBy, actorEmails),
+        actorEmail: actorLabel(request.decidedBy, actorLabels),
         summary: request.status === "approved" ? "Customer Change Request approved" : `Customer Change Request rejected: ${request.decisionReason ?? "no reason given"}`,
         relatedRequestId: request.requestId,
       })
@@ -94,13 +94,13 @@ function changeRequestEvents(requests: CustomerChangeRequest[], actorEmails: Map
   return events
 }
 
-function commercialVersionEvents(versions: CommercialConfigurationVersion[], actorEmails: Map<string, string | null>): CustomerActivityEvent[] {
+function commercialVersionEvents(versions: CommercialConfigurationVersion[], actorLabels: Map<string, string | null>): CustomerActivityEvent[] {
   const events: CustomerActivityEvent[] = []
   for (const version of versions) {
     events.push({
       id: `cv-created-${version.requestId}`,
       occurredAt: version.createdAt,
-      actorEmail: actorLabel(version.createdBy, actorEmails),
+      actorEmail: actorLabel(version.createdBy, actorLabels),
       summary: "Commercial Version created",
       relatedRequestId: version.requestId,
     })
@@ -108,7 +108,7 @@ function commercialVersionEvents(versions: CommercialConfigurationVersion[], act
       events.push({
         id: `cv-decided-${version.requestId}`,
         occurredAt: version.decidedAt,
-        actorEmail: actorLabel(version.decidedBy, actorEmails),
+        actorEmail: actorLabel(version.decidedBy, actorLabels),
         summary: version.status === "approved" ? "Commercial Version approved" : `Commercial Version rejected: ${version.decisionReason ?? "no reason given"}`,
         relatedRequestId: version.requestId,
       })
@@ -117,13 +117,13 @@ function commercialVersionEvents(versions: CommercialConfigurationVersion[], act
   return events
 }
 
-function onboardingOriginEvent(origin: OnboardingOrigin | null, actorEmails: Map<string, string | null>): CustomerActivityEvent[] {
+function onboardingOriginEvent(origin: OnboardingOrigin | null, actorLabels: Map<string, string | null>): CustomerActivityEvent[] {
   if (!origin || !origin.approvedAt) return []
   return [
     {
       id: `onboarding-approved-${origin.requestId}`,
       occurredAt: origin.approvedAt,
-      actorEmail: actorLabel(origin.approvedBy, actorEmails),
+      actorEmail: actorLabel(origin.approvedBy, actorLabels),
       summary: "Customer Onboarding approved: Customer Master created",
       relatedRequestId: origin.requestId,
     },
@@ -131,7 +131,7 @@ function onboardingOriginEvent(origin: OnboardingOrigin | null, actorEmails: Map
 }
 
 /** Reads only `is_active`'s own before/after out of a generic mutation audit row; never renders the rest of the JSON. */
-function statusChangeEvents(auditRows: AuditLogRow[], actorEmails: Map<string, string | null>): CustomerActivityEvent[] {
+function statusChangeEvents(auditRows: AuditLogRow[], actorLabels: Map<string, string | null>): CustomerActivityEvent[] {
   const events: CustomerActivityEvent[] = []
   for (const row of auditRows) {
     if (row.action !== "UPDATE" || !row.before_value || !row.after_value) continue
@@ -142,7 +142,7 @@ function statusChangeEvents(auditRows: AuditLogRow[], actorEmails: Map<string, s
     events.push({
       id: `status-${row.id}`,
       occurredAt: row.occurred_at,
-      actorEmail: actorLabel(row.actor_user_id, actorEmails),
+      actorEmail: actorLabel(row.actor_user_id, actorLabels),
       summary: reason ? `${after ? "Customer reactivated" : "Customer deactivated"}: ${reason}` : after ? "Customer reactivated" : "Customer deactivated",
       relatedRequestId: row.request_id,
     })
@@ -156,23 +156,23 @@ type BuildCustomerActivityTimelineInput = {
   fieldHistory: CustomerFieldHistoryEntry[]
   commercialVersions: CommercialConfigurationVersion[]
   statusAuditRows: AuditLogRow[]
-  actorEmails: Map<string, string | null>
+  actorLabels: Map<string, string | null>
   referenceMasterSnapshot: ReferenceMasterSnapshot
 }
 
 function buildCustomerActivityTimeline(input: BuildCustomerActivityTimelineInput): CustomerActivityEvent[] {
   const events = [
-    ...onboardingOriginEvent(input.onboardingOrigin, input.actorEmails),
-    ...fieldChangeEvents(input.fieldHistory, input.actorEmails, input.referenceMasterSnapshot),
-    ...changeRequestEvents(input.changeRequests, input.actorEmails),
-    ...commercialVersionEvents(input.commercialVersions, input.actorEmails),
-    ...statusChangeEvents(input.statusAuditRows, input.actorEmails),
+    ...onboardingOriginEvent(input.onboardingOrigin, input.actorLabels),
+    ...fieldChangeEvents(input.fieldHistory, input.actorLabels, input.referenceMasterSnapshot),
+    ...changeRequestEvents(input.changeRequests, input.actorLabels),
+    ...commercialVersionEvents(input.commercialVersions, input.actorLabels),
+    ...statusChangeEvents(input.statusAuditRows, input.actorLabels),
   ]
   return events.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
 }
 
 /** Every actor id referenced anywhere in the timeline inputs, so the caller can resolve them all in one batched lookup before building the timeline. */
-function collectActorIds(input: Omit<BuildCustomerActivityTimelineInput, "actorEmails" | "referenceMasterSnapshot">): (string | null)[] {
+function collectActorIds(input: Omit<BuildCustomerActivityTimelineInput, "actorLabels" | "referenceMasterSnapshot">): (string | null)[] {
   const ids: (string | null)[] = []
   if (input.onboardingOrigin) ids.push(input.onboardingOrigin.approvedBy)
   for (const entry of input.fieldHistory) ids.push(entry.approvedBy)

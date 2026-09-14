@@ -3,7 +3,7 @@ import "server-only"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { withLoggedOperation } from "@/platform/observability/server"
-import { resolveActorEmails } from "@/platform/audit/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import { buildCommercialVersionTimeline, collectCommercialVersionTimelineActorIds } from "../domain/commercial-version-timeline"
 
@@ -161,8 +161,8 @@ async function loadCommercialVersionTimeline(requestId: string): Promise<Request
     decisionReason: version.decisionReason,
   }
 
-  const actorEmails = await resolveActorEmails(collectCommercialVersionTimelineActorIds(input))
-  return buildCommercialVersionTimeline({ ...input, actorEmails })
+  const actorLabels = await resolveActorLabels(collectCommercialVersionTimelineActorIds(input))
+  return buildCommercialVersionTimeline({ ...input, actorLabels })
 }
 
 type ReviewQueueEntry = {

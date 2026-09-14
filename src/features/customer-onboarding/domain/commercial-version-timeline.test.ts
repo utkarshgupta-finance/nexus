@@ -18,7 +18,7 @@ describe("buildCommercialVersionTimeline", () => {
       decidedBy: "actor-approver",
       decisionStatus: "approved",
       decisionReason: null,
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
     expect(timeline.map((e) => e.summary)).toEqual(["Version created", "Submitted for review", "Approved"])
   })
@@ -33,7 +33,7 @@ describe("buildCommercialVersionTimeline", () => {
       decidedBy: "actor-approver",
       decisionStatus: "rejected",
       decisionReason: "Rate does not match the approved commercial proposal",
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
     expect(timeline.at(-1)?.summary).toBe("Rejected: Rate does not match the approved commercial proposal")
   })
@@ -48,7 +48,7 @@ describe("buildCommercialVersionTimeline", () => {
       decidedBy: null,
       decisionStatus: null,
       decisionReason: null,
-      actorEmails: ACTOR_EMAILS,
+      actorLabels: ACTOR_EMAILS,
     })
     expect(timeline.map((e) => e.summary)).toEqual(["Version created"])
   })
