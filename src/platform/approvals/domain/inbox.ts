@@ -4,6 +4,7 @@ const ITEM_TYPE_LABELS: Record<ApprovalInboxItemType, string> = {
   onboarding: "Customer Onboarding",
   change_request: "Customer Change Request",
   commercial_version: "Commercial Version",
+  go_live: "Go Live",
 }
 
 function labelForItemType(type: ApprovalInboxItemType): string {

@@ -6,7 +6,7 @@
  * "what needs attention" list.
  */
 
-type ApprovalInboxItemType = "onboarding" | "change_request" | "commercial_version"
+type ApprovalInboxItemType = "onboarding" | "change_request" | "commercial_version" | "go_live"
 
 /** A draft is not yet anyone's concern but its own author's, so it never appears in this inbox at all (see ../domain/inbox.ts's `bucketForStatus`). */
 type ApprovalInboxBucket = "needs_action" | "sent_back" | "completed"

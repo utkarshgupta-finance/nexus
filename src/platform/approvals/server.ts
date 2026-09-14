@@ -9,6 +9,7 @@ import {
 } from "@/features/customer-onboarding/server"
 import { listAllChangeRequestEntries, getSendBackCountsForRequests as getChangeRequestSendBackCounts } from "@/features/customer-change/server"
 import { formatChangeRequestId } from "@/features/customer-change"
+import { listAllGoLiveRequests, formatGoLiveRequestId } from "@/features/go-live/server"
 import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorLabels } from "@/platform/audit/server"
@@ -30,10 +31,11 @@ import type { OperationalQueueEntry } from "./domain/operational-queue"
  * server.ts entry point.
  */
 async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
-  const [onboardingEntries, changeRequestEntries, versionEntries] = await Promise.all([
+  const [onboardingEntries, changeRequestEntries, versionEntries, goLiveEntries] = await Promise.all([
     listAllOnboardingEntries(),
     listAllChangeRequestEntries(),
     listAllVersionEntries(),
+    listAllGoLiveRequests(),
   ])
 
   // Batched, not one round trip per entry: this composer runs on every
@@ -45,15 +47,18 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
   const customerIds = [
     ...changeRequestEntries.map((entry) => entry.customerId),
     ...versionConfigurations.map((configuration) => configuration?.customerId).filter((id): id is string => Boolean(id)),
+    ...goLiveEntries.map((entry) => entry.customerId),
   ]
   const customersById = new Map((await getCustomersByIds([...new Set(customerIds)])).map((customer) => [customer.id, customer]))
   const changeRequestCustomers = changeRequestEntries.map((entry) => customersById.get(entry.customerId) ?? null)
   const versionCustomers = versionConfigurations.map((configuration) => (configuration ? (customersById.get(configuration.customerId) ?? null) : null))
+  const goLiveCustomers = goLiveEntries.map((entry) => customersById.get(entry.customerId) ?? null)
 
   const actorLabels = await resolveActorLabels([
     ...onboardingEntries.map((entry) => entry.createdBy),
     ...changeRequestEntries.map((entry) => entry.createdBy),
     ...versionEntries.map((entry) => entry.createdBy),
+    ...goLiveEntries.map((entry) => entry.createdBy),
   ])
 
   const items: ApprovalInboxItem[] = []
@@ -117,6 +122,26 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     })
   })
 
+  goLiveEntries.forEach((entry, index) => {
+    const bucket = bucketForStatus(entry.status)
+    if (!bucket) return
+    const customer = goLiveCustomers[index]
+    items.push({
+      type: "go_live",
+      requestId: entry.id,
+      displayId: formatGoLiveRequestId(entry.requestNumber),
+      status: entry.status,
+      bucket,
+      customerName: customer?.name ?? "(unknown customer)",
+      customerKey: customer?.key ?? null,
+      createdBy: entry.createdBy,
+      requestedByEmail: entry.createdBy ? (actorLabels.get(entry.createdBy) ?? null) : null,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      href: `/customers/${customer?.key ?? ""}/go-live/${entry.id}`,
+    })
+  })
+
   return sortByUpdatedAtDesc(items)
 }
 
@@ -134,9 +159,14 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
  * to save it.
  */
 async function loadMyDraftsToContinue(appUserId: string): Promise<MyWorkItem[]> {
-  const [changeRequestEntries, versionEntries] = await Promise.all([listAllChangeRequestEntries(), listAllVersionEntries()])
+  const [changeRequestEntries, versionEntries, goLiveEntries] = await Promise.all([
+    listAllChangeRequestEntries(),
+    listAllVersionEntries(),
+    listAllGoLiveRequests(),
+  ])
   const myChangeRequestDrafts = changeRequestEntries.filter((entry) => entry.status === "draft" && entry.createdBy === appUserId)
   const myVersionDrafts = versionEntries.filter((entry) => entry.status === "draft" && entry.createdBy === appUserId)
+  const myGoLiveDrafts = goLiveEntries.filter((entry) => entry.status === "draft" && entry.createdBy === appUserId)
 
   const versionConfigurations = await Promise.all(
     myVersionDrafts.map((entry) => commercialConfigurationService.getCommercialConfiguration(entry.commercialConfigurationId))
@@ -144,6 +174,7 @@ async function loadMyDraftsToContinue(appUserId: string): Promise<MyWorkItem[]> 
   const customerIds = [
     ...myChangeRequestDrafts.map((entry) => entry.customerId),
     ...versionConfigurations.map((configuration) => configuration?.customerId).filter((id): id is string => Boolean(id)),
+    ...myGoLiveDrafts.map((entry) => entry.customerId),
   ]
   const customersById = new Map((await getCustomersByIds([...new Set(customerIds)])).map((customer) => [customer.id, customer]))
 
@@ -155,6 +186,15 @@ async function loadMyDraftsToContinue(appUserId: string): Promise<MyWorkItem[]> 
       customerName: customersById.get(entry.customerId)?.name ?? "(unknown customer)",
       status: entry.status,
       href: `/customers/${customersById.get(entry.customerId)?.key ?? ""}/change-requests/${entry.requestId}`,
+      updatedAt: entry.updatedAt,
+    })),
+    ...myGoLiveDrafts.map((entry) => ({
+      type: "go_live" as const,
+      requestId: entry.id,
+      displayId: formatGoLiveRequestId(entry.requestNumber),
+      customerName: customersById.get(entry.customerId)?.name ?? "(unknown customer)",
+      status: entry.status,
+      href: `/customers/${customersById.get(entry.customerId)?.key ?? ""}/go-live/${entry.id}`,
       updatedAt: entry.updatedAt,
     })),
     ...myVersionDrafts.map((entry, index) => ({

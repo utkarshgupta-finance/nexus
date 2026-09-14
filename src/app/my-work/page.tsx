@@ -22,8 +22,12 @@ export default async function MyWorkRoute() {
   let unavailable = false
   if (appUserId) {
     try {
-      const canApprove = await hasPermission("customer", "approve")
-      items = await loadMyWork(appUserId, canApprove)
+      // Same imprecision already accepted for commercial_configuration.approve
+      // (Commercial Version's own approval permission, folded in here rather
+      // than given its own flag): "pending my approval" is an approximation
+      // across every request type until per-type routing exists.
+      const [canApproveCustomer, canApproveGoLive] = await Promise.all([hasPermission("customer", "approve"), hasPermission("go_live", "approve")])
+      items = await loadMyWork(appUserId, canApproveCustomer || canApproveGoLive)
     } catch {
       unavailable = true
     }
