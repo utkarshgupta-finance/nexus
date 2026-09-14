@@ -42,7 +42,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const shellSession: AppShellSession =
     session.status === "unauthenticated" || session.status === "unavailable"
       ? null
-      : { email: "email" in session ? session.email : null, canReadSettings: sessionHasPermission(session, "reference_master", "read") }
+      : {
+          email: "email" in session ? session.email : null,
+          canReadSettings: sessionHasPermission(session, "reference_master", "read") || sessionHasPermission(session, "user_access", "read"),
+        }
 
   return (
     <html

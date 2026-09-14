@@ -2,6 +2,8 @@ import { ReferenceMasterSettings } from "@/features/reference-data/ui/reference-
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { AuthGate } from "@/components/product/auth-gate"
+import { SettingsNav } from "@/components/product/settings-nav"
+import type { SettingsNavItem } from "@/components/product/settings-nav"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { sessionHasPermission } from "@/platform/permissions"
 
@@ -41,8 +43,14 @@ export default async function CustomerOnboardingSettingsPage() {
 
   const canWrite = sessionHasPermission(session, "reference_master", "write")
 
+  const navItems: SettingsNavItem[] = [{ href: "/settings/customer-onboarding", label: "Reference Master" }]
+  if (sessionHasPermission(session, "user_access", "read")) {
+    navItems.push({ href: "/settings/user-access", label: "User Access" })
+  }
+
   return (
     <AuthGate session={session} requiredPermission={REFERENCE_MASTER_READ} loginRedirectTo="/settings/customer-onboarding">
+      <SettingsNav items={navItems} />
       <ReferenceMasterSettings initialSnapshot={snapshot} snapshotUnavailable={snapshotUnavailable} canWrite={canWrite} />
     </AuthGate>
   )

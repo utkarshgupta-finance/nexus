@@ -1324,3 +1324,59 @@ columns bolted on per table. Trigger to revisit: the first time a
 `display_name` is actually changed on a live record with real historical
 actions against it, and "who approved this in March" needs to show the
 name as it was in March, not today.
+
+## 32. User Access module: IMPLEMENTED (Platform Operating Expansion, Phase J)
+
+Settings gained a second real page, User Access
+(`/settings/user-access`), reusing `app_users`/`roles`/`permissions`/
+`user_roles` exactly as they already are: no competing RBAC system, no
+new identity concept beyond `display_name` (the permanent Actor Identity
+rule above). Five new RPCs
+(`supabase/migrations/20260916050000_user_access_foundation.sql`,
+matching the exact `set_config`-then-mutate pattern every other governed
+RPC in this schema already uses) back the module: `provision_app_user`,
+`set_app_user_active`, `set_app_user_display_name`, `grant_user_role`,
+`revoke_user_role`. A new `user_access.read`/`user_access.write`
+permission pair and an illustrative `user_access_admin` role were seeded
+the same way `reference_master`'s permissions were; no grant of this role
+to any real person was made (out of scope for a migration file, the same
+established convention `20260912150000_auth_authorization_foundation.sql`
+already documents), so an existing admin must grant it manually before
+anyone can use this page, the same bootstrapping step every
+permission-gated feature in this app already requires.
+
+A real, pre-existing gap this closes in passing: nothing in this
+codebase had ever inserted into `app_users` from application code. A
+brand-new Supabase Auth signup had no app_users row, and therefore no
+possible permission grant, until someone manually provisioned one
+outside the app entirely. `provision_app_user`, reachable from the User
+Access list's "Provision Access" button for any Auth user without an
+app_users row yet, is the first real, application-reachable way to do
+that.
+
+The list itself (`src/platform/user-access/`, a new platform capability
+alongside `platform/audit`/`platform/permissions`, following the
+established data/domain/service/server.ts split) merges three sources
+purely: Supabase Auth identity (email), the `app_users` profile (may not
+exist yet), and every active global role grant. Role removal is a
+`revoked_at` UPDATE, never a row delete, matching `user_roles`' own
+historical-grant-record design
+(`20260906152735_audit_and_control_hardening.sql`): a revoked grant stays
+permanently visible in the database even though the list itself only
+ever shows active ones.
+
+Settings now has a small shared sub-navigation
+(`src/components/product/settings-nav.tsx`) so a visitor on either
+Settings page can reach the other; the root layout's `canReadSettings`
+check (`src/app/layout.tsx`) was widened from `reference_master.read`
+alone to `reference_master.read OR user_access.read`, so a
+`user_access_admin`-only user (no Reference Master access) still sees
+the Settings link in the sidebar at all.
+
+**Scope boundary, honestly recorded, exactly as the task spec's own
+column list anticipates**: Team and Access Profile columns are not shown.
+Neither concept exists in this schema yet; they are built next by Team
+Master (task Phase K) and the Maker/Checker capability layer (task Phase
+L). This page is deliberately structured to grow those columns and role-
+assignment affordances in place once that data exists, not to fake them
+with placeholder values now.
