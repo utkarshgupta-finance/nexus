@@ -391,20 +391,11 @@ UI" limitation, below), never relaxing `canReadSettings`'s own check.
   application-service checks in §13-14/§16, exactly the layering §6
   already specified.
 - **§7's maker/checker workflow-level rule ("a user cannot check their
-  own submission") is not yet built anywhere.** A security audit
-  (Platform Operating Expansion, Phase X) confirmed no self-approval
-  guard exists in `approve_customer_onboarding_case` or
-  `approve_customer_change_request`, nor in the calling application
-  services: both gate only on `requirePermission("customer", "approve")`,
-  never on comparing the approver against the record's own
-  `created_by`/submitter. This predates the §19 `checker` role entirely;
-  `customer_lifecycle_admin` (seeded with the original Customer Lifecycle
-  foundation) already bundled create and approve permissions together, so
-  self-approval was already reachable for any single-role holder before
-  Maker/Checker existed. §19's role bundling does not add this gap, and
-  does not close it either. Building the actual workflow-level check
-  belongs with a real requirement to enforce segregation of duties, not
-  invented speculatively here.
+  own submission") is CLOSED as of Program 4 Hardening, §20.** Previously
+  this bullet recorded it as an open gap (discovered by the Phase X
+  security audit); it is now enforced server-side in every governed
+  decision RPC, not only documented as a target. See §20 for the exact
+  mechanism.
 - **`user_access.write` can grant any catalog role, including to
   oneself, with no further restriction.** Confirmed by the same Phase X
   audit: `grant_user_role` takes any `p_role_id` for any `p_user_id`,
@@ -456,3 +447,149 @@ revisit: a real request for one grant to control access to more than a
 literal role assignment (for example, "give this team's members Maker
 automatically without an admin re-granting it to each new team member
 individually").
+
+## 20. Self-approval control (Program 4 Hardening, Phase 1): IMPLEMENTED
+
+Permanent Nexus principle: **MAKER != CHECKER FOR THE SAME GOVERNED
+DECISION.** A user may create and submit their own governed request. A
+user may approve, reject, or send back a request created by someone
+else. A user must never approve, reject, or send back their own request,
+even while personally holding the reviewing permission (the `checker`
+role, §19, deliberately bundles create and approve permissions together
+for convenience; it is not license to self-review).
+
+This closes the gap §18 previously recorded as open, found by the Phase
+X security audit: `approve_customer_onboarding_case`,
+`send_back_customer_onboarding_case`, `approve_customer_change_request`,
+`reject_customer_change_request`, `send_back_customer_change_request`,
+`approve_commercial_configuration_version`, and
+`reject_commercial_configuration_version`
+(`supabase/migrations/20260917010000_self_approval_control.sql`) each
+now compare the deciding actor against the record's own stable
+`created_by` app_user id (never a display name or email, which can
+change) as the first check after confirming the record exists, before
+any status check or mutation. A match raises a named token,
+`SELF_APPROVAL_NOT_ALLOWED`, with a message already safe to show a user
+verbatim: "you cannot approve/reject/send back your own request. Another
+authorized checker must review it." Enforced in the RPC itself, not only
+the calling Server Action, so the rule holds even if a future caller
+reaches these RPCs directly, matching every other identity check in this
+codebase (§13-14, the cancel RPCs' creator-only check).
+
+**Send Back is included, not only Approve/Reject.** A send-back is a
+reviewer decision returning a request to its maker for correction; if
+the "reviewer" making that decision were the maker, that is exactly the
+self-review scenario this principle exists to prevent. No domain-
+specific reason justified an exception, so the rule is applied uniformly
+across all three lifecycles and all three decision types they support
+(Onboarding: Approve/Send Back; Customer Change: Approve/Reject/Send
+Back; Commercial Version: Approve/Reject, which has no Send Back).
+
+**Error surfaces automatically, no new UI code needed.** The three
+domain error mappers
+(`src/features/customer-onboarding/domain/case-errors.ts`,
+`src/features/customer-change/domain/change-errors.ts`,
+`src/features/customer-onboarding/domain/commercial-version-errors.ts`)
+already recognize a named `TOKEN: message` exception and surface the
+`message` portion verbatim to the UI for any non-`unknown` kind (the
+existing `toCaseActionError`/`toActionError`/`toCommercialVersionActionError`
+pattern in each feature's `actions.ts`); adding `SELF_APPROVAL_NOT_ALLOWED`
+to each mapper's token table was the only change needed for the safe
+message to reach the user.
+
+**Not covered, and correctly so**: cancelling a draft (§C/§G) is a
+maker-only action by design (only the creator may cancel their own
+draft, the opposite restriction), and discarding a Workflow Builder
+draft version (§36, Phase V) is a shared admin action with no personal
+maker/checker distinction at all. Neither is a governed approve/reject/
+send-back decision, so neither is in scope for this principle.
+
+## 21. Historical actor identity snapshot (Program 4 Hardening, Phase 2): CANONICAL MECHANISM IMPLEMENTED, PARTIALLY WIRED
+
+The permanent Actor Identity rule (`docs/CUSTOMER_LIFECYCLE.md` §31)
+resolves an actor's CURRENT `display_name` (falling back to a live
+Supabase Auth email lookup) every time a historical event renders. That
+is correct for "who is this today," but not sufficient for CFO-grade
+immutable history: if a user's name or email later changes, every past
+event they ever acted on would retroactively appear to have been
+performed by their new identity.
+
+**Mechanism**: rather than adding
+`actor_display_name_snapshot`/`actor_email_snapshot` columns to every
+governed table individually, `audit_log`
+(`supabase/migrations/20260906084244_platform_core_foundation.sql`), the
+one existing generic, database-enforced mutation log every audited
+table already writes to, gained the two columns instead
+(`supabase/migrations/20260917020000_actor_identity_snapshot.sql`). Its
+single shared trigger function, `fn_audit_row()`, now looks up
+`app_users.display_name` and `auth.users.email` for the acting user AT
+THE MOMENT of the mutation and writes both into the new row, alongside
+the existing `actor_user_id` (still authoritative; the snapshot is
+additive, never a replacement for the stable id). Zero schema change
+was needed on any of the 15+ tables already wired to this trigger; the
+snapshot exists for all of them going forward, automatically.
+
+The same migration also attached `fn_audit_row` to four tables built
+earlier this program that were never wired to it at all: `teams`,
+`user_teams`, `workflow_definitions`, `workflow_definition_versions`,
+closing a real, separate audit-coverage gap (Activate/Deactivate and
+Workflow Published events had no audit trail whatsoever before this).
+`workflow_nodes`/`workflow_edges` are deliberately excluded: draft-save
+rewrites them wholesale (delete-all-then-reinsert), so a row-level audit
+trail there would be noise, not a meaningful governed event.
+
+**Wiring, honestly scoped**: only the Customer Activity timeline
+(`src/features/customers/domain/activity.ts`'s `statusChangeEvents`,
+`src/features/customers/server/activity.ts`) reads `audit_log` directly
+today, and it now prefers the snapshot
+(`auditRowActorLabel`: snapshot name, then current live-resolved name,
+then snapshot email, never a raw id). Every other historical surface
+(Onboarding/Change Request Timelines, the unified Approvals inbox, User
+Access "Last Updated by") reads a domain table's own `*_by` column
+directly (`approved_by`, `sent_back_by`, `decided_by`, `updated_by`),
+not `audit_log`, and continues to live-resolve the actor's current name
+for now. Extending those to their own snapshot means correlating each
+`*_by` column to the specific `audit_log` row for that exact
+transition, a distinct, larger piece of work named here as the explicit
+next step, not silently left undiscovered and not claimed complete.
+
+**Backfill discipline**: existing `audit_log` rows keep `NULL`
+snapshots; no historical name is invented for them. A `NULL` snapshot
+falls back to the actor's current display name, then email, per the
+same chain, never a raw UUID.
+
+## 22. User Access privilege review (Program 4 Hardening, Phase 3): VERIFIED, no fix needed
+
+Re-examined the Phase X finding that `user_access.write` can grant any
+catalog role, including to oneself, with no further restriction (§18).
+Confirmed against the live database, not just the code: exactly one
+`app_users` row currently holds any role at all
+(`customer_lifecycle_admin`, granting only `customer.create/approve/
+change_request/delete_permanent/read`), and it does not include
+`user_access.write`, `team.write`, or `workflow_definition.write`.
+Nobody in the live system can currently grant a role to anyone,
+including themselves: a stricter state than "only an appropriately
+privileged administrator can," since there is currently no administrator
+at all for these three capabilities.
+
+No fix was made because there is no privilege-escalation path to fix:
+the design (§18, §22) is that `user_access.write` is meant to be a
+scarce, fully-trusted grant, same as `team.write`/`workflow_definition.write`
+each guard their own domain, and none of the three implies the others
+(holding `team.write` does not grant `user_access.write` or vice versa;
+`requirePermission` checks the specific resource+action every time).
+
+**Operational note, not a code defect**: this also means nobody can
+currently reach `/settings/user-access`, `/settings/teams`, or
+`/settings/workflows` through a real session, since `AuthGate` denies
+access below the relevant `*.read` permission and the one provisioned
+account holds none of them. This is the same bootstrapping gap §18
+already named ("creating the first Supabase Auth identity itself and
+granting it `user_access.write`... remains genuinely manual"), now
+concretely confirmed against the live database rather than only
+theorized. Granting a role is a real access decision for a human to
+make, not inferred here: whoever administers this Supabase project
+should grant `user_access_admin` (or, narrower, exactly the roles
+needed) to the account that should administer Settings, via
+`grant_user_role` once any account holds it, or directly via SQL for
+the very first grant.

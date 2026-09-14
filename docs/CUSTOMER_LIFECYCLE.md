@@ -1439,6 +1439,10 @@ genuinely open architectural question with more than one defensible
 answer, not a decision safely inferable without a real business need to
 validate it against.
 
+**Self-approval control (Program 4 Hardening).** Holding `checker`
+never permits approving/rejecting/sending back one's own request: see
+`docs/AUTHORIZATION_MODEL.md` §20 for the full account.
+
 ## 35. Actor display audit: IMPLEMENTED (Platform Operating Expansion, Phase M)
 
 Audited every surface the task spec named (Approvals, My Requests, My
@@ -1649,3 +1653,28 @@ be a premature abstraction the codebase deliberately avoids elsewhere.
 Extract it into `platform/attachments/` the same session a second real
 consumer needs document evidence, most plausibly Agreement lifecycle
 (§37's Phase S) once that domain has a real product brief.
+
+## 40. Program 4 Hardening: self-approval control and actor history snapshot
+
+Closes two real gaps the Phase X security audit (§X, above) surfaced,
+plus re-verifies a third. Full accounts in
+`docs/AUTHORIZATION_MODEL.md` §20-§22:
+
+- **§20, Self-approval control**: MAKER != CHECKER FOR THE SAME
+  GOVERNED DECISION, now enforced server-side in every approve/reject/
+  send-back RPC across Onboarding, Customer Change, and Commercial
+  Version. A `checker` (§34) can no longer approve, reject, or send back
+  their own request.
+- **§21, Historical actor identity snapshot**: `audit_log` now captures
+  the acting user's display name and email AS THEY WERE at the moment
+  of every audited mutation, so a later name change never rewrites past
+  history. Wired into the Customer Activity timeline (the one surface
+  that reads `audit_log` today); other surfaces continue live-resolving
+  for now, honestly disclosed as a follow-up, not claimed complete.
+  Also closed a real audit-coverage gap: Team Master and Workflow
+  Builder tables were never wired to the audit trigger at all until now.
+- **§22, User Access privilege review**: verified against the live
+  database, not just the code. No privilege-escalation path exists to
+  fix; if anything, zero users currently hold `user_access.write`,
+  `team.write`, or `workflow_definition.write` at all, an operational
+  bootstrapping gap already named in §18, now concretely confirmed.
