@@ -20,13 +20,13 @@ import type { ReferenceListKey } from "@/features/reference-data"
 import { componentTableCells } from "../domain/commercial-rate-summary"
 import { formatTimestampDate } from "@/lib/date"
 import type { CommercialComponentDraft, CommercialRateDraft } from "../domain/commercial-rate"
-import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata } from "../domain/types"
+import type { CustomerOnboardingCase, PersistedOnboardingDocumentView } from "../domain/types"
 import { formatOnboardingCaseId } from "../domain/types"
 import { CUSTOMER_ONBOARDING_FIELD_KEYS } from "../forms/customer-onboarding-form-definition"
 import { COMMENTABLE_ONBOARDING_FIELD_KEYS, labelForOnboardingField } from "../domain/field-labels"
 import { labelForCaseStatus, currentResponsibilityLabel } from "@/platform/approvals/domain/inbox"
 import { approveOnboardingCaseAction, sendBackOnboardingCaseAction } from "../actions"
-import { OnboardingEvidenceList } from "./onboarding-evidence-list"
+import { OnboardingAttachmentsList } from "./onboarding-attachments-list"
 import { RequestTimeline } from "@/components/product/request-timeline"
 import type { OnboardingTimelineEvent } from "../domain/timeline"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
@@ -59,7 +59,7 @@ function ReviewDetailPage({
   requestId: string
   onboardingCase: CustomerOnboardingCase
   canApprove: boolean
-  documents: PersistedOnboardingDocumentMetadata[]
+  documents: PersistedOnboardingDocumentView[]
   timeline?: OnboardingTimelineEvent[]
 }) {
   const router = useRouter()
@@ -199,8 +199,8 @@ function ReviewDetailPage({
         </section>
 
         <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
-          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Evidence</h2>
-          <OnboardingEvidenceList documents={documents} />
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Attachments</h2>
+          <OnboardingAttachmentsList documents={documents} />
         </section>
 
         <RequestTimeline events={timeline} />

@@ -26,6 +26,7 @@ import {
   adjacentOnboardingStage,
 } from "../domain/process"
 import { COMMERCIAL_DOCUMENT_DEFINITIONS } from "../domain/commercial-documents"
+import { ONBOARDING_DOCUMENT_LABELS } from "../domain/document-labels"
 import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import { setCurrentStage } from "../domain/case"
@@ -553,7 +554,7 @@ function CustomerOnboardingPage({
                       requestId={requestId}
                       category="tax"
                       documentType="gst_certificate"
-                      label="GST Registration Document"
+                      label={ONBOARDING_DOCUMENT_LABELS.gst_certificate}
                       value={taxDocuments.gst}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, gst: next }))}
                     />
@@ -561,7 +562,7 @@ function CustomerOnboardingPage({
                       requestId={requestId}
                       category="tax"
                       documentType="pan_card"
-                      label="PAN Document"
+                      label={ONBOARDING_DOCUMENT_LABELS.pan_card}
                       value={taxDocuments.pan}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, pan: next }))}
                     />
@@ -569,7 +570,7 @@ function CustomerOnboardingPage({
                       requestId={requestId}
                       category="tax"
                       documentType="tan_card"
-                      label="TAN Document"
+                      label={ONBOARDING_DOCUMENT_LABELS.tan_card}
                       value={taxDocuments.tan}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, tan: next }))}
                     />
@@ -580,7 +581,7 @@ function CustomerOnboardingPage({
                       requestId={requestId}
                       category="tax"
                       documentType="tax_registration"
-                      label="Tax Registration Document"
+                      label={ONBOARDING_DOCUMENT_LABELS.tax_registration}
                       value={taxDocuments.taxRegistration}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, taxRegistration: next }))}
                     />
@@ -588,7 +589,7 @@ function CustomerOnboardingPage({
                       requestId={requestId}
                       category="tax"
                       documentType="company_registration"
-                      label="Company Registration / Incorporation Document"
+                      label={ONBOARDING_DOCUMENT_LABELS.company_registration}
                       helpText="Upload a document that confirms the registered legal entity/company name."
                       value={taxDocuments.companyRegistration}
                       onChange={(next) => setTaxDocuments((current) => ({ ...current, companyRegistration: next }))}
@@ -639,7 +640,7 @@ function CustomerOnboardingPage({
                     requestId={requestId}
                     category="agreement"
                     documentType="signed_agreement"
-                    label="Signed Agreement"
+                    label={ONBOARDING_DOCUMENT_LABELS.signed_agreement}
                     value={signedAgreement}
                     onChange={setSignedAgreement}
                   />

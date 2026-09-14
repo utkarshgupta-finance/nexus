@@ -75,7 +75,7 @@ function validateAttachmentFile(
  * Expansion, Phase A): finds the currently-persisted document, if any,
  * for one attachment slot. `documents` is already scoped to one request
  * and already filtered to `isCurrent` by the caller
- * (`listOnboardingDocumentsForEditor`), so this only needs to match by
+ * (`listOnboardingDocumentsWithUploader`), so this only needs to match by
  * type; it never decides currency itself.
  */
 function findPersistedDocument<T extends { documentType: OnboardingDocumentTypeLike }>(

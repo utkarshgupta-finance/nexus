@@ -92,7 +92,7 @@ async function listOnboardingDocuments(requestId: string): Promise<PersistedOnbo
  * matching the same `resolveActorEmails` pattern every other actor
  * display in the app already uses.
  */
-async function listOnboardingDocumentsForEditor(requestId: string): Promise<PersistedOnboardingDocumentView[]> {
+async function listOnboardingDocumentsWithUploader(requestId: string): Promise<PersistedOnboardingDocumentView[]> {
   const documents = await listOnboardingDocuments(requestId)
   const actorEmails = await resolveActorEmails(documents.map((document) => document.uploadedBy))
   return documents.map((document) => ({
@@ -122,7 +122,7 @@ async function getOnboardingDocumentDownloadUrl(documentId: string): Promise<str
 export {
   uploadOnboardingDocument,
   listOnboardingDocuments,
-  listOnboardingDocumentsForEditor,
+  listOnboardingDocumentsWithUploader,
   listOnboardingDocumentsForRevision,
   getOnboardingDocumentDownloadUrl,
   InvalidDocumentError,

@@ -1067,3 +1067,32 @@ regardless of what a future SurveyJS version or theme update might
 introduce, without touching the genuinely-scrollable dropdown/popup
 regions. Recorded honestly: this closes the risk defensively; it did
 not find an active bug to reproduce in the current codebase state.
+
+## 26. Attachment language and metadata: IMPLEMENTED (Platform Operating Expansion, Phase E)
+
+Every onboarding document type now resolves to one specific,
+business-purpose label through a single registry,
+`ONBOARDING_DOCUMENT_LABELS` in
+`src/features/customer-onboarding/domain/document-labels.ts`
+(`labelForOnboardingDocumentType` for lookup with a safe fallback), so
+the requester-facing upload form, the reviewer-facing attachments list,
+and any future consumer all read the same purpose text instead of each
+inventing or duplicating it. The three Commercial Documents entries are
+reused directly from `COMMERCIAL_DOCUMENT_DEFINITIONS` rather than
+copied, so there is exactly one source of truth per document type.
+
+The reviewer screen (`src/app/reviews/[requestId]/page.tsx` and
+`review-detail-page.tsx`) renamed its "Evidence" heading to
+"Attachments" and now fetches documents through
+`listOnboardingDocumentsWithUploader` (previously named
+`listOnboardingDocumentsForEditor`, generalized since both the
+requester editor and the reviewer screen need the same uploader-label
+resolution), giving it the same `PersistedOnboardingDocumentView` shape
+the editor already used. The renamed `OnboardingAttachmentsList`
+component (replacing `OnboardingEvidenceList`) leads each row with its
+business-purpose label plus the original file name (for example "GST
+Registration Document / gst-certificate.pdf") instead of the old
+generic category subtitle ("Tax & Registration"/"Commercial
+Documents"), and shows "Uploaded by {name}, {timestamp}" underneath,
+resolved server-side the same way every other actor display in the app
+resolves an uploader identity.

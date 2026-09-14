@@ -192,7 +192,7 @@ type PersistedOnboardingDocumentMetadata = {
  * label (Platform Operating Expansion, Phase A): the raw metadata alone
  * forces every consumer to re-resolve `uploadedBy` itself, so the one
  * server composer that already resolves actor emails
- * (`services/documents.service.ts`'s `listOnboardingDocumentsForEditor`)
+ * (`services/documents.service.ts`'s `listOnboardingDocumentsWithUploader`)
  * does it once and hands callers a ready-to-render string.
  */
 type PersistedOnboardingDocumentView = PersistedOnboardingDocumentMetadata & {

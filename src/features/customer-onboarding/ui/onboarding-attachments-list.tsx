@@ -5,30 +5,26 @@ import { DownloadIcon, EyeIcon, FileIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { DocumentViewer } from "@/components/product/document-viewer"
+import { formatTimestamp } from "@/lib/date"
 import { getOnboardingDocumentDownloadUrlAction } from "../actions"
-import type { PersistedOnboardingDocumentMetadata } from "../domain/types"
+import { labelForOnboardingDocumentType } from "../domain/document-labels"
+import type { PersistedOnboardingDocumentView } from "../domain/types"
 
 /**
- * Real, persisted evidence for one Onboarding Case (task Phase D/F): a
- * reviewer can now actually see what was uploaded, closing the "what
- * evidence exists?" gap Approval UX standardization (task Phase F)
- * found. A signed URL is fetched on demand, never stored: this bucket
- * is private (task Phase D), so there is no long-lived or public URL
- * for any document.
+ * Real, persisted attachments for one Onboarding Case (Platform Operating
+ * Expansion, Phase E): each entry leads with its exact business purpose
+ * (task spec, e.g. "GST Registration Document / gst-certificate.pdf")
+ * rather than a generic category, and shows who uploaded it and when. A
+ * signed URL is fetched on demand, never stored: this bucket is private,
+ * so there is no long-lived or public URL for any document.
  */
 
-const CATEGORY_LABELS: Record<PersistedOnboardingDocumentMetadata["category"], string> = {
-  tax: "Tax & Registration",
-  commercial: "Commercial Documents",
-  agreement: "Agreement",
-}
-
-function OnboardingEvidenceList({ documents }: { documents: PersistedOnboardingDocumentMetadata[] }) {
-  const [viewing, setViewing] = useState<{ document: PersistedOnboardingDocumentMetadata; url: string } | null>(null)
+function OnboardingAttachmentsList({ documents }: { documents: PersistedOnboardingDocumentView[] }) {
+  const [viewing, setViewing] = useState<{ document: PersistedOnboardingDocumentView; url: string } | null>(null)
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  async function resolveUrl(document: PersistedOnboardingDocumentMetadata): Promise<string | null> {
+  async function resolveUrl(document: PersistedOnboardingDocumentView): Promise<string | null> {
     setError(null)
     setPendingDocumentId(document.documentId)
     const result = await getOnboardingDocumentDownloadUrlAction(document.documentId)
@@ -40,18 +36,18 @@ function OnboardingEvidenceList({ documents }: { documents: PersistedOnboardingD
     return result.url
   }
 
-  async function handleView(document: PersistedOnboardingDocumentMetadata) {
+  async function handleView(document: PersistedOnboardingDocumentView) {
     const url = await resolveUrl(document)
     if (url) setViewing({ document, url })
   }
 
-  async function handleDownload(document: PersistedOnboardingDocumentMetadata) {
+  async function handleDownload(document: PersistedOnboardingDocumentView) {
     const url = await resolveUrl(document)
     if (url) window.open(url, "_blank", "noopener,noreferrer")
   }
 
   if (documents.length === 0) {
-    return <p className="text-xs text-muted-foreground">No evidence documents have been uploaded for this request yet.</p>
+    return <p className="text-xs text-muted-foreground">No attachments have been uploaded for this request yet.</p>
   }
 
   return (
@@ -61,8 +57,12 @@ function OnboardingEvidenceList({ documents }: { documents: PersistedOnboardingD
         <div key={document.documentId} className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
           <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-xs font-medium text-foreground">{document.originalFileName}</span>
-            <span className="text-[0.7rem] text-muted-foreground">{CATEGORY_LABELS[document.category]}</span>
+            <span className="truncate text-xs font-medium text-foreground">
+              {labelForOnboardingDocumentType(document.documentType)} / {document.originalFileName}
+            </span>
+            <span className="text-[0.7rem] text-muted-foreground">
+              Uploaded by {document.uploadedByLabel ?? "an unknown user"}, {formatTimestamp(document.uploadedAt)}
+            </span>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <Button type="button" variant="outline" size="sm" disabled={pendingDocumentId === document.documentId} onClick={() => handleView(document)}>
@@ -98,4 +98,4 @@ function OnboardingEvidenceList({ documents }: { documents: PersistedOnboardingD
   )
 }
 
-export { OnboardingEvidenceList }
+export { OnboardingAttachmentsList }

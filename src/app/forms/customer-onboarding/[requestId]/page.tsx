@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { getOnboardingCase, listOnboardingFieldComments, listOnboardingDocumentsForEditor } from "@/features/customer-onboarding/server"
+import { getOnboardingCase, listOnboardingFieldComments, listOnboardingDocumentsWithUploader } from "@/features/customer-onboarding/server"
 import type { PersistedOnboardingDocumentView } from "@/features/customer-onboarding/server"
 import { CustomerOnboardingPage } from "@/features/customer-onboarding/ui/customer-onboarding-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
@@ -38,7 +38,7 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
 
   let initialDocuments: PersistedOnboardingDocumentView[] = []
   try {
-    initialDocuments = await listOnboardingDocumentsForEditor(requestId)
+    initialDocuments = await listOnboardingDocumentsWithUploader(requestId)
   } catch {
     // A read failure here should not block reopening the form itself;
     // the requester simply sees empty slots, same as before this fix,

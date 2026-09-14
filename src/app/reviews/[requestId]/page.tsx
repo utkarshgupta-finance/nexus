@@ -3,12 +3,12 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { getOnboardingCase, listOnboardingDocuments, loadOnboardingRequestTimeline } from "@/features/customer-onboarding/server"
+import { getOnboardingCase, listOnboardingDocumentsWithUploader, loadOnboardingRequestTimeline } from "@/features/customer-onboarding/server"
 import { ReviewDetailPage } from "@/features/customer-onboarding/ui/review-detail-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
-import type { PersistedOnboardingDocumentMetadata } from "@/features/customer-onboarding/server"
+import type { PersistedOnboardingDocumentView } from "@/features/customer-onboarding/server"
 
 export const dynamic = "force-dynamic"
 
@@ -32,9 +32,9 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
 
   const canApprove = await hasPermission("customer", "approve")
 
-  let documents: PersistedOnboardingDocumentMetadata[] = []
+  let documents: PersistedOnboardingDocumentView[] = []
   try {
-    documents = await listOnboardingDocuments(requestId)
+    documents = await listOnboardingDocumentsWithUploader(requestId)
   } catch {
     documents = []
   }
