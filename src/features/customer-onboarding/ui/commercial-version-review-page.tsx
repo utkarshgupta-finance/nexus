@@ -16,7 +16,7 @@ import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft } from "../domain/commercial-rate"
 import type { CommercialConfigurationVersion } from "../domain/commercial-version-types"
 import { formatCommercialVersionId } from "../domain/commercial-version-types"
-import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { labelForCaseStatus, currentResponsibilityLabel } from "@/platform/approvals/domain/inbox"
 import { RequestTimeline } from "@/components/product/request-timeline"
 import { formatTimestampDate } from "@/lib/date"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
@@ -44,6 +44,7 @@ const NATURE_SECTIONS: { nature: CommercialComponentDraft["nature"]; title: stri
 function CommercialVersionReviewPage({
   requestId,
   configId,
+  customerName,
   version,
   canDecide,
   diff,
@@ -51,6 +52,8 @@ function CommercialVersionReviewPage({
 }: {
   requestId: string
   configId: string
+  /** Platform Scale Closure, Phase J: shown as the page title, matching the other two review screens, instead of a generic "Commercial Configuration Version Review" that never named which customer this was. */
+  customerName: string
   version: CommercialConfigurationVersion
   canDecide: boolean
   /** Current vs Proposed (task Phase G); null only when there is nothing yet to compare (no active prior Commercial Components, or no draft saved). */
@@ -90,7 +93,7 @@ function CommercialVersionReviewPage({
     const result = await rejectCommercialVersionAction(requestId, reason)
     setIsSubmittingAction(false)
     if (result.ok) {
-      router.push("/reviews/commercial-versions")
+      router.push("/approvals")
       router.refresh()
     } else {
       setActionError(result.error)
@@ -100,12 +103,15 @@ function CommercialVersionReviewPage({
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
-        title="Commercial Configuration Version Review"
+        title={customerName}
         description={`${formatCommercialVersionId(version.versionNumber)}, ${version.changeCategory}`}
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="ghost" className="bg-muted text-muted-foreground">
               {labelForCaseStatus(version.status)}
+            </Badge>
+            <Badge variant="ghost" className="bg-primary/10 text-primary">
+              {currentResponsibilityLabel(version.status, canDecide)}
             </Badge>
             <Button variant="outline" size="sm" render={<Link href={`/commercials/${configId}`} />}>
               Commercial Configuration

@@ -33,6 +33,25 @@ function labelForCaseStatus(status: string): string {
   return CASE_STATUS_LABELS[status] ?? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
 }
 
+/**
+ * The one canonical "current responsibility" label (Platform Scale
+ * Closure, Phase J): every governed request header should say plainly
+ * who needs to act next, without ever fabricating an individual owner.
+ * Nexus's approval model is role-based, not per-person (no routing to a
+ * named reviewer exists), so this names a role/state
+ * ("Pending Finance Approval"), never a person ("Pending with John").
+ * `canDecide` is whichever permission check the caller already made
+ * (`commercial_configuration.approve`, `customer.approve`, etc.), so the
+ * same submitted/resubmitted state reads as "Needs Your Attention" for a
+ * reviewer and "Pending Finance Approval" for anyone else, including the
+ * requester checking on their own request.
+ */
+function currentResponsibilityLabel(status: string, canDecide: boolean): string {
+  if (status === "draft" || status === "sent_back") return "Waiting on Requester"
+  if (status === "submitted" || status === "resubmitted") return canDecide ? "Needs Your Attention" : "Pending Finance Approval"
+  return labelForCaseStatus(status)
+}
+
 /** A `draft` belongs only to its own author and is deliberately excluded from this inbox entirely: nobody else needs to see it yet. */
 function bucketForStatus(status: string): ApprovalInboxBucket | null {
   if (status === "submitted" || status === "resubmitted") return "needs_action"
@@ -49,4 +68,4 @@ function filterByBucket(items: ApprovalInboxItem[], bucket: ApprovalInboxBucket 
   return bucket === "all" ? items : items.filter((item) => item.bucket === bucket)
 }
 
-export { bucketForStatus, sortByUpdatedAtDesc, filterByBucket, labelForItemType, labelForCaseStatus }
+export { bucketForStatus, sortByUpdatedAtDesc, filterByBucket, labelForItemType, labelForCaseStatus, currentResponsibilityLabel }

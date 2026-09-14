@@ -267,6 +267,38 @@ Record-centric screens follow an Attio-like model:
 The record should read as one coherent object, not a stack of independent
 widgets.
 
+### Governed request/review screens: shared mental model [Platform Scale Closure, Phase J]
+
+Onboarding, Customer Change, and Commercial Version review screens are
+not visually identical (their domain content genuinely differs), but
+they now share one mental model a user can carry between them:
+
+- **Header**: reference id, the entity/customer name, a status badge,
+  and a `currentResponsibilityLabel` badge (`platform/approvals/domain/inbox.ts`)
+  naming who needs to act next: "Waiting on Requester", "Needs Your
+  Attention", "Pending Finance Approval" (role-based, never a fabricated
+  named owner), or the terminal status once decided.
+- **Review summary**: what changed and why approval is needed, in
+  whatever shape the domain actually has (a diff table, a proposed-rate
+  table, a plain reason field). Not forced into one identical layout.
+- **Action footer**: a "Review Decision" section stating in plain
+  language what each action actually does before the buttons, and only
+  the actions the domain really supports (Onboarding: Approve/Send Back;
+  Customer Change: Approve/Send Back/Reject; Commercial Version:
+  Approve/Reject, no Send Back, since it has no revision-resubmit cycle
+  to send back into, see `docs/CUSTOMER_LIFECYCLE.md` §20).
+- **Sent-back state**: only where the domain has one (Onboarding,
+  Customer Change). A dedicated notice shows the prior reason, not just
+  a status badge.
+- **Terminal state**: a plain sentence once approved/rejected, since the
+  record itself is now historical evidence.
+- **Where to go next**: whichever destination actually answers "what
+  changed" for that domain. Onboarding gets a dedicated success screen
+  because approval creates three new entities with no single natural
+  landing page; Customer Change and Commercial Version redirect straight
+  to the one page that already shows the applied change, which does not
+  need a duplicate intermediate confirmation screen.
+
 ## 14. Activity, history, and audit
 
 History is a first-class concept. Use a chronological activity-timeline

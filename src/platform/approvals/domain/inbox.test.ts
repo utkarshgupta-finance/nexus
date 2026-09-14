@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { bucketForStatus, sortByUpdatedAtDesc, filterByBucket } from "./inbox"
+import { bucketForStatus, sortByUpdatedAtDesc, filterByBucket, currentResponsibilityLabel } from "./inbox"
 import type { ApprovalInboxItem } from "./types"
 
 describe("bucketForStatus", () => {
@@ -49,6 +49,24 @@ describe("sortByUpdatedAtDesc", () => {
     const sorted = sortByUpdatedAtDesc(input)
     expect(sorted.map((entry) => entry.requestId)).toEqual(["newer", "older"])
     expect(input).toEqual([older, newer])
+  })
+})
+
+describe("currentResponsibilityLabel (Platform Scale Closure, Phase J)", () => {
+  it("names the requester, never a person, while a draft or sent-back request waits on them", () => {
+    expect(currentResponsibilityLabel("draft", false)).toBe("Waiting on Requester")
+    expect(currentResponsibilityLabel("sent_back", true)).toBe("Waiting on Requester")
+  })
+
+  it("tells a reviewer it needs their attention, and anyone else that it is pending role-based approval", () => {
+    expect(currentResponsibilityLabel("submitted", true)).toBe("Needs Your Attention")
+    expect(currentResponsibilityLabel("resubmitted", true)).toBe("Needs Your Attention")
+    expect(currentResponsibilityLabel("submitted", false)).toBe("Pending Finance Approval")
+  })
+
+  it("falls back to the plain status label once a decision is final", () => {
+    expect(currentResponsibilityLabel("approved", false)).toBe("Approved")
+    expect(currentResponsibilityLabel("rejected", true)).toBe("Rejected")
   })
 })
 

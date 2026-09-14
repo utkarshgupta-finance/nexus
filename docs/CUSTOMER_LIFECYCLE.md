@@ -839,3 +839,67 @@ but no field comments; Commercial Version has neither), so this was not
 generalized into one shared engine, matching the Chief-Architect-lens
 conclusion that a universal workflow engine is not yet justified
 (`docs/WORKFLOW_ENGINE_ARCHITECTURE.md` remains design-draft, correctly).
+
+## 20. UX operating system consistency across the three review screens: PARTIAL (Platform Scale Closure, Phase J)
+
+A cross-screen UX audit (Onboarding/Customer Change/Commercial Version
+review pages) found real inconsistencies and one false one, corrected
+here rather than silently repeated.
+
+**Evaluated and rejected: a Send Back path for Commercial Version.**
+§19 already established this correctly: a Commercial Version has no
+send-back state and only ever one revision, by design, not by omission.
+Re-evaluated this round with the explicit question "can the current
+lifecycle support Send Back consistently." It cannot without a real
+schema/lifecycle change: Send Back only means something where a
+revision can be edited and resubmitted (`submission_revisions`,
+`status: sent_back`), and Commercial Version's RPC layer
+(`submit_commercial_configuration_version`) only accepts a submission
+from `status = 'draft'`, never `'sent_back'` or `'rejected'`, with no
+equivalent to `create_next_revision`. Building Send Back would mean
+adding a real revision-resubmit cycle to a lifecycle deliberately kept
+simpler (draft, submitted, approved, rejected, one revision), for a
+capability no one has asked for. Reject remains the sole terminal
+decision, correctly distinct, not a stand-in for a missing Send Back.
+
+**Corrected, not fixed: the "`isDecidable` omits `resubmitted`" claim.**
+An earlier audit pass flagged `commercial-version-review-page.tsx`'s
+`isDecidable` check (`canDecide && version.status === "submitted"`) as
+missing a `resubmitted` case, by analogy with the other two review
+pages. This was a false positive: `CommercialVersionStatus` is `"draft"
+| "submitted" | "approved" | "rejected"` (`commercial-version-types.ts`),
+exactly as §19 already documented. There is no `resubmitted` status to
+omit; the check was already correct. Recorded here so this claim is not
+repeated in a future pass.
+
+**Fixed: no page named who currently needs to act.** All three review
+headers now show a `currentResponsibilityLabel` badge
+(`platform/approvals/domain/inbox.ts`) alongside the status badge:
+"Waiting on Requester" (draft/sent back), "Needs Your Attention" (a
+reviewer viewing a decidable request), "Pending Finance Approval"
+(anyone else viewing the same request), or the terminal status label
+once decided. Role-based, never a fabricated named owner, since Nexus's
+approval model has no per-person routing.
+
+**Fixed: the Commercial Version review title never named the customer.**
+It read the generic "Commercial Configuration Version Review" for every
+version of every customer; now shows the customer name, matching the
+other two review screens.
+
+**Fixed: three post-decision redirects pointed at the `/reviews/*` list
+routes** (Onboarding send-back, Customer Change send-back/reject,
+Commercial Version reject), which have no inbound link from anywhere
+else in the product (`docs/TECH_DEBT.md`) and are removed this round
+(§X). All three now redirect to `/approvals`.
+
+**Evaluated and not duplicated: a dedicated post-approval "Success
+State" for Customer Change and Commercial Version.** Onboarding needed
+one because approval creates three new entities at once (Customer,
+Commercial Configuration, Version 1) with no single natural page that
+shows all three, so it needs explicit links. Approving a Customer
+Change or a Commercial Version has exactly one natural destination
+(the customer page, the commercial configuration page), which the
+existing `router.push` already lands on immediately, itself showing
+the change now applied. Building a redundant intermediate success
+screen for these two would not answer "what changed/what's current"
+any more clearly than the destination they already redirect to.

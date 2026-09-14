@@ -24,7 +24,7 @@ import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata } from
 import { formatOnboardingCaseId } from "../domain/types"
 import { CUSTOMER_ONBOARDING_FIELD_KEYS } from "../forms/customer-onboarding-form-definition"
 import { COMMENTABLE_ONBOARDING_FIELD_KEYS, labelForOnboardingField } from "../domain/field-labels"
-import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { labelForCaseStatus, currentResponsibilityLabel } from "@/platform/approvals/domain/inbox"
 import { approveOnboardingCaseAction, sendBackOnboardingCaseAction } from "../actions"
 import { OnboardingEvidenceList } from "./onboarding-evidence-list"
 import { RequestTimeline } from "@/components/product/request-timeline"
@@ -101,7 +101,7 @@ function ReviewDetailPage({
     const result = await sendBackOnboardingCaseAction(requestId, sendBackReason, null, fieldComments)
     setPendingAction(null)
     if (result.ok) {
-      router.push("/reviews")
+      router.push("/approvals")
       router.refresh()
     } else {
       setActionError(result.error)
@@ -130,9 +130,14 @@ function ReviewDetailPage({
         title={(values[CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName] as string) || "Customer Onboarding Review"}
         description={`${formatOnboardingCaseId(onboardingCase.caseNumber)}, Revision ${onboardingCase.currentRevision.revisionNumber}`}
         actions={
-          <Badge variant="ghost" className="bg-muted text-muted-foreground">
-            {labelForCaseStatus(onboardingCase.status)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="ghost" className="bg-muted text-muted-foreground">
+              {labelForCaseStatus(onboardingCase.status)}
+            </Badge>
+            <Badge variant="ghost" className="bg-primary/10 text-primary">
+              {currentResponsibilityLabel(onboardingCase.status, canApprove)}
+            </Badge>
+          </div>
         }
       />
 

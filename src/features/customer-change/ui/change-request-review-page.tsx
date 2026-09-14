@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { approveChangeRequestAction, rejectChangeRequestAction, sendBackChangeRequestAction } from "../actions"
 import type { CustomerChangeRequest } from "../domain/types"
 import { formatChangeRequestId } from "../domain/types"
-import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { labelForCaseStatus, currentResponsibilityLabel } from "@/platform/approvals/domain/inbox"
 import { RequestTimeline } from "@/components/product/request-timeline"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import { FieldDiffTable } from "./field-diff-table"
@@ -75,7 +75,7 @@ function ChangeRequestReviewPage({
     const result = await sendBackChangeRequestAction(requestId, reason)
     setIsSubmittingAction(false)
     if (result.ok) {
-      router.push("/reviews/change-requests")
+      router.push("/approvals")
       router.refresh()
     } else {
       setActionError(result.error)
@@ -92,7 +92,7 @@ function ChangeRequestReviewPage({
     const result = await rejectChangeRequestAction(requestId, reason)
     setIsSubmittingAction(false)
     if (result.ok) {
-      router.push("/reviews/change-requests")
+      router.push("/approvals")
       router.refresh()
     } else {
       setActionError(result.error)
@@ -108,6 +108,9 @@ function ChangeRequestReviewPage({
           <div className="flex items-center gap-2">
             <Badge variant="ghost" className="bg-muted text-muted-foreground">
               {labelForCaseStatus(changeRequest.status)}
+            </Badge>
+            <Badge variant="ghost" className="bg-primary/10 text-primary">
+              {currentResponsibilityLabel(changeRequest.status, canDecide)}
             </Badge>
             <Button variant="outline" size="sm" render={<Link href={`/customers/${customerKey}`} />}>
               Customer

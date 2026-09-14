@@ -7,6 +7,8 @@ import { loadVersion, getCommercialVersionDiff, loadCommercialVersionTimeline } 
 import { CommercialVersionReviewPage } from "@/features/customer-onboarding/ui/commercial-version-review-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
+import { commercialConfigurationService } from "@/features/commercial/server"
+import { getCustomerById } from "@/features/customers/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CommercialRateDiff } from "@/features/customer-onboarding/server"
 
@@ -26,6 +28,15 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
   if (!version) notFound()
 
   const canDecide = await hasPermission("commercial_configuration", "approve")
+
+  let customerName = "Commercial Configuration Version Review"
+  try {
+    const configuration = await commercialConfigurationService.getCommercialConfiguration(version.commercialConfigurationId)
+    const customer = configuration ? await getCustomerById(configuration.customerId) : null
+    customerName = customer?.name ?? customerName
+  } catch {
+    // Keep the generic fallback title; this is a display nicety, not the review's authorization boundary.
+  }
 
   let snapshot: ReferenceMasterSnapshot
   try {
@@ -49,6 +60,7 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
         <CommercialVersionReviewPage
           requestId={requestId}
           configId={version.commercialConfigurationId}
+          customerName={customerName}
           version={version}
           canDecide={canDecide}
           diff={diff}
