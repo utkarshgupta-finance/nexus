@@ -1,14 +1,8 @@
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
-import { getCustomerMasterDetailByKey, loadCustomerActivityTimeline } from "@/features/customers/server"
-import { commercialConfigurationService } from "@/features/commercial/server"
-import { listChangeRequestsForCustomer, listCustomerFieldHistory } from "@/features/customer-change/server"
-import { getOnboardingOriginForCustomer } from "@/features/customer-onboarding/server"
-import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
+import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext } from "@/features/customers/server"
 import { hasPermission } from "@/platform/permissions/server"
-import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import type { CustomerActivityEvent } from "@/features/customers/server"
-import type { OnboardingOrigin } from "@/features/customer-onboarding/server"
 
 /**
  * Customer Master detail: one record, read-only (task spec §15, §18).
@@ -58,47 +52,35 @@ export default async function CustomerMasterDetailRoute({
     )
   }
 
-  let snapshot: ReferenceMasterSnapshot
-  try {
-    snapshot = await loadReferenceMasterSnapshot()
-  } catch {
-    snapshot = emptySnapshot()
-  }
-
-  let commercialConfigurationId: string | null = null
-  try {
-    const configurations = await commercialConfigurationService.listCommercialConfigurationsByCustomer(detail.record.id)
-    commercialConfigurationId = configurations[0]?.id ?? null
-  } catch {
-    commercialConfigurationId = null
-  }
+  // Fetched exactly once here: Change Requests, Field History, the
+  // onboarding origin, Commercial Configurations/Versions, and the
+  // Reference Master snapshot all previously ran twice, once here and
+  // once again inside the Activity timeline builder (Platform Scale
+  // Closure, Phase V).
+  const [context, canDeletePermanently, canManageStatus] = await Promise.all([
+    loadCustomerDetailContext(detail.record.id),
+    hasPermission("customer", "delete_permanent"),
+    hasPermission("customer", "approve"),
+  ])
 
   let activityEvents: CustomerActivityEvent[] = []
   try {
-    activityEvents = await loadCustomerActivityTimeline(detail.record.id)
+    activityEvents = await buildActivityTimelineFromContext(detail.record.id, context)
   } catch {
     activityEvents = []
   }
 
-  const [changeRequests, fieldHistory, canDeletePermanently, canManageStatus, onboardingOrigin] = await Promise.all([
-    listChangeRequestsForCustomer(detail.record.id),
-    listCustomerFieldHistory(detail.record.id),
-    hasPermission("customer", "delete_permanent"),
-    hasPermission("customer", "approve"),
-    getOnboardingOriginForCustomer(detail.record.id).catch((): OnboardingOrigin | null => null),
-  ])
-
   return (
     <CustomerMasterDetail
       detail={detail}
-      snapshot={snapshot}
-      commercialConfigurationId={commercialConfigurationId}
-      changeRequests={changeRequests}
-      fieldHistory={fieldHistory}
+      snapshot={context.referenceMasterSnapshot}
+      commercialConfigurationId={context.commercialConfigurations[0]?.id ?? null}
+      changeRequests={context.changeRequests}
+      fieldHistory={context.fieldHistory}
       canDeletePermanently={canDeletePermanently}
       canManageStatus={canManageStatus}
       activityEvents={activityEvents}
-      onboardingOrigin={onboardingOrigin}
+      onboardingOrigin={context.onboardingOrigin}
     />
   )
 }

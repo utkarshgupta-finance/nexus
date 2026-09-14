@@ -129,6 +129,23 @@ async function getLatestRevisionForRequest(requestId: string): Promise<Submissio
   return data
 }
 
+/** One query for every request's latest revision instead of one query per request (Platform Scale Closure, Phase V). Ascending order means the last row written per request id in the loop below is its highest revision_number. */
+async function getLatestRevisionsForRequests(requestIds: string[]): Promise<Map<string, SubmissionRevisionRow>> {
+  if (requestIds.length === 0) return new Map()
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("submission_revisions")
+    .select("*")
+    .in("request_id", requestIds)
+    .order("revision_number", { ascending: true })
+  if (error) throw new CommercialVersionOperationError(parseCommercialVersionError(error))
+  const latestByRequestId = new Map<string, SubmissionRevisionRow>()
+  for (const row of data ?? []) {
+    latestByRequestId.set(row.request_id, row)
+  }
+  return latestByRequestId
+}
+
 export {
   createVersion,
   saveDraft,
@@ -140,5 +157,6 @@ export {
   listAllVersions,
   listVersionsForConfiguration,
   getLatestRevisionForRequest,
+  getLatestRevisionsForRequests,
 }
 export type { CreateVersionInput, SubmitInput }

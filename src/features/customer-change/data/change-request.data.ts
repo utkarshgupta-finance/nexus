@@ -172,6 +172,42 @@ async function listRequirementsForRequest(requestId: string): Promise<CustomerCh
   return data ?? []
 }
 
+/** One query for every request's latest revision instead of one query per request (Platform Scale Closure, Phase V). Ascending order means the last row written per request id in the loop below is its highest revision_number. */
+async function getLatestRevisionsForRequests(requestIds: string[]): Promise<Map<string, SubmissionRevisionRow>> {
+  if (requestIds.length === 0) return new Map()
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("submission_revisions")
+    .select("*")
+    .in("request_id", requestIds)
+    .order("revision_number", { ascending: true })
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  const latestByRequestId = new Map<string, SubmissionRevisionRow>()
+  for (const row of data ?? []) {
+    latestByRequestId.set(row.request_id, row)
+  }
+  return latestByRequestId
+}
+
+/** One query for every request's requirements instead of one query per request (Platform Scale Closure, Phase V). */
+async function listRequirementsForRequests(requestIds: string[]): Promise<Map<string, CustomerChangeRequestRequirementRow[]>> {
+  if (requestIds.length === 0) return new Map()
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_change_request_requirements")
+    .select("*")
+    .in("customer_change_request_id", requestIds)
+    .order("created_at", { ascending: true })
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  const byRequestId = new Map<string, CustomerChangeRequestRequirementRow[]>()
+  for (const row of data ?? []) {
+    const list = byRequestId.get(row.customer_change_request_id) ?? []
+    list.push(row)
+    byRequestId.set(row.customer_change_request_id, list)
+  }
+  return byRequestId
+}
+
 /** Permanent, field-level Customer Master change history for one customer, newest first: the Customer -> History tab's data source. */
 async function listFieldHistoryForCustomer(customerId: string): Promise<CustomerFieldHistoryRow[]> {
   const supabase = getSupabaseServiceRoleClient()
@@ -218,9 +254,11 @@ export {
   listAllChangeRequests,
   listChangeRequestsForCustomer,
   getLatestRevisionForRequest,
+  getLatestRevisionsForRequests,
   listRevisionsForRequest,
   listSendBacksForRequest,
   listRequirementsForRequest,
+  listRequirementsForRequests,
   listFieldHistoryForCustomer,
   searchFieldHistoryByOldValue,
 }

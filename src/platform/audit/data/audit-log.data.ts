@@ -21,6 +21,7 @@ type AuditLogRow = {
   actor_context: Record<string, unknown> | null
 }
 
+/** Most recent 500 audit_log rows for one table row, oldest first (unbounded until Platform Scale Closure, Phase O: a row with a long enough audit history would otherwise be an unbounded read). Fetched newest-first so the cap keeps the most recent history, then reversed back to the ascending order every caller expects. 500 is a generous ceiling for what is normally a handful of lifecycle events per row; revisit only if a real row is found approaching it. */
 async function listAuditLogForRow(tableName: string, rowId: string): Promise<AuditLogRow[]> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase
@@ -28,9 +29,10 @@ async function listAuditLogForRow(tableName: string, rowId: string): Promise<Aud
     .select("*")
     .eq("table_name", tableName)
     .eq("row_id", rowId)
-    .order("occurred_at", { ascending: true })
+    .order("occurred_at", { ascending: false })
+    .limit(500)
   if (error) throw new Error(`Failed to read audit_log for ${tableName}/${rowId}: ${error.message}`)
-  return data ?? []
+  return (data ?? []).reverse()
 }
 
 export { listAuditLogForRow }

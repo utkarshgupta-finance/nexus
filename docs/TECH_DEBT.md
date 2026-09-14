@@ -99,6 +99,24 @@ into a second backlog.
   `getCustomersByIds`. Not yet batched (lower value, only 2 call sites):
   `getCommercialConfiguration` resolution in `platform/approvals/server.ts`
   and `/reviews/commercial-versions/page.tsx`.
+- **Further N+1/redundancy fixes this round (Platform Scale Closure,
+  Phase V)**: the Customer detail route fetched Change Requests, Field
+  History, the onboarding origin, and the Reference Master snapshot
+  twice each (once directly, once again inside the Activity timeline
+  builder); consolidated into one `loadCustomerDetailContext` composer
+  both now share. Change Requests and Commercial Versions each carried a
+  3-query and 2-query-per-row fan-out (`loadChangeRequest`/`loadVersion`
+  called once per row instead of batched); both now use one `.in()`
+  query for revisions/requirements across all rows plus reuse of the
+  already-fetched list row instead of a redundant single-row re-fetch.
+  `listAuditLogForRow` (Customer Activity/History) had no bound at all;
+  now capped at the 500 most recent rows (Phase O), fetched newest-first
+  and reversed back to the ascending order callers expect. Still not
+  batched (lower value, unchanged from last round): `getCommercialConfiguration`
+  resolution in `platform/approvals/server.ts`/My Work, and unique actor
+  email resolution in the same two places, both one round trip per
+  item/actor concurrently rather than a single `.in()`/bulk call; today's
+  volume does not justify it, see `docs/PLATFORM_ARCHITECTURE.md` §12a.
 - **Three orphaned list routes**: `/reviews`, `/reviews/change-requests`,
   `/reviews/commercial-versions` are superseded by `/approvals` (per their
   own code comments) and have no inbound link from the sidebar or any

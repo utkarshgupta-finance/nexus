@@ -169,8 +169,18 @@ async function listAllChangeRequestEntries(): Promise<ReviewQueueEntry[]> {
 
 async function listChangeRequestsForCustomer(customerId: string): Promise<CustomerChangeRequest[]> {
   const rows = await changeData.listChangeRequestsForCustomer(customerId)
-  const loaded = await Promise.all(rows.map((row) => loadChangeRequest(row.request_id)))
-  return loaded.filter((entry): entry is CustomerChangeRequest => entry !== null)
+  // Batched instead of one loadChangeRequest (3 queries) per row (Platform
+  // Scale Closure, Phase V): `rows` already carries the full change
+  // request row, so re-fetching it per row was also a redundant read, not
+  // only an unbatched revision/requirements lookup.
+  const requestIds = rows.map((row) => row.request_id)
+  const [latestRevisionsByRequestId, requirementsByRequestId] = await Promise.all([
+    changeData.getLatestRevisionsForRequests(requestIds),
+    changeData.listRequirementsForRequests(requestIds),
+  ])
+  return rows.map((row) =>
+    toCustomerChangeRequest(row, latestRevisionsByRequestId.get(row.request_id) ?? null, requirementsByRequestId.get(row.request_id) ?? [])
+  )
 }
 
 async function listCustomerFieldHistory(customerId: string): Promise<CustomerFieldHistoryEntry[]> {

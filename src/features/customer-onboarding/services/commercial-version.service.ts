@@ -201,8 +201,12 @@ async function listAllVersionEntries(): Promise<ReviewQueueEntry[]> {
 
 async function listVersionsForConfiguration(commercialConfigurationId: string): Promise<CommercialConfigurationVersion[]> {
   const rows = await versionData.listVersionsForConfiguration(commercialConfigurationId)
-  const loaded = await Promise.all(rows.map((row) => loadVersion(row.request_id)))
-  return loaded.filter((entry): entry is CommercialConfigurationVersion => entry !== null)
+  // One batched revision query instead of one query per row (Platform
+  // Scale Closure, Phase V): `rows` already carries the full version row,
+  // so re-fetching it per row via loadVersion (as the previous shape did)
+  // was also a redundant read, not only an unbatched revision lookup.
+  const revisionsByRequestId = await versionData.getLatestRevisionsForRequests(rows.map((row) => row.request_id))
+  return rows.map((row) => toCommercialConfigurationVersion(row, revisionsByRequestId.get(row.request_id) ?? null))
 }
 
 /** Commercial Current vs Proposed diff (task Phase G): null only when the version has no saved draft yet (nothing to compare against). */

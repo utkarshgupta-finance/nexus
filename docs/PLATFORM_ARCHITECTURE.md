@@ -467,6 +467,28 @@ Preserving the extension path for each of these is a design decision made
 now. Building any of them is a decision deferred until a real feature
 requires it.
 
+## 12a. Performance baseline [Platform Scale Closure, Phase V]
+
+A lightweight, honest record of the current query shape per screen, not a
+benchmark suite: no load-testing infrastructure exists or is being built.
+Revisit a row once its query count column stops being flat as usage
+grows.
+
+| Screen | Query groups | Bounded | Notable index | Remaining fan-out |
+|---|---|---|---|---|
+| Customers list | 2-3 (list, optional former-name search, reference snapshot) | Yes (former-name search `.limit(20)`) | `customers.created_at` | None |
+| Customer detail | 1 composed context fetch (4 parallel: onboarding origin, change requests, field history, commercial configurations) + 1 versions batch + 1 audit-log read for the Activity timeline, plus 2 `hasPermission` checks | Yes (`listAuditLogForRow` capped at 500, Phase O) | FK indexes on `customer_id`/`commercial_configuration_id` | None as of this round. Previously: Change Requests and Commercial Versions were each fetched twice (once for the page, once inside the Activity timeline builder), and each carried 3 and 2 queries per row; both fixed this round (§V below, `loadCustomerDetailContext`, `getLatestRevisionsForRequests`, `listRequirementsForRequests`). |
+| My Requests | 4 (cases, revisions batched via `.in()`, send-back counts batched, customers batched via `.in()`) | Yes (implicit: scoped to one requester) | `customer_onboarding_cases.created_by` | None |
+| My Work | Same as Approvals inbox, re-scoped client-side per user | Yes (200-row cap per entry type) | `status`/`updated_at` on each request table | Commercial version entries and unique actor emails are resolved with one round trip per item/actor, concurrently (`Promise.all`), not `.in()`-batched. Not fixed this round: today's volume (K, number of pending versions and unique actors at once) is small; revisit if either count is regularly in the dozens. |
+| Approvals inbox | 4 base queries (3 entry-type lists, one of which is itself list+batched-revisions) + customers batched via `.in()` | Yes (200-row cap per entry type) | Same as My Work | Same commercial-version/actor-email fan-out as My Work, same "not fixed, revisit at real volume" reasoning. |
+| Customer Activity | Folded into Customer detail's one composed context fetch above | Yes | Same as Customer detail | None as of this round |
+| Commercial detail (Version History) | 1 list query + 1 batched revision query (Phase V, was 1 + 2N) | Yes | `commercial_configuration_id` | None |
+
+Client bundle: not separately inspected this round (no build-output
+regression is expected from this round's changes, which touch only
+server-side data composition); a real bundle-size pass is future work, not
+claimed as done here.
+
 ## 13. Stage 5B technology boundaries (accepted, not implemented)
 
 Nexus has accepted the following external-technology boundaries for the
