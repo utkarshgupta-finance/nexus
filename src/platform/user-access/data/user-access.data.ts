@@ -26,11 +26,12 @@ type AppUserRow = {
   display_name: string | null
   created_at: string
   updated_at: string
+  updated_by: string | null
 }
 
 async function listAppUsers(): Promise<AppUserRow[]> {
   const supabase = getSupabaseServiceRoleClient()
-  const { data, error } = await supabase.from("app_users").select("id, is_active, display_name, created_at, updated_at")
+  const { data, error } = await supabase.from("app_users").select("id, is_active, display_name, created_at, updated_at, updated_by")
   if (error) throw error
   return data ?? []
 }

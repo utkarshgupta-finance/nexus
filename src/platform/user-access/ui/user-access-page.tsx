@@ -280,7 +280,16 @@ function UserAccessPage({
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{entry.updatedAt ? formatTimestampDate(entry.updatedAt) : "-"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {entry.updatedAt ? (
+                        <>
+                          {formatTimestampDate(entry.updatedAt)}
+                          {entry.updatedByLabel ? <span className="block text-[0.7rem]">by {entry.updatedByLabel}</span> : null}
+                        </>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {!canWrite ? null : !entry.isProvisioned ? (
                         <PendingButton

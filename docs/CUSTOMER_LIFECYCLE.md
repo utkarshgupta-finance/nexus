@@ -1438,3 +1438,56 @@ DRAFT, not built: the task's own framing ("assess... decide...") names a
 genuinely open architectural question with more than one defensible
 answer, not a decision safely inferable without a real business need to
 validate it against.
+
+## 35. Actor display audit: IMPLEMENTED (Platform Operating Expansion, Phase M)
+
+Audited every surface the task spec named (Approvals, My Requests, My
+Work, Operational Queue, Customer Activity, request Timelines,
+Commercial Version History, Customer Change History, Settings history,
+Documents). Found and fixed four real gaps via a background audit
+against the actual rendered UI, not by guessing:
+
+- **Commercial Version History showed a raw, truncated UUID.**
+  `src/features/commercial/ui/version-history-table.tsx`'s "Approved By"
+  column rendered `version.approvedBy.slice(0, 8)`, the first 8
+  characters of `commercial_configuration_versions.decided_by`, never
+  resolved. `src/app/commercials/[configId]/page.tsx` now resolves every
+  `decidedBy` through `resolveActorLabels` before building the
+  changeId-keyed map the table reads, so the column shows a real name (or
+  email), never a partial id.
+- **Customer Master's Field History tab never showed who requested or
+  approved a field change at all**, not even as a raw id: the data
+  (`CustomerFieldHistoryEntry.requestedBy`/`approvedBy`) existed but the
+  table only had Field/Old Value/New Value/Effective Date/Changed At
+  columns. Added "Requested By" and "Approved By" columns, resolved
+  server-side in `src/app/customers/[customerKey]/page.tsx` via
+  `resolveActorLabels`.
+- **Customer Change Request review page's "Previously sent back" banner
+  dropped the actor entirely.** It showed only the reason, never who sent
+  it back or when, even though the Timeline elsewhere on the same page
+  already resolves that same actor. Added a resolved `sentBackByLabel`
+  plus timestamp line, resolved in
+  `src/app/reviews/change-requests/[requestId]/page.tsx`.
+- **User Access's own "Last Updated" column had no actor**, a real schema
+  gap: `app_users` had no `updated_by` column at all, even though every
+  mutation RPC (`set_app_user_active`, `set_app_user_display_name`,
+  `provision_app_user`) already received a real actor id.
+  `supabase/migrations/20260916080000_app_users_updated_by.sql` adds the
+  column and updates all three RPCs (same exact signatures, no overload
+  risk) to persist it; the list now shows "by {name}" under the
+  timestamp.
+
+Confirmed correct, not gaps: the unified Approvals inbox already used
+`requestedByEmail` (now resolved via `resolveActorLabels`, the permanent
+Actor Identity rule); My Work and My Requests intentionally show no
+actor column since every row is implicitly the viewer's own item; the
+Operations Queue is role-based by design (`currentResponsibilityLabel`),
+not an actor-identity surface, and showing a specific person there would
+misrepresent Nexus's role-based approval model as if it routed to named
+individuals, which it does not.
+
+**Scope boundary, honestly recorded**: Documents/Agreements/Go Live
+actor display could not be audited because those surfaces do not exist
+yet (Agreements is task Phase S, Go Live is task Phase Q); this audit
+needs a follow-up pass once those are built, per task Phase M's own
+description of them as in-scope surfaces.

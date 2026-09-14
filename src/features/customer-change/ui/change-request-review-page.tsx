@@ -35,6 +35,7 @@ function ChangeRequestReviewPage({
   changeRequest,
   canDecide,
   timeline = [],
+  sentBackByLabel = null,
 }: {
   requestId: string
   customerName: string
@@ -43,6 +44,8 @@ function ChangeRequestReviewPage({
   changeRequest: CustomerChangeRequest
   canDecide: boolean
   timeline?: RequestTimelineEvent[]
+  /** Task Phase M: resolved display label for `changeRequest.sentBack.sentBackBy`, never a raw actor id. Null when this request has never been sent back, or the actor could not be resolved. */
+  sentBackByLabel?: string | null
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<"idle" | "send_back" | "reject">("idle")
@@ -142,6 +145,9 @@ function ChangeRequestReviewPage({
           <section className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/5 p-4 text-xs">
             <span className="font-medium text-foreground">Previously sent back:</span>
             <span className="text-muted-foreground">{changeRequest.sentBack.reason}</span>
+            <span className="text-muted-foreground">
+              Sent back by {sentBackByLabel ?? "an unknown user"}, {formatTimestampDate(changeRequest.sentBack.sentBackAt)}
+            </span>
           </section>
         ) : null}
 

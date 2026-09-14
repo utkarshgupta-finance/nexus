@@ -66,6 +66,7 @@ function CustomerMasterDetail({
   commercialConfigurationId,
   changeRequests,
   fieldHistory,
+  fieldHistoryActorLabels = new Map(),
   canDeletePermanently = false,
   canManageStatus = false,
   activityEvents,
@@ -77,6 +78,8 @@ function CustomerMasterDetail({
   commercialConfigurationId: string | null
   changeRequests: CustomerChangeRequest[]
   fieldHistory: CustomerFieldHistoryEntry[]
+  /** Task Phase M: requestedBy/approvedBy resolved to display labels, keyed by the raw actor id; never a raw UUID rendered in the Field History table. */
+  fieldHistoryActorLabels?: Map<string, string | null>
   /** Gates the "More Actions -> Permanently Delete Customer" entry point (Customer Lifecycle V1, Phase 14-16); resolved server-side from `customer.delete_permanent`. */
   canDeletePermanently?: boolean
   /** Gates the "More Actions -> Deactivate/Reactivate Customer" entry point (task Phase I); resolved server-side from `customer.approve`. */
@@ -435,6 +438,8 @@ function CustomerMasterDetail({
                         <th className="py-2 pr-3 font-medium">Old Value</th>
                         <th className="py-2 pr-3 font-medium">New Value</th>
                         <th className="py-2 pr-3 font-medium">Effective Date</th>
+                        <th className="py-2 pr-3 font-medium">Requested By</th>
+                        <th className="py-2 pr-3 font-medium">Approved By</th>
                         <th className="py-2 pr-3 font-medium">Changed At</th>
                       </tr>
                     </thead>
@@ -445,6 +450,8 @@ function CustomerMasterDetail({
                           <td className="py-2 pr-3 text-muted-foreground">{entry.oldValue ?? "-"}</td>
                           <td className="py-2 pr-3 text-foreground">{entry.newValue ?? "-"}</td>
                           <td className="py-2 pr-3 text-muted-foreground">{entry.effectiveDate ? formatBusinessDate(entry.effectiveDate) : "-"}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{entry.requestedBy ? (fieldHistoryActorLabels.get(entry.requestedBy) ?? "-") : "-"}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{entry.approvedBy ? (fieldHistoryActorLabels.get(entry.approvedBy) ?? "-") : "-"}</td>
                           <td className="py-2 pr-3 text-muted-foreground">{formatTimestampDate(entry.changedAt)}</td>
                         </tr>
                       ))}

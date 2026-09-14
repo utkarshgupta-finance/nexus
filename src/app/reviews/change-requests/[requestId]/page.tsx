@@ -6,6 +6,7 @@ import { hasPermission } from "@/platform/permissions/server"
 import { loadChangeRequest, getCurrentGovernedValues, loadChangeRequestTimeline } from "@/features/customer-change/server"
 import { ChangeRequestReviewPage } from "@/features/customer-change/ui/change-request-review-page"
 import { getCustomerById } from "@/features/customers/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 
 /**
  * Reviewer detail screen for one Customer Change Request, mirroring
@@ -30,6 +31,10 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
   const canDecide = await hasPermission("customer", "approve")
   const timeline = await loadChangeRequestTimeline(requestId)
 
+  /** Task Phase M: the "Previously sent back" banner needs its own resolved actor label, independent of the Timeline's own resolution. */
+  const sentBackByLabels = await resolveActorLabels([changeRequest.sentBack?.sentBackBy ?? null])
+  const sentBackByLabel = changeRequest.sentBack?.sentBackBy ? (sentBackByLabels.get(changeRequest.sentBack.sentBackBy) ?? null) : null
+
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/change-requests/${requestId}`}>
       <ChangeRequestReviewPage
@@ -40,6 +45,7 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
         changeRequest={changeRequest}
         canDecide={canDecide}
         timeline={timeline}
+        sentBackByLabel={sentBackByLabel}
       />
     </AuthGate>
   )

@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
 import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext } from "@/features/customers/server"
 import { hasPermission } from "@/platform/permissions/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 import type { CustomerActivityEvent } from "@/features/customers/server"
 
 /**
@@ -70,6 +71,14 @@ export default async function CustomerMasterDetailRoute({
     activityEvents = []
   }
 
+  /** Task Phase M: the Field History tab's own "Requested By"/"Approved By" columns need resolved labels too, independent of the Activity timeline's own resolution (which only ever surfaces a subset of these as timeline events, never the raw table). */
+  let fieldHistoryActorLabels: Map<string, string | null> = new Map()
+  try {
+    fieldHistoryActorLabels = await resolveActorLabels(context.fieldHistory.flatMap((entry) => [entry.requestedBy, entry.approvedBy]))
+  } catch {
+    fieldHistoryActorLabels = new Map()
+  }
+
   return (
     <CustomerMasterDetail
       detail={detail}
@@ -77,6 +86,7 @@ export default async function CustomerMasterDetailRoute({
       commercialConfigurationId={context.commercialConfigurations[0]?.id ?? null}
       changeRequests={context.changeRequests}
       fieldHistory={context.fieldHistory}
+      fieldHistoryActorLabels={fieldHistoryActorLabels}
       canDeletePermanently={canDeletePermanently}
       canManageStatus={canManageStatus}
       activityEvents={activityEvents}

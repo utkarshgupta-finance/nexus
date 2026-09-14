@@ -130,7 +130,7 @@ type VersionSummary = {
   reason: string | null
   createdAt: string
   createdBy: string | null
-  /** The actor who approved this version through the governed Commercial Configuration Version lifecycle (commercial_configuration_versions.decided_by); null for a version created through the older immediate-promotion path, which has no such row, or for the initial_setup version, which is never approved through that lifecycle. Never fabricated. */
+  /** The resolved display label (task Phase M: never a raw actor id) of who approved this version through the governed Commercial Configuration Version lifecycle (commercial_configuration_versions.decided_by); null for a version created through the older immediate-promotion path, which has no such row, or for the initial_setup version, which is never approved through that lifecycle. Never fabricated. */
   approvedBy: string | null
   componentIds: string[]
 }

@@ -8,6 +8,7 @@ import { getCustomerById } from "@/features/customers/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { CustomerCommercialConfigurationView } from "@/features/customer-onboarding/ui/customer-commercial-configuration-view"
 import { listVersionsForConfiguration } from "@/features/customer-onboarding/server"
+import { resolveActorLabels } from "@/platform/audit/server"
 
 /**
  * The live Commercial Configuration screen (task correction: "create one
@@ -64,13 +65,15 @@ export default async function CommercialConfigurationPage({ params }: { params: 
 
   const canCreateVersion = await hasPermission("commercial_configuration", "write")
 
-  /** changeId -> approving actor, for the Version History "Approved By" column: only versions created through the governed draft/submit/approve lifecycle have a commercial_configuration_versions row at all, so this map is naturally empty/partial for the older immediate-promotion path, never fabricated for it. */
+  /** changeId -> approving actor's resolved display label (task Phase M: never a raw UUID), for the Version History "Approved By" column: only versions created through the governed draft/submit/approve lifecycle have a commercial_configuration_versions row at all, so this map is naturally empty/partial for the older immediate-promotion path, never fabricated for it. */
   let approvedByChangeId: Map<string, string | null> = new Map()
   if (configuration) {
     try {
       const versions = await listVersionsForConfiguration(configuration.id)
+      const decidedVersions = versions.filter((version) => version.commercialChangeId !== null)
+      const actorLabels = await resolveActorLabels(decidedVersions.map((version) => version.decidedBy))
       approvedByChangeId = new Map(
-        versions.filter((version) => version.commercialChangeId !== null).map((version) => [version.commercialChangeId as string, version.decidedBy])
+        decidedVersions.map((version) => [version.commercialChangeId as string, version.decidedBy ? (actorLabels.get(version.decidedBy) ?? null) : null])
       )
     } catch {
       approvedByChangeId = new Map()

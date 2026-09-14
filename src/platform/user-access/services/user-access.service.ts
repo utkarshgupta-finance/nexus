@@ -2,7 +2,8 @@ import "server-only"
 
 import * as userAccessData from "../data/user-access.data"
 import * as teamData from "@/platform/team/data/team.data"
-import { buildUserAccessEntries } from "../domain/user-access"
+import { resolveActorLabels } from "@/platform/audit/server"
+import { buildUserAccessEntries, attachUpdatedByLabels } from "../domain/user-access"
 import type { UserAccessEntry } from "../domain/user-access"
 
 /**
@@ -25,7 +26,9 @@ async function listUserAccessEntries(): Promise<UserAccessEntry[]> {
     teamData.listActiveTeams(),
     teamData.listActiveUserTeamGrants(),
   ])
-  return buildUserAccessEntries(authUsers, appUsers, roles, grants, teams, teamGrants)
+  const entries = buildUserAccessEntries(authUsers, appUsers, roles, grants, teams, teamGrants)
+  const actorLabels = await resolveActorLabels(entries.map((entry) => entry.updatedBy))
+  return attachUpdatedByLabels(entries, actorLabels)
 }
 
 type AssignableRole = { id: string; code: string; name: string }
