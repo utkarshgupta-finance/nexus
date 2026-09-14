@@ -364,15 +364,19 @@ UI" limitation, below), never relaxing `canReadSettings`'s own check.
   "immediate implementation supports global assignment only." Scoped
   authorization (a role limited to one customer, one business unit) is
   still the documented future extension in §5, not built.
-- **No self-service provisioning UI.** Granting `app_users`/`user_roles`
-  rows today is a direct administrative action (a migration for
-  catalog-level roles/permissions, a data insert for a specific user's
-  grant), not a Settings screen. Building that UI is future work, not
-  a security gap: the underlying tables and enforcement are real either
-  way. This is also the direct cause of §17: with no such UI, and no
-  automated way to create a Supabase Auth user without the public signup
-  API (which this project's own email-confirmation setting gates),
-  provisioning the first real Preview admin is a manual, one-time step.
+- **Self-service provisioning UI: CLOSED (Platform Operating Expansion,
+  Phase J).** The User Access module (`/settings/user-access`) is now a
+  real Settings screen for exactly this: `provision_app_user` creates the
+  `app_users` row for an existing Supabase Auth identity, and
+  `grant_user_role`/`revoke_user_role` manage role grants, both from the
+  UI, both gated on `user_access.write`. Catalog-level roles/permissions
+  themselves (defining what "maker" or "reference_master_admin" even
+  means) remain migration-managed, deliberately: that is structural
+  configuration, not a per-user administrative action. The one step that
+  remains genuinely manual is creating the first Supabase Auth identity
+  itself and granting it `user_access.write` (so someone can reach this
+  screen at all), the same bootstrapping requirement §17 already
+  describes, now one step shorter.
 - **Reference Master and Commercial Configuration are protected today.**
   `requirePermission` is feature-agnostic and ready for reuse (§13), and
   as of 2026-09-12 both `src/features/reference-data/actions.ts` and
@@ -386,3 +390,44 @@ UI" limitation, below), never relaxing `canReadSettings`'s own check.
   (bypassing RLS) is still the only path that reaches them, gated by the
   application-service checks in §13-14/§16, exactly the layering §6
   already specified.
+
+## 19. Maker/Checker (Platform Operating Expansion, Phase L): IMPLEMENTED as roles, Access Profile DESIGN DRAFT
+
+Two illustrative roles, `maker` and `checker`
+(`supabase/migrations/20260916070000_maker_checker_roles.sql`), are the
+entire V1 of Maker/Checker. `checker` is defined as `maker`'s exact
+permission set (`customer.create`, `customer.change_request`,
+`commercial_configuration.write`) plus each domain's existing approval
+permission (`customer.approve`, `commercial_configuration.approve`), so
+"Checker has all Maker capabilities plus approval" is true because the
+role grant literally contains both sets, not because any application
+code layers a second check on top. `requirePermission` still checks the
+real resource+action on every call; nothing about Maker/Checker changes
+that, and no client-supplied boolean or role name is ever trusted (task
+correction §3, still in force). Assigning either role uses the existing
+User Access module (§18, Phase J) with zero new UI: `listActiveRoles()`
+already reads every active role generically.
+
+**DESIGN DRAFT, not built**: an "Access Profile" layer sitting between
+`user_roles` and `roles` (the task's own framing: "model as access-
+profile/capability layer... decide global vs team-based vs resource-
+based scope"). A real Access Profile would answer a genuinely open
+question this round did not resolve: does a profile bundle *roles*
+(reusing `role_permissions` transitively) or *permissions* directly; is
+membership global (like `user_roles` today) or does it interact with
+Team (§K, `user_teams`) so a profile can be team-scoped; and does
+revoking a profile need its own historical-grant-record table, or can it
+reuse `user_roles`' shape with a `profile_id` alongside `role_id`. Each
+of these has more than one defensible answer, and picking one now
+without a real, named business need to validate it against would be
+inventing structure to fill a phase, not solving a problem. The `maker`/
+`checker` roles above are deliberately built as an extension of what
+already exists (`roles`/`role_permissions`), so if Access Profile is
+built later, migrating from "role you were granted directly" to
+"role you hold via a profile" changes nothing about how
+`requirePermission` resolves access: the permission check stays
+identical, only the path to holding the role changes. Trigger to
+revisit: a real request for one grant to control access to more than a
+literal role assignment (for example, "give this team's members Maker
+automatically without an admin re-granting it to each new team member
+individually").

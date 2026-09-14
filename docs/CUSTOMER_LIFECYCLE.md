@@ -1420,3 +1420,21 @@ already requires).
 
 **Scope boundary, honestly recorded**: Access Profile (Maker/Checker,
 task Phase L) still does not exist and is not shown anywhere yet.
+
+## 34. Maker/Checker capability layer: IMPLEMENTED as roles (Platform Operating Expansion, Phase L)
+
+See `docs/AUTHORIZATION_MODEL.md` §19 for the full account. Summary: two
+new roles, `maker` and `checker`
+(`supabase/migrations/20260916070000_maker_checker_roles.sql`), reusing
+`roles`/`role_permissions` exactly as they already work, no new
+authorization mechanism. `checker` bundles every `maker` permission plus
+each domain's existing approval permission, so "Checker has all Maker
+capabilities plus approval" holds because the role grant contains both,
+never because of a second application-level check. Assignable
+immediately from the User Access module (Phase J) with no new UI code.
+A real "Access Profile" layer (bundling roles/permissions into a named,
+possibly team-scoped unit above `user_roles`) is an explicit DESIGN
+DRAFT, not built: the task's own framing ("assess... decide...") names a
+genuinely open architectural question with more than one defensible
+answer, not a decision safely inferable without a real business need to
+validate it against.
