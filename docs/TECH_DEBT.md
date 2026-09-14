@@ -238,3 +238,18 @@ into a second backlog.
   limited to one customer/business unit/legal entity; the extension path
   (`user_roles.scope_resource_id` already exists, unpopulated) is
   preserved, per `docs/AUTHORIZATION_MODEL.md` §5.
+- **Go Live domain, Entitlement Ledger, Agreement lifecycle, and Legal-
+  Commercial coverage** (Platform Operating Expansion, Phases Q-T) were
+  deliberately not built in that program. `docs/MASTER_DATA_FOUNDATION_DESIGN.md`
+  §21 already locks Go Live and Entitlement as domains whose boundary is
+  preserved (they anchor to `customers.id` like Commercial Configuration
+  does) but explicitly marks them "[NOT DESIGNED, correctly out of
+  scope]" pending real Finance/business input; `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md`
+  §14 lists "a go-live condition pending" only as an illustrative,
+  undesigned example of an Invoice Eligibility gate. Building any of the
+  four for real means inventing what triggers them, who approves them,
+  and what they gate, exactly the kind of business rule this project does
+  not fabricate without a product brief (this is also why a placeholder
+  Go-Live sidebar item was removed rather than left pointing at a fake
+  route, Platform Scale Program Phase M, above). Build each only once a
+  real product brief defines its business meaning.
