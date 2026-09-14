@@ -1548,3 +1548,40 @@ all three.
 (`updatedByLabel`, `publishedByLabel`) is resolved server-side via
 `resolveActorLabels` before reaching the client component, per the
 permanent Actor Identity rule (§35).
+
+## 37. Workflow execution migration strategy: DESIGN DRAFT (Platform Operating Expansion, Phase P)
+
+The Workflow Builder (§36) can be authored and published today, but no
+existing domain is wired to actually execute a published graph as its
+approval mechanism yet. This section records the deliberate order that
+follows, not a completed migration.
+
+**No existing behavior moves onto the graph engine in this program.**
+Customer Onboarding, Customer Change, and Commercial Configuration keep
+their existing, already-shipped approval mechanisms (the atomic RPCs in
+§1-§4 and the flat rule evaluator in `src/platform/workflow`) completely
+unchanged. Retrofitting a live, already-relied-upon approval path onto a
+new engine is a real behavior change with real business risk (a
+mis-migrated graph could silently skip or misroute an approval), and is
+not something this program infers permission to do without an explicit
+future decision naming exactly which domain, which cutover mechanism,
+and which rollback path.
+
+**Go Live (task Phase Q) is the intended first live consumer of the
+graph engine**, not because it is more important than the other domains,
+but because it is a genuinely new domain with no pre-existing approval
+mechanism to preserve compatibility with. Building it directly against
+`platform/workflow-builder`'s `loadWorkflowGraph`/graph shape from day
+one avoids ever writing a second bespoke approval mechanism only to
+retire it later. Whether Go Live's execution reads the graph directly
+through `platform/workflow-builder/server.ts` or through a thin
+execution-state module that tracks "which node is a given Go Live
+request currently at" is a design decision left to Phase Q itself, once
+Go Live's own requirements are in front of it.
+
+**Migrating Customer Onboarding/Customer Change/Commercial Configuration
+onto the graph engine remains an explicit future option, not a plan.**
+If it is ever undertaken, it needs its own authorization, its own
+side-by-side verification that the migrated graph produces identical
+routing to the mechanism it replaces, and its own rollback story, all
+argued on their own merits at that time.
