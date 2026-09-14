@@ -627,3 +627,18 @@ Known gap, stated honestly: only Customer Change Request creation is
 blocked for an inactive customer in this round; creating a new
 Commercial Configuration Version against an inactive customer is not
 yet blocked.
+
+## 17. Audit hardening: VERIFIED (task Phase P)
+
+Swept every `data/*.ts` repository for a plain PostgREST `.update()`/
+`.insert()` bypassing an RPC, the exact shape that caused §16's real
+bug. Result: `src/features/reference-data/data/reference-master.data.ts`
+already documents this precise pitfall in its own header and every
+Settings write already goes through a real RPC
+(`add_reference_option`/`set_reference_option_active`/etc., each
+setting `app.current_user_id` before mutating, confirmed against
+`supabase/migrations/20260912150000_auth_authorization_foundation.sql`);
+Onboarding, Customer Change, Commercial Version, and Permanent Delete
+were all already governed RPCs from their own original implementation.
+§16's `setCustomerActive` was the one real instance of this bug in the
+entire codebase, now fixed. No other instance found.
