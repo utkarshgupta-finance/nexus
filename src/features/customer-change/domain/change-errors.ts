@@ -20,6 +20,7 @@ type ChangeErrorKind =
   | "change_request_not_approvable"
   | "change_request_not_cancellable"
   | "change_request_cancel_not_owner"
+  | "change_request_self_approval_not_allowed"
   | "change_request_no_draft_revision"
   | "change_request_no_submitted_revision"
   | "change_request_send_back_reason_required"
@@ -52,6 +53,7 @@ const NAMED_TOKEN_KINDS: Record<string, ChangeErrorKind> = {
   CUSTOMER_CHANGE_STALE_BASE: "change_request_stale_base",
   CUSTOMER_CHANGE_NOT_CANCELLABLE: "change_request_not_cancellable",
   CUSTOMER_CHANGE_CANCEL_NOT_OWNER: "change_request_cancel_not_owner",
+  SELF_APPROVAL_NOT_ALLOWED: "change_request_self_approval_not_allowed",
 }
 
 const SQLSTATE_KINDS: Record<string, ChangeErrorKind> = {

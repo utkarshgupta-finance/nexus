@@ -61,6 +61,66 @@ describe("approveCase idempotency", () => {
   })
 })
 
+describe("approveCase self-approval control (Program 4 Hardening, Phase 1)", () => {
+  it("blocks approval when the actor is the same user who created the case", async () => {
+    const { approveCase } = await import("./case.data")
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "SELF_APPROVAL_NOT_ALLOWED: you cannot approve your own request. Another authorized checker must review it." },
+    })
+
+    await expect(
+      approveCase({
+        requestId: "r1",
+        customerKey: "acme",
+        customerName: "Acme",
+        commercialConfigurationKey: "acme-2026",
+        commercialConfigurationName: "Acme 2026",
+        components: [],
+        effectiveDate: "2026-01-01",
+        actorUserId: "maker-1",
+        customerFields: {},
+      })
+    ).rejects.toMatchObject({
+      caseError: { kind: "onboarding_case_self_approval_not_allowed", message: "you cannot approve your own request. Another authorized checker must review it." },
+    })
+  })
+
+  it("allows approval when the actor is a different user than the creator", async () => {
+    const { approveCase } = await import("./case.data")
+    const approvedRow = { request_id: "r1", status: "approved", customer_id: "cust-1" }
+    rpcMock.mockResolvedValueOnce({ data: approvedRow, error: null })
+
+    const result = await approveCase({
+      requestId: "r1",
+      customerKey: "acme",
+      customerName: "Acme",
+      commercialConfigurationKey: "acme-2026",
+      commercialConfigurationName: "Acme 2026",
+      components: [],
+      effectiveDate: "2026-01-01",
+      actorUserId: "checker-1",
+      customerFields: {},
+    })
+
+    expect(result.status).toBe("approved")
+  })
+})
+
+describe("sendBackCase self-approval control (Program 4 Hardening, Phase 1)", () => {
+  it("blocks send-back when the actor is the same user who created the case", async () => {
+    const { sendBackCase } = await import("./case.data")
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "SELF_APPROVAL_NOT_ALLOWED: you cannot send back your own request. Another authorized checker must review it." },
+    })
+
+    await expect(
+      sendBackCase({ requestId: "r1", reason: "missing info", targetStageKey: null, actorUserId: "maker-1", fieldComments: [] })
+    ).rejects.toMatchObject({ caseError: { kind: "onboarding_case_self_approval_not_allowed" } })
+  })
+})
+
 describe("createCase retry safety (documented, deliberate non-fix)", () => {
   it("mints an independent row per call: two calls with two different request ids both succeed, since no server-side dedup exists", async () => {
     // Platform Scale Closure Phase C finding: the caller (case.service.ts)

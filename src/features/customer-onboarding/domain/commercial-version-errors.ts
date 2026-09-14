@@ -18,6 +18,7 @@ type CommercialVersionErrorKind =
   | "commercial_version_not_rejectable"
   | "commercial_version_not_cancellable"
   | "commercial_version_cancel_not_owner"
+  | "commercial_version_self_approval_not_allowed"
   | "commercial_version_no_draft_revision"
   | "commercial_version_reject_reason_required"
   | "invalid_input"
@@ -44,6 +45,7 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   COMMERCIAL_VERSION_REJECT_REASON_REQUIRED: "commercial_version_reject_reason_required",
   COMMERCIAL_VERSION_NOT_CANCELLABLE: "commercial_version_not_cancellable",
   COMMERCIAL_VERSION_CANCEL_NOT_OWNER: "commercial_version_cancel_not_owner",
+  SELF_APPROVAL_NOT_ALLOWED: "commercial_version_self_approval_not_allowed",
 }
 
 const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {
