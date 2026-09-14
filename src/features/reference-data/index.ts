@@ -15,3 +15,5 @@
 export type { ReferenceListKey, ReferenceOption, ReferenceMasterSnapshot } from "./domain/types"
 export { getActiveOptions, getAllOptions, resolveOption, getInrConversionRate, getInvoiceFrequencyCadence } from "./domain/service"
 export { isValidIsoCurrencyCode } from "./domain/currency-codes"
+export { toGovernedFieldDto } from "./domain/api-dto"
+export type { GovernedFieldDto } from "./domain/api-dto"
