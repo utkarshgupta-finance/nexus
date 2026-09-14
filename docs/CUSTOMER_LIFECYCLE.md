@@ -942,3 +942,63 @@ derivable data, not fabricated ones:
   this same view for anyone who wants to look it up. Adding a third
   place to see the same information would be noise, not a real gap;
   revisit only if a real user asks where their old requests went.
+
+## 22. Operational queue: IMPLEMENTED (Platform Scale Closure, Phase L)
+
+A plain operational read model at `/operations/queue`, not a dashboard:
+no charts, no aggregation beyond a sortable list. Answers what a manager
+actually asks when checking on pending work: type, customer, status,
+which role currently needs to act, how old, and how many times sent
+back, across all three governed lifecycles at once.
+
+Built from the same `loadApprovalInbox` fetch the Approvals inbox
+already makes (no new base query), excluding `completed` items (a
+"what is currently stuck" view, not a history report). Adds send-back
+counts via two batched queries, one per lifecycle that has a send-back
+concept at all: Onboarding (`customer_onboarding_send_backs`) and
+Customer Change (`customer_change_send_backs`, a new batched sibling to
+the existing per-request `getChangeRequestSendBackCount`). Commercial
+Version has none (§19), so it always reads 0, never a fabricated count.
+
+"Which role currently needs to act" reuses `currentResponsibilityLabel`
+(`platform/approvals/domain/inbox.ts`, built for Phase J's review
+headers), called with `canDecide: false` unconditionally: this is a
+cross-request operational view, not "what can the current viewer
+personally do," so every submitted/resubmitted request reads "Pending
+Finance Approval" regardless of who is looking at the queue. Never
+resolves to a named individual: Nexus's approval model has no
+per-person routing to fabricate one from.
+
+Gated by the same `customer.read` permission Approvals uses. No
+dedicated manager role exists yet (`docs/AUTHORIZATION_MODEL.md` §5's
+scoped-RBAC extension point remains unpopulated, correctly); this read
+model is designed so a future SLA threshold or dashboard can consume it
+directly once that need is real, without redesigning the underlying
+data shape.
+
+## 23. Document platform: browser-independent input contract (Platform Scale Closure, Phase R)
+
+§15's core mechanics (MIME/size validation, storage path generation)
+were already genuinely browser-agnostic: `validateAttachmentFile` takes
+a duck-typed `{name, type, size}`, and `document-paths.ts`'s
+`buildStoragePath` takes only strings. The one real gap was narrower
+than it looked: `documents.service.ts` and `documents.data.ts`'s top
+signatures still typed their upload parameter as a live browser `File`.
+
+Both now take `DocumentUploadInput` (`{name, mimeType, size, bytes:
+Blob}`), a plain, browser-independent contract. `File extends Blob` in
+the DOM lib, so the one existing caller
+(`uploadOnboardingDocumentAction` in `actions.ts`) is the single
+adapter boundary: it is the only place a browser `File` is ever
+constructed into this shape, and does so with no conversion beyond
+reading three already-public fields. A future API upload endpoint or
+import job can construct the same shape from a Node `Buffer` wrapped in
+a `Blob`, with no browser runtime involved and no change to the service
+or data layer.
+
+Centralized already, unaffected by this change: validation, path
+generation, storage, metadata, and authorization (a Server Action
+behind `requirePermission`, matching every other governed mutation).
+Not built, and not needed for this: a streaming upload path (files are
+small, evidence documents capped by `validateAttachmentFile`'s own size
+limit).

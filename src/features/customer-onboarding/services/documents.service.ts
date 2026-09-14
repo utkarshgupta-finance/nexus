@@ -16,11 +16,27 @@ class InvalidDocumentError extends Error {}
  * matching every other service in this feature.
  */
 
+/**
+ * The browser-independent document input contract (Platform Scale
+ * Closure, Phase R): a browser `File` happens to satisfy this shape
+ * (`File extends Blob`, plus `name`/`type`/`size`), so the existing
+ * Server Action adapter (`actions.ts`) passes one straight through with
+ * no conversion; a future API/import caller can construct one from a
+ * plain buffer without ever needing a browser `File` object, which does
+ * not exist outside a browser/DOM-ish runtime.
+ */
+type DocumentUploadInput = {
+  name: string
+  mimeType: string
+  size: number
+  bytes: Blob
+}
+
 type UploadOnboardingDocumentInput = {
   requestId: string
   category: "tax" | "commercial" | "agreement"
   documentType: OnboardingDocumentType
-  file: File
+  file: DocumentUploadInput
   actorUserId: string | null
 }
 
@@ -37,7 +53,7 @@ type UploadOnboardingDocumentInput = {
  * with a crafted request bypassing whatever the browser validated.
  */
 async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): Promise<PersistedOnboardingDocumentMetadata> {
-  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.type, size: input.file.size }, "This document")
+  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: input.file.size }, "This document")
   if (!validation.valid) {
     throw new InvalidDocumentError(validation.reason)
   }
@@ -45,7 +61,7 @@ async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): P
   const documentId = crypto.randomUUID()
   const storagePath = buildStoragePath(input.requestId, input.category, input.documentType, documentId, input.file.name)
 
-  await documentsData.uploadDocumentBytes(storagePath, input.file)
+  await documentsData.uploadDocumentBytes(storagePath, input.file.bytes, input.file.mimeType)
   await documentsData.supersedeCurrentDocuments(input.requestId, input.documentType)
   const row = await documentsData.insertDocumentMetadata({
     documentId,
@@ -53,7 +69,7 @@ async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): P
     category: input.category,
     documentType: input.documentType,
     originalFileName: input.file.name,
-    mimeType: input.file.type,
+    mimeType: input.file.mimeType,
     sizeBytes: input.file.size,
     storagePath,
     uploadedBy: input.actorUserId,
@@ -74,3 +90,4 @@ async function getOnboardingDocumentDownloadUrl(documentId: string): Promise<str
 }
 
 export { uploadOnboardingDocument, listOnboardingDocuments, getOnboardingDocumentDownloadUrl, InvalidDocumentError }
+export type { DocumentUploadInput }

@@ -1,15 +1,23 @@
 import "server-only"
 
-import { listAllOnboardingEntries, listAllVersionEntries, formatOnboardingCaseId, formatCommercialVersionId } from "@/features/customer-onboarding/server"
-import { listAllChangeRequestEntries } from "@/features/customer-change/server"
+import {
+  listAllOnboardingEntries,
+  listAllVersionEntries,
+  formatOnboardingCaseId,
+  formatCommercialVersionId,
+  getSendBackCountsForRequests as getOnboardingSendBackCounts,
+} from "@/features/customer-onboarding/server"
+import { listAllChangeRequestEntries, getSendBackCountsForRequests as getChangeRequestSendBackCounts } from "@/features/customer-change/server"
 import { formatChangeRequestId } from "@/features/customer-change"
 import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorEmails } from "@/platform/audit/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
 import { buildMyWorkItems, buildDraftWorkItems } from "./domain/my-work"
+import { buildOperationalQueue } from "./domain/operational-queue"
 import type { ApprovalInboxItem } from "./domain/types"
 import type { MyWorkItem } from "./domain/my-work"
+import type { OperationalQueueEntry } from "./domain/operational-queue"
 
 /**
  * Unified Approvals inbox (task Phase E): gathers every real request
@@ -178,4 +186,29 @@ async function loadMyWork(appUserId: string, canApprove: boolean): Promise<MyWor
   return [...buildMyWorkItems(items, appUserId, canApprove, new Date()), ...drafts]
 }
 
-export { loadApprovalInbox, loadMyWork }
+/**
+ * Operational queue (Platform Scale Closure, Phase L): "what is
+ * currently stuck, and with whom" across all three lifecycles, for
+ * whoever holds broad read access, not scoped to one person's own work.
+ * Not a dashboard: no charts, no aggregation beyond the plain list
+ * ./domain/operational-queue.ts's own header describes. Reuses
+ * loadApprovalInbox's fetch (no new base query) and adds send-back
+ * counts in two more batched calls, one per lifecycle that has a
+ * send-back concept at all (Commercial Version does not, see
+ * docs/CUSTOMER_LIFECYCLE.md §19).
+ */
+async function loadOperationalQueue(): Promise<OperationalQueueEntry[]> {
+  const items = await loadApprovalInbox()
+  const onboardingIds = items.filter((item) => item.type === "onboarding").map((item) => item.requestId)
+  const changeRequestIds = items.filter((item) => item.type === "change_request").map((item) => item.requestId)
+
+  const [onboardingSendBackCounts, changeRequestSendBackCounts] = await Promise.all([
+    getOnboardingSendBackCounts(onboardingIds),
+    getChangeRequestSendBackCounts(changeRequestIds),
+  ])
+  const sentBackCountsByRequestId = new Map([...onboardingSendBackCounts, ...changeRequestSendBackCounts])
+
+  return buildOperationalQueue(items, sentBackCountsByRequestId, new Date())
+}
+
+export { loadApprovalInbox, loadMyWork, loadOperationalQueue }

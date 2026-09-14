@@ -13,9 +13,16 @@ class DocumentOperationError extends Error {}
  * business logic (that lives in services/documents.service.ts).
  */
 
-async function uploadDocumentBytes(storagePath: string, file: File): Promise<void> {
+/**
+ * `bytes` is typed as `Blob`, not `File` (Platform Scale Closure, Phase
+ * R): `File` is a browser/DOM-specific extension of `Blob` with extra
+ * fields (name, lastModified) this function never reads. A future
+ * non-browser caller (an API upload, an import job) can hand this a
+ * plain `Blob` without needing to fabricate a `File`.
+ */
+async function uploadDocumentBytes(storagePath: string, bytes: Blob, mimeType: string): Promise<void> {
   const supabase = getSupabaseServiceRoleClient()
-  const { error } = await supabase.storage.from(BUCKET).upload(storagePath, file, { contentType: file.type, upsert: false })
+  const { error } = await supabase.storage.from(BUCKET).upload(storagePath, bytes, { contentType: mimeType, upsert: false })
   if (error) throw new DocumentOperationError(`Failed to upload document: ${error.message}`)
 }
 

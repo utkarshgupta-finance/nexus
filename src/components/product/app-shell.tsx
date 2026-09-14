@@ -9,6 +9,7 @@ import {
   SettingsIcon,
   UserPlusIcon,
   LogOutIcon,
+  ClipboardListIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -74,7 +75,10 @@ const OPERATIONS_SECTION: NavSection = {
 
 const GOVERNANCE_SECTION: NavSection = {
   label: "Governance",
-  items: [{ label: "Approvals", href: "/approvals", icon: ShieldCheckIcon }],
+  items: [
+    { label: "Approvals", href: "/approvals", icon: ShieldCheckIcon },
+    { label: "Operational Queue", href: "/operations/queue", icon: ClipboardListIcon },
+  ],
 }
 
 function buildNavSections(canReadSettings: boolean): NavSection[] {

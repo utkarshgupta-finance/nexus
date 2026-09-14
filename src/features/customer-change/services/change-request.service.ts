@@ -119,6 +119,11 @@ async function getChangeRequestSendBackCount(requestId: string): Promise<number>
   return (await listChangeRequestSendBacks(requestId)).length
 }
 
+/** Batched across many requests at once (Platform Scale Closure, Phase L), for the operational queue read model; getChangeRequestSendBackCount stays the one-request form for a single review screen. */
+async function getSendBackCountsForRequests(requestIds: string[]): Promise<Map<string, number>> {
+  return changeData.countSendBacksForRequests(requestIds)
+}
+
 /** Revision-level submit/resubmit facts the Timeline needs, oldest first (unlike loadChangeRequest, which only ever reads the current revision). */
 async function listChangeRequestRevisionSummaries(requestId: string): Promise<{ revisionNumber: number; submittedAt: string | null; submittedBy: string | null }[]> {
   const rows = await changeData.listRevisionsForRequest(requestId)
@@ -219,6 +224,7 @@ export {
   getCurrentGovernedValues,
   listChangeRequestSendBacks,
   getChangeRequestSendBackCount,
+  getSendBackCountsForRequests,
   listChangeRequestRevisionSummaries,
 }
 export type { ReviewQueueEntry, ChangeRequestSendBackEntry }

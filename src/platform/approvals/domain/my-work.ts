@@ -100,5 +100,5 @@ function buildDraftWorkItems(draftEntries: DraftWorkSource[], now: Date): MyWork
     .sort((a, b) => b.ageDays - a.ageDays)
 }
 
-export { buildMyWorkItems, buildDraftWorkItems }
+export { buildMyWorkItems, buildDraftWorkItems, ageInDays }
 export type { MyWorkItem, MyWorkReason }

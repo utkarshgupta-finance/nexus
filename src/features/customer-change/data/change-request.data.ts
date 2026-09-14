@@ -148,6 +148,19 @@ async function listSendBacksForRequest(requestId: string): Promise<CustomerChang
   return data ?? []
 }
 
+/** One query for every request's send-back count instead of one query per request (Platform Scale Closure, Phase L: the operational queue read model needs this across many requests at once). */
+async function countSendBacksForRequests(requestIds: string[]): Promise<Map<string, number>> {
+  if (requestIds.length === 0) return new Map()
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("customer_change_send_backs").select("request_id").in("request_id", requestIds)
+  if (error) throw new ChangeRequestOperationError(parseChangeError(error))
+  const counts = new Map<string, number>()
+  for (const row of data ?? []) {
+    counts.set(row.request_id, (counts.get(row.request_id) ?? 0) + 1)
+  }
+  return counts
+}
+
 async function getLatestRevisionForRequest(requestId: string): Promise<SubmissionRevisionRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase
@@ -257,6 +270,7 @@ export {
   getLatestRevisionsForRequests,
   listRevisionsForRequest,
   listSendBacksForRequest,
+  countSendBacksForRequests,
   listRequirementsForRequest,
   listRequirementsForRequests,
   listFieldHistoryForCustomer,

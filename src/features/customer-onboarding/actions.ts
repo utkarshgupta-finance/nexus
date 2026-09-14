@@ -245,7 +245,16 @@ async function uploadOnboardingDocumentAction(
     const actor = await requirePermission("customer", "create")
     const file = formData.get("file")
     if (!(file instanceof File)) return { ok: false, error: "No file was received." }
-    const document = await uploadOnboardingDocument({ requestId, category, documentType, file, actorUserId: actor.appUserId })
+    // Browser adapter boundary (Platform Scale Closure, Phase R): the
+    // service layer takes a plain DocumentUploadInput, never a browser
+    // `File`, so this is the one place that conversion happens.
+    const document = await uploadOnboardingDocument({
+      requestId,
+      category,
+      documentType,
+      file: { name: file.name, mimeType: file.type, size: file.size, bytes: file },
+      actorUserId: actor.appUserId,
+    })
     return { ok: true, document }
   } catch (error) {
     if (error instanceof AuthorizationError) return { ok: false, error: error.message }
