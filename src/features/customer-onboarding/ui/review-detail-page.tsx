@@ -11,16 +11,23 @@ import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapshot-context"
+import { resolveOption } from "@/features/reference-data"
+import type { ReferenceListKey } from "@/features/reference-data"
 import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft, CommercialRateDraft } from "../domain/commercial-rate"
 import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata } from "../domain/types"
 import { formatOnboardingCaseId } from "../domain/types"
 import { CUSTOMER_ONBOARDING_FIELD_KEYS } from "../forms/customer-onboarding-form-definition"
+import { COMMENTABLE_ONBOARDING_FIELD_KEYS, labelForOnboardingField } from "../domain/field-labels"
+import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import { approveOnboardingCaseAction, sendBackOnboardingCaseAction } from "../actions"
 import { OnboardingEvidenceList } from "./onboarding-evidence-list"
+import { OnboardingTimeline } from "./onboarding-timeline"
+import type { OnboardingTimelineEvent } from "../domain/timeline"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
 
@@ -46,16 +53,21 @@ function ReviewDetailPage({
   onboardingCase,
   canApprove,
   documents,
+  timeline = [],
 }: {
   requestId: string
   onboardingCase: CustomerOnboardingCase
   canApprove: boolean
   documents: PersistedOnboardingDocumentMetadata[]
+  timeline?: OnboardingTimelineEvent[]
 }) {
   const router = useRouter()
   const snapshot = useReferenceMasterSnapshot()
   const [isSendingBack, setIsSendingBack] = useState(false)
   const [sendBackReason, setSendBackReason] = useState("")
+  const [fieldComments, setFieldComments] = useState<{ fieldKey: string; comment: string }[]>([])
+  const [draftFieldKey, setDraftFieldKey] = useState(COMMENTABLE_ONBOARDING_FIELD_KEYS[0])
+  const [draftFieldComment, setDraftFieldComment] = useState("")
   const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [actionError, setActionError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<"approve" | "send_back" | null>(null)
@@ -85,7 +97,7 @@ function ReviewDetailPage({
     }
     setActionError(null)
     setPendingAction("send_back")
-    const result = await sendBackOnboardingCaseAction(requestId, sendBackReason, null)
+    const result = await sendBackOnboardingCaseAction(requestId, sendBackReason, null, fieldComments)
     setPendingAction(null)
     if (result.ok) {
       router.push("/reviews")
@@ -95,6 +107,22 @@ function ReviewDetailPage({
     }
   }
 
+  function addFieldComment() {
+    if (!draftFieldComment.trim()) return
+    setFieldComments((current) => [...current.filter((entry) => entry.fieldKey !== draftFieldKey), { fieldKey: draftFieldKey, comment: draftFieldComment.trim() }])
+    setDraftFieldComment("")
+  }
+
+  function removeFieldComment(fieldKey: string) {
+    setFieldComments((current) => current.filter((entry) => entry.fieldKey !== fieldKey))
+  }
+
+  /** Canonical Reference Master label resolution (task spec: one resolver, never scattered code-to-label hacks). Falls back to the raw code only if it was never a valid option for this list at all. */
+  function governedLabel(listKey: ReferenceListKey, code: unknown): string {
+    if (typeof code !== "string" || !code) return "-"
+    return resolveOption(snapshot, listKey, code)?.label ?? code
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -102,7 +130,7 @@ function ReviewDetailPage({
         description={`${formatOnboardingCaseId(onboardingCase.caseNumber)}, Revision ${onboardingCase.currentRevision.revisionNumber}`}
         actions={
           <Badge variant="ghost" className="bg-muted text-muted-foreground">
-            {onboardingCase.status}
+            {labelForCaseStatus(onboardingCase.status)}
           </Badge>
         }
       />
@@ -115,10 +143,10 @@ function ReviewDetailPage({
             items={[
               { label: "Legal Entity Name", value: (values[CUSTOMER_ONBOARDING_FIELD_KEYS.legalEntityName] as string) || "-" },
               { label: "Brand", value: (values[CUSTOMER_ONBOARDING_FIELD_KEYS.brandName] as string) || "-" },
-              { label: "Country", value: (values[CUSTOMER_ONBOARDING_FIELD_KEYS.country] as string) || "-" },
-              { label: "Segment", value: (values[CUSTOMER_ONBOARDING_FIELD_KEYS.segment] as string) || "-" },
-              { label: "Business Unit", value: (values[CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit] as string) || "-" },
-              { label: "Industry", value: (values[CUSTOMER_ONBOARDING_FIELD_KEYS.industry] as string) || "-" },
+              { label: "Country", value: governedLabel("country", values[CUSTOMER_ONBOARDING_FIELD_KEYS.country]) },
+              { label: "Segment", value: governedLabel("segment", values[CUSTOMER_ONBOARDING_FIELD_KEYS.segment]) },
+              { label: "Business Unit", value: governedLabel("business_unit", values[CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit]) },
+              { label: "Industry", value: governedLabel("industry", values[CUSTOMER_ONBOARDING_FIELD_KEYS.industry]) },
             ]}
           />
         </section>
@@ -169,6 +197,8 @@ function ReviewDetailPage({
           <OnboardingEvidenceList documents={documents} />
         </section>
 
+        <OnboardingTimeline events={timeline} />
+
         {approvalResult ? (
           <section className="flex flex-col items-center gap-3 rounded-lg border bg-card p-4 text-center shadow-sm sm:p-6">
             <span className="flex size-9 items-center justify-center rounded-full bg-success/10 text-success">
@@ -212,6 +242,44 @@ function ReviewDetailPage({
                   value={sendBackReason}
                   onChange={(event) => setSendBackReason(event.target.value)}
                 />
+
+                <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
+                  <label className="text-xs font-medium text-foreground">Comment on a specific field (optional)</label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Select value={draftFieldKey} onValueChange={(value) => setDraftFieldKey(String(value))}>
+                      <SelectTrigger size="sm" className="sm:w-56"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {COMMENTABLE_ONBOARDING_FIELD_KEYS.map((fieldKey) => (
+                          <SelectItem key={fieldKey} value={fieldKey}>{labelForOnboardingField(fieldKey)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      placeholder="What needs to change on this field?"
+                      value={draftFieldComment}
+                      onChange={(event) => setDraftFieldComment(event.target.value)}
+                    />
+                    <Button size="sm" variant="outline" onClick={addFieldComment} disabled={!draftFieldComment.trim()}>
+                      Add
+                    </Button>
+                  </div>
+                  {fieldComments.length > 0 ? (
+                    <ul className="flex flex-col gap-1.5">
+                      {fieldComments.map((entry) => (
+                        <li key={entry.fieldKey} className="flex items-start justify-between gap-2 rounded-md bg-muted px-2 py-1.5 text-xs">
+                          <span>
+                            <span className="font-medium text-foreground">{labelForOnboardingField(entry.fieldKey)}: </span>
+                            <span className="text-muted-foreground">{entry.comment}</span>
+                          </span>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => removeFieldComment(entry.fieldKey)}>
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setIsSendingBack(false)} disabled={pendingAction !== null}>
                     Cancel

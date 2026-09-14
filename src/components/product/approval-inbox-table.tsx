@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs"
-import { filterByBucket, labelForItemType } from "@/platform/approvals/domain/inbox"
+import { filterByBucket, labelForItemType, labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import type { ApprovalInboxBucket, ApprovalInboxItem } from "@/platform/approvals/domain/types"
 
 /**
@@ -24,10 +24,6 @@ const BUCKET_TABS: { value: ApprovalInboxBucket | "all"; label: string }[] = [
   { value: "completed", label: "Completed" },
   { value: "all", label: "All" },
 ]
-
-function statusLabel(status: string): string {
-  return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
-}
 
 function ApprovalInboxTable({ items }: { items: ApprovalInboxItem[] }) {
   const [bucket, setBucket] = useState<ApprovalInboxBucket | "all">("needs_action")
@@ -73,7 +69,7 @@ function ApprovalInboxTable({ items }: { items: ApprovalInboxItem[] }) {
                   <TableCell className="text-muted-foreground">{item.requestedByEmail ?? "-"}</TableCell>
                   <TableCell>
                     <Badge variant="ghost" className="bg-muted text-muted-foreground">
-                      {statusLabel(item.status)}
+                      {labelForCaseStatus(item.status)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{new Date(item.updatedAt).toLocaleDateString()}</TableCell>

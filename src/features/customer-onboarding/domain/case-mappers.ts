@@ -45,6 +45,9 @@ function toCustomerOnboardingCase(row: CustomerOnboardingCaseRow, revisions: Sub
     approvedAt: row.approved_at,
     customerId: row.customer_id,
     commercialConfigurationId: row.commercial_configuration_id,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    updatedAt: row.updated_at,
   }
 }
 

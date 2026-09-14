@@ -30,6 +30,7 @@ import { createEmptyCommercialRateDraft } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import { setCurrentStage } from "../domain/case"
 import type { CustomerOnboardingCase } from "../domain/types"
+import type { OnboardingFieldCommentEntry } from "../services/case.service"
 import { formatOnboardingCaseId } from "../domain/types"
 import { isEligibleForCompletion } from "../domain/completion"
 import { saveOnboardingDraftAction, submitOnboardingCaseAction, checkForDuplicateCustomersAction } from "../actions"
@@ -99,6 +100,7 @@ function CustomerOnboardingPage({
   initialCase,
   snapshotUnavailable = false,
   canReview = false,
+  fieldComments = [],
 }: {
   /** The real, persisted onboarding case identity (customer_onboarding_cases.request_id). */
   requestId: string
@@ -107,6 +109,8 @@ function CustomerOnboardingPage({
   snapshotUnavailable?: boolean
   /** Server-derived: whether the current session holds customer.approve (see ../actions.ts). Gates the Submitted screen's "Review Now" action; independently re-checked server-side on the Review route itself. */
   canReview?: boolean
+  /** Every field comment ever left on this request, across every revision (task spec: Requester Form Feedback). Only the ones left against the revision that was just sent back are shown inline; older ones stay visible in the Timeline instead of cluttering the open form. */
+  fieldComments?: OnboardingFieldCommentEntry[]
 }) {
   const snapshot = useReferenceMasterSnapshot()
   const [onboardingCase, setOnboardingCase] = useState(initialCase)
@@ -242,6 +246,27 @@ function CustomerOnboardingPage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initialCase is the one-time server-loaded snapshot this survey primes from; it must never re-run and re-overwrite in-progress edits just because the case's own local state (a value this same effect helped produce) has since changed.
   }, [survey])
+
+  // Requester Form Feedback (task spec): reopening a Sent Back request
+  // must surface reviewer field comments right next to the field itself,
+  // never bury them in a generic thread the requester has to go hunting
+  // through. Only the revision that was just reviewed applies: an older
+  // send-back's comments belong in the Timeline, not inline on the
+  // current draft, once the requester has already moved past them.
+  const activeFieldComments =
+    onboardingCase.status === "sent_back"
+      ? fieldComments.filter((comment) => comment.revisionNumber === onboardingCase.currentRevision.revisionNumber - 1)
+      : []
+
+  useEffect(() => {
+    for (const fieldKey of Object.values(CUSTOMER_ONBOARDING_FIELD_KEYS)) {
+      const question = survey.getQuestionByName(fieldKey)
+      if (!question) continue
+      const comment = activeFieldComments.find((entry) => entry.fieldKey === fieldKey)
+      question.description = comment ? `Needs review: ${comment.comment}` : ""
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeFieldComments is recomputed fresh every render from stable inputs (fieldComments/status/revisionNumber); an array-identity dependency would re-run every render for no reason.
+  }, [survey, onboardingCase.status, onboardingCase.currentRevision.revisionNumber])
 
   /** The one direct path that moves the active stage, reused by the stage capsules, and by the bottom footer's Previous/Next (Commercial Documents, Commercial Rate, and Agreement & Approval are not survey pages, see ../forms/customer-onboarding-form-definition.ts's header, so only the else branch applies to them). */
   function goToStage(stageKey: CustomerOnboardingStageKey) {
@@ -427,6 +452,11 @@ function CustomerOnboardingPage({
       {onboardingCase.status === "sent_back" && onboardingCase.sentBack ? (
         <div className="mx-4 mt-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-3 text-xs text-foreground sm:mx-6">
           <span className="font-medium">Sent back for revision.</span> {onboardingCase.sentBack.reason}
+          {activeFieldComments.length > 0 ? (
+            <span className="block pt-1 text-muted-foreground">
+              {activeFieldComments.length} field{activeFieldComments.length === 1 ? "" : "s"} below need review.
+            </span>
+          ) : null}
         </div>
       ) : null}
 

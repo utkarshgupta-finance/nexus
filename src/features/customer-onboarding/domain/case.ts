@@ -42,6 +42,9 @@ function createCase(requestId: string, now: string, createdBy: AppUserId | null)
     approvedAt: null,
     customerId: null,
     commercialConfigurationId: null,
+    createdAt: now,
+    createdBy,
+    updatedAt: now,
   }
 }
 

@@ -20,6 +20,8 @@ type ApprovalInboxItem = {
   bucket: ApprovalInboxBucket
   customerName: string
   customerKey: string | null
+  /** Raw requester actor id, distinct from `requestedByEmail` (already resolved to a display string): My Work's own domain logic (../domain/my-work.ts) scopes "sent back to me" against this, never against an email string. */
+  createdBy: string | null
   requestedByEmail: string | null
   createdAt: string
   updatedAt: string

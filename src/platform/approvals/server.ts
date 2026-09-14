@@ -7,7 +7,9 @@ import { getCustomerById } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorEmails } from "@/platform/audit/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
+import { buildMyWorkItems } from "./domain/my-work"
 import type { ApprovalInboxItem } from "./domain/types"
+import type { MyWorkItem } from "./domain/my-work"
 
 /**
  * Unified Approvals inbox (task Phase E): gathers every real request
@@ -53,6 +55,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       bucket,
       customerName: entry.customerLegalName,
       customerKey: null,
+      createdBy: entry.createdBy,
       requestedByEmail: entry.createdBy ? (actorEmails.get(entry.createdBy) ?? null) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
@@ -72,6 +75,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       bucket,
       customerName: customer?.name ?? "(unknown customer)",
       customerKey: customer?.key ?? null,
+      createdBy: entry.createdBy,
       requestedByEmail: entry.createdBy ? (actorEmails.get(entry.createdBy) ?? null) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
@@ -91,6 +95,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       bucket,
       customerName: customer?.name ?? "(unknown customer)",
       customerKey: customer?.key ?? null,
+      createdBy: entry.createdBy,
       requestedByEmail: entry.createdBy ? (actorEmails.get(entry.createdBy) ?? null) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
@@ -101,4 +106,16 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
   return sortByUpdatedAtDesc(items)
 }
 
-export { loadApprovalInbox }
+/**
+ * My Work (task spec): a personal, actionable summary for the current
+ * user, scoped server-side to their own `appUserId` (never a
+ * client-supplied id). Re-scopes the same Approvals inbox items, never a
+ * second read of the underlying tables (see ./domain/my-work.ts's own
+ * header for the exact scoping rules).
+ */
+async function loadMyWork(appUserId: string, canApprove: boolean): Promise<MyWorkItem[]> {
+  const items = await loadApprovalInbox()
+  return buildMyWorkItems(items, appUserId, canApprove, new Date())
+}
+
+export { loadApprovalInbox, loadMyWork }

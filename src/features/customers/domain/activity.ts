@@ -2,6 +2,23 @@ import { labelForGovernedField } from "@/features/customer-change"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
 import type { OnboardingOrigin, CommercialConfigurationVersion } from "@/features/customer-onboarding/server"
 import type { AuditLogRow } from "@/platform/audit/server"
+import { resolveOption } from "@/features/reference-data"
+import type { ReferenceMasterSnapshot, ReferenceListKey } from "@/features/reference-data"
+
+/** Only these Field History keys are Reference-Master-governed lists; the rest (Legal Entity Name, Brand Name) are free text and are never passed through `resolveOption`. */
+const GOVERNED_LIST_FIELD_KEYS: Record<string, ReferenceListKey> = {
+  segment: "segment",
+  business_unit: "business_unit",
+  country: "country",
+  industry: "industry",
+}
+
+/** Canonical Reference Master label resolution (task spec: one resolver, never a scattered code-to-label hack): historical/inactive values must still resolve, which `resolveOption` already guarantees. */
+function governedValueLabel(fieldKey: string, value: string, snapshot: ReferenceMasterSnapshot): string {
+  const listKey = GOVERNED_LIST_FIELD_KEYS[fieldKey]
+  if (!listKey) return value
+  return resolveOption(snapshot, listKey, value)?.label ?? value
+}
 
 /**
  * Customer Activity timeline (task Phase C): one readable event stream
@@ -26,11 +43,15 @@ function actorLabel(actorId: string | null, actorEmails: Map<string, string | nu
   return actorEmails.get(actorId) ?? null
 }
 
-function fieldChangeEvents(entries: CustomerFieldHistoryEntry[], actorEmails: Map<string, string | null>): CustomerActivityEvent[] {
+function fieldChangeEvents(
+  entries: CustomerFieldHistoryEntry[],
+  actorEmails: Map<string, string | null>,
+  snapshot: ReferenceMasterSnapshot
+): CustomerActivityEvent[] {
   return entries.map((entry) => {
     const label = labelForGovernedField(entry.fieldKey)
-    const from = entry.oldValue ?? "(not set)"
-    const to = entry.newValue ?? "(not set)"
+    const from = entry.oldValue ? governedValueLabel(entry.fieldKey, entry.oldValue, snapshot) : "(not set)"
+    const to = entry.newValue ? governedValueLabel(entry.fieldKey, entry.newValue, snapshot) : "(not set)"
     return {
       id: `field-${entry.id}`,
       occurredAt: entry.changedAt,
@@ -136,12 +157,13 @@ type BuildCustomerActivityTimelineInput = {
   commercialVersions: CommercialConfigurationVersion[]
   statusAuditRows: AuditLogRow[]
   actorEmails: Map<string, string | null>
+  referenceMasterSnapshot: ReferenceMasterSnapshot
 }
 
 function buildCustomerActivityTimeline(input: BuildCustomerActivityTimelineInput): CustomerActivityEvent[] {
   const events = [
     ...onboardingOriginEvent(input.onboardingOrigin, input.actorEmails),
-    ...fieldChangeEvents(input.fieldHistory, input.actorEmails),
+    ...fieldChangeEvents(input.fieldHistory, input.actorEmails, input.referenceMasterSnapshot),
     ...changeRequestEvents(input.changeRequests, input.actorEmails),
     ...commercialVersionEvents(input.commercialVersions, input.actorEmails),
     ...statusChangeEvents(input.statusAuditRows, input.actorEmails),
@@ -150,7 +172,7 @@ function buildCustomerActivityTimeline(input: BuildCustomerActivityTimelineInput
 }
 
 /** Every actor id referenced anywhere in the timeline inputs, so the caller can resolve them all in one batched lookup before building the timeline. */
-function collectActorIds(input: Omit<BuildCustomerActivityTimelineInput, "actorEmails">): (string | null)[] {
+function collectActorIds(input: Omit<BuildCustomerActivityTimelineInput, "actorEmails" | "referenceMasterSnapshot">): (string | null)[] {
   const ids: (string | null)[] = []
   if (input.onboardingOrigin) ids.push(input.onboardingOrigin.approvedBy)
   for (const entry of input.fieldHistory) ids.push(entry.approvedBy)

@@ -32,6 +32,7 @@ function item(overrides: Partial<ApprovalInboxItem>): ApprovalInboxItem {
     bucket: "needs_action",
     customerName: "Aurora Consumer Labs Pvt Ltd",
     customerKey: null,
+    createdBy: null,
     requestedByEmail: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",

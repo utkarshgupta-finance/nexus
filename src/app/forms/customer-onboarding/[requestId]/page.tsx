@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { getOnboardingCase } from "@/features/customer-onboarding/server"
+import { getOnboardingCase, listOnboardingFieldComments } from "@/features/customer-onboarding/server"
 import { CustomerOnboardingPage } from "@/features/customer-onboarding/ui/customer-onboarding-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
@@ -33,6 +33,8 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
     notFound()
   }
 
+  const fieldComments = await listOnboardingFieldComments(requestId)
+
   let snapshot: ReferenceMasterSnapshot
   let snapshotUnavailable = false
   try {
@@ -47,7 +49,13 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_CREATE} loginRedirectTo={`/forms/customer-onboarding/${requestId}`}>
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-        <CustomerOnboardingPage requestId={requestId} initialCase={onboardingCase} snapshotUnavailable={snapshotUnavailable} canReview={canReview} />
+        <CustomerOnboardingPage
+          requestId={requestId}
+          initialCase={onboardingCase}
+          snapshotUnavailable={snapshotUnavailable}
+          canReview={canReview}
+          fieldComments={fieldComments}
+        />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>
   )

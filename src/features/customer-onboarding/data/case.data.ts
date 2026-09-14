@@ -1,7 +1,7 @@
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/server-client"
 
 import { CaseOperationError, parseCaseError } from "../domain/case-errors"
-import type { CustomerOnboardingCaseRow, SubmissionRevisionRow } from "./case-row-types"
+import type { CustomerOnboardingCaseRow, SubmissionRevisionRow, OnboardingSendBackRow, OnboardingFieldCommentRow } from "./case-row-types"
 
 /**
  * Repository for customer_onboarding_cases and the submission_revisions
@@ -47,7 +47,15 @@ async function submitCase(requestId: string, actorUserId: string): Promise<Custo
   })
 }
 
-type SendBackInput = { requestId: string; reason: string; targetStageKey: string | null; actorUserId: string }
+type SendBackFieldComment = { fieldKey: string; comment: string }
+
+type SendBackInput = {
+  requestId: string
+  reason: string
+  targetStageKey: string | null
+  actorUserId: string
+  fieldComments?: SendBackFieldComment[]
+}
 
 async function sendBackCase(input: SendBackInput): Promise<CustomerOnboardingCaseRow> {
   return callSingleRowRpc<CustomerOnboardingCaseRow>("send_back_customer_onboarding_case", {
@@ -55,6 +63,7 @@ async function sendBackCase(input: SendBackInput): Promise<CustomerOnboardingCas
     p_reason: input.reason,
     p_target_stage_key: input.targetStageKey,
     p_actor_user_id: input.actorUserId,
+    p_field_comments: (input.fieldComments ?? []).map((c) => ({ field_key: c.fieldKey, comment: c.comment })),
   })
 }
 
@@ -133,6 +142,19 @@ async function listAllCases(): Promise<CustomerOnboardingCaseRow[]> {
   return data ?? []
 }
 
+/** Every case this specific requester created, newest first: My Requests' data source. Never accepts a client-supplied id elsewhere; the caller must have already derived `appUserId` server-side. */
+async function listCasesCreatedBy(appUserId: string): Promise<CustomerOnboardingCaseRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_onboarding_cases")
+    .select("*")
+    .eq("created_by", appUserId)
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
 async function listRevisionsForRequest(requestId: string): Promise<SubmissionRevisionRow[]> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase
@@ -166,6 +188,39 @@ async function createNextRevision(requestId: string, sourceRevisionId: string, a
   })
 }
 
+/** Every send-back for this request, oldest first: the Timeline's data source, and `.length` is the authoritative Send Back count (task spec: never a manually incremented counter). */
+async function listSendBacksForRequest(requestId: string): Promise<OnboardingSendBackRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_onboarding_send_backs")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("sent_back_at", { ascending: true })
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
+/** Every send-back row across a batch of requests in one query: My Requests' Send Back count column, without one round trip per row. */
+async function listSendBacksForRequests(requestIds: string[]): Promise<OnboardingSendBackRow[]> {
+  if (requestIds.length === 0) return []
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("customer_onboarding_send_backs").select("*").in("request_id", requestIds)
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
+/** Every field comment ever left on this request across every revision, oldest first: a resubmit never removes a prior revision's comments from view (task spec). */
+async function listFieldCommentsForRequest(requestId: string): Promise<OnboardingFieldCommentRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("customer_onboarding_field_comments")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("created_at", { ascending: true })
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return data ?? []
+}
+
 export {
   createCase,
   saveDraft,
@@ -176,9 +231,13 @@ export {
   getCaseByCustomerId,
   listCasesAwaitingReview,
   listAllCases,
+  listCasesCreatedBy,
   listApprovedCases,
   listRevisionsForRequest,
   getLatestRevisionForRequest,
   createNextRevision,
+  listSendBacksForRequest,
+  listSendBacksForRequests,
+  listFieldCommentsForRequest,
 }
-export type { CreateCaseInput, SaveDraftInput, SendBackInput, ApproveCaseInput }
+export type { CreateCaseInput, SaveDraftInput, SendBackInput, SendBackFieldComment, ApproveCaseInput }

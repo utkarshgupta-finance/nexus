@@ -1,5 +1,5 @@
 import { RouteLoading } from "@/components/product/route-loading"
 
 export default function Loading() {
-  return <RouteLoading label="Loading Customer Onboarding..." />
+  return <RouteLoading label="Starting onboarding..." />
 }

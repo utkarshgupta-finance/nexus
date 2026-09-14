@@ -10,10 +10,21 @@ import "server-only"
  * the same trust boundary commercial/server.ts already documents.
  */
 
-export { getOnboardingCase, listOnboardingReviewQueue, listAllOnboardingEntries, getOnboardingOriginForCustomer } from "./services/case.service"
-export type { ReviewQueueEntry } from "./services/case.service"
-export type { OnboardingOrigin } from "./domain/types"
+export {
+  getOnboardingCase,
+  listOnboardingReviewQueue,
+  listAllOnboardingEntries,
+  listMyOnboardingRequests,
+  listOnboardingFieldComments,
+  getSendBackCountsForRequests,
+  getOnboardingOriginForCustomer,
+} from "./services/case.service"
+export type { ReviewQueueEntry, OnboardingFieldCommentEntry, MyOnboardingRequestEntry } from "./services/case.service"
+export type { OnboardingOrigin, CustomerOnboardingCase, CustomerOnboardingCaseStatus } from "./domain/types"
 export { formatOnboardingCaseId } from "./domain/types"
+export { loadOnboardingRequestTimeline, getOnboardingSendBackCount } from "./server/timeline"
+export type { OnboardingTimelineEvent } from "./domain/timeline"
+export { labelForOnboardingField, COMMENTABLE_ONBOARDING_FIELD_KEYS } from "./domain/field-labels"
 export {
   loadVersion,
   listVersionReviewQueue,

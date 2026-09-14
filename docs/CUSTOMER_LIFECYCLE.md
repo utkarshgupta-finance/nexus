@@ -642,3 +642,154 @@ Onboarding, Customer Change, Commercial Version, and Permanent Delete
 were all already governed RPCs from their own original implementation.
 §16's `setCustomerActive` was the one real instance of this bug in the
 entire codebase, now fixed. No other instance found.
+
+## 18. Customer Onboarding Operating Flow (My Requests, Send Back comments, Timeline, My Work): IMPLEMENTED
+
+A manual-testing usability closure pass, distinct from §1-17's backend
+lifecycle: the backend already existed, but a requester had no
+discoverable way to find their own Draft/Sent Back/Submitted requests
+in the UI, and My Work was a disconnected fixture. This section is the
+authoritative record of what changed and the scenario matrix that
+backs it.
+
+### 18.1 Where things live now
+
+- **Customer Onboarding landing** (`/forms/customer-onboarding`,
+  `src/app/forms/customer-onboarding/page.tsx`): a real landing page,
+  never an auto-create. "+ New Customer Onboarding" links to
+  `/forms/customer-onboarding/new` (`src/app/forms/customer-onboarding/new/page.tsx`),
+  the one and only route that creates a case. Below it, **My Requests**:
+  every request `created_by` the signed-in user
+  (`listMyOnboardingRequests`, `src/features/customer-onboarding/services/case.service.ts`),
+  server-scoped off the session's `appUserId`, never a client-supplied
+  id, never anyone else's requests.
+- **Sent Back discoverability**: a Sent Back case shows in My Requests
+  (status badge, "Review & Resubmit" action) and in My Work ("Sent Back
+  to Me" section), never only reachable by a known URL.
+- **Approvals** (`/approvals`) is unchanged: the workflow-focused list
+  of everything currently awaiting a decision, across all three
+  lifecycles.
+- **My Work** (`/my-work`, `src/features/my-work/`) is now a real,
+  server-scoped read model
+  (`src/platform/approvals/domain/my-work.ts`'s `buildMyWorkItems`),
+  built by re-scoping the same Approvals inbox items the existing
+  `loadApprovalInbox` already composes, never a second read of the
+  underlying tables and never a duplicated business record. "Sent Back
+  to Me" is scoped to the current user's own `createdBy`; "Pending My
+  Approval" is every `needs_action` item once the user holds
+  `customer.approve` at all, since Customer Lifecycle V1 has no
+  per-person approval routing yet (§6).
+
+### 18.2 Status model
+
+Backend statuses (`CustomerOnboardingCaseStatus`): `draft`,
+`submitted`, `sent_back`, `resubmitted`, `approved`. There is no
+`rejected`/`cancelled` for Onboarding in this version (unlike Customer
+Change Request, §3a); Send Back is the only reviewer decision besides
+Approve. The one canonical label map is `labelForCaseStatus`
+(`src/platform/approvals/domain/inbox.ts`), shared by My Requests, My
+Work, Approvals, and the onboarding review page. A derived, non-stored
+"Review State" (`reviewState()` in
+`src/features/customer-onboarding/ui/my-requests-table.tsx`) shows a
+friendlier phrase ("Working on Tax & Registration", "Pending Approval",
+"Needs Your Attention", "Completed") next to the raw status badge.
+
+### 18.3 Send Back count, field comments, and Timeline
+
+Two new append-only tables
+(`supabase/migrations/20260914130000_customer_onboarding_send_back_history.sql`),
+matching `customer_field_history`'s own precedent:
+
+- `customer_onboarding_send_backs`: one permanent row per send-back
+  (`revision_number`, `reason`, `sent_back_by`, `sent_back_at`). The
+  Send Back count shown to a requester is `count(*)` over this table,
+  never a manually incremented UI counter.
+- `customer_onboarding_field_comments`: one permanent row per
+  reviewer field comment (`revision_number`, `field_key`, `comment`,
+  `reviewer_id`, `resolved`), keyed by the field's stable key (never its
+  display label). Comments are never overwritten; a resubmit opens a
+  new revision but every prior revision's comments stay visible.
+
+`send_back_customer_onboarding_case` was extended (not replaced) with a
+trailing `p_field_comments jsonb default '[]'` parameter, so every
+existing caller keeps working unchanged.
+
+The request Timeline (`buildOnboardingTimeline`,
+`src/features/customer-onboarding/domain/timeline.ts`) is built purely
+from data already persisted: the case's own `created_at`/`created_by`,
+every revision's `submitted_at`/`submitted_by`, the send-back history,
+and `approved_at`/`approved_by`. Rendered oldest-first via
+`OnboardingTimeline` (`src/features/customer-onboarding/ui/onboarding-timeline.tsx`)
+on both the requester's request view and the reviewer's Review screen.
+Never raw `audit_log` JSON.
+
+### 18.4 Requester Form Feedback
+
+Reopening a Sent Back request highlights each commented field: the
+requester's page sets `question.description` to `Needs review: <comment>`
+for every field with a comment against the revision that was just
+reviewed (`src/features/customer-onboarding/ui/customer-onboarding-page.tsx`),
+and the overall Sent Back banner shows the reviewer's overall reason
+plus a count of fields needing review. The reviewer picks a field from
+a fixed, labeled list (`COMMENTABLE_ONBOARDING_FIELD_KEYS`,
+`src/features/customer-onboarding/domain/field-labels.ts`) when sending
+a case back (`src/features/customer-onboarding/ui/review-detail-page.tsx`).
+
+### 18.5 Display labels
+
+Two real raw-code display bugs were found and fixed (never a scattered
+`replace('_',' ')` hack; both now go through the one canonical
+`resolveOption(snapshot, listKey, code)` resolver from
+`@/features/reference-data`):
+
+- The onboarding review page's own "Customer Details" section
+  (`review-detail-page.tsx`) rendered Country/Segment/Business
+  Unit/Industry as raw codes (`IN`, `enterprise`, `india_enterprise`,
+  `fmcg`); now resolved.
+- The Customer Activity timeline's field-change events
+  (`src/features/customers/domain/activity.ts`) rendered a governed
+  field's old/new value as the raw stored code; now resolved, with a
+  `ReferenceMasterSnapshot` threaded through `buildCustomerActivityTimeline`.
+
+The Customers list/detail pages and the Customer Change diff view
+already used `resolveOption` correctly before this pass (verified, not
+re-touched). Customer Master's State/City fields are demo/fixture-only
+(no real persisted column yet, `domain/demo-enrichment.ts`), so no
+geography reverse-label resolver was built for them; building one now
+would be speculative ahead of the real schema.
+
+The `__all__` filter sentinel (`customer-filter-bar.tsx`) was audited
+across Customers, Approvals, My Work, and Settings: every sentinel
+value already pairs with an explicit human-readable label ("All
+segments", "All statuses", ...); no leak found.
+
+### 18.6 Scenario matrix
+
+| # | Scenario | Backend state | Requester sees it | Approver sees it | Primary action | Editable? | Revision behavior | Timeline event | My Work |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | New request created | `draft`, revision 1 | My Requests (Continue) | Not visible (draft excluded from Approvals) | Continue | Yes | Revision 1 open | "Request created" | Not shown |
+| 2 | Draft partially filled, Save Draft clicked | `draft`, revision 1 | My Requests, "Working on {stage}" | Not visible | Continue | Yes | Revision 1 updated in place | (none, Save Draft is not a timeline event) | Not shown |
+| 3 | Page refreshed after Save Draft | `draft`, revision 1 | Same values restored on reopen | Not visible | Continue | Yes | Revision 1 unchanged | (none) | Not shown |
+| 4 | Submit blocked: required field missing | `draft`, revision 1 | Inline validation error, stays on form | Not visible | Continue | Yes | No transition | (none) | Not shown |
+| 5 | Submit blocked: duplicate GST matches an approved case | `draft`, revision 1 | Hard duplicate warning, submit blocked | Not visible | Continue | Yes | No transition | (none) | Not shown |
+| 6 | Submit allowed: duplicate legal name only (soft match) | `draft` -> `submitted` | Warning shown, acknowledgeable, submit proceeds | Now visible | View | No | Revision 1 submitted | "Submitted for review" | Not shown (needs_action requires approve permission) |
+| 7 | First submission | `submitted`, revision 1 | My Requests: Submitted, View | Approvals + My Work "Pending My Approval" | View (requester) / Review (approver) | No | Revision 1 frozen | "Submitted for review" | Pending My Approval |
+| 8 | Approver opens Review screen | `submitted` | (unchanged) | Full Customer Details/Commercial Rate/Evidence/Timeline | Approve or Send Back | No | (unchanged) | (unchanged) | (unchanged) |
+| 9 | Send Back with overall comment only | `sent_back`, revision 2 opened | My Requests: Sent Back, banner with reason | Removed from needs_action | Review & Resubmit | Yes (revision 2) | Revision 1 stays frozen; revision 2 draft opened | "Sent back: {reason}" | Sent Back to Me |
+| 10 | Send Back with overall + 2 field comments | `sent_back`, revision 2 opened | Sent Back banner + 2 fields flagged "Needs review" inline | Removed from needs_action | Review & Resubmit | Yes | Same as #9 | "Sent back: {reason}" | Sent Back to Me |
+| 11 | Requester reopens Sent Back request | `sent_back` | Field comments shown next to their fields, overall reason at top | (unchanged) | Review & Resubmit | Yes | (unchanged) | (unchanged) | (unchanged) |
+| 12 | Requester corrects fields and resubmits | `sent_back` -> `resubmitted`, revision 2 submitted | My Requests: Resubmitted, View, Revision 2 | Back in Approvals + My Work | View / Review | No | Revision 2 frozen | "Resubmitted for review (Revision 2)" | Pending My Approval |
+| 13 | Second Send Back | `sent_back`, revision 3 opened, Send Back count = 2 | Sent Back, count column shows 2 | Removed from needs_action | Review & Resubmit | Yes | Revision 3 draft opened | "Sent back: {reason}" (2nd row) | Sent Back to Me |
+| 14 | Second resubmit | `resubmitted`, revision 3 submitted | Revision 3, View | Back in Approvals | View / Review | No | Revision 3 frozen | "Resubmitted for review (Revision 3)" | Pending My Approval |
+| 15 | Approve | `approved` | My Requests: Approved, "Open Customer" | Removed from Approvals + My Work | Open Customer | No | Revision 3 remains the historical current revision | "Approved" | Removed entirely |
+| 16 | Customer Master created on approval | `approved`, `customer_id` set | Open Customer link resolves | Commercial Configuration + Version 1 created | Open Customer / Open Commercials | No | (unchanged) | (unchanged) | (unchanged) |
+| 17 | Approve clicked twice (idempotency) | `approved` (unchanged) | (unchanged) | (unchanged) | (no-op) | No | No second Customer Master created | (unchanged) | (unchanged) |
+| 18 | Every prior revision stays viewable | `approved` (or any status) | Revision 1/2/3 data each still readable via `submission_revisions` | (same) | View | No | All revisions immutable once submitted | Full created->submitted->sent back->resubmitted->... sequence readable | (unchanged) |
+| 19 | Another user's draft | `draft` (someone else's) | Never appears in this user's My Requests | N/A | N/A | N/A | N/A | N/A | N/A |
+| 20 | User with only `customer.create` | any | My Requests works normally | Approvals/Review screens deny (no `customer.approve`) | Continue/View only | Per status | N/A | N/A | Sent Back to Me only, never Pending My Approval |
+| 21 | User with only `customer.approve` | any | Cannot create a request (denied at `/forms/customer-onboarding/new`) | Full Approvals + My Work access | Review | N/A | N/A | N/A | Pending My Approval only |
+| 22 | No requests at all | N/A | My Requests empty state, "Create Customer Onboarding" button | N/A | N/A | N/A | N/A | N/A | Empty state |
+| 23 | Nothing needs the user's attention | N/A | (unchanged) | N/A | N/A | N/A | N/A | N/A | "Nothing needs your attention right now" |
+| 24 | Visiting `/forms/customer-onboarding` twice in a row | `draft` (unchanged) | Same request, never a second one created | N/A | Continue | Yes | Unchanged | Unchanged | Unchanged |
+| 25 | Final submit blocked without Commercial Rate complete | `draft` or `sent_back` | Submit blocked, stays editable | N/A (never reaches Approvals) | Continue | Yes | No transition | (none) | Not shown |
+

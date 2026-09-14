@@ -38,4 +38,27 @@ type SubmissionRevisionRow = {
   submitted_by: string | null
 }
 
-export type { CustomerOnboardingCaseRow, SubmissionRevisionRow }
+/** Raw shape of a customer_onboarding_send_backs row (append-only history, one per send-back). */
+type OnboardingSendBackRow = {
+  id: string
+  request_id: string
+  revision_number: number
+  reason: string
+  target_stage_key: string | null
+  sent_back_by: string | null
+  sent_back_at: string
+}
+
+/** Raw shape of a customer_onboarding_field_comments row (append-only, one per reviewer field comment). */
+type OnboardingFieldCommentRow = {
+  id: string
+  request_id: string
+  revision_number: number
+  field_key: string
+  comment: string
+  reviewer_id: string | null
+  resolved: boolean
+  created_at: string
+}
+
+export type { CustomerOnboardingCaseRow, SubmissionRevisionRow, OnboardingSendBackRow, OnboardingFieldCommentRow }

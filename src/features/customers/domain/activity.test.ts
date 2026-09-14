@@ -4,6 +4,7 @@ import { buildCustomerActivityTimeline, collectActorIds } from "./activity"
 import type { OnboardingOrigin, CommercialConfigurationVersion } from "@/features/customer-onboarding/server"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
 import type { AuditLogRow } from "@/platform/audit/server"
+import { emptySnapshot } from "@/features/reference-data/domain/snapshot"
 
 const ACTOR_EMAILS = new Map<string, string | null>([
   ["actor-approver", "approver@example.com"],
@@ -98,6 +99,7 @@ describe("buildCustomerActivityTimeline", () => {
       commercialVersions: COMMERCIAL_VERSIONS,
       statusAuditRows: STATUS_AUDIT_ROWS,
       actorEmails: ACTOR_EMAILS,
+      referenceMasterSnapshot: emptySnapshot(),
     })
 
     expect(timeline.map((event) => event.summary)).toEqual([
@@ -120,6 +122,7 @@ describe("buildCustomerActivityTimeline", () => {
       commercialVersions: [],
       statusAuditRows: [],
       actorEmails: new Map(),
+      referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline).toEqual([])
   })
@@ -133,6 +136,7 @@ describe("buildCustomerActivityTimeline", () => {
       commercialVersions: [],
       statusAuditRows: [rowWithReason],
       actorEmails: ACTOR_EMAILS,
+      referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline[0].summary).toBe("Customer deactivated: Customer requested account closure")
   })
@@ -146,8 +150,36 @@ describe("buildCustomerActivityTimeline", () => {
       commercialVersions: [],
       statusAuditRows: [noOpRow],
       actorEmails: new Map(),
+      referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline).toEqual([])
+  })
+
+  it("resolves a governed field's old/new values to their Reference Master labels, never the raw code (task spec: display label cleanup)", () => {
+    const snapshot = { ...emptySnapshot(), segment: [{ value: "smb", label: "SMB", active: true }, { value: "enterprise", label: "Enterprise", active: true }] }
+    const timeline = buildCustomerActivityTimeline({
+      onboardingOrigin: null,
+      changeRequests: [],
+      fieldHistory: FIELD_HISTORY,
+      commercialVersions: [],
+      statusAuditRows: [],
+      actorEmails: ACTOR_EMAILS,
+      referenceMasterSnapshot: snapshot,
+    })
+    expect(timeline[0].summary).toBe('Segment changed from "SMB" to "Enterprise"')
+  })
+
+  it("falls back to the raw code when a governed value is no longer a valid option (never crashes, never blanks it)", () => {
+    const timeline = buildCustomerActivityTimeline({
+      onboardingOrigin: null,
+      changeRequests: [],
+      fieldHistory: FIELD_HISTORY,
+      commercialVersions: [],
+      statusAuditRows: [],
+      actorEmails: ACTOR_EMAILS,
+      referenceMasterSnapshot: emptySnapshot(),
+    })
+    expect(timeline[0].summary).toBe('Segment changed from "smb" to "enterprise"')
   })
 
   it("never fabricates an actor email for an unresolved id", () => {
@@ -158,6 +190,7 @@ describe("buildCustomerActivityTimeline", () => {
       commercialVersions: [],
       statusAuditRows: [],
       actorEmails: new Map(),
+      referenceMasterSnapshot: emptySnapshot(),
     })
     expect(timeline[0].actorEmail).toBeNull()
   })

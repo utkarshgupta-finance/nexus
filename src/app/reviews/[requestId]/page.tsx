@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
-import { getOnboardingCase, listOnboardingDocuments } from "@/features/customer-onboarding/server"
+import { getOnboardingCase, listOnboardingDocuments, loadOnboardingRequestTimeline } from "@/features/customer-onboarding/server"
 import { ReviewDetailPage } from "@/features/customer-onboarding/ui/review-detail-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
@@ -39,10 +39,12 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
     documents = []
   }
 
+  const timeline = await loadOnboardingRequestTimeline(requestId)
+
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/${requestId}`}>
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-        <ReviewDetailPage requestId={requestId} onboardingCase={onboardingCase} canApprove={canApprove} documents={documents} />
+        <ReviewDetailPage requestId={requestId} onboardingCase={onboardingCase} canApprove={canApprove} documents={documents} timeline={timeline} />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>
   )

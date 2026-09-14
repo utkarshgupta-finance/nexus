@@ -108,6 +108,11 @@ type CustomerOnboardingCase = {
   customerId: string | null
   /** Set only once, atomically, by approve_customer_onboarding_case; null until then. */
   commercialConfigurationId: string | null
+  /** The CASE's own creation identity, distinct from `currentRevision.createdAt/createdBy` (which reflect whichever revision is current, not the original request). My Requests' "Created At" column and the request Timeline's "Request created" event both read this, never the current revision's. */
+  createdAt: string
+  createdBy: AppUserId | null
+  /** My Requests' "Last Updated" column. */
+  updatedAt: string
 }
 
 // =============================================================================

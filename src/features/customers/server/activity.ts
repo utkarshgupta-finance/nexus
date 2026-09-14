@@ -4,6 +4,7 @@ import { listChangeRequestsForCustomer, listCustomerFieldHistory } from "@/featu
 import { getOnboardingOriginForCustomer, listVersionsForConfiguration } from "@/features/customer-onboarding/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { listAuditLogForRow, resolveActorEmails } from "@/platform/audit/server"
+import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { buildCustomerActivityTimeline, collectActorIds } from "../domain/activity"
 import type { CustomerActivityEvent } from "../domain/activity"
 
@@ -32,7 +33,22 @@ async function loadCustomerActivityTimeline(customerId: string): Promise<Custome
     collectActorIds({ onboardingOrigin, changeRequests, fieldHistory, commercialVersions, statusAuditRows })
   )
 
-  return buildCustomerActivityTimeline({ onboardingOrigin, changeRequests, fieldHistory, commercialVersions, statusAuditRows, actorEmails })
+  let referenceMasterSnapshot
+  try {
+    referenceMasterSnapshot = await loadReferenceMasterSnapshot()
+  } catch {
+    referenceMasterSnapshot = emptySnapshot()
+  }
+
+  return buildCustomerActivityTimeline({
+    onboardingOrigin,
+    changeRequests,
+    fieldHistory,
+    commercialVersions,
+    statusAuditRows,
+    actorEmails,
+    referenceMasterSnapshot,
+  })
 }
 
 export { loadCustomerActivityTimeline }

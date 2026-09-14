@@ -2,6 +2,7 @@ import "server-only"
 
 import * as caseData from "../data/case.data"
 import { toCustomerOnboardingCase } from "../domain/case-mappers"
+import { countSendBacksByRequestId } from "../domain/my-requests"
 import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
@@ -19,6 +20,7 @@ import type { ReferenceMasterSnapshot } from "@/features/reference-data"
  */
 
 const CUSTOMER_LEGAL_NAME_FIELD = "customer_legal_entity_name"
+const BRAND_NAME_FIELD = "brand_business_name"
 const COMMERCIAL_RATE_FIELD = "commercial_rate"
 const GST_NUMBER_FIELD = "gst_number"
 const PAN_FIELD = "pan"
@@ -67,11 +69,101 @@ async function sendBackOnboardingCase(
   requestId: string,
   reason: string,
   targetStageKey: string | null,
-  actorUserId: string
+  actorUserId: string,
+  fieldComments?: { fieldKey: string; comment: string }[]
 ): Promise<CustomerOnboardingCase> {
-  const row = await caseData.sendBackCase({ requestId, reason, targetStageKey, actorUserId })
+  const row = await caseData.sendBackCase({ requestId, reason, targetStageKey, actorUserId, fieldComments })
   const revisions = await caseData.listRevisionsForRequest(requestId)
   return toCustomerOnboardingCase(row, revisions)
+}
+
+/** My Requests (task spec): every case this requester created, including drafts, unlike the shared Approvals inbox which deliberately excludes drafts (see platform/approvals/domain/inbox.ts's bucketForStatus). */
+async function listOnboardingCasesCreatedBy(appUserId: string): Promise<CustomerOnboardingCase[]> {
+  const rows = await caseData.listCasesCreatedBy(appUserId)
+  const cases: CustomerOnboardingCase[] = []
+  for (const row of rows) {
+    const revisions = await caseData.listRevisionsForRequest(row.request_id)
+    if (revisions.length === 0) continue
+    cases.push(toCustomerOnboardingCase(row, revisions))
+  }
+  return cases
+}
+
+type MyOnboardingRequestEntry = {
+  requestId: string
+  caseNumber: number
+  status: CustomerOnboardingCase["status"]
+  currentStageKey: CustomerOnboardingCase["currentStageKey"]
+  legalName: string
+  brandName: string
+  revisionNumber: number
+  customerId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** My Requests' page-ready rows: pulls the two display fields (legal name, brand) out of the current revision's raw form data, the same extraction `toReviewQueueEntries` already does for Approvals, so the page itself never needs to know the onboarding form's own field keys. */
+async function listMyOnboardingRequests(appUserId: string): Promise<MyOnboardingRequestEntry[]> {
+  const cases = await listOnboardingCasesCreatedBy(appUserId)
+  return cases.map((onboardingCase) => {
+    const values = onboardingCase.currentRevision.data
+    return {
+      requestId: onboardingCase.requestId,
+      caseNumber: onboardingCase.caseNumber,
+      status: onboardingCase.status,
+      currentStageKey: onboardingCase.currentStageKey,
+      legalName: typeof values[CUSTOMER_LEGAL_NAME_FIELD] === "string" ? (values[CUSTOMER_LEGAL_NAME_FIELD] as string) : "",
+      brandName: typeof values[BRAND_NAME_FIELD] === "string" ? (values[BRAND_NAME_FIELD] as string) : "",
+      revisionNumber: onboardingCase.currentRevision.revisionNumber,
+      customerId: onboardingCase.customerId,
+      createdAt: onboardingCase.createdAt,
+      updatedAt: onboardingCase.updatedAt,
+    }
+  })
+}
+
+type OnboardingSendBackEntry = { revisionNumber: number; reason: string; sentBackBy: string | null; sentBackAt: string }
+
+/** Oldest first: the Timeline reads chronologically, and `.length` is the requester-facing Send Back count (task spec: never a manually incremented counter). */
+async function listOnboardingSendBacks(requestId: string): Promise<OnboardingSendBackEntry[]> {
+  const rows = await caseData.listSendBacksForRequest(requestId)
+  return rows.map((row) => ({ revisionNumber: row.revision_number, reason: row.reason, sentBackBy: row.sent_back_by, sentBackAt: row.sent_back_at }))
+}
+
+type OnboardingFieldCommentEntry = {
+  id: string
+  revisionNumber: number
+  fieldKey: string
+  comment: string
+  reviewerId: string | null
+  createdAt: string
+  resolved: boolean
+}
+
+/** Every field comment ever left on this request, oldest first, across every revision: a resubmit never removes a prior revision's comments from view (task spec). */
+async function listOnboardingFieldComments(requestId: string): Promise<OnboardingFieldCommentEntry[]> {
+  const rows = await caseData.listFieldCommentsForRequest(requestId)
+  return rows.map((row) => ({
+    id: row.id,
+    revisionNumber: row.revision_number,
+    fieldKey: row.field_key,
+    comment: row.comment,
+    reviewerId: row.reviewer_id,
+    createdAt: row.created_at,
+    resolved: row.resolved,
+  }))
+}
+
+/** Send Back count per request in one batched read: My Requests' data source for that column, never a manually incremented counter. Requests with zero send-backs are simply absent from the returned map (treat a missing key as 0). */
+async function getSendBackCountsForRequests(requestIds: string[]): Promise<Map<string, number>> {
+  const rows = await caseData.listSendBacksForRequests(requestIds)
+  return countSendBacksByRequestId(rows)
+}
+
+/** Revision-level submit/resubmit facts the Timeline needs, oldest first (unlike `getOnboardingCase`, which only ever returns the current revision). */
+async function listOnboardingRevisionSummaries(requestId: string): Promise<{ revisionNumber: number; submittedAt: string | null; submittedBy: string | null }[]> {
+  const rows = await caseData.listRevisionsForRequest(requestId)
+  return rows.map((row) => ({ revisionNumber: row.revision_number, submittedAt: row.submitted_at, submittedBy: row.submitted_by }))
 }
 
 type ReviewQueueEntry = {
@@ -218,8 +310,14 @@ export {
   sendBackOnboardingCase,
   listOnboardingReviewQueue,
   listAllOnboardingEntries,
+  listOnboardingCasesCreatedBy,
+  listMyOnboardingRequests,
+  listOnboardingSendBacks,
+  getSendBackCountsForRequests,
+  listOnboardingFieldComments,
+  listOnboardingRevisionSummaries,
   approveOnboardingCase,
   getOnboardingOriginForCustomer,
   listApprovedCaseTaxIdentity,
 }
-export type { ReviewQueueEntry, ApprovedCaseTaxIdentity }
+export type { ReviewQueueEntry, ApprovedCaseTaxIdentity, OnboardingSendBackEntry, OnboardingFieldCommentEntry, MyOnboardingRequestEntry }

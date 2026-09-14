@@ -81,10 +81,15 @@ async function submitOnboardingCaseAction(requestId: string): Promise<CaseAction
   }
 }
 
-async function sendBackOnboardingCaseAction(requestId: string, reason: string, targetStageKey: string | null): Promise<CaseActionResult> {
+async function sendBackOnboardingCaseAction(
+  requestId: string,
+  reason: string,
+  targetStageKey: string | null,
+  fieldComments?: { fieldKey: string; comment: string }[]
+): Promise<CaseActionResult> {
   try {
     const actor = await requirePermission("customer", "approve")
-    const onboardingCase = await sendBackOnboardingCase(requestId, reason, targetStageKey, actor.appUserId)
+    const onboardingCase = await sendBackOnboardingCase(requestId, reason, targetStageKey, actor.appUserId, fieldComments)
     return { ok: true, onboardingCase }
   } catch (error) {
     return toCaseActionError(error)
