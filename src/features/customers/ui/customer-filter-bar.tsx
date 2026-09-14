@@ -6,7 +6,7 @@ import { SearchIcon } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FilterSelect } from "@/components/product/filter-select"
 import type { ReferenceOption } from "@/features/reference-data"
 
 /**
@@ -71,44 +71,44 @@ function CustomerFilterBar({
         </Button>
       </form>
 
-      <Select value={searchParams.get("segment") ?? ALL_VALUE} onValueChange={(value) => handleFilterChange("segment", String(value))}>
-        <SelectTrigger size="sm"><SelectValue placeholder="Segment" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>All segments</SelectItem>
-          {segmentOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FilterSelect
+        value={searchParams.get("segment") ?? ALL_VALUE}
+        onValueChange={(value) => handleFilterChange("segment", value)}
+        options={segmentOptions}
+        allValue={ALL_VALUE}
+        allLabel="All segments"
+        placeholder="Segment"
+      />
 
-      <Select value={searchParams.get("businessUnit") ?? ALL_VALUE} onValueChange={(value) => handleFilterChange("businessUnit", String(value))}>
-        <SelectTrigger size="sm"><SelectValue placeholder="Business Unit" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>All business units</SelectItem>
-          {businessUnitOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FilterSelect
+        value={searchParams.get("businessUnit") ?? ALL_VALUE}
+        onValueChange={(value) => handleFilterChange("businessUnit", value)}
+        options={businessUnitOptions}
+        allValue={ALL_VALUE}
+        allLabel="All business units"
+        placeholder="Business Unit"
+      />
 
-      <Select value={searchParams.get("country") ?? ALL_VALUE} onValueChange={(value) => handleFilterChange("country", String(value))}>
-        <SelectTrigger size="sm"><SelectValue placeholder="Country" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>All countries</SelectItem>
-          {countryOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FilterSelect
+        value={searchParams.get("country") ?? ALL_VALUE}
+        onValueChange={(value) => handleFilterChange("country", value)}
+        options={countryOptions}
+        allValue={ALL_VALUE}
+        allLabel="All countries"
+        placeholder="Country"
+      />
 
-      <Select value={searchParams.get("status") ?? ALL_VALUE} onValueChange={(value) => handleFilterChange("status", String(value))}>
-        <SelectTrigger size="sm"><SelectValue placeholder="Status" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>All statuses</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="inactive">Inactive</SelectItem>
-        </SelectContent>
-      </Select>
+      <FilterSelect
+        value={searchParams.get("status") ?? ALL_VALUE}
+        onValueChange={(value) => handleFilterChange("status", value)}
+        options={[
+          { value: "active", label: "Active" },
+          { value: "inactive", label: "Inactive" },
+        ]}
+        allValue={ALL_VALUE}
+        allLabel="All statuses"
+        placeholder="Status"
+      />
 
       {hasActiveFilters ? (
         <Button variant="ghost" size="sm" onClick={() => { setQuery(""); router.push(pathname) }}>

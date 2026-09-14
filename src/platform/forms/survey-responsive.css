@@ -17,3 +17,26 @@
     min-width: 0 !important;
   }
 }
+
+/**
+ * Platform Operating Expansion, Phase B: Customer Onboarding must scroll
+ * as one normal page, never a browser scroll nested inside a second,
+ * independent form-card scroll. Nexus's own onboarding layout
+ * (customer-onboarding-page.tsx) sets no fixed height or overflow on the
+ * form card, so the real page already scrolls naturally; this is a
+ * defensive floor under SurveyJS's own root/page wrappers specifically,
+ * since a future SurveyJS version or theme could introduce a height/
+ * overflow rule on `.sd-root-modern`/`.sd-page` that this project does
+ * not control. Genuinely scrollable SurveyJS sub-regions (a long
+ * dropdown's option list, `.sv-list`/`.sd-selectlist`/`.sd-menu-list`)
+ * are intentionally left alone: those are real, small popups, not the
+ * page body, and collapsing them to `visible` would make a long option
+ * list push the whole popup off-screen instead of scrolling within it.
+ */
+.sd-root-modern,
+.sd-body,
+.sd-body--responsive,
+.sd-page {
+  overflow: visible !important;
+  max-height: none !important;
+}

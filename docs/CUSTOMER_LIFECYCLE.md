@@ -1048,3 +1048,22 @@ the current revision's evidence correctly (the only case the snapshot
 diverges from "current" is an already-decided, older revision whose
 attachment was later replaced during a subsequent send-back cycle, a
 genuine but rare need). Revisit if a real reviewer asks to see it.
+
+## 25. Onboarding page scroll: VERIFIED, defensive floor added (Platform Operating Expansion, Phase B)
+
+Investigated the reported nested-scroll defect directly: no first-party
+Nexus code (the onboarding page, its stage components, or the app
+shell) sets a fixed height or `overflow-y-auto` anywhere in the
+onboarding stack today, so the page already scrolls naturally by
+default. The only vertical-scroll regions found are SurveyJS's own
+internal popup lists (`.sv-list`/`.sd-selectlist`/`.sd-menu-list`, a
+dropdown's own option list) and a horizontal, non-nested
+`overflow-x-auto` on the mobile stage tab strip, both legitimate,
+neither a page-body-inside-a-card double scroll.
+
+Added a defensive CSS floor in `src/platform/forms/survey-responsive.css`
+forcing `.sd-root-modern`/`.sd-body`/`.sd-page` to `overflow: visible`
+regardless of what a future SurveyJS version or theme update might
+introduce, without touching the genuinely-scrollable dropdown/popup
+regions. Recorded honestly: this closes the risk defensively; it did
+not find an active bug to reproduce in the current codebase state.
