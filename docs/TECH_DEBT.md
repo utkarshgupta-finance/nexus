@@ -164,12 +164,29 @@ into a second backlog.
   debt entry only as a reminder to grep for `resolveOption` usage the next
   time a new screen renders a governed field, rather than re-deriving a
   label inline.
-- **Date formatting is ad hoc across 13+ call sites** (`.toLocaleDateString()`/
-  `.toLocaleString()` called independently rather than through one shared
-  `formatDate` helper in `src/lib/format.ts`, which today only has
-  `formatCurrency`/`formatFxSnapshot`). Not incorrect anywhere found, just
-  repetitive; a future date-format standard change would need edits in
-  13+ files instead of one.
+- ~~Date formatting was ad hoc across 13+ call sites~~ — **mostly closed
+  (Platform Scale Closure, Phase H)**. `src/lib/date.ts` is now the
+  shared utility (`formatTimestamp`/`formatTimestampDate`/
+  `formatBusinessDate`), centralized at the shared `RequestTimeline`,
+  Approvals inbox, My Requests, the three review screens' decided-on
+  lines, and Customer Master detail. A few lower-traffic call sites
+  (the now-removed `/reviews/*` list pages had some, already deleted in
+  Phase X) were not individually swept; revisit only if a new one is
+  found still calling `.toLocaleDateString()`/`.toLocaleString()`
+  directly instead of the shared utility.
+- **Two Supabase security-linter findings, real but out of scope for
+  this closure pass (Platform Scale Closure, Phase S).** 61 functions
+  (every `SECURITY DEFINER`-style RPC in the schema, including ones
+  touched this program) have a mutable `search_path`, a standard
+  Postgres hardening gap (`function_search_path_mutable`), pre-existing
+  across the entire function set, not introduced by this round.
+  Fixing it means adding `SET search_path = ''` (or a fixed schema) to
+  every one, a real, sizable, dedicated pass, not a byproduct of an
+  unrelated program; do not fix a handful ad hoc, since consistency
+  matters here. Separately, Supabase Auth's leaked-password protection
+  (HaveIBeenPwned check) is disabled at the project level
+  (`auth_leaked_password_protection`), a dashboard/infrastructure
+  setting, not a code change.
 - ~~JS-side floating-point arithmetic for monetary calculations~~ — **closed
   (Platform Scale Program, Phase G)**. `commercial-rate-fx.ts`'s `toInr`
   now rounds explicitly to 2 decimal places instead of leaving a raw
