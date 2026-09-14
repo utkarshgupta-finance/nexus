@@ -18,6 +18,7 @@ import type { CommercialConfigurationVersion } from "../domain/commercial-versio
 import { formatCommercialVersionId } from "../domain/commercial-version-types"
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
 import { RequestTimeline } from "@/components/product/request-timeline"
+import { formatTimestampDate } from "@/lib/date"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
@@ -214,7 +215,7 @@ function CommercialVersionReviewPage({
         {version.status === "approved" || version.status === "rejected" ? (
           <p className="text-xs text-muted-foreground">
             {version.status === "approved" ? "Approved" : "Rejected"}
-            {version.decidedAt ? ` on ${new Date(version.decidedAt).toLocaleDateString()}` : ""}. This version is historical evidence and can no longer
+            {version.decidedAt ? ` on ${formatTimestampDate(version.decidedAt)}` : ""}. This version is historical evidence and can no longer
             be changed.
           </p>
         ) : null}

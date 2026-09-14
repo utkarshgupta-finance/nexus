@@ -6,6 +6,7 @@ import { countSendBacksByRequestId } from "../domain/my-requests"
 import { withLoggedOperation } from "@/platform/observability/server"
 import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
+import { getBusinessDateYear } from "@/lib/date"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import type { CustomerOnboardingCase, OnboardingOrigin } from "../domain/types"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
@@ -241,7 +242,7 @@ async function approveOnboardingCase(requestId: string, actorUserId: string, sna
       }
 
       const customerKey = slugify(legalName)
-      const configurationKey = `${customerKey}-${new Date(effectiveDate).getFullYear()}`
+      const configurationKey = `${customerKey}-${getBusinessDateYear(effectiveDate)}`
 
       const components = commercialRate.components.map((component) => {
         const mapped = mapOnboardingComponentToCommercialComponentInsert(component, snapshot, commercialRate.billingCurrency as string, effectiveDate)

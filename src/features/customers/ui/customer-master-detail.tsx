@@ -28,6 +28,7 @@ import {
 import { DeleteCustomerPanel } from "./delete-customer-panel"
 import { CustomerStatusPanel } from "./customer-status-panel"
 import { CustomerActivityTimeline } from "./customer-activity-timeline"
+import { formatBusinessDate, formatTimestampDate } from "@/lib/date"
 import type { CustomerActivityEvent } from "../domain/activity"
 import type { OnboardingOrigin } from "@/features/customer-onboarding/server"
 
@@ -174,8 +175,8 @@ function CustomerMasterDetail({
                       "None yet"
                     ),
                   },
-                  { label: "Created At", value: new Date(record.createdAt).toLocaleDateString() },
-                  { label: "Last Changed At", value: new Date(record.updatedAt).toLocaleDateString() },
+                  { label: "Created At", value: formatTimestampDate(record.createdAt) },
+                  { label: "Last Changed At", value: formatTimestampDate(record.updatedAt) },
                 ]}
               />
             </section>
@@ -408,8 +409,8 @@ function CustomerMasterDetail({
                           <td className="py-2 pr-3 font-medium text-foreground">{labelForGovernedField(entry.fieldKey)}</td>
                           <td className="py-2 pr-3 text-muted-foreground">{entry.oldValue ?? "-"}</td>
                           <td className="py-2 pr-3 text-foreground">{entry.newValue ?? "-"}</td>
-                          <td className="py-2 pr-3 text-muted-foreground">{entry.effectiveDate ?? "-"}</td>
-                          <td className="py-2 pr-3 text-muted-foreground">{new Date(entry.changedAt).toLocaleDateString()}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{entry.effectiveDate ? formatBusinessDate(entry.effectiveDate) : "-"}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{formatTimestampDate(entry.changedAt)}</td>
                         </tr>
                       ))}
                     </tbody>

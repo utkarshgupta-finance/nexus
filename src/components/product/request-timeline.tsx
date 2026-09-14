@@ -11,6 +11,8 @@
  * business-specific and genuinely differs per lifecycle); only the
  * rendering is shared.
  */
+import { formatTimestamp } from "@/lib/date"
+
 type RequestTimelineEvent = {
   id: string
   occurredAt: string
@@ -28,7 +30,7 @@ function RequestTimeline({ events }: { events: RequestTimelineEvent[] }) {
           <li key={event.id} className="flex flex-col gap-0.5 border-l-2 border-muted pl-3">
             <span className="text-xs text-foreground">{event.summary}</span>
             <span className="text-[11px] text-muted-foreground">
-              {new Date(event.occurredAt).toLocaleString()}
+              {formatTimestamp(event.occurredAt)}
               {event.actorEmail ? ` · ${event.actorEmail}` : ""}
             </span>
           </li>

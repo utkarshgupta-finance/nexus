@@ -4,6 +4,7 @@ import { CheckCircle2Icon } from "lucide-react"
 import { KeyValueGrid } from "@/components/product/key-value-grid"
 import { Button } from "@/components/ui/button"
 import { formatOnboardingCaseId } from "../domain/types"
+import { formatTimestamp } from "@/lib/date"
 
 /**
  * The Submitted confirmation screen (Customer Lifecycle V1 UX pass,
@@ -51,7 +52,7 @@ function OnboardingSubmittedScreen({
             { label: "Customer", value: legalName },
             { label: "Request ID", value: formatOnboardingCaseId(caseNumber) },
             { label: "Status", value: "Submitted" },
-            { label: "Submitted At", value: submittedAt ? new Date(submittedAt).toLocaleString() : "-" },
+            { label: "Submitted At", value: submittedAt ? formatTimestamp(submittedAt) : "-" },
             { label: "Current Revision", value: revisionNumber },
           ]}
         />

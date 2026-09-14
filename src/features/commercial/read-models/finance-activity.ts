@@ -3,6 +3,7 @@ import * as configurationService from "../services/configuration.service"
 import * as invoiceService from "../services/invoice.service"
 import * as reconciliationService from "../services/reconciliation.service"
 import * as usageEarnedService from "../services/usage-earned.service"
+import { businessDateStartOfDayUtc } from "@/lib/date"
 
 /**
  * Read model for the third Commercial screen: a chronological activity
@@ -187,7 +188,24 @@ async function getFinanceActivity(commercialConfigurationId: string): Promise<Fi
     }
   }
 
-  return entries.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0))
+  return entries.sort((a, b) => {
+    const keyA = sortKeyFor(a)
+    const keyB = sortKeyFor(b)
+    return keyA < keyB ? 1 : keyA > keyB ? -1 : 0
+  })
+}
+
+/**
+ * `commercial_change.occurredAt` is a business date ("YYYY-MM-DD", when the
+ * change takes effect), every other entry's `occurredAt` is a full UTC
+ * timestamp (when the row was recorded). Comparing those two
+ * representations directly would work today only by lexical coincidence
+ * (a date string happens to sort before any timestamp sharing its prefix);
+ * this makes the conversion explicit instead of relying on that
+ * coincidence (Platform Scale Closure, Phase H).
+ */
+function sortKeyFor(entry: FinanceActivityEntry): string {
+  return entry.kind === "commercial_change" ? businessDateStartOfDayUtc(entry.occurredAt) : entry.occurredAt
 }
 
 export { getFinanceActivity }

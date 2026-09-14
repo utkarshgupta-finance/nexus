@@ -206,6 +206,54 @@ Applying either pattern to a given table is deferred until that table
 actually needs it (`docs/PLATFORM_ARCHITECTURE.md` §12); the shape is
 decided now so the first feature that needs it does not invent its own.
 
+## 7a. Business Date vs Timestamp [IMPLEMENTED, Platform Scale Closure Phase H]
+
+Two distinct representations exist and must never be mixed:
+
+- **Business date**: a calendar date with no time-of-day or timezone
+  component (a Commercial Version's Effective From/To, a Customer Change's
+  effective date). Postgres column type `date`. TypeScript representation
+  a plain `"YYYY-MM-DD"` string, never a `Date` object. It means "the 15th
+  of January" regardless of where in the world it is read, so it must
+  never shift because of the browser's or server's local timezone.
+- **Timestamp**: an instant (`created_at`, `updated_at`, `submitted_at`,
+  `approved_at`, `sent_back_at`, `decided_at`). Postgres column type
+  `timestamptz`. TypeScript representation a full ISO 8601 string, stored
+  and compared in UTC, displayed in the viewer's local timezone.
+
+A real bug from mixing them was found and fixed this round:
+`new Date(effectiveDate).getFullYear()` in
+`customer-onboarding/services/case.service.ts`, where `effectiveDate` is a
+bare business date. Per the ECMA-262 spec a bare `"YYYY-MM-DD"` string is
+parsed as UTC midnight; `.getFullYear()` then reads it back in the
+runtime's local timezone, which can silently return the wrong calendar
+year in a negative-UTC-offset environment (harmless on Vercel's UTC
+runtime today, a real bug in local development on a machine set to such a
+timezone, or on any future non-UTC deployment target). A second bug was
+found in `commercial/read-models/finance-activity.ts`, which sorted a
+business-date-valued `occurredAt` (`commercial_change`) against
+timestamp-valued `occurredAt` values from every other entry kind by plain
+string comparison; this happened to produce a reasonable order today only
+because a date-only prefix sorts before any timestamp sharing it, not
+because the comparison was actually correct.
+
+The fix is `src/lib/date.ts`: a small set of pure helpers
+(`parseBusinessDate`, `getBusinessDateYear`, `compareBusinessDates`,
+`formatBusinessDate`, `businessDateStartOfDayUtc`, `compareTimestamps`,
+`formatTimestamp`, `formatTimestampDate`) that parse a business date
+directly from its string rather than round-tripping it through a
+timezone-sensitive `Date`, and that make explicit the one legitimate case
+where a business date must be compared against a timestamp
+(`businessDateStartOfDayUtc`, used only in `finance-activity.ts`'s sort).
+No date library was added: once centralized, the actual set of operations
+Nexus needs (parse, compare, format two fixed display shapes) is small
+enough that a dependency is not justified today. Revisit if a real
+calendar-arithmetic need appears (business-day counting, recurring
+schedules), per `docs/TECH_DEBT.md`.
+
+Never write `new Date("YYYY-MM-DD")` for business-date logic. Use the
+helpers above instead.
+
 ## 8. Configuration tables
 
 Configuration falls into the categories set out in

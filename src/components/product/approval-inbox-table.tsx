@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs"
 import { filterByBucket, labelForItemType, labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { formatTimestampDate } from "@/lib/date"
 import type { ApprovalInboxBucket, ApprovalInboxItem } from "@/platform/approvals/domain/types"
 
 /**
@@ -72,7 +73,7 @@ function ApprovalInboxTable({ items }: { items: ApprovalInboxItem[] }) {
                       {labelForCaseStatus(item.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(item.updatedAt).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatTimestampDate(item.updatedAt)}</TableCell>
                   <TableCell>
                     <Button variant="outline" size="sm" render={<Link href={item.href} />}>
                       Open

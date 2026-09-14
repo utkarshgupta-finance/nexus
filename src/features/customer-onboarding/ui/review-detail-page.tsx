@@ -18,6 +18,7 @@ import { useReferenceMasterSnapshot } from "@/features/reference-data/ui/snapsho
 import { resolveOption } from "@/features/reference-data"
 import type { ReferenceListKey } from "@/features/reference-data"
 import { componentTableCells } from "../domain/commercial-rate-summary"
+import { formatTimestampDate } from "@/lib/date"
 import type { CommercialComponentDraft, CommercialRateDraft } from "../domain/commercial-rate"
 import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata } from "../domain/types"
 import { formatOnboardingCaseId } from "../domain/types"
@@ -312,7 +313,7 @@ function ReviewDetailPage({
           <>
             <Separator />
             <p className="text-xs text-muted-foreground">
-              Approved{onboardingCase.approvedAt ? ` on ${new Date(onboardingCase.approvedAt).toLocaleDateString()}` : ""}. This case is historical
+              Approved{onboardingCase.approvedAt ? ` on ${formatTimestampDate(onboardingCase.approvedAt)}` : ""}. This case is historical
               evidence and can no longer be changed.
             </p>
           </>

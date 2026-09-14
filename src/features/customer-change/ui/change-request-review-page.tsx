@@ -17,6 +17,7 @@ import { RequestTimeline } from "@/components/product/request-timeline"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import { FieldDiffTable } from "./field-diff-table"
 import { RequirementsPreview } from "./requirements-preview"
+import { formatTimestampDate } from "@/lib/date"
 
 /**
  * Reviewer surface for one Customer Change Request (task spec §16-17):
@@ -195,7 +196,7 @@ function ChangeRequestReviewPage({
         {changeRequest.status === "approved" || changeRequest.status === "rejected" ? (
           <p className="text-xs text-muted-foreground">
             {changeRequest.status === "approved" ? "Approved" : "Rejected"}
-            {changeRequest.decidedAt ? ` on ${new Date(changeRequest.decidedAt).toLocaleDateString()}` : ""}. This Change Request is historical evidence
+            {changeRequest.decidedAt ? ` on ${formatTimestampDate(changeRequest.decidedAt)}` : ""}. This Change Request is historical evidence
             and can no longer be changed.
           </p>
         ) : null}

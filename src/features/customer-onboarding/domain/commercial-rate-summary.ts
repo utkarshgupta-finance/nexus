@@ -9,6 +9,7 @@ import {
 } from "./commercial-rate"
 import type { CommercialComponentDraft, CommercialNature, InvoiceTerms, Milestone, MugOverlay, PricingModel, RevenueRecognition } from "./commercial-rate"
 import { isForeignCurrency, toInr } from "./commercial-rate-fx"
+import { formatBusinessDate } from "@/lib/date"
 
 /**
  * Human-readable calculation-preview strings: illustrative display
@@ -285,11 +286,11 @@ function rateColumnLines(snapshot: ReferenceMasterSnapshot, component: Commercia
 /** "01-Oct-2026", or "-" once no Effective From has been chosen yet. Never a raw ISO date string in a table cell. */
 function formatEffectiveDate(value: string | null): string {
   if (!value) return "-"
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return "-"
-  const day = String(date.getDate()).padStart(2, "0")
-  const month = date.toLocaleString("en-US", { month: "short" })
-  return `${day}-${month}-${date.getFullYear()}`
+  try {
+    return formatBusinessDate(value)
+  } catch {
+    return "-"
+  }
 }
 
 /**

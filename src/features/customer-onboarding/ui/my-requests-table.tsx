@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
+import { formatTimestampDate } from "@/lib/date"
 import { formatOnboardingCaseId } from "../domain/types"
 import { reviewState, primaryAction } from "../domain/my-requests"
 import type { MyRequestRow } from "../domain/my-requests"
@@ -56,8 +57,8 @@ function MyRequestsTable({ rows }: { rows: MyRequestRow[] }) {
                 <TableCell className="hidden text-muted-foreground lg:table-cell">{reviewState(row.status, row.currentStageKey)}</TableCell>
                 <TableCell className="hidden text-muted-foreground sm:table-cell">{row.revisionNumber}</TableCell>
                 <TableCell className="hidden text-muted-foreground sm:table-cell">{row.sentBackCount}</TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">{new Date(row.updatedAt).toLocaleDateString()}</TableCell>
-                <TableCell className="hidden text-muted-foreground lg:table-cell">{new Date(row.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell className="hidden text-muted-foreground md:table-cell">{formatTimestampDate(row.updatedAt)}</TableCell>
+                <TableCell className="hidden text-muted-foreground lg:table-cell">{formatTimestampDate(row.createdAt)}</TableCell>
                 <TableCell>
                   <Button variant="outline" size="sm" render={<Link href={action.href} />}>
                     {action.label}
