@@ -15,8 +15,10 @@ import { rejectCommercialVersionAction, approveCommercialVersionAction } from ".
 import { componentTableCells } from "../domain/commercial-rate-summary"
 import type { CommercialComponentDraft } from "../domain/commercial-rate"
 import type { CommercialConfigurationVersion } from "../domain/commercial-version-types"
+import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
+import { CommercialRateDiffView } from "./commercial-rate-diff-view"
 
 /**
  * Reviewer surface for one Commercial Configuration Version (Customer
@@ -39,11 +41,14 @@ function CommercialVersionReviewPage({
   configId,
   version,
   canDecide,
+  diff,
 }: {
   requestId: string
   configId: string
   version: CommercialConfigurationVersion
   canDecide: boolean
+  /** Current vs Proposed (task Phase G); null only when there is nothing yet to compare (no active prior Commercial Components, or no draft saved). */
+  diff: CommercialRateDiff | null
 }) {
   const router = useRouter()
   const snapshot = useReferenceMasterSnapshot()
@@ -109,6 +114,9 @@ function CommercialVersionReviewPage({
           {version.effectiveDate ? <p className="text-xs text-muted-foreground">Effective Date: {version.effectiveDate}</p> : null}
         </section>
 
+        {diff ? (
+          <CommercialRateDiffView diff={diff} currencyCode={currencyCode} />
+        ) : (
         <section className="flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Proposed Commercial Rate</h2>
           <p className="text-xs text-muted-foreground">Billing Currency: {currencyCode ?? "-"}</p>
@@ -149,6 +157,7 @@ function CommercialVersionReviewPage({
             )
           })}
         </section>
+        )}
 
         {isDecidable ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">

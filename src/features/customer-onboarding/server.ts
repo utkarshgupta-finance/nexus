@@ -18,6 +18,8 @@ export {
   listVersionReviewQueue,
   listAllVersionEntries,
   listVersionsForConfiguration,
+  getCommercialVersionDiff,
 } from "./services/commercial-version.service"
 export type { ReviewQueueEntry as CommercialVersionReviewQueueEntry } from "./services/commercial-version.service"
 export type { CommercialConfigurationVersion } from "./domain/commercial-version-types"
+export type { CommercialRateDiff, ComponentDiff, SlabRowDiff, DesignationRowDiff, MilestoneDiff, DiffRowStatus } from "./domain/commercial-rate-diff"

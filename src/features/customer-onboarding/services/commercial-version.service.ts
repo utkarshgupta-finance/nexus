@@ -9,6 +9,8 @@ import { toDraftComponent } from "../domain/commercial-configuration-view"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
 import { newId, isCommercialRateDraftComplete } from "../domain/commercial-rate"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
+import { diffCommercialRate } from "../domain/commercial-rate-diff"
+import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import type { CommercialConfigurationVersion, CommercialVersionChangeCategory } from "../domain/commercial-version-types"
 
 /**
@@ -30,19 +32,22 @@ async function loadVersion(requestId: string): Promise<CommercialConfigurationVe
   return toCommercialConfigurationVersion(row, revision)
 }
 
-/** "Create New Version copies current Active into Version 2 Draft" (task spec): reconstructs a CommercialRateDraft from the configuration's currently-active Components, using the exact inverse mapper the Customer Commercials view already relies on. */
+/** Reconstructs a CommercialRateDraft from a Commercial Configuration's currently-active Components, using the exact inverse mapper the Customer Commercials view already relies on. Shared by "Create New Version copies current Active into Version 2 Draft" (task spec) and the Commercial Version review page's Current vs Proposed diff (task Phase G): both need the identical "what is current, right now" reconstruction, never two divergent ones. */
+async function getCurrentCommercialRateDraft(commercialConfigurationId: string): Promise<CommercialRateDraft> {
+  const components = await commercialConfigurationService.listCommercialComponents(commercialConfigurationId)
+  const activeComponents = components.filter((component) => component.effectiveTo === null)
+  return {
+    billingCurrency: activeComponents[0]?.transactionCurrency ?? null,
+    components: activeComponents.map(toDraftComponent),
+  }
+}
+
 async function createVersionFromActive(
   commercialConfigurationId: string,
   changeCategory: CommercialVersionChangeCategory,
   actorUserId: string
 ): Promise<CommercialConfigurationVersion> {
-  const components = await commercialConfigurationService.listCommercialComponents(commercialConfigurationId)
-  const activeComponents = components.filter((component) => component.effectiveTo === null)
-
-  const draft: CommercialRateDraft = {
-    billingCurrency: activeComponents[0]?.transactionCurrency ?? null,
-    components: activeComponents.map(toDraftComponent),
-  }
+  const draft = await getCurrentCommercialRateDraft(commercialConfigurationId)
 
   const requestId = newId()
   await versionData.createVersion({
@@ -150,9 +155,19 @@ async function listVersionsForConfiguration(commercialConfigurationId: string): 
   return loaded.filter((entry): entry is CommercialConfigurationVersion => entry !== null)
 }
 
+/** Commercial Current vs Proposed diff (task Phase G): null only when the version has no saved draft yet (nothing to compare against). */
+async function getCommercialVersionDiff(requestId: string): Promise<CommercialRateDiff | null> {
+  const version = await loadVersion(requestId)
+  if (!version || !version.commercialRate) return null
+  const current = await getCurrentCommercialRateDraft(version.commercialConfigurationId)
+  return diffCommercialRate(current, version.commercialRate)
+}
+
 export {
   loadVersion,
   createVersionFromActive,
+  getCurrentCommercialRateDraft,
+  getCommercialVersionDiff,
   saveVersionDraft,
   submitVersion,
   rejectVersion,

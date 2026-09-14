@@ -252,14 +252,26 @@ another feature's internals (docs/ARCHITECTURE.md).
 "Create New Version" on `/commercials/[configId]` (gated on
 `commercial_configuration.write`) is the new, governed entry point.
 
-Known gap, stated honestly: `src/features/commercial/ui/version-history-table.tsx`
-and `toVersionSummaries` were not extended with an "Approved By" column
-for governed versions (`commercial_configuration_versions.decided_by`);
-Version History today still shows only Version/Status/Category/
-Effective From/To/Billing Currency/FX Snapshot/Created At/Actions,
-exactly as it did before this round. Both real Version 1 and the real
-Version 2 built during this round render correctly through it; only the
-new "who approved this version" fact is not yet surfaced there.
+Version History (`src/features/commercial/ui/version-history-table.tsx`)
+shows Version/Status/Category/Effective From/To/Billing Currency/FX
+Snapshot/Created At/Approved By/Actions; `toVersionSummaries` takes an
+optional changeId -> actor lookup sourced from
+`commercial_configuration_versions.decided_by`, blank (never fabricated)
+for a version created through the older immediate-promotion path.
+
+The Commercial Version review screen (`/reviews/commercial-versions/:requestId`)
+shows a Current vs Proposed diff before Approve/Reject (task Phase G),
+not the proposed rate in isolation: `getCommercialVersionDiff`
+(`services/commercial-version.service.ts`) reconstructs "current" from
+the configuration's active Components via the same `toDraftComponent`
+inverse mapper §4 already uses to seed a new draft, and
+`diffCommercialRate` (`domain/commercial-rate-diff.ts`, pure, unit-tested)
+classifies every component UNCHANGED/CHANGED/ADDED/REMOVED, matching
+Slab bands by position, Designation rows by designation name, and
+Milestones by name (none of these carry a stable id across
+reconstructions). Changed/added/removed are shown by default; unchanged
+components are available behind a "Show unchanged" toggle, never
+hidden entirely.
 
 ## 5. Permanent Customer Deletion: IMPLEMENTED
 
