@@ -42,6 +42,9 @@ export default async function UserAccessRoute() {
   if (sessionHasPermission(session, "team", "read")) {
     navItems.push({ href: "/settings/teams", label: "Team Master" })
   }
+  if (sessionHasPermission(session, "workflow_definition", "read")) {
+    navItems.push({ href: "/settings/workflows", label: "Workflows" })
+  }
   navItems.push({ href: "/settings/user-access", label: "User Access" })
 
   return (

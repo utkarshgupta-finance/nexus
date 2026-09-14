@@ -1491,3 +1491,60 @@ actor display could not be audited because those surfaces do not exist
 yet (Agreements is task Phase S, Go Live is task Phase Q); this audit
 needs a follow-up pass once those are built, per task Phase M's own
 description of them as in-scope surfaces.
+
+## 36. Workflow Builder: IMPLEMENTED (Platform Operating Expansion, Phase N/O)
+
+A real, persisted, versioned node-graph process model for admins to
+design an approval workflow visually (Start, Form Step, Approval,
+Decision, End nodes and the transitions between them), distinct from the
+existing flat, condition-triggered rule evaluator in
+`src/platform/workflow` (`WorkflowCondition`/`WorkflowRule`), which
+remains the only workflow mechanism Customer Change actually runs today.
+The two are deliberately not merged: the rule evaluator is a simple
+if-this-then-that gate over a single request, while the Workflow Builder
+models an ordered multi-step process with responsible teams and
+per-step requirements. Migrating a real domain onto the Workflow Builder
+engine is out of scope for this phase (task Phase P).
+
+**Data model**
+(`supabase/migrations/20260916090000_workflow_builder_foundation.sql`):
+`workflow_definitions` (one per named workflow, e.g. "Customer Onboarding
+Approval"), `workflow_definition_versions` (a definition can have many
+versions over time; at most one `draft` at a time, enforced by a partial
+unique index; `published` versions are immutable), `workflow_nodes` and
+`workflow_edges` (the graph itself, one row per node/edge, referencing
+each other by a stable `node_key` rather than a generated row id, so
+saving the whole graph is a simple delete-all-then-reinsert rather than a
+two-phase id-relinking operation).
+
+**Library boundary**: React Flow (`@xyflow/react`, added this phase with
+explicit approval) owns canvas mechanics only: rendering, drag, connect,
+select. Nexus owns the semantic model. A node's canvas position
+(`position_x`/`position_y`) is the one piece of React Flow's own state
+that is persisted; everything else React Flow renders is derived fresh
+from Nexus's own node/edge rows on every load, never React Flow's
+internal JSON persisted as if it were authoritative.
+
+**Validation** (`src/platform/workflow-builder/domain/validation.ts`,
+pure, 12 tests): exactly one Start node, at least one End node, no
+duplicate node keys, every edge references an existing node, no node
+unreachable from Start (a real breadth-first search, not just an
+incoming/outgoing edge count), no dead ends except End, and every
+referenced team/permission must actually exist. A draft can be saved in
+an invalid state (e.g. mid-edit, missing an End node); publishing cannot:
+`publishVersion` re-validates against the real, current team/permission
+catalog server-side before calling the publish RPC, so a stale
+client-side check is never the only check.
+
+**Authorization**: `workflow_definition.read`/`write`/`publish` are
+three separate permissions, not one, per the task's own framing that
+publishing (making a version immutable and workflow-effective) is a more
+consequential action than authoring a draft. `workflow_admin` role grants
+all three.
+
+**Settings surface**: `/settings/workflows` (list), `/settings/workflows/[definitionId]`
+(version history for one definition), `/settings/workflows/[definitionId]/versions/[versionId]`
+(the canvas editor). Every actor-identity field on these pages
+(`updatedByLabel`, `publishedByLabel`) is resolved server-side via
+`resolveActorLabels` before reaching the client component, per the
+permanent Actor Identity rule (§35).

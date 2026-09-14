@@ -34,6 +34,9 @@ export default async function TeamMasterRoute() {
     navItems.push({ href: "/settings/customer-onboarding", label: "Reference Master" })
   }
   navItems.push({ href: "/settings/teams", label: "Team Master" })
+  if (sessionHasPermission(session, "workflow_definition", "read")) {
+    navItems.push({ href: "/settings/workflows", label: "Workflows" })
+  }
   if (sessionHasPermission(session, "user_access", "read")) {
     navItems.push({ href: "/settings/user-access", label: "User Access" })
   }

@@ -47,7 +47,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           canReadSettings:
             sessionHasPermission(session, "reference_master", "read") ||
             sessionHasPermission(session, "user_access", "read") ||
-            sessionHasPermission(session, "team", "read"),
+            sessionHasPermission(session, "team", "read") ||
+            sessionHasPermission(session, "workflow_definition", "read"),
         }
 
   return (
