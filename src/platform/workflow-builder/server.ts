@@ -18,6 +18,7 @@ export {
   saveVersionGraph,
   validateVersionForPublish,
   publishVersion,
+  discardVersion,
 } from "./services/workflow-builder.service"
 export type { WorkflowGraph } from "./services/workflow-builder.service"
 export type {

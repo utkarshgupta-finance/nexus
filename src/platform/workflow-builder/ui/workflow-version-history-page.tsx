@@ -9,7 +9,7 @@ import { PendingButton } from "@/components/product/pending-button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatTimestampDate } from "@/lib/date"
-import { createWorkflowVersionAction } from "../actions"
+import { createWorkflowVersionAction, discardWorkflowVersionAction } from "../actions"
 import type { WorkflowDefinition, WorkflowDefinitionVersion } from "../domain/types"
 import { APPLIES_TO_LABELS } from "./workflow-definitions-page"
 
@@ -26,14 +26,17 @@ function WorkflowVersionHistoryPage({
   rows,
   canWrite,
   hasDraft,
+  draftVersionId,
 }: {
   definition: WorkflowDefinition
   rows: VersionRow[]
   canWrite: boolean
   hasDraft: boolean
+  draftVersionId: string | null
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [isDiscarding, startDiscardTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   function handleNewDraft() {
@@ -48,6 +51,19 @@ function WorkflowVersionHistoryPage({
     })
   }
 
+  function handleDiscardDraft() {
+    if (!draftVersionId) return
+    setError(null)
+    startDiscardTransition(async () => {
+      const result = await discardWorkflowVersionAction(draftVersionId)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      router.refresh()
+    })
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -57,6 +73,10 @@ function WorkflowVersionHistoryPage({
           canWrite && !hasDraft ? (
             <PendingButton size="sm" pending={isPending} pendingLabel="Creating..." onClick={handleNewDraft}>
               New Draft Version
+            </PendingButton>
+          ) : canWrite && hasDraft && draftVersionId ? (
+            <PendingButton size="sm" variant="outline" className="text-destructive" pending={isDiscarding} pendingLabel="Discarding..." onClick={handleDiscardDraft}>
+              Discard Draft
             </PendingButton>
           ) : undefined
         }

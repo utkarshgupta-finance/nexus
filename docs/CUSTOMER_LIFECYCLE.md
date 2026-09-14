@@ -1585,3 +1585,41 @@ If it is ever undertaken, it needs its own authorization, its own
 side-by-side verification that the migrated graph produces identical
 routing to the mechanism it replaces, and its own rollback story, all
 argued on their own merits at that time.
+
+## 38. System-wide cancel/withdraw audit: IMPLEMENTED (Platform Operating Expansion, Phase V)
+
+A background audit checked every cancel/discard/withdraw mechanism
+against the actual code, not by assumption: the three existing cancel
+RPCs (§32-§33, onboarding case/change request/commercial version) are
+draft-only, creator-enforced inside the RPC itself, safe under
+concurrent double-calls (`select ... for update` before the status
+check), and leave no orphaned `submission_revisions` or dangling
+pointer columns behind. The "Change Customer: Both" flow (§33) has no
+persisted link between its two independently-created drafts, confirmed
+in code, so cancelling one leaves no stale reference to the other. A
+cancelled onboarding case's attachments remain safely retrievable
+(deletion is trigger-forbidden on `customer_onboarding_documents`); only
+the UI stops surfacing them once the case is terminal, which is correct.
+
+**One real gap found and fixed**: `workflow_definition_versions` (§36)
+enforces at most one draft per definition
+(`uq_workflow_version_one_draft`) but had no way to discard an unwanted
+draft, a hard dead end for an admin who started a draft and abandoned it
+(the only way out was force-publishing a structurally valid graph).
+`supabase/migrations/20260916100000_workflow_version_discard.sql` adds
+`discard_workflow_definition_version`, draft-only like every other
+mutation in this module, deleting the version row (its nodes/edges
+cascade automatically via the existing `on delete cascade` foreign
+keys). Unlike the three cancel RPCs, this one is not creator-restricted:
+Workflow Builder is a shared admin resource gated by
+`workflow_definition.write`, not a personal request, matching every
+other RPC already in that module. `/settings/workflows/[definitionId]`
+now shows "Discard Draft" instead of "New Draft Version" whenever a
+draft already exists.
+
+A secondary, informational finding, not fixed: `form_versions` has full
+schema/trigger support for a `draft -> abandoned` transition, but no RPC
+ever performs it and no live UI creates a `form_versions` draft today
+(all existing rows are migration-seeded). This is an inert, currently
+unreachable capability, not a live gap; revisit only once a real Form
+Builder admin surface exists to create these rows through the app.

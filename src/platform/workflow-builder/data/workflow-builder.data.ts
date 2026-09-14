@@ -146,6 +146,13 @@ async function publishVersion(versionId: string, actorUserId: string): Promise<W
   return data
 }
 
+/** Permanently removes a draft version (never a published one); `workflow_nodes`/`workflow_edges` cascade automatically on `workflow_version_id`. */
+async function discardVersion(versionId: string, actorUserId: string): Promise<void> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { error } = await supabase.rpc("discard_workflow_definition_version", { p_version_id: versionId, p_actor_user_id: actorUserId })
+  if (error) throw error
+}
+
 export {
   listDefinitions,
   getDefinition,
@@ -157,5 +164,6 @@ export {
   createVersion,
   saveVersionGraph,
   publishVersion,
+  discardVersion,
 }
 export type { WorkflowDefinitionRow, WorkflowVersionRow, WorkflowNodeRow, WorkflowEdgeRow }

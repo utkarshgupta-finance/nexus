@@ -30,11 +30,17 @@ export default async function WorkflowVersionHistoryRoute({ params }: { params: 
   }))
 
   const canWrite = await hasPermission("workflow_definition", "write")
-  const hasDraft = versions.some((version) => version.status === "draft")
+  const draftVersion = versions.find((version) => version.status === "draft") ?? null
 
   return (
     <AuthGate session={session} requiredPermission={WORKFLOW_READ} loginRedirectTo={`/settings/workflows/${definitionId}`}>
-      <WorkflowVersionHistoryPage definition={definition} rows={rows} canWrite={canWrite} hasDraft={hasDraft} />
+      <WorkflowVersionHistoryPage
+        definition={definition}
+        rows={rows}
+        canWrite={canWrite}
+        hasDraft={draftVersion !== null}
+        draftVersionId={draftVersion?.id ?? null}
+      />
     </AuthGate>
   )
 }

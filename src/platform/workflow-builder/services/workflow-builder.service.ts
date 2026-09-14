@@ -125,6 +125,11 @@ async function publishVersion(versionId: string, actorUserId: string): Promise<W
   return toWorkflowDefinitionVersion(row)
 }
 
+/** Permanently discards a draft version (task Phase V: without this, an abandoned draft was a hard dead end since at most one draft may exist per definition). Never callable on a published version, enforced by the RPC itself. */
+async function discardVersion(versionId: string, actorUserId: string): Promise<void> {
+  await workflowData.discardVersion(versionId, actorUserId)
+}
+
 export {
   listDefinitions,
   getDefinition,
@@ -135,5 +140,6 @@ export {
   saveVersionGraph,
   validateVersionForPublish,
   publishVersion,
+  discardVersion,
 }
 export type { WorkflowGraph }

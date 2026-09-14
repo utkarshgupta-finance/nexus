@@ -2,7 +2,7 @@
 
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
-import { createDefinition, createVersion, saveVersionGraph, publishVersion } from "./services/workflow-builder.service"
+import { createDefinition, createVersion, saveVersionGraph, publishVersion, discardVersion } from "./services/workflow-builder.service"
 import type { WorkflowAppliesTo, WorkflowNodeDraft, WorkflowEdgeDraft, WorkflowDefinition, WorkflowDefinitionVersion } from "./domain/types"
 
 /**
@@ -20,6 +20,7 @@ type CreateDefinitionResult = { ok: true; definition: WorkflowDefinition } | { o
 type CreateVersionResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
 type SaveGraphResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
 type PublishResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
+type DiscardResult = { ok: true } | { ok: false; error: string }
 
 function toError(error: unknown, fallback: string): { ok: false; error: string } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
@@ -67,5 +68,22 @@ async function publishWorkflowVersionAction(versionId: string): Promise<PublishR
   }
 }
 
-export { createWorkflowDefinitionAction, createWorkflowVersionAction, saveWorkflowVersionGraphAction, publishWorkflowVersionAction }
-export type { CreateDefinitionResult, CreateVersionResult, SaveGraphResult, PublishResult }
+/** Discard is a write-permission action, not publish: it removes a draft rather than making anything immutable, matching create/save. */
+async function discardWorkflowVersionAction(versionId: string): Promise<DiscardResult> {
+  try {
+    const actor = await requirePermission("workflow_definition", "write")
+    await discardVersion(versionId, actor.appUserId)
+    return { ok: true }
+  } catch (error) {
+    return toError(error, "An unexpected error occurred while discarding this workflow version.")
+  }
+}
+
+export {
+  createWorkflowDefinitionAction,
+  createWorkflowVersionAction,
+  saveWorkflowVersionGraphAction,
+  publishWorkflowVersionAction,
+  discardWorkflowVersionAction,
+}
+export type { CreateDefinitionResult, CreateVersionResult, SaveGraphResult, PublishResult, DiscardResult }
