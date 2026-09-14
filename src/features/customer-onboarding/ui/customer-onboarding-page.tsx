@@ -347,8 +347,17 @@ function CustomerOnboardingPage({
     }
   }
 
-  /** Next always persists the current draft first (draft navigation is permissive: it never requires the current stage to be complete), then advances. */
+  /**
+   * Next always persists the current draft first (draft navigation is
+   * permissive: it never requires the current stage to be complete), then
+   * advances. Task Phase D: Next still surfaces the CURRENT stage's own
+   * invalid values (SurveyJS's own inline field errors) on the way out, so
+   * a requester who skips past a malformed value sees it flagged rather
+   * than silently loses track of it; the validation result never blocks
+   * navigation, only Submit does that.
+   */
   async function handleNext(targetStageKey: CustomerOnboardingStageKey) {
+    if (isSurveyStage) survey.validateCurrentPage()
     setPendingAction("next")
     setDraftSaved(false)
     const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
@@ -362,8 +371,22 @@ function CustomerOnboardingPage({
     }
   }
 
+  /**
+   * Task Phase D: Submit is strict across every stage that has a real
+   * mandatory requirement (Customer Details, Tax & Registration including
+   * its documents, Commercial Rate), unlike Save Draft/Next above.
+   * Agreement & Approval is deliberately excluded from this gate: it can
+   * never reach "complete" in this build (no authenticated Legal Approval
+   * identity exists yet, see the header above `legalApprovalComplete`),
+   * so gating Submit on it would make submission permanently impossible.
+   * `survey.validate(true, true)` both marks every invalid field across
+   * BOTH survey pages at once (never just the current one) and focuses/
+   * scrolls to the first invalid field, switching the current page to it
+   * if needed; `onCurrentPageChanged` (wired above) keeps `activeStageKey`
+   * in sync with that switch automatically.
+   */
   async function handleSubmit() {
-    const fieldsValid = survey.validate()
+    const surveyValid = survey.validate(true, true)
     const isIndia = country === DEFAULT_COUNTRY_CODE
     const documentErrors = isIndia
       ? [
@@ -376,9 +399,34 @@ function CustomerOnboardingPage({
           !taxDocuments.companyRegistration ? "Company Registration / Incorporation Document is required." : null,
         ]
     const documentErrorMessages = documentErrors.filter((message): message is string => message !== null)
-    setSubmitError(documentErrorMessages.length > 0 ? documentErrorMessages.join(" ") : null)
+    const customerDetailsPage = survey.pages[0]
+    const taxRegistrationPage = survey.pages[1]
+    const customerDetailsHasErrors = customerDetailsPage ? survey.hasPageErrors(customerDetailsPage) : !surveyValid
+    const taxRegistrationHasErrors = (taxRegistrationPage ? survey.hasPageErrors(taxRegistrationPage) : !surveyValid) || documentErrorMessages.length > 0
+    const commercialRateIncomplete = stageStatuses.commercial_rate !== "complete"
 
-    if (!fieldsValid || documentErrorMessages.length > 0) return
+    const incompleteStageLabels: string[] = []
+    if (customerDetailsHasErrors) incompleteStageLabels.push("Customer Details")
+    if (taxRegistrationHasErrors) incompleteStageLabels.push("Tax & Registration")
+    if (commercialRateIncomplete) incompleteStageLabels.push("Commercial Rate")
+
+    if (incompleteStageLabels.length > 0) {
+      setSubmitError(
+        `${incompleteStageLabels.length} stage${incompleteStageLabels.length === 1 ? "" : "s"} ` +
+          `need${incompleteStageLabels.length === 1 ? "s" : ""} attention before you can submit: ${incompleteStageLabels.join(", ")}.`
+      )
+      // A survey-page error already moved `currentPageNo` there (see this
+      // function's own header); only the non-survey Commercial Rate stage
+      // needs a manual jump so it, too, "opens with field-specific errors"
+      // rather than leaving the requester on whichever stage they submitted
+      // from.
+      if (!customerDetailsHasErrors && !taxRegistrationHasErrors && commercialRateIncomplete) {
+        goToStage("commercial_rate")
+      }
+      return
+    }
+
+    setSubmitError(null)
 
     if (!duplicateWarningAcknowledged) {
       setPendingAction("submit")

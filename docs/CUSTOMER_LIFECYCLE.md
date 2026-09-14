@@ -1142,3 +1142,46 @@ cancellation; Customer Change and Commercial Version reuse their
 existing generic "already been {status} and can no longer be edited"
 locked message, since it already reads correctly for `cancelled`
 without a special case.
+
+## 28. Stage-local validation: IMPLEMENTED (Platform Operating Expansion, Phase D)
+
+Save Draft remains fully permissive (no change). Next
+(`customer-onboarding-page.tsx`'s `handleNext`) now calls
+`survey.validateCurrentPage()` before advancing, surfacing the CURRENT
+survey stage's own inline field errors on the way out, without ever
+blocking the move to the next stage: a requester who skips past a
+malformed value sees it flagged rather than losing track of it
+silently, exactly matching "Next doesn't necessarily block incomplete
+stage but shows current-stage invalid values" from the task spec.
+
+Submit (`handleSubmit`) is now genuinely strict across every stage that
+has a real mandatory requirement: Customer Details, Tax & Registration
+(including its documents), and Commercial Rate. This closes a real gap:
+previously, an onboarding case could be submitted with no Commercial
+Rate ever recorded, since nothing gated Submit on that stage's
+completeness (`stageStatuses.commercial_rate`, already computed for the
+Process Journey indicator, is now also the Submit gate). A single
+`survey.validate(true, true)` call marks every invalid field across
+BOTH survey pages at once (not only the current one) and focuses/
+scrolls to the first invalid field, switching the current page to it if
+needed; `onCurrentPageChanged` (already wired for the stage-tab sync)
+keeps `activeStageKey` in lockstep with that switch. The error banner
+now names every incomplete stage explicitly ("2 stages need attention
+before you can submit: Tax & Registration, Commercial Rate.") instead
+of the previous ad hoc single-line document-only message, which stayed
+silent whenever only a survey field, not a document, was missing.
+
+Agreement & Approval is deliberately excluded from this Submit gate:
+its own `evaluateAgreementApprovalStatus` can never reach "complete" in
+this build (no authenticated Legal Approval identity exists yet, see
+`customer-onboarding-page.tsx`'s `legalApprovalComplete` constant), so
+gating Submit on it would make submission permanently impossible. This
+is the same documented, permanent design limitation `evaluateAgreementApprovalStatus`
+itself already records; Phase D does not change it.
+
+**Scope boundary, honestly recorded**: this feature has no component-
+level UI tests for `customer-onboarding-page.tsx` today (only its
+domain/service/data layers are unit tested), so this change is verified
+by `tsc`/`eslint`/full `vitest`/production build passing clean, not by
+a new render-level test, consistent with the rest of this feature's
+existing test coverage boundary.
