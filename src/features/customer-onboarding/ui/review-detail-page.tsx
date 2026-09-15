@@ -253,7 +253,11 @@ function ReviewDetailPage({
                   <label className="text-xs font-medium text-foreground">Comment on a specific field (optional)</label>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Select value={draftFieldKey} onValueChange={(value) => setDraftFieldKey(String(value))}>
-                      <SelectTrigger size="sm" className="sm:w-56"><SelectValue /></SelectTrigger>
+                      <SelectTrigger size="sm" className="sm:w-56">
+                        <SelectValue placeholder="Select a field...">
+                          {() => (draftFieldKey ? labelForOnboardingField(draftFieldKey) : "Select a field...")}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         {COMMENTABLE_ONBOARDING_FIELD_KEYS.map((fieldKey) => (
                           <SelectItem key={fieldKey} value={fieldKey}>{labelForOnboardingField(fieldKey)}</SelectItem>

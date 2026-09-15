@@ -41,11 +41,21 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // Base UI's own default is `nativeButton: true`, correct only when this
+  // renders a real `<button>`. Every call site here that passes `render`
+  // (almost always `<Link>`, an `<a>`) replaces the underlying element
+  // with something that is not a button, so the default flips to `false`
+  // whenever `render` is present, unless the caller explicitly overrides
+  // it. Fixing this once here, rather than at each `render={<Link .../>}`
+  // call site, closes a real accessibility warning Base UI raises for
+  // every one of them.
   return (
     <ButtonPrimitive
       data-slot="button"
+      nativeButton={nativeButton ?? !props.render}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

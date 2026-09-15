@@ -167,7 +167,7 @@ function CustomerMasterDetail({
               <KeyValueGrid
                 columns={3}
                 items={[
-                  { label: "Customer ID", value: <span className="font-mono text-[0.7rem]">{record.id}</span> },
+                  { label: "Customer Key", value: <span className="font-mono text-[0.7rem]">{record.key}</span> },
                   { label: "Legal Entity Name", value: record.name },
                   { label: "Brand", value: brandName ?? "Not available" },
                 ]}

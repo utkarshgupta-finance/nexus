@@ -45,6 +45,11 @@ const RECOGNITION_STATUS_LABEL: Record<string, string> = {
   pending_mrr_recognition: "Pending MRR Recognition",
 }
 
+const TREATMENT_LABELS: Record<AllocationTreatment, string> = {
+  CREATE_NEW_ENTITLEMENT_PERIOD: "Create New Entitlement Period",
+  ADD_TO_EXISTING_ENTITLEMENT_PERIOD: "Add To Existing Entitlement Period",
+}
+
 function runAction(
   action: () => Promise<{ ok: boolean; error?: string }>,
   setPending: (value: boolean) => void,
@@ -237,7 +242,7 @@ function GenerateScheduleForm({ source, goLiveMonth, onGenerated }: { source: En
           }}
         >
           <SelectTrigger className="w-64">
-            <SelectValue placeholder="Select..." />
+            <SelectValue placeholder="Select...">{() => TREATMENT_LABELS[treatment]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>

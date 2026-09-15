@@ -79,7 +79,9 @@ function WorkflowDefinitionsPage({ rows, canWrite }: { rows: DefinitionRow[]; ca
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-foreground">Applies To</label>
               <Select value={appliesToDraft} onValueChange={(value) => setAppliesToDraft(value as WorkflowAppliesTo)}>
-                <SelectTrigger size="sm" className="w-52"><SelectValue placeholder="Select..." /></SelectTrigger>
+                <SelectTrigger size="sm" className="w-52">
+                  <SelectValue placeholder="Select...">{() => (appliesToDraft ? APPLIES_TO_LABELS[appliesToDraft] : "Select...")}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {(Object.keys(APPLIES_TO_LABELS) as WorkflowAppliesTo[]).map((key) => (
                     <SelectItem key={key} value={key}>{APPLIES_TO_LABELS[key]}</SelectItem>

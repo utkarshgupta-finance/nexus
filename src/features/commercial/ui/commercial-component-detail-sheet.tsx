@@ -32,9 +32,7 @@ function CommercialComponentDetailSheet({
           <div className="flex h-full flex-col overflow-y-auto">
             <SheetHeader>
               <SheetTitle>{component.label}</SheetTitle>
-              <SheetDescription>
-                <span className="font-mono">{component.id}</span> · {component.pricingRuleKindLabel}
-              </SheetDescription>
+              <SheetDescription>{component.pricingRuleKindLabel}</SheetDescription>
             </SheetHeader>
 
             <div className="flex flex-col gap-4 px-6 pb-6">

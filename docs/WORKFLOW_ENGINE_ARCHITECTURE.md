@@ -71,10 +71,28 @@ that could contradict the already-locked Flowable boundary.
 - Aggregation and deduplication across every matched rule's
   requirements, preserving distinct scoped approvals.
 
-No feature calls this yet. No database table, migration, running
-instance, approval execution, notification, or UI exists for it. See
-`src/platform/workflow/domain/evaluator.test.ts` for the executable proof
-of every behaviour this document describes for the evaluator.
+**Corrected (NEXUS LOCAL UX + E2E ACCEPTANCE program): this section was
+stale.** `evaluateWorkflowRules` now has a real caller:
+`src/features/customer-change/domain/workflow-rules.ts`'s
+`evaluateCustomerChangeRequirements` calls it with a hardcoded
+`CUSTOMER_CHANGE_WORKFLOW_RULES` array, and `services/
+change-request.service.ts` wires the result into what a real Customer
+Change Request actually requires. The rule set itself is still a static
+TypeScript array, not database-configured, so this remains short of the
+"generic, database-driven rules engine" this document originally
+envisioned; no database table, migration, or UI exists for authoring
+these specific rules. See `src/platform/workflow/domain/evaluator.test.ts`
+for the executable proof of the evaluator's own behavior.
+
+**Do not confuse this with `platform/workflow-builder`, a separate, later,
+and fully real system** (Platform Operating Expansion Phase N/O,
+`docs/CUSTOMER_LIFECYCLE.md` §36): a database-persisted, React Flow-based
+visual node-graph editor with real migrations, a real Settings UI, and
+real draft/publish/version lifecycle, first consumed by Go Live
+(`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §6.6). That system solves a
+different problem (authoring an approval graph with a visual canvas) than
+this document's own pure condition/requirement evaluator, and this
+document does not describe it.
 
 ## 4. Field-level rules and stable field identity
 

@@ -277,7 +277,11 @@ function WorkflowCanvasEditor({
                     value={selectedNode.data.responsibleTeamId ?? ""}
                     onValueChange={(value) => updateSelectedNodeData({ responsibleTeamId: String(value) || null })}
                   >
-                    <SelectTrigger size="sm"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger size="sm">
+                      <SelectValue placeholder="None">
+                        {() => teams.find((team) => team.id === selectedNode.data.responsibleTeamId)?.name ?? "None"}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       {teams.map((team) => (
                         <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
