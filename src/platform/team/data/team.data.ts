@@ -1,4 +1,5 @@
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/server-client"
+import { parseTeamError, TeamOperationError } from "../domain/errors"
 
 /**
  * Repository for teams/user_teams (task Phase K,
@@ -40,14 +41,14 @@ async function listActiveUserTeamGrants(): Promise<UserTeamGrantRow[]> {
 async function createTeam(code: string, name: string, description: string | null, actorUserId: string): Promise<TeamRow> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.rpc("create_team", { p_code: code, p_name: name, p_description: description, p_actor_user_id: actorUserId })
-  if (error) throw error
+  if (error) throw new TeamOperationError(parseTeamError(error))
   return data
 }
 
 async function setTeamActive(teamId: string, isActive: boolean, actorUserId: string): Promise<TeamRow> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.rpc("set_team_active", { p_team_id: teamId, p_is_active: isActive, p_actor_user_id: actorUserId })
-  if (error) throw error
+  if (error) throw new TeamOperationError(parseTeamError(error))
   return data
 }
 
@@ -59,14 +60,14 @@ async function assignUserToTeam(userId: string, teamId: string, isPrimary: boole
     p_is_primary: isPrimary,
     p_actor_user_id: actorUserId,
   })
-  if (error) throw error
+  if (error) throw new TeamOperationError(parseTeamError(error))
   return data
 }
 
 async function removeUserFromTeam(userTeamId: string, actorUserId: string): Promise<UserTeamGrantRow> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.rpc("remove_user_from_team", { p_user_team_id: userTeamId, p_actor_user_id: actorUserId })
-  if (error) throw error
+  if (error) throw new TeamOperationError(parseTeamError(error))
   return data
 }
 

@@ -4,6 +4,7 @@ import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import { createTeam, setTeamActive } from "./services/team.service"
 import { assignUserToTeam as assignUserToTeamService, removeUserFromTeam as removeUserFromTeamService } from "./services/team.service"
+import { TeamOperationError } from "./domain/errors"
 
 /**
  * Real, database-backed Team Master mutations (task Phase K). Every
@@ -14,9 +15,12 @@ import { assignUserToTeam as assignUserToTeamService, removeUserFromTeam as remo
 
 type TeamActionResult = { ok: true } | { ok: false; error: string }
 
-function toActionError(error: unknown): TeamActionResult {
+function toActionError(error: unknown, conflictMessage: string): TeamActionResult {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
-  if (error instanceof Error) return { ok: false, error: error.message }
+  if (error instanceof TeamOperationError) {
+    if (error.kind === "conflict") return { ok: false, error: conflictMessage }
+    return { ok: false, error: error.message }
+  }
   return { ok: false, error: "An unexpected error occurred while updating the Team Master." }
 }
 
@@ -26,7 +30,7 @@ async function createTeamAction(code: string, name: string, description: string 
     await createTeam(code, name, description, actor.appUserId)
     return { ok: true }
   } catch (error) {
-    return toActionError(error)
+    return toActionError(error, "A team with this code already exists.")
   }
 }
 
@@ -36,7 +40,7 @@ async function setTeamActiveAction(teamId: string, isActive: boolean): Promise<T
     await setTeamActive(teamId, isActive, actor.appUserId)
     return { ok: true }
   } catch (error) {
-    return toActionError(error)
+    return toActionError(error, "An unexpected error occurred while updating the Team Master.")
   }
 }
 
@@ -46,7 +50,7 @@ async function assignUserToTeamAction(userId: string, teamId: string, isPrimary:
     await assignUserToTeamService(userId, teamId, isPrimary, actor.appUserId)
     return { ok: true }
   } catch (error) {
-    return toActionError(error)
+    return toActionError(error, "This user is already assigned to this team.")
   }
 }
 
@@ -56,7 +60,7 @@ async function removeUserFromTeamAction(userTeamId: string): Promise<TeamActionR
     await removeUserFromTeamService(userTeamId, actor.appUserId)
     return { ok: true }
   } catch (error) {
-    return toActionError(error)
+    return toActionError(error, "An unexpected error occurred while updating the Team Master.")
   }
 }
 

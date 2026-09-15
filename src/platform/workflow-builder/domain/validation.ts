@@ -56,10 +56,10 @@ function validateWorkflowGraph(
 
   for (const node of nodes) {
     if (node.nodeType !== "start" && !incomingKeys.has(node.nodeKey)) {
-      errors.push(`Node "${node.name}" (${node.nodeKey}) is disconnected: it has no incoming transition.`)
+      errors.push(`Node "${node.name}" is disconnected: it has no incoming transition.`)
     }
     if (node.nodeType !== "end" && !(outgoingByKey.get(node.nodeKey)?.length ?? 0) && node.nodeType !== "start") {
-      errors.push(`Node "${node.name}" (${node.nodeKey}) is a dead end: it has no outgoing transition and is not an End node.`)
+      errors.push(`Node "${node.name}" is a dead end: it has no outgoing transition and is not an End node.`)
     }
     if (node.nodeType === "start" && !(outgoingByKey.get(node.nodeKey)?.length ?? 0)) {
       errors.push("The Start node has no outgoing transition.")
@@ -96,7 +96,7 @@ function validateWorkflowGraph(
     }
     const unreachable = nodes.filter((node) => !reachable.has(node.nodeKey))
     for (const node of unreachable) {
-      errors.push(`Node "${node.name}" (${node.nodeKey}) is unreachable from Start.`)
+      errors.push(`Node "${node.name}" is unreachable from Start.`)
     }
     const reachableEnd = endNodes.some((node) => reachable.has(node.nodeKey))
     if (endNodes.length > 0 && !reachableEnd) {

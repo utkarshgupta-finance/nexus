@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PendingButton } from "@/components/product/pending-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { saveWorkflowVersionGraphAction, publishWorkflowVersionAction } from "../actions"
 import type { WorkflowNodeType, WorkflowDefinitionVersion, WorkflowNodeDraft, WorkflowEdgeDraft } from "../domain/types"
 import type { Team } from "@/platform/team/server"
@@ -82,6 +83,7 @@ function WorkflowCanvasEditor({
   isReadOnly: boolean
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [nodes, setNodes] = useState<FlowNode[]>(initialNodes)
   const [edges, setEdges] = useState<Edge[]>(initialEdges)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
@@ -105,20 +107,22 @@ function WorkflowCanvasEditor({
   }, [])
 
   function addNode(nodeType: WorkflowNodeType) {
-    const nodeKey = nextNodeKey(nodes)
-    const newNode: FlowNode = {
-      id: nodeKey,
-      position: { x: 80 + nodes.length * 40, y: 80 + nodes.length * 30 },
-      data: {
-        label: NODE_TYPE_LABELS[nodeType],
-        nodeType,
-        responsibleTeamId: null,
-        requiredResource: null,
-        requiredAction: null,
-        requiredFields: [],
-      },
-    }
-    setNodes((current) => [...current, newNode])
+    setNodes((current) => {
+      const nodeKey = nextNodeKey(current)
+      const newNode: FlowNode = {
+        id: nodeKey,
+        position: { x: 80 + current.length * 40, y: 80 + current.length * 30 },
+        data: {
+          label: NODE_TYPE_LABELS[nodeType],
+          nodeType,
+          responsibleTeamId: null,
+          requiredResource: null,
+          requiredAction: null,
+          requiredFields: [],
+        },
+      }
+      return [...current, newNode]
+    })
   }
 
   function updateSelectedNodeData(patch: Partial<NodeData>) {
@@ -217,6 +221,15 @@ function WorkflowCanvasEditor({
         <p className={`px-4 py-2 text-xs sm:px-6 ${message.kind === "error" ? "text-destructive" : "text-success"}`}>{message.text}</p>
       ) : null}
 
+      {isMobile ? (
+        <div className="mx-4 mt-2 flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border bg-card p-6 text-center sm:mx-6">
+          <p className="text-sm font-medium text-foreground">This canvas works best on a larger screen</p>
+          <p className="max-w-xs text-xs text-muted-foreground">
+            Building and editing a workflow needs more room than a phone screen offers. Open this page on a tablet or desktop to
+            add, connect, and configure nodes.
+          </p>
+        </div>
+      ) : (
       <div className="flex flex-1 gap-3 px-4 pb-4 sm:px-6">
         {!isReadOnly ? (
           <div className="flex w-40 shrink-0 flex-col gap-2 rounded-lg border bg-card p-3 shadow-sm">
@@ -352,6 +365,7 @@ function WorkflowCanvasEditor({
           </div>
         ) : null}
       </div>
+      )}
     </div>
   )
 }
