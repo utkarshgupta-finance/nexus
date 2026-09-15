@@ -19,6 +19,7 @@ function toRevision(row: SubmissionRevisionRow): CustomerOnboardingRevision {
     revisionNumber: row.revision_number,
     status: row.status,
     data: row.status === "submitted" && row.effective_data ? row.effective_data.values : row.raw_data,
+    rowVersion: row.row_version,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedBy: row.updated_by,

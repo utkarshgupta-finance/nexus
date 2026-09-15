@@ -42,6 +42,8 @@ type WorkflowDefinitionVersion = {
   status: WorkflowVersionStatus
   publishedAt: string | null
   publishedBy: string | null
+  /** Optimistic-lock token every Save Draft (whole-graph replace) call must echo back as expectedRowVersion (Nexus Foundational Hardening, Phase 4): two Workflow Admins editing the same draft no longer silently overwrite each other. */
+  rowVersion: number
   createdAt: string
   updatedAt: string
   updatedBy: string | null

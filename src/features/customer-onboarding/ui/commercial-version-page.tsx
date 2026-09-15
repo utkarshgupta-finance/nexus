@@ -40,6 +40,7 @@ function CommercialVersionPage({
   const isLocked = initialVersion.status !== "draft"
 
   const [commercialRate, setCommercialRate] = useState<CommercialRateDraft>(initialVersion.commercialRate ?? createEmptyCommercialRateDraft())
+  const [draftRowVersion, setDraftRowVersion] = useState(initialVersion.draftRowVersion)
   const [showSubmitPanel, setShowSubmitPanel] = useState(false)
   const [reason, setReason] = useState(initialVersion.reason ?? "")
   const [effectiveDate, setEffectiveDate] = useState(initialVersion.effectiveDate ?? new Date().toISOString().slice(0, 10))
@@ -51,15 +52,21 @@ function CommercialVersionPage({
   async function handleSaveDraft() {
     setActionError(null)
     setPendingAction("save")
-    const result = await saveCommercialVersionDraftAction(requestId, commercialRate)
+    const result = await saveCommercialVersionDraftAction(requestId, commercialRate, draftRowVersion)
     setPendingAction(null)
-    if (!result.ok) setActionError(result.error)
+    if (result.ok) setDraftRowVersion(result.version.draftRowVersion)
+    else setActionError(result.error)
   }
 
   async function handleSubmit() {
     setActionError(null)
     setPendingAction("submit")
-    await saveCommercialVersionDraftAction(requestId, commercialRate)
+    const saveResult = await saveCommercialVersionDraftAction(requestId, commercialRate, draftRowVersion)
+    if (!saveResult.ok) {
+      setPendingAction(null)
+      setActionError(saveResult.error)
+      return
+    }
     const result = await submitCommercialVersionAction(requestId, reason, effectiveDate)
     setPendingAction(null)
     if (result.ok) {

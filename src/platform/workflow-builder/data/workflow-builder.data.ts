@@ -40,6 +40,7 @@ type WorkflowVersionRow = {
   status: string
   published_at: string | null
   published_by: string | null
+  row_version: number
   created_at: string
   updated_at: string
   updated_by: string | null
@@ -126,6 +127,7 @@ async function saveVersionGraph(
   versionId: string,
   nodes: Record<string, unknown>[],
   edges: Record<string, unknown>[],
+  expectedRowVersion: number,
   actorUserId: string
 ): Promise<WorkflowVersionRow> {
   const supabase = getSupabaseServiceRoleClient()
@@ -133,6 +135,7 @@ async function saveVersionGraph(
     p_version_id: versionId,
     p_nodes: nodes,
     p_edges: edges,
+    p_expected_row_version: expectedRowVersion,
     p_actor_user_id: actorUserId,
   })
   if (error) throw error

@@ -181,31 +181,64 @@ where it is not wired up:
   **not** a concurrency mechanism; treat any future code that starts
   reading them for that purpose as a bug, not a restoration of intended
   behavior.
-- **Draft autosave** (`save_customer_onboarding_draft` and the
-  commercial version equivalent): a blind `UPDATE`, no version check at
-  all. Accepted as-is: a draft on these two request types has exactly one
-  editor (the requester), so last-write-wins is the correct, simplest
-  semantics, not a gap. This is the "reference or configuration tables
-  with low write contention" case the design principle above already
-  carves out, applied to single-owner drafts specifically.
 - **`save_customer_change_draft`** (NEXUS ACCEPTANCE CLOSURE, Part B3):
-  this was previously the same blind `UPDATE` as its two siblings above,
-  but that assumption does not hold for Customer Change: a checker with
+  this was previously a blind `UPDATE`, no version check at all — but
+  that assumption does not hold for Customer Change: a checker with
   `customer.change.write` can open and edit the same draft the requester
-  is still working on (unlike onboarding/commercial version drafts, which
-  a different actor never touches before submission), so two editors on
-  one draft is a real, reachable case, not a hypothetical. Confirmed live
-  via a deliberate two-tab repro: tab A saved one field, tab B (holding a
-  stale copy) then saved a different field, and tab A's change vanished
-  with zero warning. Fixed with a genuine optimistic lock, the same
-  pattern `submit_revision` already uses elsewhere: the RPC gained a
-  required `p_expected_row_version` parameter, opens with `select ...
-  for update`, and raises `CUSTOMER_CHANGE_DRAFT_STALE` (a human-readable
+  is still working on, so two editors on one draft is a real, reachable
+  case, not a hypothetical. Confirmed live via a deliberate two-tab
+  repro: tab A saved one field, tab B (holding a stale copy) then saved a
+  different field, and tab A's change vanished with zero warning. Fixed
+  with a genuine optimistic lock, the same pattern `submit_revision`
+  already uses elsewhere: the RPC gained a required
+  `p_expected_row_version` parameter, opens with `select ... for
+  update`, and raises `CUSTOMER_CHANGE_DRAFT_STALE` (a human-readable
   message, never the raw column name) when the caller's expected version
   does not match. `CustomerChangeRequest.revisionRowVersion` threads the
   token from load through save. Re-verified live: the same two-tab repro
   now rejects the stale save with the friendly message and preserves the
   first tab's change intact.
+- **`save_customer_onboarding_draft` and
+  `save_commercial_configuration_version_draft`** [Nexus Foundational
+  Hardening, Phase 4, supabase/migrations/20260922000000_optimistic_locking_extension.sql
+  — written, NOT yet applied to any database; staged pending explicit
+  approval to `supabase db push`]. The "single editor, so last-write-wins
+  is fine" premise these two previously relied on is the same false
+  premise Customer Change's own draft save already disproved: a checker
+  can open a submitted-then-sent-back onboarding case or commercial
+  version draft while the requester still has it open, exactly like
+  Customer Change. Fixed identically: both RPCs gained a required
+  `p_expected_row_version` parameter, compare it against
+  `submission_revisions.row_version` under `select ... for update`, and
+  raise `ONBOARDING_DRAFT_STALE`/`COMMERCIAL_VERSION_DRAFT_STALE`
+  respectively. `CustomerOnboardingRevision.rowVersion` and
+  `CommercialConfigurationVersion.draftRowVersion` thread the token
+  through, mirroring `CustomerChangeRequest.revisionRowVersion` exactly.
+- **`go_live_requests`** [Nexus Foundational Hardening, Phase 4, same
+  migration, same staged/not-yet-applied status]. Unlike the other three
+  domains, this table never had a `row_version` column at all: its draft
+  (`save_go_live_request_draft`) was completely unprotected, not even a
+  decorative unused column. Added `row_version` (bumped by the same
+  reusable `fn_bump_row_version` trigger every other real lock in this
+  schema uses), threaded through as `GoLiveRequest.rowVersion`, and wired
+  into the same expected-version check, raising `GO_LIVE_DRAFT_STALE`.
+- **`workflow_definition_versions`** (the Workflow Builder draft graph)
+  [Nexus Foundational Hardening, Phase 4, same migration, same
+  staged/not-yet-applied status]. Same gap as Go Live: no `row_version`
+  at all, so two Workflow Admins editing the same draft graph would
+  silently overwrite each other on `save_workflow_version_graph`'s
+  whole-graph replace. Added the column, threaded through as
+  `WorkflowDefinitionVersion.rowVersion`, and wired the same check,
+  raising `WORKFLOW_VERSION_DRAFT_STALE`.
+- **`customer_onboarding_cases`, `customer_change_requests`,
+  `commercial_configuration_versions`** (the CASE-level `row_version`
+  columns, distinct from `submission_revisions.row_version` above):
+  unchanged by Phase 4. Still exactly as documented below: no trigger,
+  no RPC comparison, real protection is `select ... for update` plus a
+  status-text guard on the case's own status machine. Phase 4 closed the
+  DRAFT CONTENT gap (two editors silently overwriting each other's field
+  edits); it deliberately does not touch this separate, already-correct
+  case-level status-transition protection.
 
 ## 6. Reference and master data
 

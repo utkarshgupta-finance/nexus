@@ -35,6 +35,8 @@ type GoLiveRequest = {
   status: GoLiveRequestStatus
   /** Snapshotted once at creation from the currently published go_live workflow version, if any. Never re-resolved: an in-flight request retains the workflow version it started with. */
   workflowVersionId: string | null
+  /** Optimistic-lock token every Save Draft call must echo back as expectedRowVersion (Nexus Foundational Hardening, Phase 4), so a stale save is rejected instead of silently overwriting a change someone else already saved. */
+  rowVersion: number
   comment: string | null
   sentBackReason: string | null
   sentBackBy: string | null

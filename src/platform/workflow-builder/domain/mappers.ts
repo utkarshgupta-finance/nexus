@@ -34,6 +34,7 @@ function toWorkflowDefinitionVersion(row: WorkflowVersionRow): WorkflowDefinitio
     status: row.status as WorkflowVersionStatus,
     publishedAt: row.published_at,
     publishedBy: row.published_by,
+    rowVersion: row.row_version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     updatedBy: row.updated_by,

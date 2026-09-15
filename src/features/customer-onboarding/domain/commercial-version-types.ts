@@ -31,6 +31,8 @@ type CommercialConfigurationVersion = {
   cancelledReason: string | null
   /** The draft's proposed Commercial Rate (billing currency + components); undefined until a draft has ever been saved. */
   commercialRate: CommercialRateDraft | null
+  /** submission_revisions.row_version of the current draft/submitted revision: the optimistic-lock token every Save Draft/Next/Submit call must echo back as expectedRowVersion (Nexus Foundational Hardening, Phase 4). */
+  draftRowVersion: number
   createdBy: string | null
   createdAt: string
   updatedAt: string

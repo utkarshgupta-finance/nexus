@@ -175,7 +175,7 @@ function WorkflowCanvasEditor({
     setMessage(null)
     setIsSaving(true)
     const { nodeDrafts, edgeDrafts } = toDrafts()
-    const result = await saveWorkflowVersionGraphAction(version.id, nodeDrafts, edgeDrafts)
+    const result = await saveWorkflowVersionGraphAction(version.id, nodeDrafts, edgeDrafts, version.rowVersion)
     setIsSaving(false)
     if (result.ok) {
       setMessage({ kind: "success", text: "Draft saved." })
@@ -189,7 +189,7 @@ function WorkflowCanvasEditor({
     setMessage(null)
     setIsPublishing(true)
     const { nodeDrafts, edgeDrafts } = toDrafts()
-    const saveResult = await saveWorkflowVersionGraphAction(version.id, nodeDrafts, edgeDrafts)
+    const saveResult = await saveWorkflowVersionGraphAction(version.id, nodeDrafts, edgeDrafts, version.rowVersion)
     if (!saveResult.ok) {
       setIsPublishing(false)
       setMessage({ kind: "error", text: saveResult.error })

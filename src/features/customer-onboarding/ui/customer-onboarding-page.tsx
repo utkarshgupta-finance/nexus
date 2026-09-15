@@ -337,7 +337,7 @@ function CustomerOnboardingPage({
     setPendingAction("save")
     setDraftSaved(false)
     const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
-    const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
+    const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey, onboardingCase.currentRevision.rowVersion)
     setPendingAction(null)
     if (result.ok) {
       setOnboardingCase(result.onboardingCase)
@@ -361,7 +361,7 @@ function CustomerOnboardingPage({
     setPendingAction("next")
     setDraftSaved(false)
     const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
-    const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
+    const result = await saveOnboardingDraftAction(requestId, rawData, activeStageKey, onboardingCase.currentRevision.rowVersion)
     setPendingAction(null)
     if (result.ok) {
       setOnboardingCase(result.onboardingCase)
@@ -449,7 +449,7 @@ function CustomerOnboardingPage({
     setPendingAction("submit")
     setDraftSaved(false)
     const rawData = { ...survey.data, [CUSTOMER_ONBOARDING_FIELD_KEYS.commercialRate]: commercialRate }
-    const saveResult = await saveOnboardingDraftAction(requestId, rawData, activeStageKey)
+    const saveResult = await saveOnboardingDraftAction(requestId, rawData, activeStageKey, onboardingCase.currentRevision.rowVersion)
     if (!saveResult.ok) {
       setPendingAction(null)
       setSubmitError(saveResult.error)

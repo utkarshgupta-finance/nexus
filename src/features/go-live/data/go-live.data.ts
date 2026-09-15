@@ -41,7 +41,14 @@ async function createGoLiveRequest(input: CreateGoLiveRequestInput): Promise<GoL
   })
 }
 
-type SaveDraftInput = { id: string; goLiveDate: string; prorateFirstMonth: boolean; comment: string | null; actorUserId: string }
+type SaveDraftInput = {
+  id: string
+  goLiveDate: string
+  prorateFirstMonth: boolean
+  comment: string | null
+  expectedRowVersion: number
+  actorUserId: string
+}
 
 async function saveGoLiveRequestDraft(input: SaveDraftInput): Promise<GoLiveRequestRow> {
   return callSingleRowRpc<GoLiveRequestRow>("save_go_live_request_draft", {
@@ -49,6 +56,7 @@ async function saveGoLiveRequestDraft(input: SaveDraftInput): Promise<GoLiveRequ
     p_go_live_date: input.goLiveDate,
     p_prorate_first_month: input.prorateFirstMonth,
     p_comment: input.comment,
+    p_expected_row_version: input.expectedRowVersion,
     p_actor_user_id: input.actorUserId,
   })
 }

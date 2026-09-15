@@ -22,9 +22,15 @@ type SaveGraphResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: 
 type PublishResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
 type DiscardResult = { ok: true } | { ok: false; error: string }
 
+/** Strips a leading `SOME_TOKEN: ` prefix from a raised Postgres exception message (this module has no typed error-kind parser like every other domain's own `parse*Error`; this is the minimal equivalent so a raw internal token never leaks as the primary user-facing string). */
+function stripErrorToken(message: string): string {
+  const match = /^[A-Z][A-Z0-9_]*:\s*([\s\S]*)$/.exec(message)
+  return match ? match[1] : message
+}
+
 function toError(error: unknown, fallback: string): { ok: false; error: string } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
-  if (error instanceof Error) return { ok: false, error: error.message }
+  if (error instanceof Error) return { ok: false, error: stripErrorToken(error.message) }
   return { ok: false, error: fallback }
 }
 
@@ -48,10 +54,15 @@ async function createWorkflowVersionAction(definitionId: string): Promise<Create
   }
 }
 
-async function saveWorkflowVersionGraphAction(versionId: string, nodes: WorkflowNodeDraft[], edges: WorkflowEdgeDraft[]): Promise<SaveGraphResult> {
+async function saveWorkflowVersionGraphAction(
+  versionId: string,
+  nodes: WorkflowNodeDraft[],
+  edges: WorkflowEdgeDraft[],
+  expectedRowVersion: number
+): Promise<SaveGraphResult> {
   try {
     const actor = await requirePermission("workflow_definition", "write")
-    const version = await saveVersionGraph(versionId, nodes, edges, actor.appUserId)
+    const version = await saveVersionGraph(versionId, nodes, edges, expectedRowVersion, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
     return toError(error, "An unexpected error occurred while saving this workflow version.")

@@ -63,6 +63,8 @@ type CustomerOnboardingRevision = {
   revisionNumber: number
   status: CustomerOnboardingRevisionStatus
   data: Record<string, unknown>
+  /** submission_revisions.row_version: the optimistic-lock token every Save Draft/Next/Submit call must echo back as expectedRowVersion (Nexus Foundational Hardening, Phase 4), so a stale save is rejected instead of silently overwriting a change someone else already saved. */
+  rowVersion: number
   createdBy: AppUserId | null
   createdAt: string
   updatedBy: AppUserId | null

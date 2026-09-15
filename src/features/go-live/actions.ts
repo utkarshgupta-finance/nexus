@@ -51,10 +51,16 @@ async function createGoLiveRequestAction(input: Omit<CreateGoLiveRequestInput, "
   }
 }
 
-async function saveGoLiveRequestDraftAction(id: string, goLiveDate: string, prorateFirstMonth: boolean, comment: string | null): Promise<GoLiveActionResult> {
+async function saveGoLiveRequestDraftAction(
+  id: string,
+  goLiveDate: string,
+  prorateFirstMonth: boolean,
+  comment: string | null,
+  expectedRowVersion: number
+): Promise<GoLiveActionResult> {
   try {
     const actor = await requirePermission("go_live", "create")
-    const request = await saveGoLiveRequestDraft({ id, goLiveDate, prorateFirstMonth, comment, actorUserId: actor.appUserId })
+    const request = await saveGoLiveRequestDraft({ id, goLiveDate, prorateFirstMonth, comment, expectedRowVersion, actorUserId: actor.appUserId })
     return { ok: true, request }
   } catch (error) {
     return toGoLiveActionError(error)

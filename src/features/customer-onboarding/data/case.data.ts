@@ -29,13 +29,20 @@ async function createCase(input: CreateCaseInput): Promise<CustomerOnboardingCas
   })
 }
 
-type SaveDraftInput = { requestId: string; rawData: Record<string, unknown>; currentStageKey: string; actorUserId: string }
+type SaveDraftInput = {
+  requestId: string
+  rawData: Record<string, unknown>
+  currentStageKey: string
+  expectedRowVersion: number
+  actorUserId: string
+}
 
 async function saveDraft(input: SaveDraftInput): Promise<CustomerOnboardingCaseRow> {
   return callSingleRowRpc<CustomerOnboardingCaseRow>("save_customer_onboarding_draft", {
     p_request_id: input.requestId,
     p_raw_data: input.rawData,
     p_current_stage_key: input.currentStageKey,
+    p_expected_row_version: input.expectedRowVersion,
     p_actor_user_id: input.actorUserId,
   })
 }

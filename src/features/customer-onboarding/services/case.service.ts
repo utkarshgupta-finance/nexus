@@ -54,9 +54,10 @@ async function saveOnboardingDraft(
   requestId: string,
   rawData: Record<string, unknown>,
   currentStageKey: string,
+  expectedRowVersion: number,
   actorUserId: string
 ): Promise<CustomerOnboardingCase> {
-  const row = await caseData.saveDraft({ requestId, rawData, currentStageKey, actorUserId })
+  const row = await caseData.saveDraft({ requestId, rawData, currentStageKey, expectedRowVersion, actorUserId })
   const revisions = await caseData.listRevisionsForRequest(requestId)
   return toCustomerOnboardingCase(row, revisions)
 }

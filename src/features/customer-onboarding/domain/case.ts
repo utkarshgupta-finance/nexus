@@ -65,6 +65,7 @@ function createDraftRevision(revisionNumber: number, now: string, createdBy: App
     revisionNumber,
     status: "draft",
     data: {},
+    rowVersion: 1,
     createdBy,
     createdAt: now,
     updatedBy: createdBy,

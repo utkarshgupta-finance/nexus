@@ -31,6 +31,7 @@ function toCommercialConfigurationVersion(row: CommercialConfigurationVersionRow
     cancelledAt: row.cancelled_at,
     cancelledReason: row.cancelled_reason,
     commercialRate: toCommercialRateDraft(latestRevision),
+    draftRowVersion: latestRevision?.row_version ?? 1,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

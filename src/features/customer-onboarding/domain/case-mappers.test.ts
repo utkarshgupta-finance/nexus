@@ -94,6 +94,11 @@ describe("toCustomerOnboardingCase", () => {
     expect(domainCase.currentRevision.data).toEqual({ a: 2 })
   })
 
+  it("carries the current revision's own row_version through as currentRevision.rowVersion (Nexus Foundational Hardening, Phase 4: the optimistic-lock token Save Draft must echo back)", () => {
+    const domainCase = toCustomerOnboardingCase(baseCaseRow(), [draftRevisionRow({ row_version: 3 })])
+    expect(domainCase.currentRevision.rowVersion).toBe(3)
+  })
+
   it("maps sent-back fields into the sentBack object only when present, otherwise null", () => {
     const withSentBack = toCustomerOnboardingCase(
       baseCaseRow({

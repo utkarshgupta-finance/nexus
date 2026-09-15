@@ -67,8 +67,13 @@ async function createVersionFromActive(
   return version
 }
 
-async function saveVersionDraft(requestId: string, commercialRate: CommercialRateDraft, actorUserId: string): Promise<CommercialConfigurationVersion> {
-  await versionData.saveDraft(requestId, { commercial_rate: commercialRate }, actorUserId)
+async function saveVersionDraft(
+  requestId: string,
+  commercialRate: CommercialRateDraft,
+  expectedRowVersion: number,
+  actorUserId: string
+): Promise<CommercialConfigurationVersion> {
+  await versionData.saveDraft(requestId, { commercial_rate: commercialRate }, expectedRowVersion, actorUserId)
   const version = await loadVersion(requestId)
   if (!version) throw new Error(`Commercial Configuration Version ${requestId} not found after saving draft.`)
   return version

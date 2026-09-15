@@ -73,8 +73,14 @@ function toEdgeRpcPayload(edge: WorkflowEdgeDraft): Record<string, unknown> {
   return { from_node_key: edge.fromNodeKey, to_node_key: edge.toNodeKey, label: edge.label, condition: edge.condition }
 }
 
-async function saveVersionGraph(versionId: string, nodes: WorkflowNodeDraft[], edges: WorkflowEdgeDraft[], actorUserId: string): Promise<WorkflowDefinitionVersion> {
-  const row = await workflowData.saveVersionGraph(versionId, nodes.map(toNodeRpcPayload), edges.map(toEdgeRpcPayload), actorUserId)
+async function saveVersionGraph(
+  versionId: string,
+  nodes: WorkflowNodeDraft[],
+  edges: WorkflowEdgeDraft[],
+  expectedRowVersion: number,
+  actorUserId: string
+): Promise<WorkflowDefinitionVersion> {
+  const row = await workflowData.saveVersionGraph(versionId, nodes.map(toNodeRpcPayload), edges.map(toEdgeRpcPayload), expectedRowVersion, actorUserId)
   return toWorkflowDefinitionVersion(row)
 }
 

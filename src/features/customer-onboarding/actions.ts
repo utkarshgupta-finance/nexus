@@ -70,11 +70,12 @@ async function createOnboardingCaseAction(): Promise<CaseActionResult> {
 async function saveOnboardingDraftAction(
   requestId: string,
   rawData: Record<string, unknown>,
-  currentStageKey: string
+  currentStageKey: string,
+  expectedRowVersion: number
 ): Promise<CaseActionResult> {
   try {
     const actor = await requirePermission("customer", "create")
-    const onboardingCase = await saveOnboardingDraft(requestId, rawData, currentStageKey, actor.appUserId)
+    const onboardingCase = await saveOnboardingDraft(requestId, rawData, currentStageKey, expectedRowVersion, actor.appUserId)
     return { ok: true, onboardingCase }
   } catch (error) {
     return toCaseActionError(error)
@@ -168,10 +169,14 @@ async function createCommercialVersionAction(commercialConfigurationId: string, 
   }
 }
 
-async function saveCommercialVersionDraftAction(requestId: string, commercialRate: CommercialRateDraft): Promise<CommercialVersionActionResult> {
+async function saveCommercialVersionDraftAction(
+  requestId: string,
+  commercialRate: CommercialRateDraft,
+  expectedRowVersion: number
+): Promise<CommercialVersionActionResult> {
   try {
     const actor = await requirePermission("commercial_configuration", "write")
-    const version = await saveVersionDraft(requestId, commercialRate, actor.appUserId)
+    const version = await saveVersionDraft(requestId, commercialRate, expectedRowVersion, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
     return toCommercialVersionActionError(error)

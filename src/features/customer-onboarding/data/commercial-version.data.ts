@@ -38,10 +38,16 @@ async function createVersion(input: CreateVersionInput): Promise<CommercialConfi
   })
 }
 
-async function saveDraft(requestId: string, rawData: Record<string, unknown>, actorUserId: string): Promise<CommercialConfigurationVersionRow> {
+async function saveDraft(
+  requestId: string,
+  rawData: Record<string, unknown>,
+  expectedRowVersion: number,
+  actorUserId: string
+): Promise<CommercialConfigurationVersionRow> {
   return callSingleRowRpc<CommercialConfigurationVersionRow>("save_commercial_configuration_version_draft", {
     p_request_id: requestId,
     p_raw_data: rawData,
+    p_expected_row_version: expectedRowVersion,
     p_actor_user_id: actorUserId,
   })
 }

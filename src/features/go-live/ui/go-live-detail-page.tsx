@@ -86,7 +86,7 @@ function GoLiveDetailPage({
   }
 
   function handleSaveDraft() {
-    run(() => saveGoLiveRequestDraftAction(request.id, goLiveDate, prorateFirstMonth, null))
+    run(() => saveGoLiveRequestDraftAction(request.id, goLiveDate, prorateFirstMonth, null, request.rowVersion))
   }
 
   function handleSubmit() {
