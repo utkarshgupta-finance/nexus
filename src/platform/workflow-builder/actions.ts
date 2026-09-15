@@ -28,9 +28,14 @@ function stripErrorToken(message: string): string {
   return match ? match[1] : message
 }
 
+/** Checks for a `message: string` shape rather than `instanceof Error`: the Postgrest error thrown by `supabase.rpc()` carries a real message but is not reliably `instanceof Error` across this app's server bundle, which previously made every real RPC error (including well-formed `SOME_TOKEN: ...` messages) fall through to the generic fallback text below. */
+function hasStringMessage(error: unknown): error is { message: string } {
+  return typeof error === "object" && error !== null && "message" in error && typeof (error as { message: unknown }).message === "string"
+}
+
 function toError(error: unknown, fallback: string): { ok: false; error: string } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
-  if (error instanceof Error) return { ok: false, error: stripErrorToken(error.message) }
+  if (hasStringMessage(error)) return { ok: false, error: stripErrorToken(error.message) }
   return { ok: false, error: fallback }
 }
 
