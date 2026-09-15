@@ -14,6 +14,23 @@ function buildGoLiveTimeline(request: GoLiveRequest, sendBacks: GoLiveSendBackEn
     { id: "created", occurredAt: request.createdAt, actorEmail: label(request.createdBy), summary: "Go Live request created" },
   ]
 
+  if (request.submittedAt) {
+    // Only a single latest submission is tracked (no per-cycle revisions
+    // table, see the migration's own comment on this file's shape), so
+    // "resubmission" cannot be read off any status/count alone: it must
+    // compare timestamps against send-back history. Testing this live
+    // caught a real bug where every submission was mislabeled
+    // "Resubmitted" the moment ANY send-back existed, even retroactively
+    // relabeling the very first submission that preceded it.
+    const isResubmission = sendBacks.some((sendBack) => new Date(sendBack.sentBackAt).getTime() < new Date(request.submittedAt!).getTime())
+    events.push({
+      id: "submitted",
+      occurredAt: request.submittedAt,
+      actorEmail: label(request.submittedBy),
+      summary: isResubmission ? "Resubmitted for review" : "Submitted for review",
+    })
+  }
+
   for (const sendBack of sendBacks) {
     events.push({
       id: `sent-back-${sendBack.id}`,

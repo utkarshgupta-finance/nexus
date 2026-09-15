@@ -22,6 +22,7 @@ type ChangeErrorKind =
   | "change_request_cancel_not_owner"
   | "change_request_self_approval_not_allowed"
   | "change_request_no_draft_revision"
+  | "change_request_draft_stale"
   | "change_request_no_submitted_revision"
   | "change_request_send_back_reason_required"
   | "change_request_reject_reason_required"
@@ -47,6 +48,7 @@ const NAMED_TOKEN_KINDS: Record<string, ChangeErrorKind> = {
   CUSTOMER_CHANGE_NOT_REJECTABLE: "change_request_not_rejectable",
   CUSTOMER_CHANGE_NOT_APPROVABLE: "change_request_not_approvable",
   CUSTOMER_CHANGE_NO_DRAFT_REVISION: "change_request_no_draft_revision",
+  CUSTOMER_CHANGE_DRAFT_STALE: "change_request_draft_stale",
   CUSTOMER_CHANGE_NO_SUBMITTED_REVISION: "change_request_no_submitted_revision",
   CUSTOMER_CHANGE_SEND_BACK_REASON_REQUIRED: "change_request_send_back_reason_required",
   CUSTOMER_CHANGE_REJECT_REASON_REQUIRED: "change_request_reject_reason_required",

@@ -1693,3 +1693,67 @@ Accounts Receivable, ERP integration). It reuses the self-approval and
 actor-identity-snapshot rules from Program 4 Hardening (§40) unchanged,
 and is the first business domain to consume the Workflow Builder (§36)
 as a display-only execution boundary rather than only an authoring tool.
+
+## 42. NEXUS ACCEPTANCE CLOSURE + Slab-wise MUG: IMPLEMENTED, five real defects found and fixed
+
+Two threads of work, run together: (A) Commercial Rate gained a
+Slab-wise MUG mode (full account: `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md`
+§8 addendum); (B) five prior acceptance items previously assumed to need
+only a human reviewer were re-evaluated by actually running them with
+real, distinct fictional personas rather than one self-approving admin
+account, on the stated principle that "manual-only" should never be
+assumed without checking whether today's tooling can already prove it.
+That re-evaluation found and fixed five real, previously-undetected
+defects, none related to Slab-wise MUG itself:
+
+1. **Maker/checker roles had no read permissions**: a `maker`/`checker`
+   test persona hit "Access restricted" on `/my-work`. Fixed with an
+   additive grant migration.
+2. **Go Live submission never recorded who/when**: `go_live_requests`
+   never captured `submitted_by`/`submitted_at`, so the Timeline was
+   missing its "Submitted" event entirely, the only one of the three
+   governed lifecycles with this gap. Fixed, matching the existing
+   Onboarding/Change Request pattern.
+3. **Customer Change review page crashed for a genuinely different
+   checker**: `useReferenceMasterSnapshot must be called within a
+   ReferenceMasterSnapshotProvider`, reachable only because every prior
+   test session had used one self-approving admin account and never
+   exercised this route as a second, real reviewer. Fixed: the route was
+   missing a provider wrapper every sibling review route already had.
+4. **Concurrent Customer Change drafts silently overwrote each other**,
+   the most severe of the five: confirmed via a genuine two-tab repro,
+   with zero warning to the user whose change vanished. Full account and
+   fix: `docs/DATA_ARCHITECTURE.md` §5a.
+5. **Commercial Version creation crashed on an already-open version**: a
+   raw Postgres unique-constraint violation surfaced as an uncaught
+   Next.js Runtime Error via completely normal navigation. Fixed with a
+   named error kind and a redirect to the already-open version instead
+   of a dead end.
+
+A sixth, unrelated but equally severe defect was found live while
+completing the Slab-wise MUG Commercial Change end-to-end test
+specifically (approving a real amendment): every Commercial Configuration
+Version approval, for any component, had been failing outright since an
+earlier migration made `stable_component_key` `NOT NULL` without ever
+teaching the INSERT path to populate it. Full account, fix, and the
+still-open TypeScript-side carry-forward gap it exposed:
+`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §5.
+
+Also re-evaluated rather than assumed manual: fictional E2E test users
+provisioned through the sanctioned Supabase Auth Admin API (never a raw
+`auth.users` insert); a full maker-submits, checker-blocked-from-
+self-approval, checker-sends-back-with-comment, maker-edits-and-
+resubmits, checker-approves cycle completed for both Go Live and
+Customer Change with two genuinely distinct signed-in identities;
+touch-gesture interaction on the Workflow Builder canvas, honestly
+scoped as an EMULATED PASS for single-pointer pan/tap (real, driven
+through the browser's touch emulation) with multi-touch pinch-zoom
+correctly left as a hard automation-environment limitation, not silently
+skipped or falsely claimed; and Customer Onboarding document upload,
+replacement, download, and reopen-persistence, all confirmed against the
+real storage and RPC layer (native OS file-picker chrome itself remains
+the one genuine human-only residual, per this program's own
+distinction between upload behavior and picker UI). Workflow Builder
+access for a `workflow_admin`-granted persona, and whether Workflow
+Builder actually drives runtime approval routing in any domain, is
+covered in `docs/WORKFLOW_ENGINE_ARCHITECTURE.md` §3a.

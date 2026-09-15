@@ -55,10 +55,10 @@ async function createChangeRequestAction(customerId: string): Promise<ChangeRequ
   }
 }
 
-async function saveChangeDraftAction(requestId: string, rawData: Record<string, unknown>): Promise<ChangeRequestActionResult> {
+async function saveChangeDraftAction(requestId: string, rawData: Record<string, unknown>, expectedRowVersion: number): Promise<ChangeRequestActionResult> {
   try {
     const actor = await requirePermission("customer", "change_request")
-    const changeRequest = await saveChangeDraft(requestId, rawData, actor.appUserId)
+    const changeRequest = await saveChangeDraft(requestId, rawData, expectedRowVersion, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {
     return toActionError(error)

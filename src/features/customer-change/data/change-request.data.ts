@@ -30,12 +30,13 @@ async function createChangeRequest(input: CreateChangeRequestInput): Promise<Cus
   })
 }
 
-type SaveDraftInput = { requestId: string; rawData: Record<string, unknown>; actorUserId: string }
+type SaveDraftInput = { requestId: string; rawData: Record<string, unknown>; expectedRowVersion: number; actorUserId: string }
 
 async function saveDraft(input: SaveDraftInput): Promise<CustomerChangeRequestRow> {
   return callSingleRowRpc<CustomerChangeRequestRow>("save_customer_change_draft", {
     p_request_id: input.requestId,
     p_raw_data: input.rawData,
+    p_expected_row_version: input.expectedRowVersion,
     p_actor_user_id: input.actorUserId,
   })
 }

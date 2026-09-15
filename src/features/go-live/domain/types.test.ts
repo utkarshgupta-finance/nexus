@@ -19,6 +19,8 @@ function request(overrides: Partial<GoLiveRequest> & { status: GoLiveRequestStat
     sentBackReason: null,
     sentBackBy: null,
     sentBackAt: null,
+    submittedBy: null,
+    submittedAt: null,
     approvedBy: null,
     approvedAt: null,
     cancelledBy: null,

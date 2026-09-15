@@ -38,6 +38,7 @@ function toCustomerChangeRequest(
     reason: row.reason,
     effectiveDate: row.effective_date,
     baseCustomerRowVersion: row.base_customer_row_version,
+    revisionRowVersion: latestRevision ? latestRevision.row_version : 1,
     proposedValues: toProposedValues(latestRevision),
     requirements: requirementRows.map(toRequirement),
     sentBack: row.sent_back_reason && row.sent_back_at ? { reason: row.sent_back_reason, sentBackBy: row.sent_back_by, sentBackAt: row.sent_back_at } : null,

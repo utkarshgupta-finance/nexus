@@ -69,15 +69,25 @@ function ChangeRequestPage({
   async function handleSaveDraft() {
     setActionError(null)
     setPendingAction("save")
-    const result = await saveChangeDraftAction(requestId, formValues)
+    const result = await saveChangeDraftAction(requestId, formValues, changeRequest.revisionRowVersion)
     setPendingAction(null)
-    if (!result.ok) setActionError(result.error)
+    if (result.ok) {
+      setChangeRequest(result.changeRequest)
+    } else {
+      setActionError(result.error)
+    }
   }
 
   async function handleSubmit() {
     setActionError(null)
     setPendingAction("submit")
-    await saveChangeDraftAction(requestId, formValues)
+    const saveResult = await saveChangeDraftAction(requestId, formValues, changeRequest.revisionRowVersion)
+    if (!saveResult.ok) {
+      setPendingAction(null)
+      setActionError(saveResult.error)
+      return
+    }
+    setChangeRequest(saveResult.changeRequest)
     const result = await submitChangeRequestAction(requestId, reason, effectiveDate)
     setPendingAction(null)
     if (result.ok) {

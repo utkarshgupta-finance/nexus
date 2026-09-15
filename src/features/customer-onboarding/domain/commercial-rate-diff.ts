@@ -2,6 +2,7 @@ import type {
   CommercialRateDraft,
   CommercialComponentDraft,
   SlabRow,
+  SlabMugMode,
   DesignationRow,
   Milestone,
   MugOverlay,
@@ -36,6 +37,9 @@ type SlabRowDiff = {
   to: number | null
   currentRate: number | null
   proposedRate: number | null
+  /** This band's own Slab-wise MUG quantity, `null` in Overall mode or when this band never had one entered. */
+  currentMug: number | null
+  proposedMug: number | null
 }
 
 type DesignationRowDiff = {
@@ -69,6 +73,8 @@ type ComponentDiff = {
   mugChanged: boolean
   currentMug: number | null
   proposedMug: number | null
+  /** Overall <-> Slab-wise MUG mode change, distinct from `mugChanged` (which only tracks the single Overall quantity, always `null` on both sides while in Slab-wise mode). */
+  slabMugModeChanged: boolean
   invoiceCycleChanged: boolean
   effectiveDateChanged: boolean
   slabRowDiffs: SlabRowDiff[]
@@ -100,6 +106,11 @@ function componentMugMinimumUnits(component: CommercialComponentDraft): number |
   return mugMinimumUnits(componentMug(component))
 }
 
+/** `slabMugMode` only exists on a Slab component's Recurring/On-Demand variant (never Flat Fee, Per Unit, Designation Based, or Non-Recurring Slab, which has no `mug` concept at all). */
+function componentSlabMugMode(component: CommercialComponentDraft): SlabMugMode | null {
+  return component.pricingModel === "slab" && "slabMugMode" in component ? component.slabMugMode : null
+}
+
 function componentSingleRate(component: CommercialComponentDraft): number | null {
   if (component.pricingModel === "per_unit") return component.rate
   if (component.pricingModel === "flat_fee") return component.amount
@@ -113,18 +124,40 @@ function diffSlabRows(current: SlabRow[], proposed: SlabRow[]): SlabRowDiff[] {
     const currentRow = current[index] ?? null
     const proposedRow = proposed[index] ?? null
     if (currentRow && proposedRow) {
-      const changed = currentRow.from !== proposedRow.from || currentRow.to !== proposedRow.to || currentRow.rate !== proposedRow.rate
+      const changed =
+        currentRow.from !== proposedRow.from ||
+        currentRow.to !== proposedRow.to ||
+        currentRow.rate !== proposedRow.rate ||
+        currentRow.mug !== proposedRow.mug
       diffs.push({
         status: changed ? "changed" : "unchanged",
         from: proposedRow.from,
         to: proposedRow.to,
         currentRate: currentRow.rate,
         proposedRate: proposedRow.rate,
+        currentMug: currentRow.mug,
+        proposedMug: proposedRow.mug,
       })
     } else if (currentRow && !proposedRow) {
-      diffs.push({ status: "removed", from: currentRow.from, to: currentRow.to, currentRate: currentRow.rate, proposedRate: null })
+      diffs.push({
+        status: "removed",
+        from: currentRow.from,
+        to: currentRow.to,
+        currentRate: currentRow.rate,
+        proposedRate: null,
+        currentMug: currentRow.mug,
+        proposedMug: null,
+      })
     } else if (proposedRow) {
-      diffs.push({ status: "added", from: proposedRow.from, to: proposedRow.to, currentRate: null, proposedRate: proposedRow.rate })
+      diffs.push({
+        status: "added",
+        from: proposedRow.from,
+        to: proposedRow.to,
+        currentRate: null,
+        proposedRate: proposedRow.rate,
+        currentMug: null,
+        proposedMug: proposedRow.mug,
+      })
     }
   }
   return diffs
@@ -242,6 +275,7 @@ function diffComponentPair(componentId: string, current: CommercialComponentDraf
       mugChanged: false,
       currentMug: current ? componentMugMinimumUnits(current) : null,
       proposedMug: proposed ? componentMugMinimumUnits(proposed) : null,
+      slabMugModeChanged: false,
       invoiceCycleChanged: false,
       effectiveDateChanged: false,
       slabRowDiffs: [],
@@ -258,6 +292,7 @@ function diffComponentPair(componentId: string, current: CommercialComponentDraf
 
   const currentMug = componentMugMinimumUnits(current)
   const proposedMug = componentMugMinimumUnits(proposed)
+  const slabMugModeChanged = samePricingModel && componentSlabMugMode(current) !== componentSlabMugMode(proposed)
 
   const slabRowDiffs =
     samePricingModel && current.pricingModel === "slab" && proposed.pricingModel === "slab"
@@ -293,6 +328,7 @@ function diffComponentPair(componentId: string, current: CommercialComponentDraf
     current.description !== proposed.description ||
     currentRate !== proposedRate ||
     currentMug !== proposedMug ||
+    slabMugModeChanged ||
     invoiceCycleChanged ||
     effectiveDateChanged ||
     slabRowDiffs.some((diff) => diff.status !== "unchanged") ||
@@ -309,6 +345,7 @@ function diffComponentPair(componentId: string, current: CommercialComponentDraf
     mugChanged: currentMug !== proposedMug,
     currentMug,
     proposedMug,
+    slabMugModeChanged,
     invoiceCycleChanged,
     effectiveDateChanged,
     slabRowDiffs,

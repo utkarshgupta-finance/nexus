@@ -42,6 +42,7 @@ const CHANGE_REQUESTS: CustomerChangeRequest[] = [
     reason: null,
     effectiveDate: null,
     baseCustomerRowVersion: 1,
+    revisionRowVersion: 1,
     proposedValues: {},
     requirements: [],
     sentBack: null,

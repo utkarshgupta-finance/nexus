@@ -31,6 +31,8 @@ type CustomerChangeRequest = {
   reason: string | null
   effectiveDate: string | null
   baseCustomerRowVersion: number
+  /** submission_revisions.row_version of the current draft/submitted revision: the optimistic-lock token every Save Draft call must echo back as expectedRowVersion, so a stale save is rejected (CUSTOMER_CHANGE_DRAFT_STALE) instead of silently overwriting a concurrent edit. */
+  revisionRowVersion: number
   proposedValues: Record<string, unknown>
   requirements: CustomerChangeRequirement[]
   sentBack: { reason: string; sentBackBy: string | null; sentBackAt: string } | null

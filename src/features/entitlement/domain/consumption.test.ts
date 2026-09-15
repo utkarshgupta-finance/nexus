@@ -44,4 +44,11 @@ describe("computeMonthlyLedger", () => {
     const result = computeMonthlyLedger({ recognitionClass: "REQUIRES_MRR_RECOGNITION", entitlementQuantity: 500, actualUsageQuantity: 700, mugQuantity: null })
     expect(result).toEqual({ actualUsageQuantity: 700, consumptionQuantity: 0, unbilledQuantity: 0, unearnedQuantity: 0, recognitionStatus: "pending_mrr_recognition" })
   })
+
+  it("10. Complex monthly usage (Slab, with a Slab-wise MUG configured) remains Pending MRR Recognition: a non-null mugQuantity is still never read", () => {
+    const withoutMug = computeMonthlyLedger({ recognitionClass: "REQUIRES_MRR_RECOGNITION", entitlementQuantity: 500, actualUsageQuantity: 700, mugQuantity: null })
+    const withSlabWiseMug = computeMonthlyLedger({ recognitionClass: "REQUIRES_MRR_RECOGNITION", entitlementQuantity: 500, actualUsageQuantity: 700, mugQuantity: 600 })
+    expect(withSlabWiseMug).toEqual(withoutMug)
+    expect(withSlabWiseMug).toEqual({ actualUsageQuantity: 700, consumptionQuantity: 0, unbilledQuantity: 0, unearnedQuantity: 0, recognitionStatus: "pending_mrr_recognition" })
+  })
 })

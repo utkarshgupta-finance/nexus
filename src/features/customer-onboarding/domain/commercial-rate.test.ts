@@ -7,6 +7,7 @@ import {
   calculateMilestoneAmount,
   calculateMugValue,
   calculateSlabAmountForQuantity,
+  calculateSlabWiseMugSummary,
   createComponent,
   createDesignationRow,
   createEmptyCommercialRateDraft,
@@ -240,65 +241,65 @@ describe("areSlabRowsValid (row shape shared by both Slab Methods)", () => {
   })
 
   it("is true for a single open-ended row", () => {
-    expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: 100 }])).toBe(true)
+    expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: 100, mug: null }])).toBe(true)
   })
 
   it("is true for the spec's own worked example: 1-100 @100, 101-250 @90, 251+ @80", () => {
     const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: 250, rate: 90 },
-      { id: "3", from: 251, to: null, rate: 80 },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 101, to: 250, rate: 90, mug: null },
+      { id: "3", from: 251, to: null, rate: 80, mug: null },
     ]
     expect(areSlabRowsValid(rows)).toBe(true)
   })
 
   it("is false when a row's rate is missing or not positive", () => {
-    expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: null }])).toBe(false)
-    expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: 0 }])).toBe(false)
+    expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: null, mug: null }])).toBe(false)
+    expect(areSlabRowsValid([{ id: "1", from: 1, to: null, rate: 0, mug: null }])).toBe(false)
   })
 
   it("is false when from is missing", () => {
-    expect(areSlabRowsValid([{ id: "1", from: null, to: 100, rate: 50 }])).toBe(false)
+    expect(areSlabRowsValid([{ id: "1", from: null, to: 100, rate: 50, mug: null }])).toBe(false)
   })
 
   it("is false when from is after to", () => {
-    expect(areSlabRowsValid([{ id: "1", from: 200, to: 100, rate: 50 }])).toBe(false)
+    expect(areSlabRowsValid([{ id: "1", from: 200, to: 100, rate: 50, mug: null }])).toBe(false)
   })
 
   it("is false when consecutive rows obviously overlap", () => {
     const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 100, to: 200, rate: 90 },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 100, to: 200, rate: 90, mug: null },
     ]
     expect(areSlabRowsValid(rows)).toBe(false)
   })
 
   it("is false when a row follows one that is still open-ended (task correction §7)", () => {
     const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: null, rate: 90 },
-      { id: "3", from: 101, to: null, rate: 80 },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 101, to: null, rate: 90, mug: null },
+      { id: "3", from: 101, to: null, rate: 80, mug: null },
     ]
     expect(areSlabRowsValid(rows)).toBe(false)
   })
 
   it("Slab rates are mandatory for every row, Whole Quantity and Progressive alike (task correction §6)", () => {
     const missingFirstRate = [
-      { id: "1", from: 1, to: 100, rate: null },
-      { id: "2", from: 101, to: null, rate: 90 },
+      { id: "1", from: 1, to: 100, rate: null, mug: null },
+      { id: "2", from: 101, to: null, rate: 90, mug: null },
     ]
     expect(areSlabRowsValid(missingFirstRate)).toBe(false)
 
     const missingMiddleRate = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: 200, rate: null },
-      { id: "3", from: 201, to: null, rate: 80 },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 101, to: 200, rate: null, mug: null },
+      { id: "3", from: 201, to: null, rate: 80, mug: null },
     ]
     expect(areSlabRowsValid(missingMiddleRate)).toBe(false)
 
     const missingLastRate = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: null, rate: null },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 101, to: null, rate: null, mug: null },
     ]
     expect(areSlabRowsValid(missingLastRate)).toBe(false)
   })
@@ -454,7 +455,7 @@ describe("isComponentComplete", () => {
     expect(isComponentComplete(component)).toBe(false)
     const withUnit = { ...component, pricingUnit: "DISTRIBUTOR" }
     expect(isComponentComplete(withUnit)).toBe(false)
-    const withRow = { ...withUnit, slabRows: [{ id: "1", from: 1, to: null, rate: 90 }] }
+    const withRow = { ...withUnit, slabRows: [{ id: "1", from: 1, to: null, rate: 90, mug: null }] }
     expect(isComponentComplete(withRow)).toBe(true)
     const progressive = { ...withRow, slabMethod: "progressive" as const }
     expect(isComponentComplete(progressive)).toBe(true)
@@ -603,27 +604,27 @@ describe("createSlabRow: From defaults (task correction §2)", () => {
   })
 
   it("a row created after a closed previous row defaults From to previous To + 1", () => {
-    const previous = { id: "1", from: 1, to: 100, rate: 100 }
+    const previous = { id: "1", from: 1, to: 100, rate: 100, mug: null }
     expect(createSlabRow(previous).from).toBe(101)
   })
 
   it("a row created after a still-open-ended previous row keeps the previous row's own From (defensive fallback, the UI never allows this)", () => {
-    const previous = { id: "1", from: 1, to: null, rate: 100 }
+    const previous = { id: "1", from: 1, to: null, rate: 100, mug: null }
     expect(createSlabRow(previous).from).toBe(1)
   })
 })
 
 describe("recalculateSlabFroms (task correction §2-3: From is system-derived, never typed)", () => {
   it("forces the first row's From to 1 even if it was set to something else", () => {
-    const rows = [{ id: "1", from: 5, to: 100, rate: 100 }]
+    const rows = [{ id: "1", from: 5, to: 100, rate: 100, mug: null }]
     expect(recalculateSlabFroms(rows)[0].from).toBe(1)
   })
 
   it("cascades From = previous To + 1 down a chain of rows", () => {
     const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 999, to: 250, rate: 90 },
-      { id: "3", from: 999, to: null, rate: 80 },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 999, to: 250, rate: 90, mug: null },
+      { id: "3", from: 999, to: null, rate: 80, mug: null },
     ]
     const recalculated = recalculateSlabFroms(rows)
     expect(recalculated.map((row) => row.from)).toEqual([1, 101, 251])
@@ -631,8 +632,8 @@ describe("recalculateSlabFroms (task correction §2-3: From is system-derived, n
 
   it("recalculates every later From when an earlier row's To changes", () => {
     const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: 250, rate: 90 },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 101, to: 250, rate: 90, mug: null },
     ]
     const edited = rows.map((row) => (row.id === "1" ? { ...row, to: 150 } : row))
     expect(recalculateSlabFroms(edited).map((row) => row.from)).toEqual([1, 151])
@@ -640,9 +641,9 @@ describe("recalculateSlabFroms (task correction §2-3: From is system-derived, n
 
   it("never produces overlapping or gapped rows: consecutive rows are always contiguous", () => {
     const rows = recalculateSlabFroms([
-      { id: "1", from: 1, to: 50, rate: 10 },
-      { id: "2", from: 1, to: 120, rate: 9 },
-      { id: "3", from: 1, to: null, rate: 8 },
+      { id: "1", from: 1, to: 50, rate: 10, mug: null },
+      { id: "2", from: 1, to: 120, rate: 9, mug: null },
+      { id: "3", from: 1, to: null, rate: 8, mug: null },
     ])
     expect(areSlabRowsValid(rows)).toBe(true)
     expect(rows[1].from).toBe(51)
@@ -652,8 +653,8 @@ describe("recalculateSlabFroms (task correction §2-3: From is system-derived, n
 
 describe("calculateSlabAmountForQuantity (task correction §1's worked example)", () => {
   const rows = [
-    { id: "1", from: 1, to: 100, rate: 100 },
-    { id: "2", from: 101, to: 250, rate: 90 },
+    { id: "1", from: 1, to: 100, rate: 100, mug: null },
+    { id: "2", from: 101, to: 250, rate: 90, mug: null },
   ]
 
   it("Whole Quantity: prices the entire quantity at the single band it falls into (150 x 90 = 13,500)", () => {
@@ -673,7 +674,7 @@ describe("calculateSlabAmountForQuantity (task correction §1's worked example)"
   })
 
   it("returns null when the quantity does not fall inside any Whole Quantity band", () => {
-    const incompleteRows = [{ id: "1", from: 1, to: 100, rate: 100 }]
+    const incompleteRows = [{ id: "1", from: 1, to: 100, rate: 100, mug: null }]
     expect(calculateSlabAmountForQuantity(incompleteRows, "whole_quantity", 150)).toBeNull()
   })
 })
@@ -695,8 +696,8 @@ describe("calculateMugValue (task correction §1, §3: a calculated reference, n
       pricingUnit: "USER",
       slabMethod: "whole_quantity" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 100 },
-        { id: "2", from: 101, to: 250, rate: 90 },
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 101, to: 250, rate: 90, mug: null },
       ],
       mug: { enabled: true, minimumUnits: 150, designationMinimums: [] },
     }
@@ -709,8 +710,8 @@ describe("calculateMugValue (task correction §1, §3: a calculated reference, n
       pricingUnit: "USER",
       slabMethod: "progressive" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 100 },
-        { id: "2", from: 101, to: 250, rate: 90 },
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 101, to: 250, rate: 90, mug: null },
       ],
       mug: { enabled: true, minimumUnits: 150, designationMinimums: [] },
     }
@@ -791,7 +792,7 @@ describe("Person Pricing Unit (task correction §11-12): usable anywhere a Prici
     const component = {
       ...createComponent("recurring", "slab"),
       pricingUnit: "PERSON",
-      slabRows: [{ id: "1", from: 1, to: null, rate: 90 }],
+      slabRows: [{ id: "1", from: 1, to: null, rate: 90, mug: null }],
       invoiceTerms: COMPLETE_TERMS,
     }
     expect(isComponentComplete(withDescription(component, "Field Staff"))).toBe(true)
@@ -876,9 +877,9 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
       pricingUnit: "DISTRIBUTOR",
       invoiceTerms: COMPLETE_TERMS,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 100 },
-        { id: "2", from: 101, to: 200, rate: null },
-        { id: "3", from: 201, to: null, rate: 80 },
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 101, to: 200, rate: null, mug: null },
+        { id: "3", from: 201, to: null, rate: 80, mug: null },
       ],
     }
     const messages = messagesOf(component)
@@ -892,7 +893,7 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
       ...withDescription(createComponent("recurring", "slab"), "DMS"),
       pricingUnit: "USER",
       invoiceTerms: COMPLETE_TERMS,
-      slabRows: [{ id: "1", from: 1, to: null, rate: null }],
+      slabRows: [{ id: "1", from: 1, to: null, rate: null, mug: null }],
     }
     expect(messagesOf(component)).toContain("Slab 1 Rate required")
   })
@@ -903,8 +904,8 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
       pricingUnit: "USER",
       invoiceTerms: COMPLETE_TERMS,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 100 },
-        { id: "2", from: 101, to: null, rate: null },
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 101, to: null, rate: null, mug: null },
       ],
     }
     expect(messagesOf(component)).toContain("Slab 2 Rate required")
@@ -912,8 +913,8 @@ describe("validateCommercialComponent (task correction: incomplete state must ex
 
   it("stays incomplete until every slab row has a valid Rate, for Whole Quantity and Progressive alike", () => {
     const rows = [
-      { id: "1", from: 1, to: 100, rate: 100 },
-      { id: "2", from: 101, to: null, rate: null },
+      { id: "1", from: 1, to: 100, rate: 100, mug: null },
+      { id: "2", from: 101, to: null, rate: null, mug: null },
     ]
     const wholeQuantity = { ...withDescription(createComponent("recurring", "slab"), "DMS"), pricingUnit: "USER", invoiceTerms: COMPLETE_TERMS, slabRows: rows }
     expect(validateCommercialComponent(wholeQuantity).isComplete).toBe(false)
@@ -1057,8 +1058,8 @@ describe("validateCommercialComponent: overlapping slab is invalid, not merely i
       pricingUnit: "USER",
       invoiceTerms: COMPLETE_TERMS,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 100 },
-        { id: "2", from: 100, to: 200, rate: 90 },
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 100, to: 200, rate: 90, mug: null },
       ],
     }
     const result = validateCommercialComponent(component)
@@ -1072,11 +1073,108 @@ describe("validateCommercialComponent: overlapping slab is invalid, not merely i
       ...withDescription(createComponent("recurring", "slab"), "DMS"),
       pricingUnit: "USER",
       invoiceTerms: COMPLETE_TERMS,
-      slabRows: [{ id: "1", from: 1, to: null, rate: null }],
+      slabRows: [{ id: "1", from: 1, to: null, rate: null, mug: null }],
     }
     const result = validateCommercialComponent(component)
     expect(result.isComplete).toBe(false)
     expect(result.isValid).toBe(true)
     expect(isComponentValid(component)).toBe(true)
+  })
+})
+
+describe("Slab-wise MUG (Commercial Master extension, task worked example: 1-500 @100 MUG 400, 501-1000 @80 MUG 200, 1001+ @60 no MUG)", () => {
+  const WORKED_EXAMPLE_ROWS = [
+    { id: "1", from: 1, to: 500, rate: 100, mug: 400 },
+    { id: "2", from: 501, to: 1000, rate: 80, mug: 200 },
+    { id: "3", from: 1001, to: null, rate: 60, mug: null },
+  ]
+
+  function slabWiseComponent(rows: { id: string; from: number | null; to: number | null; rate: number | null; mug: number | null }[]) {
+    return {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "DISTRIBUTOR",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: rows,
+      slabMugMode: "slab_wise" as const,
+      mug: { enabled: true as const, minimumUnits: null, designationMinimums: [] },
+    }
+  }
+
+  it("1. Slab pricing + No MUG: existing no-MUG behavior is unchanged", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "DISTRIBUTOR",
+      invoiceTerms: COMPLETE_TERMS,
+      slabRows: [{ id: "1", from: 1, to: null, rate: 90, mug: null }],
+    }
+    expect(component.mug).toEqual({ enabled: false })
+    expect(calculateMugValue(component)).toBeNull()
+    expect(isComponentComplete(component)).toBe(true)
+  })
+
+  it("2. Slab pricing + Overall MUG: existing component-level MUG behavior is unaffected by the Slab-wise extension", () => {
+    const component = {
+      ...withDescription(createComponent("recurring", "slab"), "DMS"),
+      pricingUnit: "DISTRIBUTOR",
+      invoiceTerms: COMPLETE_TERMS,
+      slabMethod: "whole_quantity" as const,
+      slabRows: [
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 101, to: 250, rate: 90, mug: null },
+      ],
+      slabMugMode: "overall" as const,
+      mug: { enabled: true as const, minimumUnits: 150, designationMinimums: [] },
+    }
+    expect(calculateMugValue(component)).toBe(13500)
+    expect(calculateSlabWiseMugSummary(component)).toBeNull()
+  })
+
+  it("3. Slab pricing + Slab-wise MUG: uses the exact worked example (400@100 + 200@80 + 0@60 = 56,000 across 600 units)", () => {
+    const component = slabWiseComponent(WORKED_EXAMPLE_ROWS)
+    const summary = calculateSlabWiseMugSummary(component)
+    expect(summary).toEqual({ totalUnits: 600, totalValue: 56000 })
+    expect(calculateMugValue(component)).toBe(56000)
+  })
+
+  it("4. Different MUG per slab: each band keeps its own distinct MUG quantity, never averaged or shared", () => {
+    const component = slabWiseComponent([
+      { id: "1", from: 1, to: 500, rate: 100, mug: 400 },
+      { id: "2", from: 501, to: 1000, rate: 80, mug: 200 },
+      { id: "3", from: 1001, to: null, rate: 60, mug: 50 },
+    ])
+    expect(component.slabRows.map((row) => row.mug)).toEqual([400, 200, 50])
+    const summary = calculateSlabWiseMugSummary(component)
+    expect(summary).toEqual({ totalUnits: 650, totalValue: 400 * 100 + 200 * 80 + 50 * 60 })
+  })
+
+  it("5. Slab with zero MUG: 0 or blank on a band means no slab-specific minimum, contributing nothing, and is not a validation error", () => {
+    const component = slabWiseComponent([
+      { id: "1", from: 1, to: 500, rate: 100, mug: 0 },
+      { id: "2", from: 501, to: 1000, rate: 80, mug: null },
+      { id: "3", from: 1001, to: null, rate: 60, mug: null },
+    ])
+    const summary = calculateSlabWiseMugSummary(component)
+    expect(summary).toBeNull()
+    const result = validateCommercialComponent(component)
+    expect(result.issues.some((issue) => issue.field.startsWith("slab-mug-"))).toBe(false)
+    expect(result.isValid).toBe(true)
+  })
+
+  it("a negative slab MUG is reported invalid, using the line item's own unit, never a second unit", () => {
+    const component = slabWiseComponent([
+      { id: "1", from: 1, to: 500, rate: 100, mug: -5 },
+      { id: "2", from: 501, to: 1000, rate: 80, mug: null },
+      { id: "3", from: 1001, to: null, rate: 60, mug: null },
+    ])
+    const result = validateCommercialComponent(component)
+    expect(result.issues.some((issue) => issue.field === "slab-mug-0" && issue.severity === "invalid")).toBe(true)
+    expect(isComponentValid(component)).toBe(false)
+  })
+
+  it("Slab-wise MUG mode requires no MUG on every slab: 0 or blank on some bands is still a valid, saveable configuration", () => {
+    const component = slabWiseComponent(WORKED_EXAMPLE_ROWS)
+    const result = validateCommercialComponent(component)
+    expect(result.isValid).toBe(true)
+    expect(result.isComplete).toBe(true)
   })
 })

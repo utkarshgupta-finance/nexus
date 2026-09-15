@@ -4,6 +4,7 @@ import {
   calculateDesignationMugSummary,
   calculateMilestoneAmount,
   calculateMugValue,
+  calculateSlabWiseMugSummary,
   designationMinimumUnitsFor,
   nonRecurringMilestoneBasisAmount,
 } from "./commercial-rate"
@@ -151,6 +152,11 @@ function recognitionSummaryLine(recognition: RevenueRecognition): string {
   return `Revenue Recognition: Milestone Based (${count} milestone${count === 1 ? "" : "s"})`
 }
 
+/** True only for a Slab component with MUG enabled in Slab-wise mode: the generic single-quantity MUG lines (`mugSummaryLine`, the plain branch of `mugQuantityLines`) do not apply, the per-band lines in `slabRateLines`/`mugQuantityLines` do instead. */
+function isSlabWiseMugComponent(component: CommercialComponentDraft): boolean {
+  return component.pricingModel === "slab" && "slabMugMode" in component && component.slabMugMode === "slab_wise" && component.mug.enabled
+}
+
 /** The Pricing Unit a component's MUG floors, resolved per Pricing Model (Designation Based uses its first row's Per, normally User). */
 function mugUnitCode(component: Extract<CommercialComponentDraft, { nature: "recurring" | "on_demand" }>): string | null {
   if (component.pricingModel === "per_unit" || component.pricingModel === "slab") return component.pricingUnit
@@ -176,9 +182,11 @@ function summarizeComponent(snapshot: ReferenceMasterSnapshot, component: Commer
     const unit = unitLabel(snapshot, component.pricingUnit)
     const methodLabel = component.slabMethod === "progressive" ? "Progressive" : "Whole Quantity"
     lines.push(`Slab (${methodLabel})`)
+    const showSlabMug = isSlabWiseMugComponent(component)
     for (const row of component.slabRows) {
       const range = row.to === null ? `${row.from ?? "-"}+` : `${row.from ?? "-"}-${row.to}`
-      lines.push(`${range} ${unit}: ${formatAmount(row.rate, currencyCode)} / ${unit}`)
+      const mugSuffix = showSlabMug ? ` (MUG ${row.mug !== null && row.mug > 0 ? formatQuantity(row.mug) : "-"})` : ""
+      lines.push(`${range} ${unit}: ${formatAmount(row.rate, currencyCode)} / ${unit}${mugSuffix}`)
     }
   } else {
     for (const row of component.designationRows) {
@@ -187,8 +195,12 @@ function summarizeComponent(snapshot: ReferenceMasterSnapshot, component: Commer
   }
 
   if (component.nature !== "non_recurring" && "mug" in component) {
-    const mugLine = mugSummaryLine(snapshot, component.mug, mugUnitCode(component))
-    if (mugLine) lines.push(mugLine)
+    if (isSlabWiseMugComponent(component)) {
+      lines.push("MUG: Slab-wise (see rates above)")
+    } else {
+      const mugLine = mugSummaryLine(snapshot, component.mug, mugUnitCode(component))
+      if (mugLine) lines.push(mugLine)
+    }
     const calculatedLine = calculatedMugValueLine(component, currencyCode)
     if (calculatedLine) lines.push(calculatedLine)
   }
@@ -235,12 +247,14 @@ function slabRateLines(
   currencyCode: string | null
 ): string[] {
   const unit = unitLabel(snapshot, component.pricingUnit)
+  const showSlabMug = isSlabWiseMugComponent(component)
   return component.slabRows.map((row) => {
     const range = row.to === null ? `${row.from ?? "-"}+` : `${row.from ?? "-"}-${row.to}`
     const primary = `${formatAmount(row.rate, currencyCode)} / ${unit}`
-    if (row.rate === null || !isForeignCurrency(currencyCode)) return `${range}: ${primary}`
+    const mugSuffix = showSlabMug ? ` · MUG ${row.mug !== null && row.mug > 0 ? formatQuantity(row.mug) : "-"}` : ""
+    if (row.rate === null || !isForeignCurrency(currencyCode)) return `${range}: ${primary}${mugSuffix}`
     const inrAmount = toInr(snapshot, row.rate, currencyCode)
-    return inrAmount === null ? `${range}: ${primary}` : `${range}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})`
+    return inrAmount === null ? `${range}: ${primary}${mugSuffix}` : `${range}: ${primary} (${formatAmount(inrAmount, "INR")} / ${unit})${mugSuffix}`
   })
 }
 
@@ -394,6 +408,17 @@ function mugQuantityLines(snapshot: ReferenceMasterSnapshot, component: Commerci
     return lines
   }
 
+  if (isSlabWiseMugComponent(component) && component.pricingModel === "slab") {
+    const lines = component.slabRows.map((row) => {
+      const range = row.to === null ? `${row.from ?? "-"}+` : `${row.from ?? "-"}-${row.to}`
+      return `${range}: ${row.mug !== null && row.mug > 0 ? formatQuantity(row.mug) : "-"}`
+    })
+    const summary = calculateSlabWiseMugSummary(component)
+    const totalUnits = summary?.totalUnits ?? null
+    lines.push(`Total: ${formatQuantity(totalUnits)} ${unitLabelForQuantity(snapshot, mugUnitCode(component), totalUnits)}`)
+    return lines
+  }
+
   const line = mugSummaryLine(snapshot, component.mug, mugUnitCode(component))
   return line ? [line.replace("MUG: ", "")] : ["-"]
 }
@@ -454,6 +479,7 @@ export {
   invoiceSummaryLine,
   mugSummaryLine,
   calculatedMugValueLine,
+  isSlabWiseMugComponent,
   mugUnitCode,
   natureLabel,
   modelLabel,

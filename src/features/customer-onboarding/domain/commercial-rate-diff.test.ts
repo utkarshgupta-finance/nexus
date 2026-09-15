@@ -84,6 +84,37 @@ describe("diffCommercialRate", () => {
     expect(slabDiffs[2].status).toBe("added")
   })
 
+  it("8. Current vs Proposed shows a Slab-wise MUG change: mode switch and per-band quantity changes are both surfaced", () => {
+    const row1 = { ...createSlabRow(null), from: 1, to: 500, rate: 100, mug: 400 }
+    const row2 = { ...createSlabRow(row1), from: 501, to: null, rate: 80, mug: 200 }
+    const current = {
+      ...createComponent("recurring", "slab"),
+      id: "c1",
+      pricingUnit: "user",
+      slabRows: [row1, row2],
+      slabMugMode: "overall" as const,
+      mug: { enabled: true, minimumUnits: 600, designationMinimums: [] },
+    } as OngoingComponent
+
+    const proposedRow1 = { ...row1, mug: 450 }
+    const proposedRow2 = { ...row2, mug: 250 }
+    const proposed = { ...current, slabRows: [proposedRow1, proposedRow2], slabMugMode: "slab_wise" as const }
+
+    const diff = diffCommercialRate(draft([current]), draft([proposed]))
+    expect(diff.components[0].slabMugModeChanged).toBe(true)
+    const slabDiffs = diff.components[0].slabRowDiffs
+    expect(slabDiffs[0].currentMug).toBe(400)
+    expect(slabDiffs[0].proposedMug).toBe(450)
+    expect(slabDiffs[1].currentMug).toBe(200)
+    expect(slabDiffs[1].proposedMug).toBe(250)
+  })
+
+  it("does not flag slabMugModeChanged when only the pricing model differs (added/removed components never falsely compare modes)", () => {
+    const current = { ...createComponent("recurring", "slab"), id: "c1", pricingUnit: "user" } as OngoingComponent
+    const diff = diffCommercialRate(draft([current]), draft([]))
+    expect(diff.components[0].slabMugModeChanged).toBe(false)
+  })
+
   it("diffs Designation rows by designation name", () => {
     const salesRep = createDesignationRow()
     const manager = createDesignationRow()

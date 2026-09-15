@@ -43,6 +43,7 @@ import type {
   PricingModel,
   RevenueRecognition,
   SlabMethod,
+  SlabMugMode,
   SlabRow,
 } from "../domain/commercial-rate"
 
@@ -228,6 +229,94 @@ function DesignationMugRowsEditor({
   )
 }
 
+const SLAB_MUG_MODE_CHOICES: { value: "none" | SlabMugMode; label: string }[] = [
+  { value: "none", label: "No MUG" },
+  { value: "overall", label: "Overall MUG" },
+  { value: "slab_wise", label: "Slab-wise MUG" },
+]
+
+/**
+ * Slab-only MUG editor (Commercial Master extension): a three-way MUG Mode
+ * (No MUG / Overall MUG / Slab-wise MUG) in place of the plain checkbox
+ * every other Pricing Model still uses. Overall reuses the exact same
+ * single Minimum Units input as before (no regression to existing Slab
+ * commercials); Slab-wise shows no input here at all, each band's own MUG
+ * is entered directly on its row in `SlabRowsEditor` above, keeping this
+ * compact rather than opening a second screen (task: "Do not create
+ * another separate screen").
+ */
+function SlabMugFields({
+  mug,
+  slabMugMode,
+  pricingUnitCode,
+  calculatedValue,
+  currencyCode,
+  onChange,
+  onModeChange,
+}: {
+  mug: MugOverlay
+  slabMugMode: SlabMugMode
+  pricingUnitCode: string | null
+  calculatedValue: number | null
+  currencyCode: string | null
+  onChange: (next: MugOverlay) => void
+  onModeChange: (mode: "none" | SlabMugMode) => void
+}) {
+  const snapshot = useReferenceMasterSnapshot()
+  const unitWord = `${unitLabel(snapshot, pricingUnitCode)}s`
+  const mode: "none" | SlabMugMode = mug.enabled ? slabMugMode : "none"
+
+  return (
+    <div className="flex flex-col gap-2">
+      <FieldLabel>MUG Mode</FieldLabel>
+      <ToggleGroup
+        value={[mode]}
+        onValueChange={(value) => {
+          if (value[0]) onModeChange(value[0] as "none" | SlabMugMode)
+        }}
+        variant="outline"
+        size="sm"
+        className="w-fit"
+      >
+        {SLAB_MUG_MODE_CHOICES.map((choice) => (
+          <ToggleGroupItem key={choice.value} value={choice.value}>
+            {choice.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+
+      {mug.enabled && mode === "overall" ? (
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <FieldLabel>Minimum {unitWord}</FieldLabel>
+          <Input
+            type="number"
+            min={0}
+            value={mug.minimumUnits ?? ""}
+            onChange={(event) => onChange({ ...mug, minimumUnits: event.target.value ? Number(event.target.value) : null })}
+            placeholder="e.g. 5000"
+          />
+          <span className="text-[0.7rem] text-muted-foreground">Assessed monthly, applied before pricing.</span>
+        </div>
+      ) : null}
+
+      {mug.enabled && mode === "slab_wise" ? (
+        <span className="text-[0.7rem] text-muted-foreground">Enter each slab&apos;s own MUG in the Slab rows above. Blank or 0 means no minimum for that band.</span>
+      ) : null}
+
+      {mug.enabled && calculatedValue !== null ? (
+        <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-dashed px-2.5 py-2 sm:max-w-xs">
+          <span className="text-[0.7rem] font-medium text-foreground">Calculated MUG Value (reference only)</span>
+          {dualCurrencyLines(snapshot, calculatedValue, currencyCode, " / Month", formatAmount).map((line) => (
+            <span key={line} className="text-xs text-muted-foreground">
+              {line}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function MugFields({
   mug,
   pricingModel,
@@ -302,6 +391,7 @@ function SlabRowsEditor({
   pricingUnit,
   slabMethod,
   rows,
+  showMug,
   onChangeUnit,
   onChangeMethod,
   onChangeRows,
@@ -309,6 +399,8 @@ function SlabRowsEditor({
   pricingUnit: string | null
   slabMethod: SlabMethod
   rows: SlabRow[]
+  /** Slab-wise MUG mode: adds a per-row MUG input alongside From/To/Rate (task: "Keep the UX compact... do not create another separate screen"). */
+  showMug: boolean
   onChangeUnit: (value: string) => void
   onChangeMethod: (value: SlabMethod) => void
   onChangeRows: (rows: SlabRow[]) => void
@@ -365,7 +457,7 @@ function SlabRowsEditor({
 
       <div className="flex flex-col gap-2">
         {rows.map((row, index) => (
-          <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+          <div key={row.id} className={`grid items-end gap-2 ${showMug ? "grid-cols-[1fr_1fr_1fr_1fr_auto]" : "grid-cols-[1fr_1fr_1fr_auto]"}`}>
             <div className="flex flex-col gap-1">
               <span className="text-[0.7rem] text-muted-foreground">From</span>
               <Input type="number" readOnly disabled value={row.from ?? ""} className="bg-muted text-muted-foreground" />
@@ -392,6 +484,20 @@ function SlabRowsEditor({
                 }
               />
             </div>
+            {showMug ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-[0.7rem] text-muted-foreground">MUG</span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={row.mug ?? ""}
+                  placeholder="0"
+                  onChange={(event) =>
+                    updateRows(rows.map((entry) => (entry.id === row.id ? { ...entry, mug: event.target.value ? Number(event.target.value) : null } : entry)))
+                  }
+                />
+              </div>
+            ) : null}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -739,6 +845,7 @@ function ComponentEditor({
           pricingUnit={component.pricingUnit}
           slabMethod={component.slabMethod}
           rows={component.slabRows}
+          showMug={"slabMugMode" in component && component.mug.enabled && component.slabMugMode === "slab_wise"}
           onChangeUnit={(value) => onChange({ ...component, pricingUnit: value })}
           onChangeMethod={(value) => onChange({ ...component, slabMethod: value })}
           onChangeRows={(rows) => onChange({ ...component, slabRows: rows })}
@@ -766,16 +873,35 @@ function ComponentEditor({
       {"mug" in component ? (
         <>
           <Separator />
-          <MugFields
-            mug={component.mug}
-            pricingModel={component.pricingModel}
-            pricingUnitCode={mugUnitCode(component)}
-            designationRows={component.pricingModel === "designation_based" ? component.designationRows : null}
-            designationSummary={component.pricingModel === "designation_based" ? calculateDesignationMugSummary(component) : null}
-            calculatedValue={calculateMugValue(component)}
-            currencyCode={currencyCode}
-            onChange={(mug) => onChange({ ...component, mug } as CommercialComponentDraft)}
-          />
+          {component.pricingModel === "slab" && "slabMugMode" in component ? (
+            <SlabMugFields
+              mug={component.mug}
+              slabMugMode={component.slabMugMode}
+              pricingUnitCode={mugUnitCode(component)}
+              calculatedValue={calculateMugValue(component)}
+              currencyCode={currencyCode}
+              onChange={(mug) => onChange({ ...component, mug } as CommercialComponentDraft)}
+              onModeChange={(mode) => {
+                if (mode === "none") {
+                  onChange({ ...component, mug: { enabled: false } } as CommercialComponentDraft)
+                  return
+                }
+                const nextMug: MugOverlay = component.mug.enabled ? component.mug : { enabled: true, minimumUnits: null, designationMinimums: [] }
+                onChange({ ...component, mug: nextMug, slabMugMode: mode } as CommercialComponentDraft)
+              }}
+            />
+          ) : (
+            <MugFields
+              mug={component.mug}
+              pricingModel={component.pricingModel}
+              pricingUnitCode={mugUnitCode(component)}
+              designationRows={component.pricingModel === "designation_based" ? component.designationRows : null}
+              designationSummary={component.pricingModel === "designation_based" ? calculateDesignationMugSummary(component) : null}
+              calculatedValue={calculateMugValue(component)}
+              currencyCode={currencyCode}
+              onChange={(mug) => onChange({ ...component, mug } as CommercialComponentDraft)}
+            />
+          )}
         </>
       ) : null}
 

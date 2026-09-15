@@ -174,6 +174,21 @@ function emptyMug(): MugOverlay {
 }
 
 /**
+ * Slab-wise MUG (Commercial Master extension): a Slab component's MUG may
+ * be expressed either as one combined quantity against the whole slab
+ * schedule (`"overall"`, the original and still-default behavior, using
+ * `MugOverlay.minimumUnits` exactly as before) or as an independent MUG
+ * quantity per slab band (`"slab_wise"`, using each `SlabRow.mug` instead).
+ * This is a COMMERCIAL TERM, not an Entitlement concept: it lives here,
+ * alongside every other Slab pricing detail, not in the Entitlement Ledger
+ * domain. Meaningful only for Slab (`slabMugMode` does not exist on Per
+ * Unit or Designation Based components); defaults to `"overall"` so every
+ * previously-approved Slab commercial keeps its exact existing behavior
+ * with no migration needed.
+ */
+type SlabMugMode = "overall" | "slab_wise"
+
+/**
  * `designationRows` is required only for a Designation Based component: a
  * MUG row is complete once every CURRENT designation pricing row (never a
  * stale, since-deleted one) has a positive Minimum Units entry. Per Unit
@@ -211,8 +226,17 @@ function syncDesignationMinimums(designationMinimums: DesignationMugRow[], desig
 // Slab rows and Designation rows
 // =============================================================================
 
-/** One band of a Slab component. `to: null` means open-ended (the last row). */
-type SlabRow = { id: string; from: number | null; to: number | null; rate: number | null }
+/**
+ * One band of a Slab component. `to: null` means open-ended (the last
+ * row). `mug` is this band's own MUG quantity, in the same metric/unit as
+ * the component's own Pricing Unit (never a second unit choice); only
+ * meaningful when the component's `slabMugMode` is `"slab_wise"`, ignored
+ * otherwise. `null`/`0` means no slab-specific minimum for this band, not
+ * an error: unlike Designation Based MUG, a Slab-wise MUG is never
+ * required on every band (a customer may have a minimum on the entry band
+ * only, for example).
+ */
+type SlabRow = { id: string; from: number | null; to: number | null; rate: number | null; mug: number | null }
 
 /** `per` defaults to the Pricing Unit "USER" ("Unit should normally be User"). */
 type DesignationRow = { id: string; designation: string; rate: number | null; per: string | null }
@@ -235,6 +259,7 @@ function createSlabRow(previousRow: SlabRow | null = null): SlabRow {
     from: previousRow ? (previousRow.to !== null ? previousRow.to + 1 : previousRow.from) : 1,
     to: null,
     rate: null,
+    mug: null,
   }
 }
 
@@ -416,11 +441,17 @@ type DesignationPricing = { pricingModel: "designation_based"; designationRows: 
 /** Non-Recurring: no unit basis to guarantee a minimum monthly quantity of (see MUG's own header). */
 type PricingFieldsNoMug = PerUnitPricing | FlatFeePricing | SlabPricing | DesignationPricing
 
-/** Recurring/On-Demand: MUG is offered wherever a unit quantity exists (never on Flat Fee). */
+/**
+ * Recurring/On-Demand: MUG is offered wherever a unit quantity exists
+ * (never on Flat Fee). Slab additionally carries `slabMugMode` (Overall vs
+ * Slab-wise, see `SlabMugMode`'s own header); Per Unit and Designation
+ * Based have no such mode, since Slab is the only pricing model with more
+ * than one meaningful "which quantity does MUG apply to" answer.
+ */
 type PricingFieldsWithMug =
   | (PerUnitPricing & { mug: MugOverlay })
   | FlatFeePricing
-  | (SlabPricing & { mug: MugOverlay })
+  | (SlabPricing & { mug: MugOverlay; slabMugMode: SlabMugMode })
   | (DesignationPricing & { mug: MugOverlay })
 
 /**
@@ -484,7 +515,11 @@ function createComponent(nature: CommercialNature, pricingModel?: PricingModel):
   }
 
   const withMug =
-    pricing.pricingModel === "flat_fee" ? pricing : { ...pricing, mug: emptyMug() }
+    pricing.pricingModel === "flat_fee"
+      ? pricing
+      : pricing.pricingModel === "slab"
+        ? { ...pricing, mug: emptyMug(), slabMugMode: "overall" as const }
+        : { ...pricing, mug: emptyMug() }
   return { ...base, ...withMug, nature } as CommercialComponentDraft
 }
 
@@ -511,6 +546,10 @@ function calculateMugValue(component: CommercialComponentDraft): number | null {
     return calculateDesignationMugSummary(component)?.totalValue ?? null
   }
 
+  if (component.pricingModel === "slab" && component.slabMugMode === "slab_wise") {
+    return calculateSlabWiseMugSummary(component)?.totalValue ?? null
+  }
+
   const quantity = component.mug.minimumUnits
   if (!isPositive(quantity)) return null
 
@@ -521,6 +560,36 @@ function calculateMugValue(component: CommercialComponentDraft): number | null {
     return calculateSlabAmountForQuantity(component.slabRows, component.slabMethod, quantity)
   }
   return null
+}
+
+/**
+ * Slab-wise MUG's own total (mirrors `calculateDesignationMugSummary`):
+ * each slab band's own MUG quantity x its own Rate, summed for
+ * `totalValue`, summed alone for `totalUnits`. A band with no MUG entered
+ * (`null` or `0`, task: "0/blank may mean no slab-specific minimum")
+ * contributes nothing, never treated as an error; a band with a MUG
+ * quantity but no rate (should not happen, Rate is mandatory on every
+ * slab row) contributes units but not value, the same "do not fake the
+ * amount" behavior every other calculated-reference-value function here
+ * follows. Returns `null` only when MUG is off or no band has any MUG
+ * quantity entered yet.
+ */
+function calculateSlabWiseMugSummary(
+  component: Extract<CommercialComponentDraft, { pricingModel: "slab" }> & { mug: MugOverlay }
+): { totalUnits: number; totalValue: number } | null {
+  if (!component.mug.enabled) return null
+  let totalUnits = 0
+  let totalValue = 0
+  let anyEntered = false
+
+  for (const row of component.slabRows) {
+    if (!isPositive(row.mug)) continue
+    anyEntered = true
+    totalUnits += row.mug
+    if (row.rate !== null) totalValue += row.mug * row.rate
+  }
+
+  return anyEntered ? { totalUnits, totalValue } : null
 }
 
 /**
@@ -686,6 +755,25 @@ function validateSlabRowIssues(rows: SlabRow[], issues: ComponentValidationIssue
   })
 }
 
+/**
+ * Slab-wise MUG has no per-band requirement (task: "Do not require a
+ * positive MUG on every slab. 0/blank may mean no slab-specific minimum
+ * where appropriate"): a band left blank is never an issue. The only
+ * thing that can go wrong is a genuinely invalid entry: not a finite
+ * number, or negative (task: "MUG quantity >= 0"). Checked only while
+ * MUG itself is enabled; irrelevant (never called) when MUG is off or the
+ * component is in `"overall"` mode instead.
+ */
+function validateSlabMugIssues(mug: MugOverlay, rows: SlabRow[], issues: ComponentValidationIssue[]): void {
+  if (!mug.enabled) return
+  rows.forEach((row, index) => {
+    if (row.mug === null) return
+    if (!Number.isFinite(row.mug) || row.mug < 0) {
+      issues.push({ field: `slab-mug-${index}`, message: `Slab ${index + 1} MUG must be 0 or a positive quantity`, severity: "invalid" })
+    }
+  })
+}
+
 /** Every designation row needs its own name, Rate, and Unit (task correction §7's same "every rate required" principle applied to Designation Based). */
 function validateDesignationRowIssues(rows: DesignationRow[], issues: ComponentValidationIssue[]): void {
   if (rows.length === 0) {
@@ -781,7 +869,13 @@ function validateCommercialComponent(component: CommercialComponentDraft): Compo
   } else if (component.pricingModel === "slab") {
     if (component.pricingUnit === null) issues.push({ field: "pricingUnit", message: "Unit required", severity: "incomplete" })
     validateSlabRowIssues(component.slabRows, issues)
-    if (component.nature !== "non_recurring") validateMugIssues(component.mug, undefined, issues)
+    if (component.nature !== "non_recurring") {
+      if (component.slabMugMode === "slab_wise") {
+        validateSlabMugIssues(component.mug, component.slabRows, issues)
+      } else {
+        validateMugIssues(component.mug, undefined, issues)
+      }
+    }
   } else {
     validateDesignationRowIssues(component.designationRows, issues)
     if (component.nature !== "non_recurring") validateMugIssues(component.mug, component.designationRows, issues)
@@ -867,6 +961,7 @@ export {
   createComponent,
   calculateMugValue,
   calculateDesignationMugSummary,
+  calculateSlabWiseMugSummary,
   calculateSlabAmountForQuantity,
   createEmptyCommercialRateDraft,
   isPositive,
@@ -880,6 +975,7 @@ export type {
   CommercialNature,
   PricingModel,
   SlabMethod,
+  SlabMugMode,
   InvoiceTerms,
   MugOverlay,
   DesignationMugRow,

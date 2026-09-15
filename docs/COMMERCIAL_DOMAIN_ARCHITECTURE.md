@@ -314,6 +314,37 @@ introduced with a genuinely different period need, that would be
 evaluated on its own terms at that time, not assumed to reopen this
 answer.
 
+**[IMPLEMENTED, NEXUS ACCEPTANCE CLOSURE, Part A] Slab-wise MUG.** A
+Slab pricing Component (Progressive or Whole Quantity) may carry its
+quantity commitment in one of two modes, chosen explicitly, never
+inferred: **Overall MUG** (the pre-existing behavior above, one combined
+monthly quantity floor for the whole component) or **Slab-wise MUG** (a
+separate, independent monthly quantity floor per band, each compared
+only against actual usage that falls in that band). This does not relax
+the "exactly one Commercial Component" rule above: a Slab-wise MUG
+component's per-band floors are still one component's own internal
+breakdown, never a commitment spanning multiple components. Fictional
+worked example (Slab-wise MUG, three bands): band 1-100 at INR 500 with
+MUG 100, band 101-200 at INR 450 with MUG 50, band 201+ at INR 400 with
+no MUG; billed quantity 600 units in a month values at
+`100 x 500 + 50 x 450 + 450 x 400 = 232,500`
+irrespective of actual units per band, since the combined billed
+quantity already exceeds every band's own floor; a band with actual
+usage below its own floor bills at that band's floor instead, band by
+band, never netted against another band's surplus. A band with no MUG
+(zero or unset) contributes nothing to the floor and is not a validation
+error. Domain logic: `src/features/customer-onboarding/domain/
+commercial-rate.ts` (`calculateSlabWiseMugSummary`), diff support in
+`commercial-rate-diff.ts` (`slabMugModeChanged`), UI in
+`commercial-rate-section.tsx`, persistence in
+`commercial-configuration-promotion.ts`, reconstruction in
+`commercial-configuration-view.ts`. Slab (in either MUG mode) remains
+`REQUIRES_MRR_RECOGNITION` in the Entitlement Ledger
+(`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.7); a Slab-wise MUG
+quantity is carried in `pricing_rule_parameters` for a future MRR
+Recognition module to read, but today's ledger math does not read it,
+matching Slab's existing, unchanged Pending MRR Recognition treatment.
+
 ## 9. Billing Policy domain (unchanged, locked)
 
 **[LOCKED]** Three independent dimensions describe what should be

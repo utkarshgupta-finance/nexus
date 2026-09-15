@@ -18,6 +18,8 @@ function toGoLiveRequest(row: GoLiveRequestRow): GoLiveRequest {
     sentBackReason: row.sent_back_reason,
     sentBackBy: row.sent_back_by,
     sentBackAt: row.sent_back_at,
+    submittedBy: row.submitted_by,
+    submittedAt: row.submitted_at,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
     cancelledBy: row.cancelled_by,

@@ -94,6 +94,39 @@ different problem (authoring an approval graph with a visual canvas) than
 this document's own pure condition/requirement evaluator, and this
 document does not describe it.
 
+### 3a. Runtime truth table: is approval routing actually driven by Workflow Builder?
+
+(NEXUS ACCEPTANCE CLOSURE, Part C1.) Workflow Builder (`platform/
+workflow-builder`) lets an admin author and publish a real, persisted
+approval graph per domain. Separately, an independent maker/checker
+system already gates every real submit/approve/reject action. This
+table states plainly, per domain, which one actually decides who is
+allowed to approve something today:
+
+| Domain | Runtime approval routing | Evidence |
+| --- | --- | --- |
+| Customer Onboarding | INDEPENDENT of Workflow Builder | `submit_customer_onboarding_case`/`approve_customer_onboarding_case` (`supabase/migrations/20260913040000_customer_lifecycle_onboarding_foundation.sql`, `20260917010000_self_approval_control.sql`) contain zero `workflow_*` references. Gating is `requirePermission` plus a hardcoded `created_by` self-approval check. |
+| Customer Change | INDEPENDENT of Workflow Builder | `submit_customer_change_request`/`approve_customer_change_request` (`supabase/migrations/20260913060000_customer_change_request_foundation.sql`) also have zero `workflow_*` references. `src/features/customer-change/domain/workflow-rules.ts` calls the pure evaluator from §3 above against a hardcoded array; that is a separate, table-less TypeScript system, not the Workflow Builder graph. |
+| Commercial Version | INDEPENDENT of Workflow Builder | `submit_commercial_configuration_version`/`approve_commercial_configuration_version` (`supabase/migrations/20260913070000_commercial_configuration_version_lifecycle.sql`) have zero `workflow_*` references; same maker/checker/self-approval pattern. |
+| Go Live | INDEPENDENT of Workflow Builder for authorization; the one domain that reads the graph at all, and only for display | `create_go_live_request` snapshots the currently published `go_live` workflow version's id onto the request row (`supabase/migrations/20260918010000_go_live_domain.sql`). `resolveApprovalStep` (`src/platform/workflow-builder/domain/runtime.ts`) reads that graph's Approval node purely to populate a "Responsible Team" display column. `approve_go_live_request` itself has zero `workflow_*` reference; gating is a hardcoded `requirePermission("go_live", "approve")` (`src/features/go-live/actions.ts`) plus the same self-approval check. |
+
+Verified live (NEXUS ACCEPTANCE CLOSURE, Part C1): the checker test
+persona, granted the `workflow_admin` role through the normal
+`grant_user_role` RPC, can reach Settings > Workflows, open an existing
+draft workflow, and see its React Flow canvas render correctly. This
+confirms Workflow Builder access itself works; it does not change any
+verdict in the table above.
+
+**Bottom line:** publishing or editing a workflow graph today never
+changes who can actually approve anything, in any domain. This is the
+deliberate security boundary this document and
+`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §6.6 both already state: a
+database-configured graph must never be able to redirect what
+permission is actually enforced. Treat any future claim that "the
+workflow decides the approvers" as false until a domain's RPC is shown
+to genuinely query `workflow_definitions`/`workflow_definition_versions`
+for that decision, not merely to snapshot a graph id for display.
+
 ## 4. Field-level rules and stable field identity
 
 A `WorkflowRule` attaches to a `WorkflowVersionDefinition`, which belongs
@@ -242,8 +275,18 @@ that could drift from reality.
 
 ## 13. Explicitly not built in this stage
 
-No workflow database schema or migration, no background worker or job,
-no live approval execution, no notification, no React Flow builder, no
-XState runtime, no authorization-aware role resolution. This stage proves
-the domain contracts and a pure evaluator first; everything above is a
-future stage's work.
+At the time this section was written: no workflow database schema or
+migration, no background worker or job, no live approval execution, no
+notification, no React Flow builder, no XState runtime, no
+authorization-aware role resolution. This stage proved the domain
+contracts and a pure evaluator first.
+
+**Since superseded for the schema/React Flow/authorization-aware
+claims**, none of which describe this document's own pure evaluator: a
+real database-persisted, React Flow-based Workflow Builder was built
+later (§3, Platform Operating Expansion Phase N/O) and now has real
+migrations, a real Settings UI, and real draft/publish/version
+lifecycle. It remains true, and is now explicitly re-confirmed in §3a,
+that no domain's authorization is actually resolved from it: "no
+authorization-aware role resolution" is still accurate for the system
+this document describes, and by design for Workflow Builder too.

@@ -37,8 +37,8 @@ describe("summarizeComponent", () => {
       pricingUnit: "USER",
       slabMethod: "progressive" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 100 },
-        { id: "2", from: 101, to: null, rate: 90 },
+        { id: "1", from: 1, to: 100, rate: 100, mug: null },
+        { id: "2", from: 101, to: null, rate: 90, mug: null },
       ],
     }
     const lines = summarizeComponent(REFERENCE_MASTER_FIXTURES, component, "INR")
@@ -175,8 +175,8 @@ describe("componentTableCells (Commercial Components table, task corrections §4
       pricingUnit: "DISTRIBUTOR",
       slabMethod: "whole_quantity" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 500 },
-        { id: "2", from: 101, to: null, rate: 400 },
+        { id: "1", from: 1, to: 100, rate: 500, mug: null },
+        { id: "2", from: 101, to: null, rate: 400, mug: null },
       ],
     }
     const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
@@ -193,9 +193,9 @@ describe("componentTableCells (Commercial Components table, task corrections §4
       pricingUnit: "USER",
       slabMethod: "progressive" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 500 },
-        { id: "2", from: 101, to: 200, rate: 450 },
-        { id: "3", from: 201, to: null, rate: 400 },
+        { id: "1", from: 1, to: 100, rate: 500, mug: null },
+        { id: "2", from: 101, to: 200, rate: 450, mug: null },
+        { id: "3", from: 201, to: null, rate: 400, mug: null },
       ],
     }
     const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "INR")
@@ -210,9 +210,9 @@ describe("componentTableCells (Commercial Components table, task corrections §4
       pricingUnit: "USER",
       slabMethod: "whole_quantity" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 10 },
-        { id: "2", from: 101, to: 200, rate: 9 },
-        { id: "3", from: 201, to: null, rate: 8 },
+        { id: "1", from: 1, to: 100, rate: 10, mug: null },
+        { id: "2", from: 101, to: 200, rate: 9, mug: null },
+        { id: "3", from: 201, to: null, rate: 8, mug: null },
       ],
     }
     const cells = componentTableCells(REFERENCE_MASTER_FIXTURES, component, "USD")

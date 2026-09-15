@@ -39,6 +39,8 @@ type GoLiveRequest = {
   sentBackReason: string | null
   sentBackBy: string | null
   sentBackAt: string | null
+  submittedBy: string | null
+  submittedAt: string | null
   approvedBy: string | null
   approvedAt: string | null
   cancelledBy: string | null

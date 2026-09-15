@@ -83,21 +83,42 @@ function toBillingQuantityBasis(timing: BillingTiming, mug: MugOverlay | null): 
   return mug?.enabled ? "mug" : "previous_period_actual"
 }
 
-function slabTiers(rows: SlabRow[]): { from: number | null; to: number | null; rate: number | null }[] {
-  return rows.map((row) => ({ from: row.from, to: row.to, rate: row.rate }))
+/**
+ * `mug` travels with each tier so a future MRR Recognition module can
+ * reproduce exactly what was agreed per band (task: "ensure Commercial
+ * Version context carries the slab MUG configuration"), even though
+ * today's ledger math never reads it (Slab is `REQUIRES_MRR_RECOGNITION`,
+ * see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.7). `null` for a band
+ * with no slab-specific minimum, exactly as authored.
+ */
+function slabTiers(rows: SlabRow[]): { from: number | null; to: number | null; rate: number | null; mug: number | null }[] {
+  return rows.map((row) => ({ from: row.from, to: row.to, rate: row.rate, mug: row.mug }))
 }
 
 function designationRates(rows: DesignationRow[]): { designation: string; rate: number | null; per: string | null }[] {
   return rows.map((row) => ({ designation: row.designation, rate: row.rate, per: row.per }))
 }
 
-/** The one combined monthly quantity threshold for a MUG commitment: the plain quantity for Per Unit/Slab, or the sum of every designation's own Minimum Units for Designation Based (this file's header explains why one aggregate value is correct here). */
+/**
+ * The one combined monthly quantity threshold for a MUG commitment: the
+ * plain quantity for Per Unit/Slab (Overall mode), or the sum of every
+ * designation's own Minimum Units for Designation Based (this file's
+ * header explains why one aggregate value is correct here). Slab-wise MUG
+ * has no single combined quantity to report here (each band has its own,
+ * already carried in `pricing_rule_parameters.tiers[].mug` via
+ * `slabTiers`): honestly returns `null` rather than fabricating a sum,
+ * matching this codebase's "do not fake the amount" principle. No
+ * `commercial_commitments` row is created for a Slab-wise MUG component;
+ * this does not regress anything, since Slab already never reaches the
+ * Entitlement Ledger's real MUG math regardless (`REQUIRES_MRR_RECOGNITION`).
+ */
 function mugThresholdValue(component: CommercialComponentDraft): number | null {
   if (!("mug" in component) || !component.mug.enabled) return null
   if (component.pricingModel === "designation_based") {
     const total = component.mug.designationMinimums.reduce((sum, entry) => sum + (entry.minimumUnits ?? 0), 0)
     return total > 0 ? total : null
   }
+  if (component.pricingModel === "slab" && component.slabMugMode === "slab_wise") return null
   return component.mug.minimumUnits
 }
 
@@ -159,6 +180,8 @@ function mapOnboardingComponentToCommercialComponentInsert(
       tiers: slabTiers(component.slabRows),
       slabMethod: component.slabMethod,
       pricingUnit: component.pricingUnit,
+      // Non-Recurring's Slab variant has no `mug`/`slabMugMode` at all (no monthly cadence to floor against); "overall" is an inert default never read back for that case.
+      slabMugMode: "slabMugMode" in component ? component.slabMugMode : "overall",
     }
     if (mug?.enabled) pricingRuleParameters.mug = { minimumUnits: mug.minimumUnits }
   } else {

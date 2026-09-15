@@ -14,6 +14,8 @@ type GoLiveRequestRow = {
   sent_back_reason: string | null
   sent_back_by: string | null
   sent_back_at: string | null
+  submitted_by: string | null
+  submitted_at: string | null
   approved_by: string | null
   approved_at: string | null
   cancelled_by: string | null

@@ -48,6 +48,14 @@ function formatPercentChange(value: number | null): string | null {
   return `${sign}${rounded}%`
 }
 
+const SLAB_MUG_MODE_LABELS: Record<string, string> = { overall: "Overall MUG", slab_wise: "Slab-wise MUG" }
+
+/** "No MUG" / "Overall MUG" / "Slab-wise MUG" for a Slab component's own side of a `slabMugModeChanged` line. */
+function slabMugModeLabel(component: CommercialComponentDraft | null): string {
+  if (!component || !("slabMugMode" in component) || !component.mug.enabled) return "No MUG"
+  return SLAB_MUG_MODE_LABELS[component.slabMugMode] ?? component.slabMugMode
+}
+
 /** Only meaningful for Recurring/On-Demand (Non-Recurring never carries a `mug` field, so `diff.mugChanged` is always false there). */
 function componentMugUnitCode(component: CommercialComponentDraft | null): string | null {
   if (!component) return null
@@ -105,6 +113,12 @@ function ComponentDiffCard({ diff, currencyCode }: { diff: ComponentDiff; curren
         </p>
       ) : null}
 
+      {diff.slabMugModeChanged ? (
+        <p className="text-xs text-foreground">
+          MUG Mode: {slabMugModeLabel(diff.current)} &rarr; {slabMugModeLabel(diff.proposed)}
+        </p>
+      ) : null}
+
       {diff.invoiceCycleChanged ? (
         <p className="text-xs text-foreground">
           Invoice Cycle: {currentInvoiceLine ?? "Not set"} &rarr; {proposedInvoiceLine ?? "Not set"}
@@ -125,6 +139,12 @@ function ComponentDiffCard({ diff, currencyCode }: { diff: ComponentDiff; curren
                 <TableHead>Band</TableHead>
                 <TableHead>Current Rate</TableHead>
                 <TableHead>Proposed Rate</TableHead>
+                {diff.slabRowDiffs.some((row) => row.currentMug !== null || row.proposedMug !== null) ? (
+                  <>
+                    <TableHead>Current MUG</TableHead>
+                    <TableHead>Proposed MUG</TableHead>
+                  </>
+                ) : null}
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -137,6 +157,12 @@ function ComponentDiffCard({ diff, currencyCode }: { diff: ComponentDiff; curren
                   </TableCell>
                   <TableCell>{formatAmount(row.currentRate, currencyCode)}</TableCell>
                   <TableCell>{formatAmount(row.proposedRate, currencyCode)}</TableCell>
+                  {diff.slabRowDiffs.some((entry) => entry.currentMug !== null || entry.proposedMug !== null) ? (
+                    <>
+                      <TableCell>{row.currentMug !== null ? formatQuantity(row.currentMug) : "-"}</TableCell>
+                      <TableCell>{row.proposedMug !== null ? formatQuantity(row.proposedMug) : "-"}</TableCell>
+                    </>
+                  ) : null}
                   <TableCell>
                     <StatusBadge status={row.status} />
                   </TableCell>

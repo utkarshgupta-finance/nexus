@@ -21,6 +21,7 @@ type CommercialVersionErrorKind =
   | "commercial_version_self_approval_not_allowed"
   | "commercial_version_no_draft_revision"
   | "commercial_version_reject_reason_required"
+  | "commercial_version_already_open"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -72,6 +73,21 @@ function parseCommercialVersionError(error: PostgrestLikeError): CommercialVersi
     const kind = NAMED_TOKEN_KINDS[token]
     if (kind) {
       return { kind, message: detail || rawMessage, sqlState, cause: rawMessage }
+    }
+  }
+
+  // A real bug found via live retest: this specific 23505 (one open version
+  // per configuration, uq_commercial_configuration_versions_one_open_per_config)
+  // used to fall through to the generic "conflict" kind below, which shows
+  // the raw Postgres constraint text verbatim. Caught here first so the page
+  // that creates a version can redirect straight to the already-open one
+  // instead of surfacing a database error.
+  if (sqlState === "23505" && /uq_commercial_configuration_versions_one_open_per_config/.test(rawMessage)) {
+    return {
+      kind: "commercial_version_already_open",
+      message: "There is already an open Commercial Version for this configuration. Continue that one instead of starting a new change.",
+      sqlState,
+      cause: rawMessage,
     }
   }
 

@@ -78,6 +78,29 @@ describe("toCustomerChangeRequest", () => {
     expect(result.baseCustomerRowVersion).toBe(4)
   })
 
+  it("maps revisionRowVersion from the latest revision's own row_version, the optimistic-lock token Save Draft must echo back (a real concurrent-edit bug found via a genuine two-tab retest)", () => {
+    const revision: SubmissionRevisionRow = {
+      id: "rev-1",
+      request_id: "req-1",
+      revision_number: 2,
+      status: "draft",
+      raw_data: { segment: "sme" },
+      effective_data: null,
+      row_version: 3,
+      created_at: "",
+      created_by: null,
+      updated_at: "",
+      updated_by: null,
+      submitted_by: null,
+      submitted_at: null,
+    }
+    expect(toCustomerChangeRequest(BASE_ROW, revision, []).revisionRowVersion).toBe(3)
+  })
+
+  it("defaults revisionRowVersion to 1 when there is no revision at all, never a fabricated higher number", () => {
+    expect(toCustomerChangeRequest(BASE_ROW, null, []).revisionRowVersion).toBe(1)
+  })
+
   it("maps sent-back fields into a sentBack object when present", () => {
     const row: CustomerChangeRequestRow = { ...BASE_ROW, status: "sent_back", sent_back_reason: "Confirm with Finance", sent_back_by: "user-b", sent_back_at: "2026-09-02T00:00:00.000Z" }
     const result = toCustomerChangeRequest(row, null, [])

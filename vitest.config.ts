@@ -9,5 +9,23 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
+    // Several test files cold-load a dynamic `import(...)` module graph
+    // inside the test body (a deliberate pattern proving a real module
+    // boundary, e.g. `server-only` guards). 30000ms gives real headroom
+    // over Vitest's 5000ms default without masking a genuine hang
+    // (nothing in this suite legitimately runs anywhere close to that
+    // long).
+    testTimeout: 30000,
+    // Root cause of the timeout above under a full-suite run: default
+    // `isolate: true` spawns one fresh fork per test file (98 files here).
+    // On a memory-constrained machine that starves whichever file happens
+    // to spawn under peak contention, a different file each run, not a
+    // real regression. Capping the fork pool bounds concurrent process
+    // count to what the machine can actually run without thrashing.
+    poolOptions: {
+      forks: {
+        maxForks: 4,
+      },
+    },
   },
 })

@@ -200,6 +200,92 @@ describe("toDraftComponent", () => {
   })
 })
 
+describe("Slab-wise MUG reconstruction (stable identity: keyed by tier position, the same precedent already used for Slab band diffing)", () => {
+  function slabWiseComponent(overrides: Partial<CommercialComponent> = {}): CommercialComponent {
+    return baseComponent({
+      pricingRuleKind: "volume",
+      pricingRuleParameters: {
+        name: "Distributor Platform",
+        commercialNature: "recurring",
+        invoiceFrequencyCode: "monthly",
+        invoiceTimingCode: "advance",
+        tiers: [
+          { from: 1, to: 500, rate: 100, mug: 400 },
+          { from: 501, to: 1000, rate: 80, mug: 200 },
+          { from: 1001, to: null, rate: 60, mug: null },
+        ],
+        slabMethod: "whole_quantity",
+        pricingUnit: "DISTRIBUTOR",
+        slabMugMode: "slab_wise",
+        mug: { minimumUnits: null },
+      },
+      ...overrides,
+    })
+  }
+
+  it("6. Commercial Version change modifies slab MUG: reconstructing the new version's parameters reflects the new slab MUG values", () => {
+    const oldVersion = slabWiseComponent({ id: "comp-old" })
+    const oldDraft = toDraftComponent(oldVersion)
+    expect(oldDraft.pricingModel).toBe("slab")
+    if (oldDraft.pricingModel !== "slab" || !("slabMugMode" in oldDraft)) throw new Error("expected slab with MUG")
+    expect(oldDraft.slabMugMode).toBe("slab_wise")
+    expect(oldDraft.slabRows.map((row) => row.mug)).toEqual([400, 200, null])
+
+    const newVersion = slabWiseComponent({
+      id: "comp-new",
+      supersedesComponentId: "comp-old",
+      pricingRuleParameters: {
+        ...oldVersion.pricingRuleParameters,
+        tiers: [
+          { from: 1, to: 500, rate: 100, mug: 450 },
+          { from: 501, to: 1000, rate: 80, mug: 250 },
+          { from: 1001, to: null, rate: 60, mug: 100 },
+        ],
+      },
+    })
+    const newDraft = toDraftComponent(newVersion)
+    if (newDraft.pricingModel !== "slab" || !("slabMugMode" in newDraft)) throw new Error("expected slab with MUG")
+    expect(newDraft.slabRows.map((row) => row.mug)).toEqual([450, 250, 100])
+  })
+
+  it("7. Old version retains its previous slab MUG: reconstructing an old and a new version independently never leaks state between them", () => {
+    const oldVersion = slabWiseComponent({ id: "comp-old" })
+    const newVersion = slabWiseComponent({
+      id: "comp-new",
+      supersedesComponentId: "comp-old",
+      pricingRuleParameters: {
+        ...oldVersion.pricingRuleParameters,
+        tiers: [
+          { from: 1, to: 500, rate: 100, mug: 999 },
+          { from: 501, to: 1000, rate: 80, mug: 999 },
+          { from: 1001, to: null, rate: 60, mug: 999 },
+        ],
+        slabMugMode: "overall",
+        mug: { minimumUnits: 999 },
+      },
+    })
+
+    const oldDraft = toDraftComponent(oldVersion)
+    const newDraft = toDraftComponent(newVersion)
+    if (oldDraft.pricingModel !== "slab" || !("slabMugMode" in oldDraft)) throw new Error("expected slab with MUG")
+    if (newDraft.pricingModel !== "slab" || !("slabMugMode" in newDraft)) throw new Error("expected slab with MUG")
+    expect(oldDraft.slabMugMode).toBe("slab_wise")
+    expect(oldDraft.slabRows.map((row) => row.mug)).toEqual([400, 200, null])
+    expect(newDraft.slabMugMode).toBe("overall")
+    expect(newDraft.slabRows.map((row) => row.mug)).toEqual([999, 999, 999])
+  })
+
+  it("9. Approved version exposes correct slab MUG downstream: the persisted table cells show every band's own MUG and the calculated total", () => {
+    const component = slabWiseComponent()
+    const { cells } = persistedComponentTableCells(component, REFERENCE_MASTER_FIXTURES)
+    expect(cells.pricing).toBe("Slab - Whole Quantity")
+    const mugText = cells.mugQuantityLines.join(" ")
+    expect(mugText).toContain("400")
+    expect(mugText).toContain("200")
+    expect(mugText).toContain("600")
+  })
+})
+
 describe("snapshotWithFrozenFxRate", () => {
   it("overrides only the matching currency's inrConversionRate, leaving INR and other currencies untouched", () => {
     const withUsd = { ...REFERENCE_MASTER_FIXTURES, currency: [{ value: "USD", label: "USD", active: true, inrConversionRate: 83 }] }

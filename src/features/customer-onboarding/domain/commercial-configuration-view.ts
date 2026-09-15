@@ -11,6 +11,7 @@ import type {
   MugOverlay,
   RevenueRecognition,
   SlabMethod,
+  SlabMugMode,
   SlabRow,
 } from "./commercial-rate"
 import { componentTableCells } from "./commercial-rate-summary"
@@ -123,14 +124,17 @@ function toDraftComponent(component: CommercialComponent): CommercialComponentDr
   }
 
   if (component.pricingRuleKind === "volume" || component.pricingRuleKind === "graduated") {
-    const tiers = Array.isArray(params.tiers) ? (params.tiers as { from: number | null; to: number | null; rate: number | null }[]) : []
+    const tiers = Array.isArray(params.tiers)
+      ? (params.tiers as { from: number | null; to: number | null; rate: number | null; mug?: number | null }[])
+      : []
     const slabMethod: SlabMethod =
       params.slabMethod === "progressive" || params.slabMethod === "whole_quantity"
         ? params.slabMethod
         : component.pricingRuleKind === "graduated"
           ? "progressive"
           : "whole_quantity"
-    const slabRows: SlabRow[] = tiers.map((tier) => ({ id: newId(), from: tier.from, to: tier.to, rate: tier.rate }))
+    const slabMugMode: SlabMugMode = params.slabMugMode === "slab_wise" ? "slab_wise" : "overall"
+    const slabRows: SlabRow[] = tiers.map((tier) => ({ id: newId(), from: tier.from, to: tier.to, rate: tier.rate, mug: tier.mug ?? null }))
     const pricing = {
       pricingModel: "slab" as const,
       pricingUnit: typeof params.pricingUnit === "string" ? params.pricingUnit : null,
@@ -140,7 +144,7 @@ function toDraftComponent(component: CommercialComponent): CommercialComponentDr
     if (nature === "non_recurring") {
       return { ...base, ...pricing, nature, revenueRecognition: revenueRecognitionFromParameters(params) }
     }
-    return { ...base, ...pricing, nature, mug: mugFromParameters(params.mug as MugParameters | undefined, []) }
+    return { ...base, ...pricing, nature, mug: mugFromParameters(params.mug as MugParameters | undefined, []), slabMugMode }
   }
 
   // dimension (Designation Based)

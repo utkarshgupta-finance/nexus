@@ -181,13 +181,31 @@ where it is not wired up:
   **not** a concurrency mechanism; treat any future code that starts
   reading them for that purpose as a bug, not a restoration of intended
   behavior.
-- **Draft autosave** (`save_customer_onboarding_draft` and its two
-  siblings): a blind `UPDATE`, no version check at all. Accepted as-is:
-  a draft on these three request types has exactly one editor (the
-  requester), so last-write-wins is the correct, simplest semantics, not
-  a gap. This is the "reference or configuration tables with low write
-  contention" case the design principle above already carves out, applied
-  to single-owner drafts specifically.
+- **Draft autosave** (`save_customer_onboarding_draft` and the
+  commercial version equivalent): a blind `UPDATE`, no version check at
+  all. Accepted as-is: a draft on these two request types has exactly one
+  editor (the requester), so last-write-wins is the correct, simplest
+  semantics, not a gap. This is the "reference or configuration tables
+  with low write contention" case the design principle above already
+  carves out, applied to single-owner drafts specifically.
+- **`save_customer_change_draft`** (NEXUS ACCEPTANCE CLOSURE, Part B3):
+  this was previously the same blind `UPDATE` as its two siblings above,
+  but that assumption does not hold for Customer Change: a checker with
+  `customer.change.write` can open and edit the same draft the requester
+  is still working on (unlike onboarding/commercial version drafts, which
+  a different actor never touches before submission), so two editors on
+  one draft is a real, reachable case, not a hypothetical. Confirmed live
+  via a deliberate two-tab repro: tab A saved one field, tab B (holding a
+  stale copy) then saved a different field, and tab A's change vanished
+  with zero warning. Fixed with a genuine optimistic lock, the same
+  pattern `submit_revision` already uses elsewhere: the RPC gained a
+  required `p_expected_row_version` parameter, opens with `select ...
+  for update`, and raises `CUSTOMER_CHANGE_DRAFT_STALE` (a human-readable
+  message, never the raw column name) when the caller's expected version
+  does not match. `CustomerChangeRequest.revisionRowVersion` threads the
+  token from load through save. Re-verified live: the same two-tab repro
+  now rejects the stale save with the friendly message and preserves the
+  first tab's change intact.
 
 ## 6. Reference and master data
 

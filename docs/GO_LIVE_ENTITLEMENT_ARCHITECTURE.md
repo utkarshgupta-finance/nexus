@@ -124,15 +124,64 @@ Users component" is really a chain of superseded rows, not one row. Go
 Live and the Entitlement Ledger need one continuing identity for that
 chain, so `commercial_components.stable_component_key` (new, additive
 column, `supabase/migrations/20260918010000_go_live_domain.sql`) was
-added: minted fresh (own new id) whenever an onboarding case first
-creates a component, and carried forward from the prior version's own
-`stable_component_key` on every subsequent Version approval. It is
-purely additive: no existing RPC signature changed, and the Current-vs-
-Proposed diff still matches by the transient `id`, unaffected.
+added: intended to be minted fresh (own new id) whenever an onboarding
+case first creates a component, and carried forward from the prior
+version's own `stable_component_key` on every subsequent Version
+approval.
 
 `fn_protect_commercial_component_lifecycle` was extended to allow
 `stable_component_key` to be set exactly once from null (mirroring the
 pre-existing `effective_to` allowance), never mutated afterward.
+
+**Defect and fix (NEXUS ACCEPTANCE CLOSURE, Part B5).** The column was
+made `NOT NULL` by the same migration that introduced it, but
+`add_commercial_component`'s own `INSERT` was never updated to populate
+it: every Commercial Configuration Version approval (fresh onboarding or
+an amendment, regardless of Slab-wise MUG) failed outright with a `null
+value in column "stable_component_key"` constraint violation from the
+moment this migration landed. `approve_customer_onboarding_case` and
+`approve_commercial_configuration_version` each carried a follow-up
+`UPDATE ... set stable_component_key = ...` intended to fix this up
+after the insert, but that code was unreachable dead code: the insert
+above it always failed first. Found via a genuine live retest (approving
+a real Slab-wise MUG amendment), not assumed working from the passing
+unit tests, which never exercised the real RPC.
+
+Fixed in `supabase/migrations/20260920080000_fix_add_commercial_component_stable_key.sql`:
+`add_commercial_component` gained a new `p_stable_component_key uuid
+default null` parameter and now inserts
+`coalesce(p_stable_component_key, p_new_commercial_component_id)`
+directly, so the column is always populated correctly at `INSERT` time.
+The caller resolves the final key value (`null` to mint fresh, or the
+superseded component's own key to carry forward) and passes it in;
+neither approval RPC ever writes to `stable_component_key` in a
+follow-up `UPDATE` again, since `fn_protect_commercial_component_lifecycle`
+would reject changing an already-non-null value to something different.
+Re-verified live: the previously-blocked Slab-wise MUG amendment
+approved successfully after the fix, materializing as the customer's
+new active Commercial Configuration Version with the prior version
+correctly superseded.
+
+**Known gap, not yet closed.** The RPC-side carry-forward parameter now
+works correctly, but nothing on the TypeScript side calls it with a real
+value yet:
+`mapOnboardingComponentToCommercialComponentInsert`
+(`src/features/customer-onboarding/domain/commercial-configuration-promotion.ts`)
+does not include `stable_component_key` in the payload it builds for any
+component, onboarding or amendment. In practice this means every
+component minted today, including one carried forward unchanged across
+a Version amendment, gets a brand new `stable_component_key` equal to
+its own new row id, exactly as it always has (this is not a regression:
+the RPC-side crash meant no component had ever successfully carried a
+key forward before this fix either). True cross-version identity
+continuity (the stated purpose of this column, and the basis Go Live and
+the Entitlement Ledger are described as keying on above) requires the
+promotion layer to identify which draft components were reconstructed
+from a still-active prior-version row and thread that row's real
+`stable_component_key` through. This is a real, disclosed boundary, not
+a silent gap: treat any Go Live or Entitlement Ledger continuity claim
+across a Commercial Version amendment as unverified until this is
+implemented.
 
 Every Go Live request, Entitlement Source, Monthly Usage row, and
 Monthly Entitlement Ledger row is keyed by `stable_component_key`, never

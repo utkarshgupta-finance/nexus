@@ -49,8 +49,8 @@ async function createChangeRequest(customerId: string, actorUserId: string): Pro
   return changeRequest
 }
 
-async function saveChangeDraft(requestId: string, rawData: Record<string, unknown>, actorUserId: string): Promise<CustomerChangeRequest> {
-  await changeData.saveDraft({ requestId, rawData, actorUserId })
+async function saveChangeDraft(requestId: string, rawData: Record<string, unknown>, expectedRowVersion: number, actorUserId: string): Promise<CustomerChangeRequest> {
+  await changeData.saveDraft({ requestId, rawData, expectedRowVersion, actorUserId })
   const changeRequest = await loadChangeRequest(requestId)
   if (!changeRequest) throw new Error(`Change Request ${requestId} not found after saving draft.`)
   return changeRequest

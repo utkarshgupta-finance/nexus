@@ -148,16 +148,16 @@ describe("mapOnboardingComponentToCommercialComponentInsert", () => {
       pricingUnit: "DISTRIBUTOR",
       slabMethod: "whole_quantity" as const,
       slabRows: [
-        { id: "1", from: 1, to: 100, rate: 500 },
-        { id: "2", from: 101, to: null, rate: 400 },
+        { id: "1", from: 1, to: 100, rate: 500, mug: null },
+        { id: "2", from: 101, to: null, rate: 400, mug: null },
       ],
       invoiceTerms: { invoiceFrequency: "monthly", invoiceTiming: "advance" },
     }
     const result = mapOnboardingComponentToCommercialComponentInsert(component, REFERENCE_MASTER_FIXTURES, "INR", EFFECTIVE_FROM)
     expect(result.pricingRuleKind).toBe("volume")
     expect(result.pricingRuleParameters.tiers).toEqual([
-      { from: 1, to: 100, rate: 500 },
-      { from: 101, to: null, rate: 400 },
+      { from: 1, to: 100, rate: 500, mug: null },
+      { from: 101, to: null, rate: 400, mug: null },
     ])
     expect(result.pricingRuleParameters.slabMethod).toBe("whole_quantity")
   })
@@ -167,7 +167,7 @@ describe("mapOnboardingComponentToCommercialComponentInsert", () => {
       ...createComponent("recurring", "slab"),
       pricingUnit: "USER",
       slabMethod: "progressive" as const,
-      slabRows: [{ id: "1", from: 1, to: null, rate: 90 }],
+      slabRows: [{ id: "1", from: 1, to: null, rate: 90, mug: null }],
       invoiceTerms: { invoiceFrequency: "monthly", invoiceTiming: "advance" },
     }
     const result = mapOnboardingComponentToCommercialComponentInsert(component, REFERENCE_MASTER_FIXTURES, "INR", EFFECTIVE_FROM)

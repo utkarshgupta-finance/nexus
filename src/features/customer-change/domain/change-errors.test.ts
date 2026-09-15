@@ -21,4 +21,15 @@ describe("parseChangeError", () => {
     expect(error.message).toBe("you cannot approve your own request. Another authorized checker must review it.")
     expect(error.changeError.kind).toBe("change_request_self_approval_not_allowed")
   })
+
+  it("maps the CUSTOMER_CHANGE_DRAFT_STALE token (a real concurrent-edit conflict, found via a genuine two-tab retest) to a human-readable message, never raw terms like row_version or database", () => {
+    const parsed = parseChangeError({
+      message: "CUSTOMER_CHANGE_DRAFT_STALE: This draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes.",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("change_request_draft_stale")
+    expect(parsed.message).toBe("This draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes.")
+    expect(parsed.message).not.toMatch(/row_version|database|version mismatch/i)
+  })
 })
