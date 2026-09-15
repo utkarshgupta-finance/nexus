@@ -104,6 +104,31 @@ function validateWorkflowGraph(
     }
   }
 
+  // Decision nodes must route deterministically (Workflow Runtime V1,
+  // supabase/migrations/20260921000000_workflow_runtime_v1.sql runs the
+  // identical checks server-side as the real gate; this is the same
+  // rule, surfaced here as an immediate, friendly Builder error instead
+  // of a failed publish attempt).
+  for (const node of nodes.filter((node) => node.nodeType === "decision")) {
+    const outgoing = outgoingByKey.get(node.nodeKey) ?? []
+    if (outgoing.length < 2) {
+      errors.push(`Decision node "${node.name}" must have at least two outgoing branches to be a real decision.`)
+    }
+    const fallbackEdges = outgoing.filter((edge) => !edge.condition)
+    if (fallbackEdges.length > 1) {
+      errors.push(`Decision node "${node.name}" has more than one default (unconditioned) branch; routing would be ambiguous.`)
+    }
+    for (const edge of outgoing) {
+      if (!edge.condition) continue
+      if (edge.condition.operator !== "equals" && edge.condition.operator !== "not_equals") {
+        errors.push(`Decision node "${node.name}" has a branch with an unsupported operator ("${edge.condition.operator}"); only equals/not_equals are supported.`)
+      }
+      if (!edge.condition.field) {
+        errors.push(`Decision node "${node.name}" has a branch condition with no field set.`)
+      }
+    }
+  }
+
   return errors.length === 0 ? { valid: true } : { valid: false, errors }
 }
 

@@ -41,6 +41,7 @@ export default async function WorkflowCanvasRoute({
     source: edge.fromNodeKey,
     target: edge.toNodeKey,
     label: edge.label ?? undefined,
+    data: { condition: edge.condition },
   }))
 
   const isReadOnly = graph.version.status === "published"

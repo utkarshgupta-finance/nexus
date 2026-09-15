@@ -254,31 +254,44 @@ mutation on `go_live_requests`, `go_live_documents`, `entitlement_sources`,
 `fn_audit_row` trigger, including the actor identity snapshot from
 Program 4 Hardening (`docs/AUTHORIZATION_MODEL.md` §21).
 
-### 6.6 Workflow Runtime: display-only, never the real gate
+### 6.6 Workflow Runtime: team routing is real; the permission boundary is not graph-controlled
 
-Go Live is the first business domain to consume the Workflow Builder
+**[Updated, Nexus Foundational Hardening Phase 2 / Workflow Runtime V1,
+supabase/migrations/20260921000000_workflow_runtime_v1.sql. See
+docs/WORKFLOW_ENGINE_ARCHITECTURE.md §3a for the full, current picture
+across all four governed domains, not only Go Live.]**
+
+Go Live was the first business domain to consume the Workflow Builder
 (`docs/CUSTOMER_LIFECYCLE.md` §36) as something more than an authoring
-tool. Before this program, Workflow Builder could author a graph but had
-no reusable execution mechanics; building a second, unrelated hardcoded
-workflow engine would have violated the task's own "do not over-
-generalize" instruction, so a minimal Workflow Runtime was added instead
+tool, via a minimal Workflow Runtime
 (`src/platform/workflow-builder/domain/runtime.ts`):
 
 - `create_go_live_request` resolves and snapshots the currently published
   `go_live` Workflow Definition Version's id onto the request at creation
   time, so an in-flight request keeps the graph it started with even if a
-  newer version is later published.
-- `resolveApprovalStep(nodes)` reads that snapshotted graph's Approval
-  node (`requiredResource`/`requiredAction`/`responsibleTeamId`) purely
-  for **display** (an Operational Queue "Responsible Team" column).
+  newer version is later published. Commercial Configuration Version,
+  Customer Onboarding, and Customer Change now do the identical
+  snapshotting for their own `applies_to`.
+- `approve_go_live_request` (and the other three domains' own `approve_*`
+  RPCs) now call `fn_resolve_workflow_responsible_team` inside the
+  approval transaction itself and require the approving actor to be an
+  active member of the Approval node's named team, if one is set. This
+  is genuinely enforced, not display-only: a Workflow Admin's team
+  choice on an Approval node now controls who may actually approve.
+- `resolveWorkflowApprovalStep` (the same graph walk, kept in TS) is
+  used only to show that team ahead of time, e.g. an Operational Queue
+  "Responsible Team" column; the SQL walk inside the RPC is the real,
+  final authority at the moment of approval.
 
-The real authorization check in `approve_go_live_request` and every other
-Server Action is a fixed, hardcoded `requirePermission("go_live",
-"approve")`, never derived from the graph. This is a deliberate security
-boundary: a database-configured workflow graph must never be able to
-redirect what permission is actually enforced. If a future domain needs
-real conditional routing (a graph literally deciding who must approve),
-that is new scope, not an extension of this runtime.
+The REQUIRED PERMISSION remains a fixed, hardcoded
+`requirePermission("go_live", "approve")` (and the equivalent fixed
+permission for the other three domains), never derived from the graph.
+This is the one piece of the original security boundary that is
+unchanged and non-negotiable: a database-configured workflow graph
+routes WHO (which team) approves, never WHICH PERMISSION is required to
+approve. Real conditional (Decision-node) routing now exists too, for
+Commercial Configuration Version's `segment` field specifically; see
+`docs/WORKFLOW_ENGINE_ARCHITECTURE.md` §3a for its exact, bounded scope.
 
 ## 7. Entitlement Ledger domain
 

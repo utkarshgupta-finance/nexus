@@ -20,6 +20,8 @@ type CaseErrorKind =
   | "onboarding_no_draft_revision"
   | "onboarding_no_submitted_revision"
   | "onboarding_send_back_reason_required"
+  | "workflow_team_required"
+  | "workflow_decision_no_match"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -44,6 +46,8 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   ONBOARDING_CASE_NOT_CANCELLABLE: "onboarding_case_not_cancellable",
   ONBOARDING_CASE_CANCEL_NOT_OWNER: "onboarding_case_cancel_not_owner",
   SELF_APPROVAL_NOT_ALLOWED: "onboarding_case_self_approval_not_allowed",
+  WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
+  WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
 }
 
 const SQLSTATE_KINDS: Record<string, CaseErrorKind> = {

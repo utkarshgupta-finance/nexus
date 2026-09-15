@@ -22,6 +22,8 @@ type GoLiveErrorKind =
   | "go_live_send_back_reason_required"
   | "go_live_confirmation_required"
   | "go_live_self_approval_not_allowed"
+  | "workflow_team_required"
+  | "workflow_decision_no_match"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -48,6 +50,8 @@ const NAMED_TOKEN_KINDS: Record<string, GoLiveErrorKind> = {
   GO_LIVE_SEND_BACK_REASON_REQUIRED: "go_live_send_back_reason_required",
   GO_LIVE_CONFIRMATION_REQUIRED: "go_live_confirmation_required",
   SELF_APPROVAL_NOT_ALLOWED: "go_live_self_approval_not_allowed",
+  WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
+  WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
 }
 
 const SQLSTATE_KINDS: Record<string, GoLiveErrorKind> = {

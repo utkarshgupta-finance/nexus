@@ -24,6 +24,20 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { saveWorkflowVersionGraphAction, publishWorkflowVersionAction } from "../actions"
 import type { WorkflowNodeType, WorkflowDefinitionVersion, WorkflowNodeDraft, WorkflowEdgeDraft } from "../domain/types"
 import type { Team } from "@/platform/team/server"
+import type { WorkflowCondition, WorkflowConditionOperator } from "@/platform/workflow/domain/types"
+
+/**
+ * Decision-node branch fields supported by Workflow Runtime V1
+ * (src/platform/workflow-builder/domain/runtime.ts,
+ * supabase/migrations/20260921000000_workflow_runtime_v1.sql). Small and
+ * explicit on purpose: an edge condition naming a field outside this
+ * list would silently never match anything at approval time, which is
+ * exactly the "misleading configuration" this list exists to prevent.
+ * Extend only alongside a domain's approve_* RPC actually resolving
+ * that field into its context bag.
+ */
+const SUPPORTED_DECISION_FIELDS = ["segment"] as const
+const DECISION_OPERATORS: WorkflowConditionOperator[] = ["equals", "not_equals"]
 
 /**
  * Workflow Builder canvas (task Phase N/O): React Flow owns canvas/node/
@@ -152,7 +166,7 @@ function WorkflowCanvasEditor({
       fromNodeKey: edge.source,
       toNodeKey: edge.target,
       label: typeof edge.label === "string" ? edge.label : null,
-      condition: null,
+      condition: (edge.data?.condition as WorkflowCondition | null | undefined) ?? null,
     }))
     return { nodeDrafts, edgeDrafts }
   }
@@ -193,6 +207,20 @@ function WorkflowCanvasEditor({
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId) ?? null
+  const selectedEdgeSourceType = selectedEdge ? nodes.find((node) => node.id === selectedEdge.source)?.data.nodeType : null
+  const selectedEdgeCondition = (selectedEdge?.data?.condition as WorkflowCondition | null | undefined) ?? null
+
+  function updateSelectedEdgeCondition(patch: Partial<WorkflowCondition>) {
+    if (!selectedEdge) return
+    const base: WorkflowCondition = selectedEdgeCondition ?? { field: SUPPORTED_DECISION_FIELDS[0], operator: "equals", value: "" }
+    const next: WorkflowCondition = { ...base, ...patch }
+    setEdges((current) => current.map((edge) => (edge.id === selectedEdge.id ? { ...edge, data: { ...edge.data, condition: next } } : edge)))
+  }
+
+  function clearSelectedEdgeCondition() {
+    if (!selectedEdge) return
+    setEdges((current) => current.map((edge) => (edge.id === selectedEdge.id ? { ...edge, data: { ...edge.data, condition: null } } : edge)))
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -349,6 +377,52 @@ function WorkflowCanvasEditor({
                     }
                   />
                 </div>
+                {selectedEdgeSourceType === "decision" ? (
+                  <div className="flex flex-col gap-1.5 rounded-md border border-dashed p-2">
+                    <span className="text-[0.65rem] font-medium tracking-wide text-muted-foreground uppercase">Branch Condition</span>
+                    <p className="text-[0.65rem] text-muted-foreground">Leave unset for this branch to be the default (at most one default per Decision node).</p>
+                    <label className="text-xs font-medium text-foreground" htmlFor="edge-condition-field">Field</label>
+                    <Select
+                      value={selectedEdgeCondition?.field ?? ""}
+                      onValueChange={(value) => updateSelectedEdgeCondition({ field: String(value) })}
+                    >
+                      <SelectTrigger id="edge-condition-field" size="sm">
+                        <SelectValue placeholder="Unset (default branch)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_DECISION_FIELDS.map((field) => (
+                          <SelectItem key={field} value={field}>{field}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <label className="text-xs font-medium text-foreground" htmlFor="edge-condition-operator">Operator</label>
+                    <Select
+                      value={selectedEdgeCondition?.operator ?? "equals"}
+                      onValueChange={(value) => updateSelectedEdgeCondition({ operator: value as WorkflowConditionOperator })}
+                    >
+                      <SelectTrigger id="edge-condition-operator" size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DECISION_OPERATORS.map((operator) => (
+                          <SelectItem key={operator} value={operator}>{operator}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <label className="text-xs font-medium text-foreground" htmlFor="edge-condition-value">Value</label>
+                    <Input
+                      id="edge-condition-value"
+                      placeholder="e.g. enterprise"
+                      value={typeof selectedEdgeCondition?.value === "string" ? selectedEdgeCondition.value : ""}
+                      onChange={(event) => updateSelectedEdgeCondition({ value: event.target.value })}
+                    />
+                    {selectedEdgeCondition ? (
+                      <Button variant="outline" size="sm" onClick={clearSelectedEdgeCondition}>
+                        Clear (make this the default branch)
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"

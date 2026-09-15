@@ -22,6 +22,8 @@ type CommercialVersionErrorKind =
   | "commercial_version_no_draft_revision"
   | "commercial_version_reject_reason_required"
   | "commercial_version_already_open"
+  | "workflow_team_required"
+  | "workflow_decision_no_match"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -47,6 +49,8 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   COMMERCIAL_VERSION_NOT_CANCELLABLE: "commercial_version_not_cancellable",
   COMMERCIAL_VERSION_CANCEL_NOT_OWNER: "commercial_version_cancel_not_owner",
   SELF_APPROVAL_NOT_ALLOWED: "commercial_version_self_approval_not_allowed",
+  WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
+  WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
 }
 
 const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {

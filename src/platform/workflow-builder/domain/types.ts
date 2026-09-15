@@ -1,13 +1,22 @@
 /**
- * Workflow Builder domain types (task Phase N/O): a node-graph process
- * model (Start/Form Step/Approval/Decision/End), distinct from the
- * existing flat, condition-triggered rule evaluator in
- * `src/platform/workflow/domain/types.ts` (still the only workflow
- * mechanism Customer Change actually runs today, unchanged by this
- * module). Matches
+ * Workflow Builder domain types: a node-graph process model (Start/Form
+ * Step/Approval/Decision/End). Matches
  * supabase/migrations/20260916090000_workflow_builder_foundation.sql
  * column-for-column.
+ *
+ * `WorkflowEdge.condition`/`WorkflowEdgeDraft.condition` reuse
+ * `WorkflowCondition` from `src/platform/workflow/domain/types.ts` (the
+ * separate, older flat rule evaluator Customer Change's own hardcoded
+ * rule array runs, unchanged by this module) for field/operator/value
+ * vocabulary only, not its evaluator: Workflow Runtime V1
+ * (supabase/migrations/20260921000000_workflow_runtime_v1.sql,
+ * src/platform/workflow-builder/domain/runtime.ts) evaluates a
+ * Decision-node edge's condition against a static per-domain context
+ * bag (there is no current/proposed distinction for approval routing),
+ * restricted to "equals"/"not_equals"; "changed" is rejected at publish
+ * time since it is not meaningful here.
  */
+import type { WorkflowCondition } from "@/platform/workflow/domain/types"
 
 type WorkflowAppliesTo = "customer_onboarding" | "customer_change" | "commercial_configuration" | "go_live" | "agreement"
 
@@ -70,7 +79,7 @@ type WorkflowEdge = {
   fromNodeKey: string
   toNodeKey: string
   label: string | null
-  condition: unknown | null
+  condition: WorkflowCondition | null
 }
 
 /** The shape `save_workflow_version_graph` accepts: a plain node/edge draft, never a row id (the RPC replaces the whole graph and mints fresh rows every save). */
@@ -90,7 +99,7 @@ type WorkflowEdgeDraft = {
   fromNodeKey: string
   toNodeKey: string
   label: string | null
-  condition: unknown | null
+  condition: WorkflowCondition | null
 }
 
 export type {

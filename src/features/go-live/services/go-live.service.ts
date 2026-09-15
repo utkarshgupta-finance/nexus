@@ -3,7 +3,7 @@ import "server-only"
 import * as goLiveData from "../data/go-live.data"
 import { toGoLiveRequest, toGoLiveSendBackEntry } from "../domain/mappers"
 import { resolveActorLabels } from "@/platform/audit/server"
-import { loadWorkflowGraph, resolveApprovalStep } from "@/platform/workflow-builder/server"
+import { loadWorkflowGraph, resolveWorkflowApprovalStep, DEFAULT_APPROVAL_STEP } from "@/platform/workflow-builder/server"
 import type { ResolvedApprovalStep } from "@/platform/workflow-builder/server"
 import type { GoLiveRequest, GoLiveSendBackEntry } from "../domain/types"
 import type { CreateGoLiveRequestInput } from "../data/go-live.data"
@@ -88,24 +88,28 @@ async function listSendBacksForGoLiveRequest(goLiveRequestId: string): Promise<G
 }
 
 /**
- * Resolves what the bound Workflow Version's Approval node names as
- * responsible, for DISPLAY only (e.g. an Operational Queue "Responsible
- * Team" column) — never as the actual authorization gate. The real
- * `requirePermission("go_live", "approve")` check in actions.ts is
- * always the fixed, hardcoded permission: letting a database-configured
- * graph value determine which permission string gets checked would let
- * anyone able to author a workflow graph redirect authorization itself,
- * which is a materially different (and much riskier) trust boundary
- * than "this graph names a team for display purposes." Falls back to
+ * Resolves what the bound Workflow Version names as responsible, for
+ * DISPLAY (e.g. an Operational Queue "Responsible Team" column) ahead of
+ * an actual approval attempt. As of Workflow Runtime V1
+ * (supabase/migrations/20260921000000_workflow_runtime_v1.sql), the
+ * TEAM this resolves to is genuinely enforced: `approve_go_live_request`
+ * runs the identical graph walk (`fn_resolve_workflow_responsible_team`)
+ * inside the approval transaction itself, so this display and the real
+ * gate agree by construction. The REQUIRED PERMISSION stays the fixed,
+ * hardcoded `requirePermission("go_live", "approve")` in actions.ts
+ * regardless of what an Approval node's `resource`/`action` says
+ * (surfaced here for display only): a workflow graph can route WHICH
+ * TEAM must approve, never WHICH PERMISSION is required, so authoring a
+ * graph can never itself grant broader approval rights. Falls back to
  * the hardcoded default when the request has no bound
- * workflow_version_id (no graph was published for go_live yet at
- * creation time) or that version's graph has no Approval node.
+ * workflow_version_id, that version's graph has no Start node, or no
+ * Approval node is reached along the path taken.
  */
 async function resolveApprovalStepForGoLiveRequest(request: GoLiveRequest): Promise<ResolvedApprovalStep> {
-  if (!request.workflowVersionId) return { resource: "go_live", action: "approve", responsibleTeamId: null }
+  if (!request.workflowVersionId) return DEFAULT_APPROVAL_STEP
   const graph = await loadWorkflowGraph(request.workflowVersionId)
-  if (!graph) return { resource: "go_live", action: "approve", responsibleTeamId: null }
-  return resolveApprovalStep(graph.nodes)
+  if (!graph) return DEFAULT_APPROVAL_STEP
+  return resolveWorkflowApprovalStep(graph.nodes, graph.edges, {}) ?? DEFAULT_APPROVAL_STEP
 }
 
 /** Batched actor-label resolution for a set of Go Live requests: created/sent-back/approved/cancelled actors, ready for a UI to render human names, never raw ids. */

@@ -33,5 +33,5 @@ export type {
   WorkflowVersionStatus,
 } from "./domain/types"
 export type { WorkflowGraphValidationResult } from "./domain/validation"
-export { resolveApprovalStep, DEFAULT_APPROVAL_STEP } from "./domain/runtime"
+export { resolveApprovalStep, resolveWorkflowApprovalStep, DEFAULT_APPROVAL_STEP } from "./domain/runtime"
 export type { ResolvedApprovalStep } from "./domain/runtime"

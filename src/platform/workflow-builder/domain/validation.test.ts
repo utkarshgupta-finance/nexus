@@ -174,3 +174,71 @@ describe("validateWorkflowGraph", () => {
     if (!result.valid) expect(result.errors.some((error) => error.includes("does not exist"))).toBe(true)
   })
 })
+
+describe("validateWorkflowGraph: Decision node branches (Workflow Runtime V1)", () => {
+  function decisionGraph(edgesFromDecision: WorkflowEdgeDraft[]): { nodes: WorkflowNodeDraft[]; edges: WorkflowEdgeDraft[] } {
+    return {
+      nodes: [
+        node({ nodeKey: "start", nodeType: "start" }),
+        node({ nodeKey: "decide", nodeType: "decision" }),
+        node({ nodeKey: "approve_a", nodeType: "approval" }),
+        node({ nodeKey: "approve_b", nodeType: "approval" }),
+        node({ nodeKey: "end", nodeType: "end" }),
+      ],
+      edges: [
+        { fromNodeKey: "start", toNodeKey: "decide", label: null, condition: null },
+        ...edgesFromDecision,
+        { fromNodeKey: "approve_a", toNodeKey: "end", label: null, condition: null },
+        { fromNodeKey: "approve_b", toNodeKey: "end", label: null, condition: null },
+      ],
+    }
+  }
+
+  it("accepts a Decision node with one conditioned branch and one default branch", () => {
+    const { nodes, edges } = decisionGraph([
+      { fromNodeKey: "decide", toNodeKey: "approve_a", label: null, condition: { field: "segment", operator: "equals", value: "enterprise" } },
+      { fromNodeKey: "decide", toNodeKey: "approve_b", label: "Default", condition: null },
+    ])
+    expect(validateWorkflowGraph(nodes, edges, NO_CONTEXT)).toEqual({ valid: true })
+  })
+
+  it("rejects a Decision node with fewer than two outgoing branches", () => {
+    const { nodes, edges } = decisionGraph([{ fromNodeKey: "decide", toNodeKey: "approve_a", label: null, condition: null }])
+    // approve_b is now unreachable/disconnected in this shape; drop it to isolate the "too few branches" error.
+    const trimmedNodes = nodes.filter((n) => n.nodeKey !== "approve_b")
+    const trimmedEdges = edges.filter((e) => e.fromNodeKey !== "approve_b" && e.toNodeKey !== "approve_b")
+    const result = validateWorkflowGraph(trimmedNodes, trimmedEdges, NO_CONTEXT)
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors.some((error) => error.includes("at least two outgoing branches"))).toBe(true)
+  })
+
+  it("rejects a Decision node with two default (unconditioned) branches", () => {
+    const { nodes, edges } = decisionGraph([
+      { fromNodeKey: "decide", toNodeKey: "approve_a", label: null, condition: null },
+      { fromNodeKey: "decide", toNodeKey: "approve_b", label: null, condition: null },
+    ])
+    const result = validateWorkflowGraph(nodes, edges, NO_CONTEXT)
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors.some((error) => error.includes("more than one default"))).toBe(true)
+  })
+
+  it("rejects a Decision branch with an unsupported operator", () => {
+    const { nodes, edges } = decisionGraph([
+      { fromNodeKey: "decide", toNodeKey: "approve_a", label: null, condition: { field: "segment", operator: "changed", value: "enterprise" } },
+      { fromNodeKey: "decide", toNodeKey: "approve_b", label: null, condition: null },
+    ])
+    const result = validateWorkflowGraph(nodes, edges, NO_CONTEXT)
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors.some((error) => error.includes("unsupported operator"))).toBe(true)
+  })
+
+  it("rejects a Decision branch with an empty field", () => {
+    const { nodes, edges } = decisionGraph([
+      { fromNodeKey: "decide", toNodeKey: "approve_a", label: null, condition: { field: "", operator: "equals", value: "enterprise" } },
+      { fromNodeKey: "decide", toNodeKey: "approve_b", label: null, condition: null },
+    ])
+    const result = validateWorkflowGraph(nodes, edges, NO_CONTEXT)
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors.some((error) => error.includes("no field set"))).toBe(true)
+  })
+})

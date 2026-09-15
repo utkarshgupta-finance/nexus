@@ -96,36 +96,77 @@ document does not describe it.
 
 ### 3a. Runtime truth table: is approval routing actually driven by Workflow Builder?
 
-(NEXUS ACCEPTANCE CLOSURE, Part C1.) Workflow Builder (`platform/
-workflow-builder`) lets an admin author and publish a real, persisted
-approval graph per domain. Separately, an independent maker/checker
-system already gates every real submit/approve/reject action. This
-table states plainly, per domain, which one actually decides who is
-allowed to approve something today:
+**[IMPLEMENTED, Nexus Foundational Hardening Phase 2 / Workflow Runtime V1,
+supabase/migrations/20260921000000_workflow_runtime_v1.sql.]** This
+section previously concluded "publishing or editing a workflow graph
+today never changes who can actually approve anything, in any domain."
+That is no longer true for TEAM ROUTING. It remains true for WHICH
+PERMISSION is required, by deliberate design:
 
-| Domain | Runtime approval routing | Evidence |
-| --- | --- | --- |
-| Customer Onboarding | INDEPENDENT of Workflow Builder | `submit_customer_onboarding_case`/`approve_customer_onboarding_case` (`supabase/migrations/20260913040000_customer_lifecycle_onboarding_foundation.sql`, `20260917010000_self_approval_control.sql`) contain zero `workflow_*` references. Gating is `requirePermission` plus a hardcoded `created_by` self-approval check. |
-| Customer Change | INDEPENDENT of Workflow Builder | `submit_customer_change_request`/`approve_customer_change_request` (`supabase/migrations/20260913060000_customer_change_request_foundation.sql`) also have zero `workflow_*` references. `src/features/customer-change/domain/workflow-rules.ts` calls the pure evaluator from §3 above against a hardcoded array; that is a separate, table-less TypeScript system, not the Workflow Builder graph. |
-| Commercial Version | INDEPENDENT of Workflow Builder | `submit_commercial_configuration_version`/`approve_commercial_configuration_version` (`supabase/migrations/20260913070000_commercial_configuration_version_lifecycle.sql`) have zero `workflow_*` references; same maker/checker/self-approval pattern. |
-| Go Live | INDEPENDENT of Workflow Builder for authorization; the one domain that reads the graph at all, and only for display | `create_go_live_request` snapshots the currently published `go_live` workflow version's id onto the request row (`supabase/migrations/20260918010000_go_live_domain.sql`). `resolveApprovalStep` (`src/platform/workflow-builder/domain/runtime.ts`) reads that graph's Approval node purely to populate a "Responsible Team" display column. `approve_go_live_request` itself has zero `workflow_*` reference; gating is a hardcoded `requirePermission("go_live", "approve")` (`src/features/go-live/actions.ts`) plus the same self-approval check. |
+- **Team routing is now real.** All four domains' `approve_*` RPCs call
+  `fn_resolve_workflow_responsible_team(workflow_version_id, context)`,
+  which walks the bound published graph (Start -> optional Decision
+  branches -> the first Approval node reached) and, if that node names a
+  `responsible_team_id`, requires the approving actor to be an active
+  member of that team (`fn_require_workflow_team_membership`), raising
+  `WORKFLOW_TEAM_REQUIRED` otherwise. A Workflow Admin selecting "Team =
+  Legal" on an Approval node now genuinely restricts who may approve.
+- **The required permission stays fixed and domain-owned.** Every
+  `approve_*` Server Action still calls a hardcoded
+  `requirePermission(resource, action)` (`go_live`/`approve`,
+  `commercial_configuration`/`approve`, `customer`/`approve` for both
+  Onboarding and Change) regardless of what an Approval node's
+  `required_resource`/`required_action` say. Those fields are still
+  surfaced for display (and validated at publish time to match the
+  domain's own fixed permission, so the Builder can never advertise a
+  permission it cannot deliver), but a workflow graph can never redirect
+  which permission gates approval. This is the same security boundary
+  this document and `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §6.6
+  already named as non-negotiable; only the team-scoping half of "the
+  Builder controls runtime" moved from aspirational to real.
+- **Decision nodes now branch for real, in one domain.** Commercial
+  Configuration Version resolves its Decision context as
+  `{"segment": <customer's current or newly-proposed segment>}`; the
+  other three domains pass `{}` (an empty context), so a Decision node
+  used there always falls to its default (unconditioned) branch, or
+  raises `WORKFLOW_DECISION_NO_MATCH` if it has none. Extending Decision
+  context to another domain/field is a small, explicit addition (see
+  `SUPPORTED_DECISION_FIELDS` in
+  `src/platform/workflow-builder/ui/workflow-canvas-editor.tsx` and the
+  matching `jsonb_build_object(...)` call in that domain's `approve_*`
+  RPC), never a silent one: an unsupported field never partially works.
+- **Version binding now exists for all four domains**, not only Go
+  Live: `commercial_configuration_versions.workflow_version_id`,
+  `customer_onboarding_cases.workflow_version_id`, and
+  `customer_change_requests.workflow_version_id` are each resolved once,
+  at creation, to the currently published version for that `applies_to`
+  (identical to Go Live's pre-existing pattern), and never re-resolved:
+  an in-flight request keeps the graph it started with.
 
-Verified live (NEXUS ACCEPTANCE CLOSURE, Part C1): the checker test
-persona, granted the `workflow_admin` role through the normal
-`grant_user_role` RPC, can reach Settings > Workflows, open an existing
-draft workflow, and see its React Flow canvas render correctly. This
-confirms Workflow Builder access itself works; it does not change any
-verdict in the table above.
+| Domain | Runtime approval routing |
+| --- | --- |
+| Go Live | Team routing: REAL (enforced in `approve_go_live_request`). Permission: fixed (`go_live`/`approve`). |
+| Commercial Version | Team routing: REAL, Decision-aware on `segment` (enforced in `approve_commercial_configuration_version`). Permission: fixed (`commercial_configuration`/`approve`). |
+| Customer Onboarding | Team routing: REAL (enforced in `approve_customer_onboarding_case`). Permission: fixed (`customer`/`approve`). |
+| Customer Change | Team routing: REAL (enforced in `approve_customer_change_request`). Permission: fixed (`customer`/`approve`). Still separately runs its own pure rule evaluator (§3) against a hardcoded array for evidence/approval REQUIREMENTS; that remains a distinct system from Workflow Builder's graph, unchanged by this phase. |
 
-**Bottom line:** publishing or editing a workflow graph today never
-changes who can actually approve anything, in any domain. This is the
-deliberate security boundary this document and
-`docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §6.6 both already state: a
-database-configured graph must never be able to redirect what
-permission is actually enforced. Treat any future claim that "the
-workflow decides the approvers" as false until a domain's RPC is shown
-to genuinely query `workflow_definitions`/`workflow_definition_versions`
-for that decision, not merely to snapshot a graph id for display.
+`src/platform/workflow-builder/domain/runtime.ts`'s
+`resolveWorkflowApprovalStep` is the identical algorithm, kept for
+pre-approval DISPLAY only (so a reviewer sees the responsible team
+before opening a request); the SQL walk inside the approval transaction
+is the actual authority. The older `resolveApprovalStep` (picks the
+first Approval node by key, ignoring edges entirely) is kept only for
+backward compatibility with code not yet migrated to the real walk.
+
+**Bottom line, corrected:** a workflow graph now genuinely controls WHO
+(which team) approves, in all four domains. It still never controls
+WHICH PERMISSION is required to approve — that remains a fixed,
+Nexus-owned invariant, never redirectable by whoever can author a
+graph. Treat any future claim that "the workflow decides the required
+permission" as false; treat "the workflow decides the responsible team"
+as true and tested (`src/platform/workflow-builder/domain/runtime.test.ts`,
+live-verified through the real Builder UI, see Phase 2's own closeout
+notes).
 
 ## 4. Field-level rules and stable field identity
 
@@ -286,7 +327,9 @@ claims**, none of which describe this document's own pure evaluator: a
 real database-persisted, React Flow-based Workflow Builder was built
 later (§3, Platform Operating Expansion Phase N/O) and now has real
 migrations, a real Settings UI, and real draft/publish/version
-lifecycle. It remains true, and is now explicitly re-confirmed in §3a,
-that no domain's authorization is actually resolved from it: "no
-authorization-aware role resolution" is still accurate for the system
-this document describes, and by design for Workflow Builder too.
+lifecycle. As of Workflow Runtime V1 (§3a, Nexus Foundational Hardening
+Phase 2), "no authorization-aware role resolution" is partially
+superseded again: TEAM routing is now genuinely resolved from a
+published graph and enforced at approval time, in all four domains.
+WHICH PERMISSION is required remains fixed and never graph-resolved,
+by deliberate, unchanged design (§3a).

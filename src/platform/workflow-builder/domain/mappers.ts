@@ -9,6 +9,7 @@ import type {
   WorkflowVersionStatus,
   WorkflowNodeConfig,
 } from "./types"
+import type { WorkflowCondition } from "@/platform/workflow/domain/types"
 
 /** Pure row -> domain mappers, no I/O, safe to unit test directly. */
 
@@ -62,7 +63,7 @@ function toWorkflowEdge(row: WorkflowEdgeRow): WorkflowEdge {
     fromNodeKey: row.from_node_key,
     toNodeKey: row.to_node_key,
     label: row.label,
-    condition: row.condition,
+    condition: (row.condition ?? null) as WorkflowCondition | null,
   }
 }
 
