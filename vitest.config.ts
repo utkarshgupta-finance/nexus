@@ -20,12 +20,8 @@ export default defineConfig({
     // `isolate: true` spawns one fresh fork per test file (98 files here).
     // On a memory-constrained machine that starves whichever file happens
     // to spawn under peak contention, a different file each run, not a
-    // real regression. Capping the fork pool bounds concurrent process
+    // real regression. Bounding worker count caps concurrent process
     // count to what the machine can actually run without thrashing.
-    poolOptions: {
-      forks: {
-        maxForks: 4,
-      },
-    },
+    maxWorkers: 4,
   },
 })
