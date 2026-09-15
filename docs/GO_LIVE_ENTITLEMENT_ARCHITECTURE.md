@@ -162,26 +162,36 @@ approved successfully after the fix, materializing as the customer's
 new active Commercial Configuration Version with the prior version
 correctly superseded.
 
-**Known gap, not yet closed.** The RPC-side carry-forward parameter now
-works correctly, but nothing on the TypeScript side calls it with a real
-value yet:
-`mapOnboardingComponentToCommercialComponentInsert`
-(`src/features/customer-onboarding/domain/commercial-configuration-promotion.ts`)
-does not include `stable_component_key` in the payload it builds for any
-component, onboarding or amendment. In practice this means every
-component minted today, including one carried forward unchanged across
-a Version amendment, gets a brand new `stable_component_key` equal to
-its own new row id, exactly as it always has (this is not a regression:
-the RPC-side crash meant no component had ever successfully carried a
-key forward before this fix either). True cross-version identity
-continuity (the stated purpose of this column, and the basis Go Live and
-the Entitlement Ledger are described as keying on above) requires the
-promotion layer to identify which draft components were reconstructed
-from a still-active prior-version row and thread that row's real
-`stable_component_key` through. This is a real, disclosed boundary, not
-a silent gap: treat any Go Live or Entitlement Ledger continuity claim
-across a Commercial Version amendment as unverified until this is
-implemented.
+**Gap closed (Nexus Foundational Hardening, Phase 1).** The RPC-side
+carry-forward parameter worked correctly, but nothing on the TypeScript
+side called it with a real value: every component minted by an amendment
+got a brand new `stable_component_key` equal to its own new row id, every
+time, regardless of whether the underlying line item was continuing or
+genuinely new.
+
+The actual missing link was one layer higher than first suspected.
+`mapOnboardingComponentToCommercialComponentInsert` was never the right
+place for it: that mapper only ever produces business-rule fields
+(pricing, cadence, FX), and correctly carries no identity of any kind.
+The real gap was that `CommercialComponentDraft`
+(`src/features/customer-onboarding/domain/commercial-rate.ts`) had no
+`stableComponentKey` field at all, conflating identity with `id` (the
+transient per-version row id, which is never stable across an
+amendment). Fixed by adding `stableComponentKey` to the draft type,
+seeding it from the persisted row in `toDraftComponent`
+(`.../domain/commercial-configuration-view.ts`), preserving it through a
+Rate/MUG/pricing-model-only edit (`changePricingModel`,
+`.../ui/commercial-rate-section.tsx`), and sending it through as
+`stable_component_key` in `approveVersion`'s RPC payload
+(`.../services/commercial-version.service.ts`). A genuinely new
+component's `stableComponentKey` is `null` on the draft
+(`createComponent`), so the RPC's own `coalesce(p_stable_component_key,
+p_new_commercial_component_id)` mints a fresh identity for it, exactly as
+designed. Covered by regression tests in `commercial-rate.test.ts`,
+`commercial-configuration-view.test.ts`, and
+`commercial-version.service.test.ts` (the last asserts the actual RPC
+payload, not only the domain mapper). Cross-version identity continuity
+is no longer an unverified claim: it is the behavior these tests guard.
 
 Every Go Live request, Entitlement Source, Monthly Usage row, and
 Monthly Entitlement Ledger row is keyed by `stable_component_key`, never

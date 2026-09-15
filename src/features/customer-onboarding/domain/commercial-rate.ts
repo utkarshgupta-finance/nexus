@@ -425,6 +425,19 @@ function formatPercentForMessage(value: number): string {
 
 type CommercialComponentBase = {
   id: string
+  /**
+   * The commercial component's persistent business identity across
+   * Commercial Version amendments (`commercial_components.stable_component_key`),
+   * distinct from `id` (a new row, and therefore a new `id`, is created on
+   * every amendment). `null` means this draft component has no prior
+   * persisted identity to carry forward: either it is genuinely new
+   * (`createComponent`), or it predates this field. `toDraftComponent`
+   * seeds this from the active row's own `stableComponentKey`; the
+   * amendment approval payload builder must send this value through
+   * unchanged so `approve_commercial_configuration_version` carries the
+   * same identity forward instead of minting a new one.
+   */
+  stableComponentKey: string | null
   /** Free text component name, e.g. "SFA", "Implementation", "WhatsApp". Never restricted to a fixed product list. */
   description: string
   invoiceTerms: InvoiceTerms
@@ -502,6 +515,7 @@ function createComponent(nature: CommercialNature, pricingModel?: PricingModel):
   const model = pricingModel ?? defaultPricingModelFor(nature)
   const base: CommercialComponentBase = {
     id: newId(),
+    stableComponentKey: null,
     description: "",
     invoiceTerms: nature === "non_recurring" ? { ...emptyInvoiceTerms(), invoiceFrequency: "one_time" } : emptyInvoiceTerms(),
     effectiveFrom: null,

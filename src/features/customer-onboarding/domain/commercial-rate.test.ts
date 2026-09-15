@@ -80,6 +80,12 @@ describe("createComponent", () => {
     expect(component.invoiceTerms.invoiceFrequency).toBeNull()
   })
 
+  it("Stable Commercial Component Identity: a genuinely new component has no stableComponentKey, so the amendment RPC mints one", () => {
+    expect(createComponent("recurring", "per_unit").stableComponentKey).toBeNull()
+    expect(createComponent("recurring", "flat_fee").stableComponentKey).toBeNull()
+    expect(createComponent("non_recurring", "slab").stableComponentKey).toBeNull()
+  })
+
   it("creates a Recurring Flat Fee component with no MUG field at all (no unit basis)", () => {
     const component = createComponent("recurring", "flat_fee")
     expect(component.pricingModel).toBe("flat_fee")

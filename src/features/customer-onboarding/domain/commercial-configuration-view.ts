@@ -96,6 +96,7 @@ function toDraftComponent(component: CommercialComponent): CommercialComponentDr
 
   const base = {
     id: component.id,
+    stableComponentKey: component.stableComponentKey,
     description: typeof params.name === "string" ? params.name : "",
     invoiceTerms,
     effectiveFrom: component.effectiveFrom,

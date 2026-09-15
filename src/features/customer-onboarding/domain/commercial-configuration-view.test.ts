@@ -198,6 +198,18 @@ describe("toDraftComponent", () => {
     expect(() => toDraftComponent(component)).not.toThrow()
     expect(toDraftComponent(component).nature).toBe("recurring")
   })
+
+  it("Stable Commercial Component Identity: carries the persisted row's stableComponentKey onto the draft, distinct from the row's own id", () => {
+    const component = baseComponent({
+      id: "row-v3",
+      stableComponentKey: "stable-key-abc",
+      pricingRuleKind: "flat",
+      pricingRuleParameters: { amount: 5000, commercialNature: "recurring" },
+    })
+    const draft = toDraftComponent(component)
+    expect(draft.id).toBe("row-v3")
+    expect(draft.stableComponentKey).toBe("stable-key-abc")
+  })
 })
 
 describe("Slab-wise MUG reconstruction (stable identity: keyed by tier position, the same precedent already used for Slab band diffing)", () => {

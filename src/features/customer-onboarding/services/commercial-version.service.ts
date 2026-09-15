@@ -124,6 +124,15 @@ async function approveVersion(requestId: string, actorUserId: string, snapshot: 
           fx_snapshot_rate: mapped.fxSnapshotRate,
           effective_from: mapped.effectiveFrom,
           mug_threshold_value: mapped.mugThresholdValue,
+          // Stable Commercial Component Identity: a component reconstructed
+          // from the currently active row (getCurrentCommercialRateDraft ->
+          // toDraftComponent) carries that row's own stableComponentKey
+          // forward unchanged. A genuinely new component added in this
+          // version has none (createComponent seeds null), so
+          // approve_commercial_configuration_version's own
+          // coalesce(p_stable_component_key, p_new_commercial_component_id)
+          // mints a fresh identity for it, exactly once.
+          stable_component_key: component.stableComponentKey,
         }
       })
 

@@ -752,6 +752,7 @@ function changePricingModel(component: CommercialComponentDraft, pricingModel: P
   return {
     ...fresh,
     id: component.id,
+    stableComponentKey: component.stableComponentKey,
     description: component.description,
     notes: component.notes,
     effectiveFrom: component.effectiveFrom,

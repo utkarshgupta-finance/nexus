@@ -1442,6 +1442,28 @@ allow this one column to be set once from null, exactly like the
 pre-existing `effective_to` allowance. Full detail in `docs/
 GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §5.
 
+**Nexus Foundational Hardening, Phase 1: closed a real client-side gap in
+"carried forward unchanged."** `approve_commercial_configuration_version`
+always correctly forwarded whatever `stable_component_key` its caller
+supplied per component; the caller (the amendment/rate-change UI's
+`CommercialComponentDraft`) never actually carried one, at all, on any
+component, because the draft type itself had no field to hold it (only
+`id`, the transient per-version row id) and the RPC payload builder in
+`src/features/customer-onboarding/services/commercial-version.service.ts`
+never populated one. Every amendment therefore silently minted a brand
+new identity for every component, unconditionally, since the day this
+column shipped. Fixed by adding `stableComponentKey` to
+`CommercialComponentBase` (`.../domain/commercial-rate.ts`), seeding it
+from the persisted row in `toDraftComponent`
+(`.../domain/commercial-configuration-view.ts`), preserving it through a
+Rate/MUG/pricing-model-only edit (`changePricingModel`,
+`.../ui/commercial-rate-section.tsx`), and finally sending it through as
+`stable_component_key` in `approveVersion`'s RPC payload. A genuinely new
+component's `stableComponentKey` is `null` on the draft
+(`createComponent`), so the RPC's own
+`coalesce(p_stable_component_key, p_new_commercial_component_id)` mints a
+fresh identity for it, exactly as designed.
+
 ## 23. What this document is not
 
 Not a database schema. Not an implementation. Not a decision on Flowable,
