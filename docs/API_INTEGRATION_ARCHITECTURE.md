@@ -50,14 +50,28 @@ inline in the Server Action rather than in a service function (see
 future second caller of either capability would either duplicate that
 branch or have to notice it lives in the wrong layer.
 
-## 2. Versioned routes: FUTURE
+## 2. Versioned routes: IMPLEMENTED FOUNDATION (corrected; this section previously said no `/api/v1` existed)
 
-No `/api/*` route exists yet beyond `/api/geography/*` (a same-origin,
-server-only proxy over a local dataset, not a public/integration API) and
-`/api/demo/customer-documents/*` (synthetic demo PDFs, not real data).
-When a real public or internal API is built, it starts at `/api/v1/...`
-from its very first version, per `docs/PLATFORM_ARCHITECTURE.md` §9. There
-is no `/api/v2` to plan for yet because there is no `/api/v1` yet.
+`/api/v1` is real: `GET /api/v1/customers`, `GET /api/v1/customers/[id]`,
+and `GET /api/v1/onboarding/[id]` (`src/app/api/v1/*`), each behind
+`requireApiPermission` and `handleApiV1Request`
+(`src/platform/api/server.ts`), each mapping its result to a real DTO
+(`CustomerDto`, `OnboardingCaseDto`) rather than a raw database row,
+matching §3 below. This is a genuine second caller of the same service
+layer the UI uses, not a parallel implementation.
+
+What is still missing, honestly stated: no route accepts a request body
+yet (no POST/PATCH anywhere in `api/v1`), and no Go Live, Entitlement, or
+Usage routes exist in any form. The shared scaffold (auth, error shape,
+DTO convention) already generalizes cleanly to them once a real caller
+needs it; building them ahead of that need is explicitly out of scope
+(§9's own "no machine auth without a real caller" principle applies
+equally to unused read/write routes).
+
+`/api/geography/*` (a same-origin, server-only proxy over a local
+dataset) and `/api/demo/customer-documents/*` (synthetic demo PDFs)
+remain outside this versioning scheme, correctly: neither is a public or
+integration API surface.
 
 ## 3. Stable application DTOs, never raw database rows: FUTURE (principle recorded now)
 

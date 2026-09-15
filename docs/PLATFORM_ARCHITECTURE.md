@@ -504,20 +504,19 @@ regression is expected from this round's changes, which touch only
 server-side data composition); a real bundle-size pass is future work, not
 claimed as done here.
 
-## 12b. Library decision closure [Platform Scale Closure, Phase W]
+## 12b. Library decision closure [Platform Scale Closure, Phase W; React Flow entry corrected, NEXUS FULL PRODUCT READINESS]
 
 Explicit, current-need-based decisions, confirmed against the actual
-installed dependency list (no date/decimal/table/state-machine/diagram/
-schema library is installed today):
+installed dependency list:
 
 | Library | Decision | Concrete trigger |
 |---|---|---|
 | Date (date-fns/Luxon) | **DO NOT USE** | `src/lib/date.ts` (Phase H) already covers Nexus's actual operations: parse a business date, compare, and two fixed display formats. Adopt only if a real calendar-arithmetic need appears that native `Date` cannot express cleanly (business-day counting, recurring schedules, DST-aware scheduling), not merely because more call sites accumulate. |
 | Decimal (decimal.js/big.js) | **DO NOT USE** | The Money Policy (`docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §18a/18b) already confines rounding to one canonical module. No observed floating-point discrepancy exists in an authoritative calculation; adopt only if one is actually found, or if a real requirement needs more than 2 decimal places of precision. |
 | TanStack Table | **USE WHEN** | Every current list (Customers, My Requests, Approvals, My Work, the new Operational Queue) is small and composed from raw `components/ui/table` primitives correctly. Adopt when a real list needs user-controlled sorting, column state, or virtualization for a large dataset, per the existing `docs/UI_SYSTEM.md` §19/`docs/TECH_DEBT.md` trigger, unchanged this round. |
-| XState | **DO NOT USE** | The three governed lifecycles (Onboarding, Customer Change, Commercial Version) still have genuinely different Request/Revision/Send-Back/Requirement/Decision shapes (confirmed again this round: Commercial Version has no send-back/resubmit cycle at all, `docs/CUSTOMER_LIFECYCLE.md` §19-20). A shared state machine would mean designing for the union of three shapes with no second real consumer yet. Adopt only once transition mechanics genuinely repeat across lifecycles AND a shared machine measurably reduces complexity, not merely because three similar-looking status enums exist. |
-| React Flow | **DO NOT USE** | No visual workflow-authoring feature is planned; `docs/WORKFLOW_ENGINE_ARCHITECTURE.md` remains design-draft. Adopt only if visual workflow authoring becomes a real, scoped product feature. |
-| Zod | **USE WHEN** | `/api/v1` (Phase B) exists but only as GET reads with simple query-parameter clamping (`limit`/`offset`), which a few lines of manual validation already handle correctly and legibly. Adopt once a route accepts a real request body (a POST/PUT with a nested object shape) where hand-rolled validation would be error-prone and Zod's schema-to-type inference pays for itself; do not add it speculatively ahead of that. |
+| XState | **DO NOT USE** | The three governed lifecycles (Onboarding, Customer Change, Commercial Version) still have genuinely different Request/Revision/Send-Back/Requirement/Decision shapes (confirmed again this round: Commercial Version has no send-back/resubmit cycle at all, `docs/CUSTOMER_LIFECYCLE.md` §19-20). A shared state machine would mean designing for the union of three shapes with no second real consumer yet. Adopt only once transition mechanics genuinely repeat across lifecycles AND a shared machine measurably reduces complexity, not merely because three similar-looking status enums exist. Go Live's own status transitions were checked again in the NEXUS FULL PRODUCT READINESS program: still a plain derived-status function over a status string, no strain found. |
+| React Flow (`@xyflow/react`) | **USE NOW** (corrected; this row previously said DO NOT USE) | Visual workflow authoring became a real, scoped product feature in Platform Operating Expansion Phase N/O (`docs/CUSTOMER_LIFECYCLE.md` §36) and is installed and in active use in `src/platform/workflow-builder/ui/workflow-canvas-editor.tsx`, scoped correctly to canvas mechanics only: Nexus persists `position_x`/`position_y`, everything else is derived from `workflow_nodes`/`workflow_edges` on load. This row was never updated when that adoption happened; corrected here rather than left contradicting reality. |
+| Zod | **USE WHEN** | `/api/v1` (Phase B) exists but only as GET reads with simple query-parameter clamping (`limit`/`offset`), which a few lines of manual validation already handle correctly and legibly. Adopt once a route accepts a real request body (a POST/PUT with a nested object shape) where hand-rolled validation would be error-prone and Zod's schema-to-type inference pays for itself; do not add it speculatively ahead of that. Still true after the NEXUS FULL PRODUCT READINESS review: no route accepts a body yet. |
 
 ## 13. Stage 5B technology boundaries (accepted, not implemented)
 

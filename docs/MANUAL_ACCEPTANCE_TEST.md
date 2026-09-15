@@ -267,3 +267,44 @@ intentionally excluded: they are not built.
 | 119 | Recording a second Invoice Entitlement for the same component (an additional invoice) and choosing "Add To Existing" extends the schedule without duplicating already-allocated months | | |
 | 120 | Recording a settlement against an open Unbilled entry with a quantity less than the total moves it to Partially Settled, not Settled | | |
 | 121 | Recording a settlement that brings the cumulative settled quantity to the entry's full total moves it to Settled | | |
+
+## Full Product Readiness: discoverability and bootstrap
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 122 | With go_live_admin/finance_admin/workflow_admin/user_access_admin/team_admin granted, the sidebar's single "Settings" link, once inside, shows cross-navigation tabs to Reference Master, Team Master, Workflows, and User Access all at once | | |
+| 123 | Customer Detail shows a "Go Live" tab (not only a header button) with a summary of recurring/on-demand line item counts and Live/Pending/Not Started counts | | |
+| 124 | Clicking "Open Go Live and Entitlement" from the new Go Live tab lands on the same `/customers/[key]/go-live` page the header button reaches | | |
+| 125 | A session with none of the five newly-granted roles still sees the Go Live button/tab and the Settings sidebar link (if it holds `reference_master.read`), but is denied with an honest message on the pages themselves, never a silent blank screen | | |
+
+## Workflow Builder
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 126 | `/settings/workflows` lists existing workflow definitions with Name/Applies To/Version/Status/Last Updated/Updated By | | |
+| 127 | Creating a new Workflow Definition opens the canvas editor with an empty graph | | |
+| 128 | Adding nodes (Approval, and any other node types available) and connecting them with edges persists on Save | | |
+| 129 | The canvas shows a minimap, background grid, and zoom/pan controls; nodes remain readable at default zoom | | |
+| 130 | Discarding a draft version removes it without affecting any previously published version | | |
+| 131 | Publishing a version runs validation (for example, rejects an incomplete or disconnected graph if that is a real rule) before marking it published | | |
+| 132 | A published version becomes immutable: editing it again creates a new draft version rather than mutating the published one | | |
+| 133 | Go Live's own workflow_version_id is snapshotted at request creation: publishing a newer Workflow version after a Go Live request already exists does not change that request's own bound graph | | |
+| 134 | The Operational Queue's "Responsible Team" column (if populated) reflects the bound graph's Approval node, and is clearly documented/understood as informational, never the actual permission gate | | |
+
+## Team Master and User Access (now reachable end-to-end)
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 135 | `/settings/teams` lists teams with Code/Name/Description/Status/Last Updated, and Add Team works for a user with `team.write` | | |
+| 136 | Deactivating a team is one-way-reversible (can be reactivated), and an inactive team no longer appears in the "assign a team" dropdown on User Access | | |
+| 137 | `/settings/user-access` lists every provisioned user with status, team(s), and roles | | |
+| 138 | Granting a role to a user takes effect on their next request (no stale session caching observed) | | |
+| 139 | Revoking a role removes access on the next request | | |
+| 140 | Self-approval remains blocked even for a user holding every admin role: they cannot approve a Go Live/Customer/Commercial Version request they created themselves | | |
+
+## Honesty checks (things that look real but are not)
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 141 | Customer Detail's "Documents" tab is clearly labeled as demo/fixture data (badge), never presented as the real Onboarding/Go Live evidence, which lives only on each request's own review/detail screen | | |
+| 142 | `/commercials` (no customer context) shows its own "Legacy design-reference screen, not live data" banner and is not reachable from any navigation | | |

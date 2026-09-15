@@ -8,6 +8,71 @@ into a second backlog.
 
 ## Now (worth doing soon, not urgent)
 
+- **Go Live and Entitlement Source creation share the already-accepted
+  create-with-client-UUID idempotency gap (NEXUS FULL PRODUCT
+  READINESS).** `create_go_live_request` and `create_entitlement_source`
+  both insert with a client-minted UUID and no dedup, same class as the
+  three `create_*` RPCs already accepted below. `create_entitlement_source`
+  is the more consequential of the two: `invoice_quantity` feeds directly
+  into `generate_allocation_schedule`'s math, so a retry-duplicate would
+  double an invoiced entitlement pool. Same mitigation as the existing
+  entry applies today (creation happens via a single navigation, not a
+  repeatable button) and the same deferral reasoning holds; listed here
+  so a future idempotency-key pass covers five RPCs, not three.
+  `record_settlement`, the one RPC in this family with no natural
+  create-then-retry shape at all (no client id, and its own derived
+  status directly sums every row), was fixed this round with a real
+  unique constraint rather than deferred, since a duplicate there
+  silently double-counts a real settled quantity, a materially worse
+  outcome than a duplicate shell row.
+- **Customer domain has no `services/customers.service.ts`.** Every
+  other domain follows actions → service → data → RPC; Customer's
+  `actions.ts` calls `data/customers.data.ts` (`setCustomerActive`) and
+  `data/deletion.data.ts` (`deleteCustomerPermanently`) directly. Works
+  correctly today and Customer reads already have a real second caller
+  (`/api/v1/customers`), so this is a layering deviation, not a bug.
+  Add a service layer before Customer writes need a second caller
+  (an API write route, a bulk import) rather than as a standalone
+  refactor.
+- **Commercial has no `actions.ts`.** Commercial Version mutations are
+  triggered from `customer-onboarding/actions.ts` (thin, correct) and
+  also directly from `app/commercials/[configId]/versions/new/page.tsx`,
+  a Server Component that calls `requirePermission` and the service
+  layer on render rather than through a Server Action. This still goes
+  through the real service layer (no bypass to `data.ts`/Supabase), so
+  it is a pattern that is easy to misuse if copied elsewhere, not a
+  live defect. Add a proper `actions.ts` the next time this route needs
+  a second entry point.
+- **`user-access.service.ts` imports `@/platform/team/data/team.data`
+  directly**, bypassing Team's own service layer for a cross-domain
+  read. Minor, but sets a precedent worth not repeating; route through
+  `@/platform/team/server` instead next time this file is touched.
+- **`useReferenceMasterSnapshot`/`ReferenceMasterSnapshotProvider` are
+  imported directly from `reference-data/ui/snapshot-context.tsx` at
+  10+ call sites** across `customer-onboarding`, `customer-change`, and
+  several routes, never through `reference-data/index.ts` (which does
+  not re-export them). Functionally harmless (still inside the feature's
+  own public surface area conceptually), but breaks the stated barrel
+  convention at a scale worth eventually promoting to the barrel or
+  documenting as an accepted UI-context exception.
+- **`entitlement.service.ts`'s `resolveLineItemContext` fetches an
+  entire customer's line items to find one by `stableComponentKey`**,
+  via the same `listCurrentLineItemsForCustomer` call the Go Live list
+  page uses. Called on every usage submission/finalization, a hotter
+  path than a detail-page view. Correct, just wasteful; worth a
+  single-component lookup if usage submission volume ever grows past
+  today's low, manual-entry scale.
+- **Two cross-feature imports bypass a feature's own barrel**:
+  `go-live/services/documents.service.ts` imports
+  `validateAttachmentFile` from `customer-onboarding/domain/documents`
+  directly (not re-exported by onboarding's `server.ts`/`index.ts`), and
+  `customer-onboarding/ui/customer-commercial-configuration-view.tsx`
+  imports `VersionHistoryTable` from `commercial/ui/version-history-table`
+  directly (same gap). Neither is a security or correctness issue; both
+  are candidates for promoting the shared piece into the owning
+  feature's real public surface, or into `platform/`, the next time
+  either file is touched.
+
 - **Two Server Actions contain small business branches that belong in a
   service function.** `customer-onboarding/actions.ts`'s
   `checkForDuplicateCustomersAction` inline-maps tax identities + customer
@@ -220,6 +285,52 @@ into a second backlog.
   ever found; this closed the policy gap before it could become one.
 
 ## Later (explicit trigger points, do not build early)
+
+- **No dedicated Maker/Checker screen exists** (NEXUS FULL PRODUCT
+  READINESS product surface audit). Who is a Maker versus a Checker is
+  only visible by cross-referencing role names inside the generic User
+  Access role-grant UI; matches the already-documented `docs/
+  AUTHORIZATION_MODEL.md` §19 position that a dedicated Access Profile
+  concept is DESIGN DRAFT, not built. Build a real "who can approve what"
+  screen once a second, more complex authorization shape (a scoped or
+  per-team approval matrix) makes the current role-name-only view
+  genuinely hard to reason about; today's role count is still small
+  enough to read directly.
+- **No global audit/history viewer exists.** Activity/History is only
+  ever a per-customer tab; Settings mutations (Reference Master, Team
+  Master, Workflow publish/discard) are captured in `audit_log` (`docs/
+  AUTHORIZATION_MODEL.md` §21) but have no UI surface at all beyond
+  informal "Last Updated by" columns. Build a cross-entity audit viewer
+  once a real compliance/support need to search audit history by actor
+  or time range (not by customer) appears; the data already supports it.
+- **Documents platform duplication assessed, not generalized (NEXUS
+  FULL PRODUCT READINESS, Phase 15).** `docs/ARCHITECTURE.md` §4 names
+  `attachments` as a shared platform capability, but no
+  `platform/attachments/` module exists: Customer Onboarding and Go Live
+  each have their own `documents.data.ts`/`documents.service.ts`,
+  identical in shape (private bucket, opaque path, `is_current`-only
+  mutation, signed-URL download), sharing only the pure
+  `validateAttachmentFile` function. Two real consumers now exist, which
+  is exactly the trigger point `docs/API_INTEGRATION_ARCHITECTURE.md` §1
+  already named for evaluating a shared capability. Not generalized in
+  this pass because both consumers' actual persistence shape and RLS
+  posture are already correct and identical; extracting a shared module
+  now would move working code without fixing a real defect, purely for
+  structural tidiness (abstraction theater the task's own principle
+  guards against). Revisit when a third consumer (Agreement Lifecycle,
+  MRR Recognition, Invoice/CN evidence) needs the same shape: at three
+  real, independently-evolving consumers, a shared `platform/attachments/`
+  module pays for itself.
+- **Customer Detail's "Documents" tab renders synthetic demo PDFs
+  (`/api/demo/customer-documents/[documentType]`), not the real
+  persisted documents from Onboarding or Go Live.** These are two
+  genuinely separate systems today: the Documents tab is a pre-existing,
+  clearly-labeled demo fixture (`Badge: "Demo / Fixture"`), while real
+  evidence lives in `customer_onboarding_documents`/`go_live_documents`
+  and is only viewable from each request's own review/detail screen.
+  Not fixed in this pass (would require a new cross-request document
+  read model, a real feature, not a bug fix); flagged so a future task
+  does not assume the Documents tab already shows real evidence.
 
 - **Move to a shared `DataTable` component** (per `docs/UI_SYSTEM.md` §19,
   documented but never built) when a list page needs real sorting/
