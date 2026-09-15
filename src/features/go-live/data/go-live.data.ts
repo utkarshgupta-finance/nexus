@@ -102,16 +102,22 @@ async function listGoLiveRequestsAwaitingReview(): Promise<GoLiveRequestRow[]> {
   return data ?? []
 }
 
+/** Every Go Live request regardless of status, newest first: the unified Approvals inbox's data source. Capped since this only ever backs an operational inbox, never a report, matching listAllCases/listAllChangeRequestEntries/listAllVersionEntries. */
 async function listAllGoLiveRequests(): Promise<GoLiveRequestRow[]> {
   const supabase = getSupabaseServiceRoleClient()
-  const { data, error } = await supabase.from("go_live_requests").select("*").order("created_at", { ascending: false })
+  const { data, error } = await supabase.from("go_live_requests").select("*").order("updated_at", { ascending: false }).limit(200)
   if (error) throw error
   return data ?? []
 }
 
 async function listGoLiveRequestsCreatedBy(appUserId: string): Promise<GoLiveRequestRow[]> {
   const supabase = getSupabaseServiceRoleClient()
-  const { data, error } = await supabase.from("go_live_requests").select("*").eq("created_by", appUserId).order("created_at", { ascending: false })
+  const { data, error } = await supabase
+    .from("go_live_requests")
+    .select("*")
+    .eq("created_by", appUserId)
+    .order("updated_at", { ascending: false })
+    .limit(200)
   if (error) throw error
   return data ?? []
 }

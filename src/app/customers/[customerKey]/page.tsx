@@ -3,7 +3,9 @@ import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-de
 import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext } from "@/features/customers/server"
 import { hasPermission } from "@/platform/permissions/server"
 import { resolveActorLabels } from "@/platform/audit/server"
+import { listCurrentLineItemsForCustomer } from "@/features/go-live/server"
 import type { CustomerActivityEvent } from "@/features/customers/server"
+import type { GoLiveLineItem } from "@/features/go-live/domain/line-items"
 
 /**
  * Customer Master detail: one record, read-only (task spec §15, §18).
@@ -64,6 +66,19 @@ export default async function CustomerMasterDetailRoute({
     hasPermission("customer", "approve"),
   ])
 
+  // Go Live tab summary (NEXUS FULL PRODUCT READINESS, Phase 2): Go Live
+  // was previously reachable only via a header button crowded alongside
+  // Change Customer/Commercials, with no Tab-level presence like every
+  // other capability on this page gets. Fetched here, not inside the
+  // Go Live feature's own route, matching this page's own established
+  // "fetch once per tab" convention (see the comment above).
+  let lineItems: GoLiveLineItem[] = []
+  try {
+    lineItems = await listCurrentLineItemsForCustomer(detail.record.id)
+  } catch {
+    lineItems = []
+  }
+
   let activityEvents: CustomerActivityEvent[] = []
   try {
     activityEvents = await buildActivityTimelineFromContext(detail.record.id, context)
@@ -91,6 +106,7 @@ export default async function CustomerMasterDetailRoute({
       canManageStatus={canManageStatus}
       activityEvents={activityEvents}
       onboardingOrigin={context.onboardingOrigin}
+      lineItems={lineItems}
     />
   )
 }

@@ -20,7 +20,7 @@ import {
   revokeUserRoleAction,
 } from "../actions"
 import { assignUserToTeamAction, removeUserFromTeamAction } from "@/platform/team/actions"
-import type { TeamRow } from "@/platform/team/server"
+import type { Team } from "@/platform/team/server"
 import { labelForUserAccessEntry } from "../domain/user-access"
 import type { UserAccessEntry } from "../domain/user-access"
 import type { AssignableRole } from "../services/user-access.service"
@@ -50,7 +50,7 @@ function UserAccessPage({
 }: {
   entries: UserAccessEntry[]
   assignableRoles: AssignableRole[]
-  assignableTeams: TeamRow[]
+  assignableTeams: Team[]
   canWrite: boolean
   canManageTeams: boolean
 }) {

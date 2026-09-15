@@ -8,4 +8,4 @@ import "server-only"
  */
 
 export { listTeams, listActiveTeams, createTeam, setTeamActive, assignUserToTeam, removeUserFromTeam } from "./services/team.service"
-export type { TeamRow } from "./data/team.data"
+export type { Team } from "./domain/types"

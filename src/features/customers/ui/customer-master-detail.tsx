@@ -39,6 +39,7 @@ import { CustomerActivityTimeline } from "./customer-activity-timeline"
 import { formatBusinessDate, formatTimestampDate } from "@/lib/date"
 import type { CustomerActivityEvent } from "../domain/activity"
 import type { OnboardingOrigin } from "@/features/customer-onboarding/server"
+import type { GoLiveLineItem } from "@/features/go-live/domain/line-items"
 
 /**
  * Customer workspace (Customer Lifecycle V1, task §3): Overview, Customer
@@ -71,6 +72,7 @@ function CustomerMasterDetail({
   canManageStatus = false,
   activityEvents,
   onboardingOrigin,
+  lineItems = [],
 }: {
   detail: CustomerMasterDetailData
   snapshot: ReferenceMasterSnapshot
@@ -88,6 +90,8 @@ function CustomerMasterDetail({
   activityEvents: CustomerActivityEvent[]
   /** The onboarding case that created this Customer Master (task Phase N); null for a customer created directly, never through onboarding. */
   onboardingOrigin: OnboardingOrigin | null
+  /** Every current recurring and on-demand Commercial line item with its Go Live standing (NEXUS FULL PRODUCT READINESS, Phase 2), so Go Live gets a real Tab summary like every other capability here, not only a header button. */
+  lineItems?: GoLiveLineItem[]
 }) {
   const { record, enrichment, documents } = detail
   const isDemo = enrichment !== null
@@ -111,6 +115,12 @@ function CustomerMasterDetail({
   const tan = resolveTan(record, enrichment)
   const statusLabel = labelForCaseStatus
   const latestChangeRequest = [...changeRequests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] ?? null
+
+  const recurringLineItems = lineItems.filter((item) => item.isRecurring)
+  const onDemandLineItemCount = lineItems.length - recurringLineItems.length
+  const liveCount = recurringLineItems.filter((item) => item.goLiveStatus === "LIVE").length
+  const pendingCount = recurringLineItems.filter((item) => item.goLiveStatus === "GO_LIVE_PENDING").length
+  const notStartedCount = recurringLineItems.filter((item) => item.goLiveStatus === "NO_GO_LIVE").length
 
   return (
     <div className="flex flex-1 flex-col">
@@ -145,6 +155,7 @@ function CustomerMasterDetail({
             <TabsTab value="details">Customer Details</TabsTab>
             <TabsTab value="tax">Tax &amp; Registration</TabsTab>
             <TabsTab value="commercials">Commercials</TabsTab>
+            <TabsTab value="go-live">Go Live</TabsTab>
             <TabsTab value="documents">Documents</TabsTab>
             <TabsTab value="change-requests">Change Requests</TabsTab>
             <TabsTab value="history">History</TabsTab>
@@ -302,6 +313,29 @@ function CustomerMasterDetail({
               ) : (
                 <p className="text-xs text-muted-foreground">No Commercial Configuration exists for this customer yet.</p>
               )}
+            </section>
+          </TabsPanel>
+
+          <TabsPanel value="go-live" className="flex flex-col gap-4 pt-4">
+            <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Go Live and Entitlement</h2>
+              {lineItems.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No Commercial line items exist for this customer yet.</p>
+              ) : (
+                <KeyValueGrid
+                  columns={3}
+                  items={[
+                    { label: "Recurring Line Items", value: String(recurringLineItems.length) },
+                    { label: "Live", value: String(liveCount) },
+                    { label: "Pending Go Live", value: String(pendingCount) },
+                    { label: "Not Started", value: String(notStartedCount) },
+                    { label: "On-Demand Line Items", value: String(onDemandLineItemCount) },
+                  ]}
+                />
+              )}
+              <Button variant="outline" size="sm" className="w-fit" render={<Link href={`/customers/${record.key}/go-live`} />}>
+                Open Go Live and Entitlement
+              </Button>
             </section>
           </TabsPanel>
 

@@ -579,20 +579,37 @@ each guard their own domain, and none of the three implies the others
 (holding `team.write` does not grant `user_access.write` or vice versa;
 `requirePermission` checks the specific resource+action every time).
 
-**Operational note, not a code defect**: this also means nobody can
-currently reach `/settings/user-access`, `/settings/teams`, or
-`/settings/workflows` through a real session, since `AuthGate` denies
-access below the relevant `*.read` permission and the one provisioned
-account holds none of them. This is the same bootstrapping gap §18
-already named ("creating the first Supabase Auth identity itself and
-granting it `user_access.write`... remains genuinely manual"), now
-concretely confirmed against the live database rather than only
-theorized. Granting a role is a real access decision for a human to
-make, not inferred here: whoever administers this Supabase project
-should grant `user_access_admin` (or, narrower, exactly the roles
-needed) to the account that should administer Settings, via
-`grant_user_role` once any account holds it, or directly via SQL for
-the very first grant.
+**Operational note, not a code defect**: at the time of this review,
+this also meant nobody could reach `/settings/user-access`,
+`/settings/teams`, or `/settings/workflows` through a real session,
+since `AuthGate` denies access below the relevant `*.read` permission
+and the one provisioned account held none of them. This was the same
+bootstrapping gap §18 already named ("creating the first Supabase Auth
+identity itself and granting it `user_access.write`... remains
+genuinely manual"), concretely confirmed against the live database
+rather than only theorized.
+
+**Resolved (NEXUS FULL PRODUCT READINESS program).** This exact gap was
+the root cause of two reported product defects: Go Live and Workflow
+Builder appearing "not visible" were not routing or navigation bugs
+(both routes, and the Customer workspace's Go Live button, were already
+real and reachable); every session simply hit a permission denial the
+moment it got there, because no account held `go_live.*`,
+`workflow_definition.*`, `entitlement.*`, `usage.*`, `team.*`, or
+`user_access.*` at all. With explicit user authorization, the
+account already holding `customer_lifecycle_admin` /
+`commercial_configuration_admin` / `reference_master_admin` (the real
+working account) was granted `go_live_admin`, `finance_admin`,
+`workflow_admin`, `user_access_admin`, and `team_admin` via
+`grant_user_role`, self-attributed as the bootstrap actor (there being
+no other account yet able to grant it), exactly the "directly via SQL
+for the very first grant" path this section already anticipated. This
+single account can now reach every Settings section and both
+previously-invisible features. Self-approval (§20) still correctly
+blocks this same account from approving its own Go Live, Customer, or
+Commercial Version requests: a second account is still required to
+exercise any approval step end-to-end, and none currently exists beyond
+the narrow `commercial_configuration_admin`-only account.
 
 ## 23. Go Live + Entitlement Ledger permissions (NEXUS GO LIVE + ENTITLEMENT LEDGER program): IMPLEMENTED
 

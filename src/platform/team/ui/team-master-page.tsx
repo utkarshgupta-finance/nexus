@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatTimestampDate } from "@/lib/date"
 import { createTeamAction, setTeamActiveAction } from "../actions"
-import type { TeamRow } from "../data/team.data"
+import type { Team } from "../domain/types"
 
 /**
  * Settings/Administration -> Team Master (task Phase K): a governed
@@ -19,7 +19,7 @@ import type { TeamRow } from "../data/team.data"
  * grouping, no configurable-vs-governed distinction, and no per-list
  * special cases the way Reference Master does.
  */
-function TeamMasterPage({ teams, canWrite }: { teams: TeamRow[]; canWrite: boolean }) {
+function TeamMasterPage({ teams, canWrite }: { teams: Team[]; canWrite: boolean }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingTeamId, setPendingTeamId] = useState<string | null>(null)
@@ -47,10 +47,10 @@ function TeamMasterPage({ teams, canWrite }: { teams: TeamRow[]; canWrite: boole
     })
   }
 
-  function toggleActive(team: TeamRow) {
+  function toggleActive(team: Team) {
     setPendingTeamId(team.id)
     startTransition(async () => {
-      const result = await setTeamActiveAction(team.id, !team.is_active)
+      const result = await setTeamActiveAction(team.id, !team.isActive)
       setPendingTeamId(null)
       if (!result.ok) {
         setFormError(result.error)
@@ -113,11 +113,11 @@ function TeamMasterPage({ teams, canWrite }: { teams: TeamRow[]; canWrite: boole
                     <TableCell className="text-foreground">{team.name}</TableCell>
                     <TableCell className="text-muted-foreground">{team.description ?? "-"}</TableCell>
                     <TableCell>
-                      <Badge variant="ghost" className={team.is_active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
-                        {team.is_active ? "Active" : "Inactive"}
+                      <Badge variant="ghost" className={team.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
+                        {team.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{formatTimestampDate(team.updated_at)}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatTimestampDate(team.updatedAt)}</TableCell>
                     {canWrite ? (
                       <TableCell className="text-right">
                         <PendingButton
@@ -127,7 +127,7 @@ function TeamMasterPage({ teams, canWrite }: { teams: TeamRow[]; canWrite: boole
                           pendingLabel="Saving..."
                           onClick={() => toggleActive(team)}
                         >
-                          {team.is_active ? "Deactivate" : "Activate"}
+                          {team.isActive ? "Deactivate" : "Activate"}
                         </PendingButton>
                       </TableCell>
                     ) : null}

@@ -22,7 +22,7 @@ import { PendingButton } from "@/components/product/pending-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { saveWorkflowVersionGraphAction, publishWorkflowVersionAction } from "../actions"
 import type { WorkflowNodeType, WorkflowDefinitionVersion, WorkflowNodeDraft, WorkflowEdgeDraft } from "../domain/types"
-import type { TeamRow } from "@/platform/team/server"
+import type { Team } from "@/platform/team/server"
 
 /**
  * Workflow Builder canvas (task Phase N/O): React Flow owns canvas/node/
@@ -78,7 +78,7 @@ function WorkflowCanvasEditor({
   version: WorkflowDefinitionVersion
   initialNodes: FlowNode[]
   initialEdges: Edge[]
-  teams: TeamRow[]
+  teams: Team[]
   isReadOnly: boolean
 }) {
   const router = useRouter()
