@@ -40,10 +40,21 @@ function toError(error: unknown, fallback: string): { ok: false; error: string }
   return { ok: false, error: fallback }
 }
 
-/** Same as toError, but also flags WORKFLOW_VERSION_DRAFT_STALE so the Builder canvas can offer a Refresh control (Batch 1, K-010), matching the stale-refresh pattern already used on the four governed domains' review pages. */
+/**
+ * Same as toError, but also flags WORKFLOW_VERSION_DRAFT_STALE so the Builder canvas can offer a Refresh control (Batch 1, K-010), matching the
+ * stale-refresh pattern already used on the four governed domains' review pages.
+ *
+ * Also replaces WORKFLOW_VERSION_NOT_FOUND's raw exception detail (a bare table name and UUID, e.g. "no workflow_definition_versions row for
+ * id ...") with a human-readable message, and offers the same Refresh control: this token means another admin discarded the draft out from
+ * under this session (Batch 2, K-029), and reloading correctly lands on the version's real current state (a 404, since the draft no longer
+ * exists) rather than leaking an internal schema detail as the primary on-screen text.
+ */
 function toSaveError(error: unknown, fallback: string): { ok: false; error: string; stale?: boolean } {
   if (hasStringMessage(error) && error.message.startsWith("WORKFLOW_VERSION_DRAFT_STALE")) {
     return { ok: false, error: stripErrorToken(error.message), stale: true }
+  }
+  if (hasStringMessage(error) && error.message.startsWith("WORKFLOW_VERSION_NOT_FOUND")) {
+    return { ok: false, error: "This draft no longer exists. It was likely discarded by another admin. Refresh to start a new draft.", stale: true }
   }
   return toError(error, fallback)
 }

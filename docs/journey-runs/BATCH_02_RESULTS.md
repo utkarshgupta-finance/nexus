@@ -125,34 +125,34 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: K-029
 - Journey Name: Concurrent Discard Removes a Draft Graph an Editor Is Actively Editing
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-16 17:40
+- Completed At: 2026-09-16 18:00
 - Priority: P1
 - Automation Feasibility: FULL
-- Personas: Workflow Admin A (editing), Workflow Admin B (discarding)
-- Test Data / Record References: TBD
-- Starting State: TBD
-- Actions Executed: TBD
-- Expected Result: TBD
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Personas: Workflow Admin A (editing, browser session as wf-test.workflow-editor@example.test), Workflow Admin B (discarding, simulated via a direct service-role RPC call disclosed here as a simulation, since a genuinely independent second cookie-jar browser session was not available in this tool session)
+- Test Data / Record References: "BATCH2 K-Series Builder Mechanics" (Customer Change), a fresh draft version created for this test
+- Starting State: A draft version open for editing in the browser (Admin A), simultaneously targeted for discard by Admin B
+- Actions Executed: Admin A opened the draft canvas and added a node (an unsaved local change, not yet saved). Admin B called discard_workflow_definition_version directly against the same draft id. Admin A then clicked Save Draft without reloading.
+- Expected Result: Admin A's save errors cleanly with a not-found/discarded message, does not silently resurrect a draft row or leave orphaned node/edge rows; Admin A sees a clear, actionable message and can start a fresh draft rather than being stuck on a dead reference.
+- Actual Result (original): Admin B's discard succeeded cleanly (version row fully removed). Admin A's Save Draft was correctly rejected (no data was silently resurrected, no orphaned rows), but the error message shown was the raw internal exception detail: "no workflow_definition_versions row for id 8f3ec7c6-bab9-4231-bce9-85d1636ff6f0", a bare table name and UUID leaked directly to the user, violating the project's own "no raw technical identifiers as primary UI" rule and the journey's own UX Check.
+- Regular Path Result: FAILED THEN FIXED + PASS
 - Stress Variant Result: N/A
 - Authorization Result: N/A
-- Concurrency Result: TBD
+- Concurrency Result: PASS (no orphaned rows, no silent resurrection, in both the original and fixed runs; only the message text was wrong)
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: TBD
-- Recovery Result: TBD
-- UX Result: TBD
-- Original Status: TBD
-- Defect IDs: None
-- Root Cause: N/A
-- Fix: N/A
-- Fix Commit if applicable: N/A
-- Regression Test: N/A
-- Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Audit/Data Integrity Result: PASS (confirmed via direct query: the version row was fully gone, no dangling nodes/edges referenced it, both before and after the message fix)
+- Recovery Result: PASS after fix (clicking the new Refresh control lands on a 404, since the draft genuinely no longer exists; the sidebar remains available to navigate back and start a fresh draft, which was then verified live)
+- UX Result: FAILED THEN FIXED + PASS
+- Original Status: FAILED
+- Defect IDs: K029-D01
+- Root Cause: src/platform/workflow-builder/actions.ts's toSaveError only special-cased WORKFLOW_VERSION_DRAFT_STALE with a friendly message; WORKFLOW_VERSION_NOT_FOUND (raised by save_workflow_version_graph when the target draft no longer exists) fell through to the generic stripErrorToken path, which shows the raw exception detail verbatim.
+- Fix: Added a WORKFLOW_VERSION_NOT_FOUND branch to toSaveError returning "This draft no longer exists. It was likely discarded by another admin. Refresh to start a new draft." and flagging stale=true so the existing Refresh control (already built for K-010/K-030) appears.
+- Fix Commit if applicable: (pending, committed with this ledger update)
+- Regression Test: Live re-verification (no unit-testable layer, this is Server Action error-mapping copy): recreated a fresh draft, repeated the exact discard-then-save race, confirmed the new friendly message and Refresh button appear; clicked Refresh and confirmed it lands cleanly (a 404, since the draft is genuinely gone) rather than a raw error or a stuck page; confirmed a brand-new draft can be created normally afterward.
+- Rerun Result: PASS
+- Neighboring Journeys Rerun: Verified by code inspection that the pre-existing WORKFLOW_VERSION_DRAFT_STALE branch (K-010/K-030) is untouched, since the fix added a new independent branch rather than modifying the existing one.
+- Final Status: FAILED THEN FIXED + PASS
+- Notes: The concurrency mechanism itself (discard-wins, save-loses-cleanly) was already correct; the defect was purely in the user-facing message. Admin B's discard was simulated via a direct backend RPC call rather than a second independent browser cookie-jar session, disclosed here honestly per the mission's guidance for tool-session limitations.
 
 ---
 
