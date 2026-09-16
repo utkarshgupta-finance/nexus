@@ -75,6 +75,20 @@ describe("validateWorkflowGraph", () => {
     if (!result.valid) expect(result.errors.some((error) => error.includes("dead end"))).toBe(true)
   })
 
+  it("rejects an End node that has an outgoing transition (Batch 1, K-025)", () => {
+    const result = validateWorkflowGraph(
+      [node({ nodeKey: "start", nodeType: "start" }), node({ nodeKey: "approve", nodeType: "approval" }), node({ nodeKey: "end", nodeType: "end" })],
+      [
+        { fromNodeKey: "start", toNodeKey: "approve", label: null, condition: null },
+        { fromNodeKey: "approve", toNodeKey: "end", label: null, condition: null },
+        { fromNodeKey: "end", toNodeKey: "approve", label: null, condition: null },
+      ],
+      NO_CONTEXT
+    )
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors.some((error) => error.includes("terminal"))).toBe(true)
+  })
+
   it("rejects a node unreachable from Start even if it has some incoming edge from another unreachable node", () => {
     const result = validateWorkflowGraph(
       [

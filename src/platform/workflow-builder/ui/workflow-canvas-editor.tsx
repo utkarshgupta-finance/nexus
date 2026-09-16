@@ -105,6 +105,7 @@ function WorkflowCanvasEditor({
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null)
+  const [isStale, setIsStale] = useState(false)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({}), [])
 
@@ -173,6 +174,7 @@ function WorkflowCanvasEditor({
 
   async function handleSave() {
     setMessage(null)
+    setIsStale(false)
     setIsSaving(true)
     const { nodeDrafts, edgeDrafts } = toDrafts()
     const result = await saveWorkflowVersionGraphAction(version.id, nodeDrafts, edgeDrafts, version.rowVersion)
@@ -182,17 +184,20 @@ function WorkflowCanvasEditor({
       router.refresh()
     } else {
       setMessage({ kind: "error", text: result.error })
+      setIsStale(result.stale ?? false)
     }
   }
 
   async function handlePublish() {
     setMessage(null)
+    setIsStale(false)
     setIsPublishing(true)
     const { nodeDrafts, edgeDrafts } = toDrafts()
     const saveResult = await saveWorkflowVersionGraphAction(version.id, nodeDrafts, edgeDrafts, version.rowVersion)
     if (!saveResult.ok) {
       setIsPublishing(false)
       setMessage({ kind: "error", text: saveResult.error })
+      setIsStale(saveResult.stale ?? false)
       return
     }
     const publishResult = await publishWorkflowVersionAction(version.id)
@@ -246,7 +251,34 @@ function WorkflowCanvasEditor({
       />
 
       {message ? (
-        <p className={`px-4 py-2 text-xs sm:px-6 ${message.kind === "error" ? "text-destructive" : "text-success"}`}>{message.text}</p>
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 sm:px-6">
+          <p className={`text-xs ${message.kind === "error" ? "text-destructive" : "text-success"}`}>{message.text}</p>
+          {isStale ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                // A plain router.refresh() re-fetches this page's server props, but
+                // this canvas's nodes/edges are held in local useState seeded once
+                // from initialNodes/initialEdges (deliberately, so unrelated
+                // re-renders never wipe an admin's in-progress edits); a changed
+                // `version` prop alone does not re-seed that state. Without a full
+                // reload here, the canvas keeps showing this admin's stale copy of
+                // the graph, and clicking Save Draft again would silently resave
+                // that stale copy, overwriting the other admin's real change even
+                // though the row_version check now happens to match. Confirmed
+                // live during Batch 1 (K-010): the row_version check alone is not
+                // sufficient to prevent silent data loss once the UI's own Refresh
+                // control claims the page is current. A hard reload guarantees the
+                // whole page, including this local state, reflects the true
+                // current graph before any further save is possible.
+                window.location.reload()
+              }}
+            >
+              Refresh
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       {isMobile ? (

@@ -19,7 +19,7 @@ import type { WorkflowAppliesTo, WorkflowNodeDraft, WorkflowEdgeDraft, WorkflowD
 type CreateDefinitionResult = { ok: true; definition: WorkflowDefinition } | { ok: false; error: string }
 type SetDefinitionActiveResult = { ok: true; definition: WorkflowDefinition } | { ok: false; error: string }
 type CreateVersionResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
-type SaveGraphResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
+type SaveGraphResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string; stale?: boolean }
 type PublishResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
 type DiscardResult = { ok: true } | { ok: false; error: string }
 
@@ -38,6 +38,14 @@ function toError(error: unknown, fallback: string): { ok: false; error: string }
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
   if (hasStringMessage(error)) return { ok: false, error: stripErrorToken(error.message) }
   return { ok: false, error: fallback }
+}
+
+/** Same as toError, but also flags WORKFLOW_VERSION_DRAFT_STALE so the Builder canvas can offer a Refresh control (Batch 1, K-010), matching the stale-refresh pattern already used on the four governed domains' review pages. */
+function toSaveError(error: unknown, fallback: string): { ok: false; error: string; stale?: boolean } {
+  if (hasStringMessage(error) && error.message.startsWith("WORKFLOW_VERSION_DRAFT_STALE")) {
+    return { ok: false, error: stripErrorToken(error.message), stale: true }
+  }
+  return toError(error, fallback)
 }
 
 async function createWorkflowDefinitionAction(code: string, name: string, appliesTo: WorkflowAppliesTo): Promise<CreateDefinitionResult> {
@@ -93,7 +101,7 @@ async function saveWorkflowVersionGraphAction(
     const version = await saveVersionGraph(versionId, nodes, edges, expectedRowVersion, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
-    return toError(error, "An unexpected error occurred while saving this workflow version.")
+    return toSaveError(error, "An unexpected error occurred while saving this workflow version.")
   }
 }
 

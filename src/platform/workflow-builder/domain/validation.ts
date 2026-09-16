@@ -64,6 +64,9 @@ function validateWorkflowGraph(
     if (node.nodeType === "start" && !(outgoingByKey.get(node.nodeKey)?.length ?? 0)) {
       errors.push("The Start node has no outgoing transition.")
     }
+    if (node.nodeType === "end" && (outgoingByKey.get(node.nodeKey)?.length ?? 0) > 0) {
+      errors.push(`Node "${node.name}" is an End node but has an outgoing transition; an End node is terminal and must have none.`)
+    }
     if (node.responsibleTeamId && !context.validTeamIds.has(node.responsibleTeamId)) {
       errors.push(`Node "${node.name}" references a team that no longer exists or is inactive.`)
     }
