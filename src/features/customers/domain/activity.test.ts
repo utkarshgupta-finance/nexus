@@ -55,6 +55,8 @@ const CHANGE_REQUESTS: CustomerChangeRequest[] = [
     createdBy: "actor-requester",
     createdAt: "2026-01-20T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",
+    workflowVersionId: null,
+    currentWorkflowNodeKey: null,
   },
 ]
 
@@ -79,6 +81,8 @@ const COMMERCIAL_VERSIONS: CommercialConfigurationVersion[] = [
     createdBy: "actor-requester",
     createdAt: "2026-02-10T00:00:00.000Z",
     updatedAt: "2026-02-15T00:00:00.000Z",
+    workflowVersionId: null,
+    currentWorkflowNodeKey: null,
   },
 ]
 

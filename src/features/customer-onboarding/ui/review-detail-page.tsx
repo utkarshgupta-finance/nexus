@@ -71,6 +71,7 @@ function ReviewDetailPage({
   const [draftFieldComment, setDraftFieldComment] = useState("")
   const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isActionStale, setIsActionStale] = useState(false)
   const [pendingAction, setPendingAction] = useState<"approve" | "send_back" | null>(null)
   const [approvalResult, setApprovalResult] = useState<{ customerKey: string | null; commercialConfigurationId: string | null } | null>(null)
 
@@ -80,14 +81,21 @@ function ReviewDetailPage({
 
   async function handleApprove() {
     setActionError(null)
+    setIsActionStale(false)
     setPendingAction("approve")
-    const result = await approveOnboardingCaseAction(requestId, effectiveDate)
+    // Workflow Runtime V1 UX + Audit Closure: echoes back the node this
+    // page was showing as current, so a stale page (another checker
+    // already advanced it) gets a clear "already moved on" message
+    // instead of a confusing team-mismatch error. The backend's own
+    // current-node/team check remains the sole authority either way.
+    const result = await approveOnboardingCaseAction(requestId, effectiveDate, onboardingCase.currentWorkflowNodeKey)
     setPendingAction(null)
     if (result.ok) {
       setApprovalResult({ customerKey: result.customerKey, commercialConfigurationId: result.commercialConfigurationId })
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -97,6 +105,7 @@ function ReviewDetailPage({
       return
     }
     setActionError(null)
+    setIsActionStale(false)
     setPendingAction("send_back")
     const result = await sendBackOnboardingCaseAction(requestId, sendBackReason, null, fieldComments)
     setPendingAction(null)
@@ -105,6 +114,7 @@ function ReviewDetailPage({
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -235,7 +245,24 @@ function ReviewDetailPage({
               to the requester with your reason; there is no separate Reject for Onboarding.
             </p>
 
-            {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
+            {actionError ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-destructive">{actionError}</p>
+                {isActionStale ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setActionError(null)
+                      setIsActionStale(false)
+                      router.refresh()
+                    }}
+                  >
+                    Refresh
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
 
             {isSendingBack ? (
               <div className="flex flex-col gap-2">

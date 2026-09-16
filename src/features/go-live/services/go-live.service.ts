@@ -2,7 +2,6 @@ import "server-only"
 
 import * as goLiveData from "../data/go-live.data"
 import { toGoLiveRequest, toGoLiveSendBackEntry } from "../domain/mappers"
-import { resolveActorLabels } from "@/platform/audit/server"
 import { loadWorkflowGraph, resolveWorkflowApprovalStep, DEFAULT_APPROVAL_STEP } from "@/platform/workflow-builder/server"
 import type { ResolvedApprovalStep } from "@/platform/workflow-builder/server"
 import type { GoLiveRequest, GoLiveSendBackEntry } from "../domain/types"
@@ -37,8 +36,8 @@ async function sendBackGoLiveRequest(id: string, reason: string, actorUserId: st
   return toGoLiveRequest(row)
 }
 
-async function approveGoLiveRequest(id: string, actorUserId: string): Promise<GoLiveRequest> {
-  const row = await goLiveData.approveGoLiveRequest(id, actorUserId)
+async function approveGoLiveRequest(id: string, actorUserId: string, expectedCurrentNodeKey: string | null = null): Promise<GoLiveRequest> {
+  const row = await goLiveData.approveGoLiveRequest(id, actorUserId, expectedCurrentNodeKey)
   return toGoLiveRequest(row)
 }
 
@@ -112,12 +111,6 @@ async function resolveApprovalStepForGoLiveRequest(request: GoLiveRequest): Prom
   return resolveWorkflowApprovalStep(graph.nodes, graph.edges, {}) ?? DEFAULT_APPROVAL_STEP
 }
 
-/** Batched actor-label resolution for a set of Go Live requests: created/sent-back/approved/cancelled actors, ready for a UI to render human names, never raw ids. */
-async function resolveGoLiveActorLabels(requests: GoLiveRequest[]): Promise<Map<string, string | null>> {
-  const ids = requests.flatMap((request) => [request.createdBy, request.sentBackBy, request.approvedBy, request.cancelledBy])
-  return resolveActorLabels(ids)
-}
-
 export {
   createGoLiveRequest,
   saveGoLiveRequestDraft,
@@ -134,5 +127,4 @@ export {
   listGoLiveRequestsCreatedBy,
   listSendBacksForGoLiveRequest,
   resolveApprovalStepForGoLiveRequest,
-  resolveGoLiveActorLabels,
 }

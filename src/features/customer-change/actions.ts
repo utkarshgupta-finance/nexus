@@ -29,10 +29,18 @@ import type { CustomerChangeRequest } from "./domain/types"
  * uses (docs/CUSTOMER_LIFECYCLE.md: no per-role approval routing yet).
  */
 
-type ChangeRequestActionResult = { ok: true; changeRequest: CustomerChangeRequest } | { ok: false; error: string }
+type ChangeRequestActionResult = { ok: true; changeRequest: CustomerChangeRequest } | { ok: false; error: string; stale?: boolean }
 
 function toActionError(error: unknown): ChangeRequestActionResult {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof ChangeRequestOperationError && error.changeError.kind === "workflow_node_already_advanced") {
+    // Workflow Runtime V1 UX + Audit Closure: never surface the raw
+    // WORKFLOW_NODE_ALREADY_ADVANCED token or a confusing team-mismatch
+    // error when another checker has simply already acted; `stale: true`
+    // lets the review page show an explicit Refresh affordance instead
+    // of a dead end.
+    return { ok: false, error: "This approval has already moved to the next step. Refresh to see its current status.", stale: true }
+  }
   if (error instanceof ChangeRequestOperationError && error.changeError.kind === "unknown") {
     return { ok: false, error: withCorrelationReference(error.message, error) }
   }
@@ -96,10 +104,11 @@ async function rejectChangeRequestAction(requestId: string, reason: string): Pro
   }
 }
 
-async function approveChangeRequestAction(requestId: string): Promise<ChangeRequestActionResult> {
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve, echoed back so a stale-page approval gets a clear "already moved on" message instead of a raw team-mismatch error. Purely a UX input, never authorization: the RPC's own current-node/team check is the only thing that ever actually decides whether this approval is allowed. */
+async function approveChangeRequestAction(requestId: string, expectedCurrentNodeKey: string | null = null): Promise<ChangeRequestActionResult> {
   try {
     const actor = await requirePermission("customer", "approve")
-    const changeRequest = await approveChangeRequest(requestId, actor.appUserId)
+    const changeRequest = await approveChangeRequest(requestId, actor.appUserId, expectedCurrentNodeKey)
     return { ok: true, changeRequest }
   } catch (error) {
     return toActionError(error)

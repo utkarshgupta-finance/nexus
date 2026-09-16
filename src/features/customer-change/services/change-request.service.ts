@@ -103,11 +103,11 @@ async function cancelChangeRequest(requestId: string, reason: string | null, act
 }
 
 /** The atomic apply: approve_customer_change_request re-verifies the customer's row_version itself (staleness/concurrency) and writes customer_field_history inside the same transaction; this service adds no logic on top beyond reloading the result. Logged (Platform Scale Program, Phase A): an approval failure here is exactly the class of operation a CFO/CTO needs traceable without reproducing it manually. */
-async function approveChangeRequest(requestId: string, actorUserId: string): Promise<CustomerChangeRequest> {
+async function approveChangeRequest(requestId: string, actorUserId: string, expectedCurrentNodeKey: string | null = null): Promise<CustomerChangeRequest> {
   return withLoggedOperation(
     { eventCode: "customer_change.approve", operation: "approveChangeRequest", resourceType: "customer_change_request", resourceId: requestId, actorUserId },
     async () => {
-      await changeData.approveChangeRequest(requestId, actorUserId)
+      await changeData.approveChangeRequest(requestId, actorUserId, expectedCurrentNodeKey)
       const changeRequest = await loadChangeRequest(requestId)
       if (!changeRequest) throw new Error(`Change Request ${requestId} not found after approving.`)
       return changeRequest

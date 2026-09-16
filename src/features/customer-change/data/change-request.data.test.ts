@@ -38,6 +38,24 @@ describe("approveChangeRequest self-approval control", () => {
     const result = await approveChangeRequest("r1", "checker-1")
     expect(result.status).toBe("approved")
   })
+
+  it("Workflow Runtime V1 UX + Audit Closure: passes the expected current node key to the RPC when given, so a stale approval gets a clear WORKFLOW_NODE_ALREADY_ADVANCED error instead of a confusing team-mismatch one", async () => {
+    const { approveChangeRequest } = await import("./change-request.data")
+    rpcMock.mockResolvedValueOnce({ data: { request_id: "r1", status: "submitted" }, error: null })
+
+    await approveChangeRequest("r1", "checker-1", "node_finance")
+
+    expect(rpcMock).toHaveBeenCalledWith("approve_customer_change_request", expect.objectContaining({ p_expected_current_node_key: "node_finance" }))
+  })
+
+  it("defaults the expected current node key to null when the caller does not have one yet (never omits the param, so the RPC's own default resolves it)", async () => {
+    const { approveChangeRequest } = await import("./change-request.data")
+    rpcMock.mockResolvedValueOnce({ data: { request_id: "r1", status: "submitted" }, error: null })
+
+    await approveChangeRequest("r1", "checker-1")
+
+    expect(rpcMock).toHaveBeenCalledWith("approve_customer_change_request", expect.objectContaining({ p_expected_current_node_key: null }))
+  })
 })
 
 describe("rejectChangeRequest self-approval control", () => {

@@ -4,6 +4,7 @@ import { commercialConfigurationService } from "@/features/commercial/server"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
 import { withLoggedOperation } from "@/platform/observability/server"
 import { resolveActorLabels } from "@/platform/audit/server"
+import { getWorkflowTransitionTimelineInputs, buildWorkflowTransitionEvents } from "@/platform/workflow-builder/server"
 import type { RequestTimelineEvent } from "@/components/product/request-timeline"
 import { buildCommercialVersionTimeline, collectCommercialVersionTimelineActorIds } from "../domain/commercial-version-timeline"
 
@@ -102,7 +103,12 @@ async function cancelVersion(requestId: string, reason: string | null, actorUser
 }
 
 /** The atomic apply/activate: maps the version's submitted Commercial Rate draft through the exact same promotion mapper used everywhere else, then calls the single atomic approve_commercial_configuration_version RPC, which closes the prior version's Components and materializes every new one in one transaction. Logged (Platform Scale Program, Phase A): this is the one operation that revalues a customer's live commercial terms, so a failure here must be traceable without reproducing it manually. */
-async function approveVersion(requestId: string, actorUserId: string, snapshot: ReferenceMasterSnapshot): Promise<CommercialConfigurationVersion> {
+async function approveVersion(
+  requestId: string,
+  actorUserId: string,
+  snapshot: ReferenceMasterSnapshot,
+  expectedCurrentNodeKey: string | null = null
+): Promise<CommercialConfigurationVersion> {
   return withLoggedOperation(
     { eventCode: "commercial.version_approve", operation: "approveVersion", resourceType: "commercial_configuration_version", resourceId: requestId, actorUserId },
     async () => {
@@ -141,7 +147,7 @@ async function approveVersion(requestId: string, actorUserId: string, snapshot: 
         }
       })
 
-      await versionData.approveVersion(requestId, components, actorUserId)
+      await versionData.approveVersion(requestId, components, actorUserId, expectedCurrentNodeKey)
       const approved = await loadVersion(requestId)
       if (!approved) throw new Error(`Commercial Configuration Version ${requestId} not found after approving.`)
       return approved
@@ -161,7 +167,10 @@ async function loadCommercialVersionTimeline(requestId: string): Promise<Request
   const version = await loadVersion(requestId)
   if (!version) return []
 
-  const revision = await versionData.getLatestRevisionForRequest(requestId)
+  const [revision, transitionInputs] = await Promise.all([
+    versionData.getLatestRevisionForRequest(requestId),
+    getWorkflowTransitionTimelineInputs("commercial_configuration", requestId),
+  ])
   const decisionStatus = version.status === "approved" || version.status === "rejected" ? version.status : null
 
   const input = {
@@ -175,8 +184,9 @@ async function loadCommercialVersionTimeline(requestId: string): Promise<Request
     decisionReason: version.decisionReason,
   }
 
-  const actorLabels = await resolveActorLabels(collectCommercialVersionTimelineActorIds(input))
-  return buildCommercialVersionTimeline({ ...input, actorLabels })
+  const actorLabels = await resolveActorLabels([...collectCommercialVersionTimelineActorIds(input), ...transitionInputs.actorIds])
+  const workflowTransitionEvents = buildWorkflowTransitionEvents(transitionInputs.transitions, transitionInputs.nodeDisplayByKey, actorLabels)
+  return buildCommercialVersionTimeline({ ...input, actorLabels, workflowTransitionEvents })
 }
 
 type ReviewQueueEntry = {

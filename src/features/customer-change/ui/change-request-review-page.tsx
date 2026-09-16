@@ -51,20 +51,29 @@ function ChangeRequestReviewPage({
   const [mode, setMode] = useState<"idle" | "send_back" | "reject">("idle")
   const [reason, setReason] = useState("")
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isActionStale, setIsActionStale] = useState(false)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
 
   const isDecidable = canDecide && (changeRequest.status === "submitted" || changeRequest.status === "resubmitted")
 
   async function handleApprove() {
     setActionError(null)
+    setIsActionStale(false)
     setIsSubmittingAction(true)
-    const result = await approveChangeRequestAction(requestId)
+    // Workflow Runtime V1 UX + Audit Closure: echoes back the node this
+    // page was showing as current when the checker clicked Approve, so a
+    // stale page (another checker already advanced it) gets a clear
+    // "already moved on" message instead of a confusing team-mismatch
+    // error. The backend's own current-node/team check remains the sole
+    // authority either way.
+    const result = await approveChangeRequestAction(requestId, changeRequest.currentWorkflowNodeKey)
     setIsSubmittingAction(false)
     if (result.ok) {
       router.push(`/customers/${customerKey}`)
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -74,6 +83,7 @@ function ChangeRequestReviewPage({
       return
     }
     setActionError(null)
+    setIsActionStale(false)
     setIsSubmittingAction(true)
     const result = await sendBackChangeRequestAction(requestId, reason)
     setIsSubmittingAction(false)
@@ -82,6 +92,7 @@ function ChangeRequestReviewPage({
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -91,6 +102,7 @@ function ChangeRequestReviewPage({
       return
     }
     setActionError(null)
+    setIsActionStale(false)
     setIsSubmittingAction(true)
     const result = await rejectChangeRequestAction(requestId, reason)
     setIsSubmittingAction(false)
@@ -99,6 +111,7 @@ function ChangeRequestReviewPage({
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -159,7 +172,24 @@ function ChangeRequestReviewPage({
               this request to the requester for revision; Reject is terminal and never touches the Customer Master.
             </p>
 
-            {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
+            {actionError ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-destructive">{actionError}</p>
+                {isActionStale ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setActionError(null)
+                      setIsActionStale(false)
+                      router.refresh()
+                    }}
+                  >
+                    Refresh
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
 
             {mode === "idle" ? (
               <div className="flex flex-wrap gap-2">

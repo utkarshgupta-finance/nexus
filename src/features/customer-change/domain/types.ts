@@ -46,6 +46,9 @@ type CustomerChangeRequest = {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  /** Workflow Runtime V1 Sequential Execution: the workflow version this request is bound to (resolved once at creation, never re-resolved) and which Approval node it is currently sitting at. Null current node means no workflow is bound, the graph has no Approval node, or the request is between Send Back and resubmit. */
+  workflowVersionId: string | null
+  currentWorkflowNodeKey: string | null
 }
 
 type CustomerFieldHistoryEntry = {

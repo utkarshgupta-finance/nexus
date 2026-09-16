@@ -24,6 +24,20 @@ type BuildChangeRequestTimelineInput = {
   revisions: ChangeTimelineRevisionInput[]
   sendBacks: ChangeTimelineSendBackInput[]
   actorLabels: Map<string, string | null>
+  /**
+   * Workflow Runtime V1 UX + Audit Closure: this request's own workflow
+   * node transitions, already mapped to Timeline events by the one
+   * shared builder (platform/workflow-builder/domain/transition-events.ts).
+   * When non-empty, these fully replace the send-back/decided events
+   * below (built from customer_change_send_backs/decided_by, the same
+   * moments the workflow transitions now describe with a node name and
+   * per-step attribution), so the Timeline never shows the same decision
+   * twice. Empty for a request never routed through a real workflow
+   * (pre-Sequential-Execution data, or no workflow bound at all), which
+   * falls back to exactly the send-back/decided behavior this function
+   * always had.
+   */
+  workflowTransitionEvents?: RequestTimelineEvent[]
 }
 
 function actorLabel(actorId: string | null, actorLabels: Map<string, string | null>): string | null {
@@ -33,6 +47,8 @@ function actorLabel(actorId: string | null, actorLabels: Map<string, string | nu
 
 /** Oldest first: a single request's own history reads naturally top-to-bottom as "what happened, in order." */
 function buildChangeRequestTimeline(input: BuildChangeRequestTimelineInput): RequestTimelineEvent[] {
+  const hasWorkflowHistory = (input.workflowTransitionEvents?.length ?? 0) > 0
+
   const events: RequestTimelineEvent[] = [
     { id: "created", occurredAt: input.createdAt, actorEmail: actorLabel(input.createdBy, input.actorLabels), summary: "Change Request created" },
   ]
@@ -47,28 +63,32 @@ function buildChangeRequestTimeline(input: BuildChangeRequestTimelineInput): Req
     })
   }
 
-  for (const sendBack of input.sendBacks) {
-    events.push({
-      id: `sent-back-${sendBack.revisionNumber}-${sendBack.sentBackAt}`,
-      occurredAt: sendBack.sentBackAt,
-      actorEmail: actorLabel(sendBack.sentBackBy, input.actorLabels),
-      summary: `Sent back: ${sendBack.reason}`,
-    })
-  }
+  if (hasWorkflowHistory) {
+    events.push(...(input.workflowTransitionEvents ?? []))
+  } else {
+    for (const sendBack of input.sendBacks) {
+      events.push({
+        id: `sent-back-${sendBack.revisionNumber}-${sendBack.sentBackAt}`,
+        occurredAt: sendBack.sentBackAt,
+        actorEmail: actorLabel(sendBack.sentBackBy, input.actorLabels),
+        summary: `Sent back: ${sendBack.reason}`,
+      })
+    }
 
-  if (input.decidedAt && input.decisionStatus) {
-    events.push({
-      id: "decided",
-      occurredAt: input.decidedAt,
-      actorEmail: actorLabel(input.decidedBy, input.actorLabels),
-      summary: input.decisionStatus === "approved" ? "Approved" : `Rejected: ${input.decisionReason ?? "no reason given"}`,
-    })
+    if (input.decidedAt && input.decisionStatus) {
+      events.push({
+        id: "decided",
+        occurredAt: input.decidedAt,
+        actorEmail: actorLabel(input.decidedBy, input.actorLabels),
+        summary: input.decisionStatus === "approved" ? "Approved" : `Rejected: ${input.decisionReason ?? "no reason given"}`,
+      })
+    }
   }
 
   return events.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())
 }
 
-function collectChangeRequestTimelineActorIds(input: Omit<BuildChangeRequestTimelineInput, "actorLabels">): (string | null)[] {
+function collectChangeRequestTimelineActorIds(input: Omit<BuildChangeRequestTimelineInput, "actorLabels" | "workflowTransitionEvents">): (string | null)[] {
   const ids: (string | null)[] = [input.createdBy, input.decidedBy]
   for (const revision of input.revisions) ids.push(revision.submittedBy)
   for (const sendBack of input.sendBacks) ids.push(sendBack.sentBackBy)

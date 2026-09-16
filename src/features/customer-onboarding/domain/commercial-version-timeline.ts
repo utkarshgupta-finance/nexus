@@ -20,6 +20,8 @@ type BuildCommercialVersionTimelineInput = {
   decisionStatus: "approved" | "rejected" | null
   decisionReason: string | null
   actorLabels: Map<string, string | null>
+  /** Workflow Runtime V1 UX + Audit Closure: see ../../customer-change/domain/timeline.ts's own BuildChangeRequestTimelineInput.workflowTransitionEvents for the full contract. When non-empty, replaces the decided event below. */
+  workflowTransitionEvents?: RequestTimelineEvent[]
 }
 
 function actorLabel(actorId: string | null, actorLabels: Map<string, string | null>): string | null {
@@ -28,6 +30,8 @@ function actorLabel(actorId: string | null, actorLabels: Map<string, string | nu
 }
 
 function buildCommercialVersionTimeline(input: BuildCommercialVersionTimelineInput): RequestTimelineEvent[] {
+  const hasWorkflowHistory = (input.workflowTransitionEvents?.length ?? 0) > 0
+
   const events: RequestTimelineEvent[] = [
     { id: "created", occurredAt: input.createdAt, actorEmail: actorLabel(input.createdBy, input.actorLabels), summary: "Version created" },
   ]
@@ -36,7 +40,9 @@ function buildCommercialVersionTimeline(input: BuildCommercialVersionTimelineInp
     events.push({ id: "submitted", occurredAt: input.submittedAt, actorEmail: actorLabel(input.submittedBy, input.actorLabels), summary: "Submitted for review" })
   }
 
-  if (input.decidedAt && input.decisionStatus) {
+  if (hasWorkflowHistory) {
+    events.push(...(input.workflowTransitionEvents ?? []))
+  } else if (input.decidedAt && input.decisionStatus) {
     events.push({
       id: "decided",
       occurredAt: input.decidedAt,
@@ -48,7 +54,7 @@ function buildCommercialVersionTimeline(input: BuildCommercialVersionTimelineInp
   return events.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())
 }
 
-function collectCommercialVersionTimelineActorIds(input: Omit<BuildCommercialVersionTimelineInput, "actorLabels">): (string | null)[] {
+function collectCommercialVersionTimelineActorIds(input: Omit<BuildCommercialVersionTimelineInput, "actorLabels" | "workflowTransitionEvents">): (string | null)[] {
   return [input.createdBy, input.submittedBy, input.decidedBy]
 }
 

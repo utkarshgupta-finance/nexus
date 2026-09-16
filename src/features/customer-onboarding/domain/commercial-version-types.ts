@@ -36,6 +36,9 @@ type CommercialConfigurationVersion = {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  /** Workflow Runtime V1 Sequential Execution: the workflow version this version is bound to, and which Approval node it is currently sitting at. Null current node means no workflow is bound, the graph has no Approval node, or the version is between Send Back and resubmit (this domain has no Send Back today, but the field stays consistent with the other three). */
+  workflowVersionId: string | null
+  currentWorkflowNodeKey: string | null
 }
 
 /** Human-Friendly ID (task Phase L): "CC-000078". Never renumbered; the underlying `requestId` UUID remains the real identity everywhere. */

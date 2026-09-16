@@ -308,3 +308,22 @@ intentionally excluded: they are not built.
 |---|------|--------|-------|
 | 141 | Customer Detail's "Documents" tab is clearly labeled as demo/fixture data (badge), never presented as the real Onboarding/Go Live evidence, which lives only on each request's own review/detail screen | | |
 | 142 | `/commercials` (no customer context) shows its own "Legacy design-reference screen, not live data" banner and is not reachable from any navigation | | |
+
+## Workflow Runtime V1: Sequential Execution, Timeline, and stale-approval UX
+
+*Requires a workflow with at least 3 Approval nodes (Start -> Finance -> Legal -> Leadership -> End) and at least two checker accounts on different teams. Covers `docs/WORKFLOW_ENGINE_ARCHITECTURE.md` §3b and §10, and `docs/CUSTOMER_LIFECYCLE.md` §19a.*
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 143 | Submitting a request against a 3-Approval-node workflow assigns it to the first node's team only; a different team's checker does not see it as actionable | | |
+| 144 | Approving as the first node's team advances the request to the second node; the first team's task disappears and the second team's appears (My Work) | | |
+| 145 | Sending back from a later node (not the first) returns the request to the Maker; prior approvals from earlier nodes remain visible in the Timeline | | |
+| 146 | After editing and resubmitting a sent-back request, approval restarts at the FIRST Approval node, never resuming from where it was sent back | | |
+| 147 | Rejecting at any node (first, middle, or last) is terminal: no proposed change is ever applied, and every prior approval on that request remains visible | | |
+| 148 | The request Timeline shows real node names ("Finance Approval", "Legal Approval") and real actor names for every approve/send-back/reject event, never a raw node key, team UUID, or user id | | |
+| 149 | A request sent back and resubmitted at least once shows its Timeline grouped under "Approval cycle 1" / "Approval cycle 2" markers; a request approved in one cycle shows no cycle markers at all | | |
+| 150 | The final approval line names the actual last node ("Leadership Approval approved"), never a second, generic "Approved" entry alongside it | | |
+| 151 | If a request is approved elsewhere while a checker has its review page open, clicking Approve on that now-stale page shows a plain, friendly message ("This approval has already moved to the next step...") — never a raw `WORKFLOW_NODE_ALREADY_ADVANCED` or SQL error | | |
+| 152 | Clicking Refresh after that stale message shows the current, correct state (including the updated Timeline) and clears the stale message itself, not just the underlying data | | |
+| 153 | Settings > Workflows shows an Active/Inactive column; activating a second workflow for a context that already has an active one is blocked with a message naming the currently active workflow, never silently swapped | | |
+| 154 | The governed replacement action (Activate on an inactive workflow) atomically deactivates whichever other workflow held that context's active slot and activates the new one in one step | | |

@@ -168,6 +168,68 @@ as true and tested (`src/platform/workflow-builder/domain/runtime.test.ts`,
 live-verified through the real Builder UI, see Phase 2's own closeout
 notes).
 
+### 3b. Sequential Approval Execution and active-workflow uniqueness
+
+**[IMPLEMENTED, Workflow Runtime V1 Sequential Execution + UX/Audit
+Closure, `supabase/migrations/20260925000000_workflow_runtime_v1_sequential_execution.sql`
+and `20260925010000_fix_approve_rpc_overload_ambiguity.sql`.]** §3a's
+walk (Start -> ... -> the first Approval node) is no longer the whole
+story: a graph like Start -> Finance -> Legal -> Leadership -> End now
+actually executes all three Approval nodes in order, not only the
+first one.
+
+- **Durable current position.** Each of the four governed tables
+  (`customer_onboarding_cases`, `customer_change_requests`,
+  `commercial_configuration_versions`, `go_live_requests`) carries
+  `current_workflow_node_key` (which Approval node it is sitting at
+  right now; null if no workflow is bound, the graph has no Approval
+  node, or the request is between Send Back and resubmit) and
+  `workflow_cycle_number` (incremented on Send Back). This is never
+  inferred from UI state; it is read and written server-side inside the
+  same transaction as every submit/approve/send_back/reject.
+- **Resumable walk.** `fn_resolve_workflow_next_approval(workflow_version_id,
+  from_node_key, context)` generalizes §3a's walk to resume from any
+  node (`from_node_key = null` means "resolve the first Approval node,"
+  used at submit) instead of always restarting at Start. Every
+  `approve_*` RPC authorizes against the row's current node's team
+  (`fn_workflow_node_team` plus the same `fn_require_workflow_team_membership`
+  from §3a), then either advances `current_workflow_node_key` (status
+  unchanged) or, on reaching End, applies the governed business
+  mutation exactly once.
+- **Send Back restarts the chain.** Send Back clears
+  `current_workflow_node_key` and increments `workflow_cycle_number`;
+  resubmit re-resolves from the first Approval node, since the
+  underlying proposed truth may have changed since earlier approvals.
+  Reject is terminal at whichever node it happens, with no partial
+  mutation ever applied.
+- **Concurrency.** An optional `p_expected_current_node_key` parameter
+  on all four `approve_*` RPCs lets a stale page produce a clear
+  `WORKFLOW_NODE_ALREADY_ADVANCED` error instead of a confusing
+  team-mismatch one; the row's own `FOR UPDATE` lock plus the
+  current-node/team check is what actually makes two racing checkers
+  safe, independent of whether this parameter is passed.
+- **At most one active workflow per binding context.** A partial
+  unique index (`workflow_definitions(applies_to) where is_active`)
+  enforces that at most one workflow definition is active per context
+  (`customer_onboarding`, `customer_change`, `commercial_configuration`,
+  `go_live`, and the reserved-but-unused `agreement`). Activating a
+  second one for the same context is rejected with a named conflict
+  (`WORKFLOW_DEFINITION_CONTEXT_ALREADY_ACTIVE`) naming the currently
+  active workflow, never silently resolved; `replace_active_workflow_definition`
+  is the governed one-click swap (Settings > Workflows). A newly created
+  definition for a context that already has an active one is created
+  inactive by default, never contends for the slot at creation time.
+
+Still deliberately not a general BPM engine: the same bounded, 10-hop,
+Start -> [Decision] -> Approval shape as §3a, just resumable instead of
+always restarting from Start. Publish-time validation now requires
+exactly one outgoing edge for start/form_step/approval nodes (a
+resumable engine needs the "next node" unambiguous; only Decision nodes
+branch).
+
+Regression coverage: `scripts/verify-workflow-runtime-sequential-execution.ts`
+(reusable, calls the real RPCs against the linked database).
+
 ## 4. Field-level rules and stable field identity
 
 A `WorkflowRule` attaches to a `WorkflowVersionDefinition`, which belongs
@@ -278,13 +340,42 @@ implementation does not invent a different shape.
 
 ## 10. Audit
 
-A future workflow audit trail must answer: which workflow and version
-ran, what triggered it, which rules matched, what requirements were
-created, what evidence was supplied, who was resolved for each approval,
-who approved or sent back, what changed, when, and the final outcome.
-This reuses `docs/PLATFORM_ARCHITECTURE.md` §7's existing audit/domain
-event distinction rather than inventing a second audit mechanism for
-workflow specifically.
+**[PARTIALLY IMPLEMENTED, Workflow Runtime V1 UX + Audit Closure.]**
+Per-node transition history (who acted at which node, when, what action,
+with what comment, and what the previous/next node was) is real: every
+`submit_*`/`approve_*`/`send_back_*`/`reject_*` RPC writes a row to the
+shared, append-only `workflow_node_transitions` table (§3b), keyed by
+domain + resource id, tagged with the cycle number a Send Back
+increments. The request detail Timeline (each domain's own
+`domain/timeline.ts`, sharing one pure mapper,
+`src/platform/workflow-builder/domain/transition-events.ts`) surfaces
+these as human-readable events, resolving node and team names from
+`workflow_nodes` and actor names via the same live `resolveActorLabels`
+lookup every other Timeline event already uses, never a raw node_key,
+team UUID, or actor id. When a request has real transition history, it
+replaces (never duplicates) that domain's own decided/sent-back events,
+so a final approval reads as "Leadership Approval approved," not a
+second, generic "Approved" line stacked on top of it. Repeated Send
+Back cycles are grouped under a subtle "Approval cycle N" marker, shown
+only once more than one cycle exists.
+
+Actor identity here is resolved live, by deliberate choice, not from a
+point-in-time snapshot: `workflow_node_transitions` carries no snapshot
+columns, and neither does any other event source these same Timelines
+already read (`created_by`, `submitted_by`, `sent_back_by`,
+`decided_by`/`approved_by` are all resolved live too). Adding a snapshot
+mechanism for only the new event type would make one Timeline
+internally inconsistent about whether its own history is a live lookup
+or a point-in-time snapshot; this was inspected and deliberately
+declined rather than adding schema for it. If a genuine business need
+for point-in-time actor snapshots emerges, the existing `audit_log`
+table's `actor_display_name_snapshot`/`actor_email_snapshot` columns
+(`docs/PLATFORM_ARCHITECTURE.md` §7) are the mechanism to extend, not a
+new one.
+
+Still not fully answered here: which rules matched and what evidence
+was supplied remain the pure rule evaluator's own concern (§3, §6), a
+distinct system from Workflow Builder graphs, unchanged by this closure.
 
 ## 11. Forms integration
 

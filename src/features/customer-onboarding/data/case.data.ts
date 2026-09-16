@@ -85,6 +85,8 @@ type ApproveCaseInput = {
   actorUserId: string
   /** Task Phase H: every other governed Customer Master field this onboarding case recorded, keyed by real `customers` column name. */
   customerFields: Record<string, string | null>
+  /** Workflow Runtime V1 UX + Audit Closure: the Approval node this actor's page believed was current when they clicked Approve. Optional and purely a UX improvement, never an authorization input: the RPC's own current-node/team check remains the sole authority. */
+  expectedCurrentNodeKey?: string | null
 }
 
 async function approveCase(input: ApproveCaseInput): Promise<CustomerOnboardingCaseRow> {
@@ -98,6 +100,7 @@ async function approveCase(input: ApproveCaseInput): Promise<CustomerOnboardingC
     p_effective_date: input.effectiveDate,
     p_actor_user_id: input.actorUserId,
     p_customer_fields: input.customerFields,
+    p_expected_current_node_key: input.expectedCurrentNodeKey ?? null,
   })
 }
 

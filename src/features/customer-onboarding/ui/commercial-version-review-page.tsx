@@ -65,6 +65,7 @@ function CommercialVersionReviewPage({
   const [mode, setMode] = useState<"idle" | "reject">("idle")
   const [reason, setReason] = useState("")
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isActionStale, setIsActionStale] = useState(false)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
 
   const currencyCode = version.commercialRate?.billingCurrency ?? null
@@ -72,14 +73,20 @@ function CommercialVersionReviewPage({
 
   async function handleApprove() {
     setActionError(null)
+    setIsActionStale(false)
     setIsSubmittingAction(true)
-    const result = await approveCommercialVersionAction(requestId)
+    // Workflow Runtime V1 UX + Audit Closure: echoes back the node this
+    // page was showing as current, so a stale page (another checker
+    // already advanced it) gets a clear "already moved on" message
+    // instead of a confusing team-mismatch error.
+    const result = await approveCommercialVersionAction(requestId, version.currentWorkflowNodeKey)
     setIsSubmittingAction(false)
     if (result.ok) {
       router.push(`/commercials/${configId}`)
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -89,6 +96,7 @@ function CommercialVersionReviewPage({
       return
     }
     setActionError(null)
+    setIsActionStale(false)
     setIsSubmittingAction(true)
     const result = await rejectCommercialVersionAction(requestId, reason)
     setIsSubmittingAction(false)
@@ -97,6 +105,7 @@ function CommercialVersionReviewPage({
       router.refresh()
     } else {
       setActionError(result.error)
+      setIsActionStale(result.stale ?? false)
     }
   }
 
@@ -183,7 +192,24 @@ function CommercialVersionReviewPage({
               that date arrives. Reject is terminal and never changes the Commercial Configuration.
             </p>
 
-            {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
+            {actionError ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-destructive">{actionError}</p>
+                {isActionStale ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setActionError(null)
+                      setIsActionStale(false)
+                      router.refresh()
+                    }}
+                  >
+                    Refresh
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
 
             {mode === "idle" ? (
               <div className="flex flex-wrap gap-2">

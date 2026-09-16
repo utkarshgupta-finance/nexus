@@ -75,10 +75,12 @@ async function rejectChangeRequest(requestId: string, reason: string, actorUserI
   })
 }
 
-async function approveChangeRequest(requestId: string, actorUserId: string): Promise<CustomerChangeRequestRow> {
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node this actor's page believed was current when they clicked Approve. Optional and purely a UX improvement, never an authorization input: the RPC's own current-node/team check remains the sole authority; a mismatch here only produces a clearer WORKFLOW_NODE_ALREADY_ADVANCED error instead of a confusing team-mismatch one. */
+async function approveChangeRequest(requestId: string, actorUserId: string, expectedCurrentNodeKey: string | null = null): Promise<CustomerChangeRequestRow> {
   return callSingleRowRpc<CustomerChangeRequestRow>("approve_customer_change_request", {
     p_request_id: requestId,
     p_actor_user_id: actorUserId,
+    p_expected_current_node_key: expectedCurrentNodeKey,
   })
 }
 

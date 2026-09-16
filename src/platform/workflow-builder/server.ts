@@ -14,6 +14,7 @@ export {
   listVersionsForDefinition,
   loadWorkflowGraph,
   getResponsibleTeamIdsByNode,
+  getWorkflowTransitionTimelineInputs,
   createDefinition,
   setDefinitionActive,
   replaceActiveDefinition,
@@ -38,3 +39,5 @@ export type {
 export type { WorkflowGraphValidationResult } from "./domain/validation"
 export { resolveApprovalStep, resolveWorkflowApprovalStep, DEFAULT_APPROVAL_STEP } from "./domain/runtime"
 export type { ResolvedApprovalStep } from "./domain/runtime"
+export { buildWorkflowTransitionEvents } from "./domain/transition-events"
+export type { WorkflowTransitionRecord, WorkflowNodeDisplay, WorkflowTransitionAction } from "./domain/transition-events"

@@ -69,8 +69,9 @@ async function sendBackGoLiveRequest(id: string, reason: string, actorUserId: st
   return callSingleRowRpc<GoLiveRequestRow>("send_back_go_live_request", { p_id: id, p_reason: reason, p_actor_user_id: actorUserId })
 }
 
-async function approveGoLiveRequest(id: string, actorUserId: string): Promise<GoLiveRequestRow> {
-  return callSingleRowRpc<GoLiveRequestRow>("approve_go_live_request", { p_id: id, p_actor_user_id: actorUserId })
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node this actor's page believed was current when they clicked Approve. Optional and purely a UX improvement, never an authorization input: the RPC's own current-node/team check remains the sole authority. */
+async function approveGoLiveRequest(id: string, actorUserId: string, expectedCurrentNodeKey: string | null = null): Promise<GoLiveRequestRow> {
+  return callSingleRowRpc<GoLiveRequestRow>("approve_go_live_request", { p_id: id, p_actor_user_id: actorUserId, p_expected_current_node_key: expectedCurrentNodeKey })
 }
 
 async function cancelGoLiveRequest(id: string, reason: string | null, actorUserId: string): Promise<GoLiveRequestRow> {

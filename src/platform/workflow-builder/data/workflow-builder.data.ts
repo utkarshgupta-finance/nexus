@@ -94,6 +94,34 @@ async function listNodesForVersions(versionIds: string[]): Promise<WorkflowNodeR
   return data ?? []
 }
 
+/** Raw shape of a workflow_node_transitions row (Workflow Runtime V1 Sequential Execution, supabase/migrations/20260925000000_workflow_runtime_v1_sequential_execution.sql). Append-only; never updated or deleted. */
+type WorkflowNodeTransitionRow = {
+  id: string
+  domain: string
+  resource_id: string
+  workflow_version_id: string
+  cycle_number: number
+  from_node_key: string | null
+  to_node_key: string | null
+  action: string
+  actor_user_id: string
+  comment: string | null
+  occurred_at: string
+}
+
+/** Every transition ever recorded for one request, oldest first: a Timeline reads its own history top to bottom, same convention as every other Timeline data source in this codebase. */
+async function listTransitionsForResource(domain: string, resourceId: string): Promise<WorkflowNodeTransitionRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("workflow_node_transitions")
+    .select("*")
+    .eq("domain", domain)
+    .eq("resource_id", resourceId)
+    .order("occurred_at", { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 type WorkflowEdgeRow = {
   id: string
   workflow_version_id: string
@@ -196,6 +224,7 @@ export {
   listNodesForVersion,
   listNodesForVersions,
   listEdgesForVersion,
+  listTransitionsForResource,
   createDefinition,
   setDefinitionActive,
   replaceActiveDefinition,
@@ -204,4 +233,4 @@ export {
   publishVersion,
   discardVersion,
 }
-export type { WorkflowDefinitionRow, WorkflowVersionRow, WorkflowNodeRow, WorkflowEdgeRow }
+export type { WorkflowDefinitionRow, WorkflowVersionRow, WorkflowNodeRow, WorkflowEdgeRow, WorkflowNodeTransitionRow }

@@ -30,10 +30,18 @@ import type { DocumentUploadInput } from "./services/documents.service"
  * configuration (see platform/workflow-builder/domain/runtime.ts).
  */
 
-type GoLiveActionResult = { ok: true; request: GoLiveRequest } | { ok: false; error: string }
+type GoLiveActionResult = { ok: true; request: GoLiveRequest } | { ok: false; error: string; stale?: boolean }
 
-function toGoLiveActionError(error: unknown): { ok: false; error: string } {
+function toGoLiveActionError(error: unknown): { ok: false; error: string; stale?: boolean } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof GoLiveOperationError && error.goLiveError.kind === "workflow_node_already_advanced") {
+    // Workflow Runtime V1 UX + Audit Closure: never surface the raw
+    // WORKFLOW_NODE_ALREADY_ADVANCED token or a confusing team-mismatch
+    // error when another checker has simply already acted; `stale: true`
+    // lets the review page show an explicit Refresh affordance instead
+    // of a dead end.
+    return { ok: false, error: "This approval has already moved to the next step. Refresh to see its current status.", stale: true }
+  }
   if (error instanceof GoLiveOperationError && error.goLiveError.kind === "unknown") {
     return { ok: false, error: withCorrelationReference(error.message, error) }
   }
@@ -87,10 +95,11 @@ async function sendBackGoLiveRequestAction(id: string, reason: string): Promise<
   }
 }
 
-async function approveGoLiveRequestAction(id: string): Promise<GoLiveActionResult> {
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve; see toGoLiveActionError's own comment for the stale-approval UX this enables. */
+async function approveGoLiveRequestAction(id: string, expectedCurrentNodeKey: string | null = null): Promise<GoLiveActionResult> {
   try {
     const actor = await requirePermission("go_live", "approve")
-    const request = await approveGoLiveRequest(id, actor.appUserId)
+    const request = await approveGoLiveRequest(id, actor.appUserId, expectedCurrentNodeKey)
     return { ok: true, request }
   } catch (error) {
     return toGoLiveActionError(error)

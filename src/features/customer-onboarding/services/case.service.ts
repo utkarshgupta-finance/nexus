@@ -235,7 +235,13 @@ async function listAllOnboardingEntries(): Promise<ReviewQueueEntry[]> {
  * creates the Customer Master row, the Commercial Configuration, Version
  * 1, and every Component in one transaction.
  */
-async function approveOnboardingCase(requestId: string, actorUserId: string, snapshot: ReferenceMasterSnapshot, effectiveDate: string): Promise<CustomerOnboardingCase> {
+async function approveOnboardingCase(
+  requestId: string,
+  actorUserId: string,
+  snapshot: ReferenceMasterSnapshot,
+  effectiveDate: string,
+  expectedCurrentNodeKey: string | null = null
+): Promise<CustomerOnboardingCase> {
   return withLoggedOperation(
     { eventCode: "onboarding.approve", operation: "approveOnboardingCase", resourceType: "customer_onboarding_case", resourceId: requestId, actorUserId },
     async () => {
@@ -285,6 +291,7 @@ async function approveOnboardingCase(requestId: string, actorUserId: string, sna
         effectiveDate,
         actorUserId,
         customerFields: extractGovernedCustomerFieldsFromOnboarding(values, commercialRate),
+        expectedCurrentNodeKey,
       })
       const revisions = await caseData.listRevisionsForRequest(requestId)
       return toCustomerOnboardingCase(row, revisions)

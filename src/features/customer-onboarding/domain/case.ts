@@ -48,6 +48,8 @@ function createCase(requestId: string, now: string, createdBy: AppUserId | null)
     createdAt: now,
     createdBy,
     updatedAt: now,
+    workflowVersionId: null,
+    currentWorkflowNodeKey: null,
   }
 }
 

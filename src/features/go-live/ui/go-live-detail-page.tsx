@@ -63,6 +63,7 @@ function GoLiveDetailPage({
   const [showSendBackForm, setShowSendBackForm] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isErrorStale, setIsErrorStale] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const confirmationFileRef = useRef<HTMLInputElement>(null)
   const uatFileRef = useRef<HTMLInputElement>(null)
@@ -71,14 +72,16 @@ function GoLiveDetailPage({
   const isEditable = request.status === "draft" || request.status === "sent_back"
   const isDecidable = request.status === "submitted" || request.status === "resubmitted"
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(action: () => Promise<{ ok: boolean; error?: string; stale?: boolean }>) {
     setError(null)
+    setIsErrorStale(false)
     setMessage(null)
     setIsPending(true)
     action().then((result) => {
       setIsPending(false)
       if (!result.ok) {
         setError(result.error ?? "An unexpected error occurred.")
+        setIsErrorStale(result.stale ?? false)
         return
       }
       router.refresh()
@@ -94,7 +97,11 @@ function GoLiveDetailPage({
   }
 
   function handleApprove() {
-    run(() => approveGoLiveRequestAction(request.id))
+    // Workflow Runtime V1 UX + Audit Closure: echoes back the node this
+    // page was showing as current, so a stale page (another checker
+    // already advanced it) gets a clear "already moved on" message
+    // instead of a confusing team-mismatch error.
+    run(() => approveGoLiveRequestAction(request.id, request.currentWorkflowNodeKey))
   }
 
   function handleSendBack() {
@@ -148,7 +155,24 @@ function GoLiveDetailPage({
       />
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6">
-        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        {error ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs text-destructive">{error}</p>
+            {isErrorStale ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setError(null)
+                  setIsErrorStale(false)
+                  router.refresh()
+                }}
+              >
+                Refresh
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {message ? <p className="text-xs text-success">{message}</p> : null}
 
         {lineItem ? (

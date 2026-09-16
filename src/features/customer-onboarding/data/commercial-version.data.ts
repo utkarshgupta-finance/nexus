@@ -71,11 +71,18 @@ async function rejectVersion(requestId: string, reason: string, actorUserId: str
   })
 }
 
-async function approveVersion(requestId: string, components: Record<string, unknown>[], actorUserId: string): Promise<CommercialConfigurationVersionRow> {
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node this actor's page believed was current when they clicked Approve. Optional and purely a UX improvement, never an authorization input: the RPC's own current-node/team check remains the sole authority. */
+async function approveVersion(
+  requestId: string,
+  components: Record<string, unknown>[],
+  actorUserId: string,
+  expectedCurrentNodeKey: string | null = null
+): Promise<CommercialConfigurationVersionRow> {
   return callSingleRowRpc<CommercialConfigurationVersionRow>("approve_commercial_configuration_version", {
     p_request_id: requestId,
     p_components: components,
     p_actor_user_id: actorUserId,
+    p_expected_current_node_key: expectedCurrentNodeKey,
   })
 }
 

@@ -7,9 +7,26 @@ import type { GoLiveRequest, GoLiveSendBackEntry } from "./types"
  * domain-agnostic `RequestTimeline` renderer exactly as Customer
  * Change/Commercial Version already do; only event composition is
  * feature-specific.
+ *
+ * `workflowTransitionEvents` (Workflow Runtime V1 UX + Audit Closure):
+ * see ../../customer-change/domain/timeline.ts's own
+ * BuildChangeRequestTimelineInput.workflowTransitionEvents for the full
+ * contract. When non-empty, replaces the send-back/approved events
+ * below (built from go_live_send_backs/approved_by, the same moments
+ * the workflow transitions now describe with a node name and per-step
+ * attribution); the final approval line still carries Go Live's own
+ * "line item is now Live" detail, folded into the last transition event
+ * itself rather than as a second line.
  */
-function buildGoLiveTimeline(request: GoLiveRequest, sendBacks: GoLiveSendBackEntry[], actorLabels: Map<string, string | null>): RequestTimelineEvent[] {
+function buildGoLiveTimeline(
+  request: GoLiveRequest,
+  sendBacks: GoLiveSendBackEntry[],
+  actorLabels: Map<string, string | null>,
+  workflowTransitionEvents: RequestTimelineEvent[] = []
+): RequestTimelineEvent[] {
   const label = (id: string | null) => (id ? (actorLabels.get(id) ?? null) : null)
+  const hasWorkflowHistory = workflowTransitionEvents.length > 0
+
   const events: RequestTimelineEvent[] = [
     { id: "created", occurredAt: request.createdAt, actorEmail: label(request.createdBy), summary: "Go Live request created" },
   ]
@@ -31,17 +48,21 @@ function buildGoLiveTimeline(request: GoLiveRequest, sendBacks: GoLiveSendBackEn
     })
   }
 
-  for (const sendBack of sendBacks) {
-    events.push({
-      id: `sent-back-${sendBack.id}`,
-      occurredAt: sendBack.sentBackAt,
-      actorEmail: label(sendBack.sentBackBy),
-      summary: `Sent back: ${sendBack.reason}`,
-    })
-  }
+  if (hasWorkflowHistory) {
+    events.push(...workflowTransitionEvents)
+  } else {
+    for (const sendBack of sendBacks) {
+      events.push({
+        id: `sent-back-${sendBack.id}`,
+        occurredAt: sendBack.sentBackAt,
+        actorEmail: label(sendBack.sentBackBy),
+        summary: `Sent back: ${sendBack.reason}`,
+      })
+    }
 
-  if (request.approvedAt) {
-    events.push({ id: "approved", occurredAt: request.approvedAt, actorEmail: label(request.approvedBy), summary: "Approved: line item is now Live" })
+    if (request.approvedAt) {
+      events.push({ id: "approved", occurredAt: request.approvedAt, actorEmail: label(request.approvedBy), summary: "Approved: line item is now Live" })
+    }
   }
 
   if (request.cancelledAt) {

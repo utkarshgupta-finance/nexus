@@ -840,6 +840,42 @@ generalized into one shared engine, matching the Chief-Architect-lens
 conclusion that a universal workflow engine is not yet justified
 (`docs/WORKFLOW_ENGINE_ARCHITECTURE.md` remains design-draft, correctly).
 
+### 19a. Workflow-transition Timeline events supersede send-back-history events when a workflow is bound: IMPLEMENTED (Workflow Runtime V1 UX + Audit Closure)
+
+§19's Timelines read from each domain's own send-back-history table
+(`customer_change_send_backs`, `customer_onboarding_send_backs`,
+`go_live_send_backs`) and `decided_by`/`decided_at`/`approved_by`/
+`approved_at` columns. Once Sequential Approval Execution
+(`docs/WORKFLOW_ENGINE_ARCHITECTURE.md` §3b) made every
+submit/approve/send_back/reject a recorded node transition
+(`workflow_node_transitions`), those same moments are now doubly
+recorded: once in the domain's own history table/columns, and once as a
+transition row naming the actual node and team involved. Showing both
+would read as two entries for one decision.
+
+The fix: each domain's `domain/timeline.ts` now takes an optional
+`workflowTransitionEvents` input (built by the one shared mapper,
+`src/platform/workflow-builder/domain/transition-events.ts`). When
+non-empty, it fully replaces that domain's own send-back/decided/
+approved/rejected events for the same Timeline, so "Legal Approval sent
+back" (node-attributed, real team name) appears instead of "Sent back:
+{reason}" (no node/team attribution), and the final "Leadership
+Approval approved" line replaces a generic "Approved" rather than
+sitting alongside it. When empty (a request never actually routed
+through a real workflow, including every request that predates this
+migration), the Timeline falls back to exactly the §19/§18 behavior,
+unchanged. Repeated Send Back cycles are grouped under a subtle
+"Approval cycle N" marker (`workflow_cycle_number`), shown only once
+more than one cycle exists, so the common single-cycle case stays
+exactly as terse as §19 already made it.
+
+Go Live's Timeline composition still lives at the page level
+(`src/app/customers/[customerKey]/go-live/[requestId]/page.tsx`), not
+in a `server/timeline.ts` loader like the other three (§19 never
+unified that), so this same optional-input pattern was applied there
+directly rather than forcing an unrelated refactor into this task's
+scope.
+
 ## 20. UX operating system consistency across the three review screens: PARTIAL (Platform Scale Closure, Phase J)
 
 A cross-screen UX audit (Onboarding/Customer Change/Commercial Version

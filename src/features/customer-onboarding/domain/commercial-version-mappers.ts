@@ -35,6 +35,8 @@ function toCommercialConfigurationVersion(row: CommercialConfigurationVersionRow
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    workflowVersionId: row.workflow_version_id,
+    currentWorkflowNodeKey: row.current_workflow_node_key,
   }
 }
 

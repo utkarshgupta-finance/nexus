@@ -119,6 +119,9 @@ type CustomerOnboardingCase = {
   createdBy: AppUserId | null
   /** My Requests' "Last Updated" column. */
   updatedAt: string
+  /** Workflow Runtime V1 Sequential Execution: the workflow version this case is bound to, and which Approval node it is currently sitting at. Null current node means no workflow is bound, the graph has no Approval node, or the case is between Send Back and resubmit. */
+  workflowVersionId: string | null
+  currentWorkflowNodeKey: string | null
 }
 
 // =============================================================================

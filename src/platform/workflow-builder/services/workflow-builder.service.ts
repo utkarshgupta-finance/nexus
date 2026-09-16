@@ -3,10 +3,11 @@ import "server-only"
 import * as workflowData from "../data/workflow-builder.data"
 import { toWorkflowDefinition, toWorkflowDefinitionVersion, toWorkflowNode, toWorkflowEdge } from "../domain/mappers"
 import { validateWorkflowGraph } from "../domain/validation"
-import { listActiveTeams } from "@/platform/team/server"
+import { listActiveTeams, listTeams } from "@/platform/team/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/server-client"
 import type { WorkflowDefinition, WorkflowDefinitionVersion, WorkflowNode, WorkflowEdge, WorkflowNodeDraft, WorkflowEdgeDraft, WorkflowAppliesTo } from "../domain/types"
 import type { WorkflowGraphValidationResult } from "../domain/validation"
+import type { WorkflowTransitionRecord, WorkflowNodeDisplay, WorkflowTransitionAction } from "../domain/transition-events"
 
 /**
  * Application service for the Workflow Builder module (task Phase N/O).
@@ -58,6 +59,47 @@ async function getResponsibleTeamIdsByNode(versionIds: string[]): Promise<Map<st
   const distinctVersionIds = [...new Set(versionIds)]
   const nodeRows = await workflowData.listNodesForVersions(distinctVersionIds)
   return new Map(nodeRows.map((row) => [`${row.workflow_version_id}::${row.node_key}`, row.responsible_team_id]))
+}
+
+type WorkflowTransitionTimelineInputs = {
+  transitions: WorkflowTransitionRecord[]
+  nodeDisplayByKey: Map<string, WorkflowNodeDisplay>
+  actorIds: string[]
+}
+
+/**
+ * Everything one request's Timeline needs to render its workflow
+ * transitions (Workflow Runtime V1 UX + Audit Closure): the raw
+ * transition rows mapped to the pure domain shape, plus a node_key ->
+ * {nodeName, teamName} display map (never a raw node_key or team UUID
+ * reaching the UI) and the list of actor ids the caller must fold into
+ * its own batched `resolveActorLabels` call. All transitions for one
+ * request share one workflow_version_id (resolved once at creation,
+ * never re-resolved), so node display only needs one version's worth of
+ * nodes, not a cross-request batch like `getResponsibleTeamIdsByNode`.
+ */
+async function getWorkflowTransitionTimelineInputs(domain: string, resourceId: string): Promise<WorkflowTransitionTimelineInputs> {
+  const rows = await workflowData.listTransitionsForResource(domain, resourceId)
+  if (rows.length === 0) return { transitions: [], nodeDisplayByKey: new Map(), actorIds: [] }
+
+  const workflowVersionId = rows[0].workflow_version_id
+  const [nodeRows, teams] = await Promise.all([workflowData.listNodesForVersion(workflowVersionId), listTeams()])
+  const teamNameById = new Map(teams.map((team) => [team.id, team.name]))
+  const nodeDisplayByKey = new Map(
+    nodeRows.map((node) => [node.node_key, { nodeName: node.name, teamName: node.responsible_team_id ? (teamNameById.get(node.responsible_team_id) ?? null) : null }])
+  )
+
+  const transitions: WorkflowTransitionRecord[] = rows.map((row) => ({
+    fromNodeKey: row.from_node_key,
+    toNodeKey: row.to_node_key,
+    action: row.action as WorkflowTransitionAction,
+    actorUserId: row.actor_user_id,
+    comment: row.comment,
+    occurredAt: row.occurred_at,
+    cycleNumber: row.cycle_number,
+  }))
+
+  return { transitions, nodeDisplayByKey, actorIds: transitions.map((transition) => transition.actorUserId) }
 }
 
 async function createDefinition(code: string, name: string, appliesTo: WorkflowAppliesTo, actorUserId: string): Promise<WorkflowDefinition> {
@@ -169,6 +211,7 @@ export {
   listVersionsForDefinition,
   loadWorkflowGraph,
   getResponsibleTeamIdsByNode,
+  getWorkflowTransitionTimelineInputs,
   createDefinition,
   setDefinitionActive,
   replaceActiveDefinition,

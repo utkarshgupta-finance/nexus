@@ -38,6 +38,25 @@ describe("buildCommercialVersionTimeline", () => {
     expect(timeline.at(-1)?.summary).toBe("Rejected: Rate does not match the approved commercial proposal")
   })
 
+  it("Workflow Runtime V1 UX + Audit Closure: replaces the decided event with the workflow transition events when this version was actually routed through a workflow, never showing both", () => {
+    const timeline = buildCommercialVersionTimeline({
+      createdAt: "2026-01-01T00:00:00.000Z",
+      createdBy: "actor-requester",
+      submittedAt: "2026-01-02T00:00:00.000Z",
+      submittedBy: "actor-requester",
+      decidedAt: "2026-01-05T00:00:00.000Z",
+      decidedBy: "actor-approver",
+      decisionStatus: "approved",
+      decisionReason: null,
+      actorLabels: ACTOR_EMAILS,
+      workflowTransitionEvents: [
+        { id: "workflow-transition-0", occurredAt: "2026-01-05T00:00:00.000Z", actorEmail: "approver@example.com", summary: "Finance Approval approved" },
+      ],
+    })
+    expect(timeline.map((e) => e.summary)).toEqual(["Version created", "Submitted for review", "Finance Approval approved"])
+    expect(timeline.some((event) => event.summary === "Approved")).toBe(false)
+  })
+
   it("never invents a submitted or decided event for a version still in draft", () => {
     const timeline = buildCommercialVersionTimeline({
       createdAt: "2026-01-01T00:00:00.000Z",

@@ -38,6 +38,24 @@ describe("buildOnboardingTimeline", () => {
     expect(timeline.every((event) => event.actorEmail === "requester@example.com" || event.actorEmail === "approver@example.com")).toBe(true)
   })
 
+  it("Workflow Runtime V1 UX + Audit Closure: replaces the send-back/approved events with the workflow transition events when this case was actually routed through a workflow, never showing both", () => {
+    const timeline = buildOnboardingTimeline({
+      createdAt: "2026-01-01T00:00:00.000Z",
+      createdBy: "actor-requester",
+      approvedAt: "2026-01-10T00:00:00.000Z",
+      approvedBy: "actor-approver",
+      revisions: [{ revisionNumber: 1, submittedAt: "2026-01-02T00:00:00.000Z", submittedBy: "actor-requester" }],
+      sendBacks: [{ revisionNumber: 1, reason: "GST number looks incorrect", sentBackBy: "actor-approver", sentBackAt: "2026-01-03T00:00:00.000Z" }],
+      actorLabels: ACTOR_EMAILS,
+      workflowTransitionEvents: [
+        { id: "workflow-transition-0", occurredAt: "2026-01-10T00:00:00.000Z", actorEmail: "approver@example.com", summary: "Finance Approval approved" },
+      ],
+    })
+    expect(timeline.map((event) => event.summary)).toEqual(["Request created", "Submitted for review", "Finance Approval approved"])
+    expect(timeline.some((event) => event.summary.startsWith("Sent back:"))).toBe(false)
+    expect(timeline.some((event) => event.summary === "Approved")).toBe(false)
+  })
+
   it("never invents a submitted or approved event for a draft that was never submitted", () => {
     const timeline = buildOnboardingTimeline({
       createdAt: "2026-01-01T00:00:00.000Z",

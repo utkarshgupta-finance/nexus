@@ -22,6 +22,7 @@ type CaseErrorKind =
   | "onboarding_send_back_reason_required"
   | "workflow_team_required"
   | "workflow_decision_no_match"
+  | "workflow_node_already_advanced"
   | "onboarding_draft_stale"
   | "invalid_input"
   | "conflict"
@@ -49,6 +50,7 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   SELF_APPROVAL_NOT_ALLOWED: "onboarding_case_self_approval_not_allowed",
   WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
+  WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
   ONBOARDING_DRAFT_STALE: "onboarding_draft_stale",
 }
 

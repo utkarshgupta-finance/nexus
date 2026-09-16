@@ -52,6 +52,8 @@ function toCustomerOnboardingCase(row: CustomerOnboardingCaseRow, revisions: Sub
     createdAt: row.created_at,
     createdBy: row.created_by,
     updatedAt: row.updated_at,
+    workflowVersionId: row.workflow_version_id,
+    currentWorkflowNodeKey: row.current_workflow_node_key,
   }
 }
 

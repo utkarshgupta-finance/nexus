@@ -18,7 +18,6 @@ export {
   listGoLiveRequestsCreatedBy,
   listSendBacksForGoLiveRequest,
   resolveApprovalStepForGoLiveRequest,
-  resolveGoLiveActorLabels,
 } from "./services/go-live.service"
 export { listCurrentLineItemsForCustomer } from "./services/line-items.service"
 export type { GoLiveLineItem } from "./domain/line-items"

@@ -43,10 +43,18 @@ import type { DuplicateCandidate, DuplicateMatch, ExistingCustomerIdentity } fro
  * docs/AUTHORIZATION_MODEL.md's resource+action convention.
  */
 
-type CaseActionResult = { ok: true; onboardingCase: CustomerOnboardingCase } | { ok: false; error: string }
+type CaseActionResult = { ok: true; onboardingCase: CustomerOnboardingCase } | { ok: false; error: string; stale?: boolean }
 
-function toCaseActionError(error: unknown): { ok: false; error: string } {
+function toCaseActionError(error: unknown): { ok: false; error: string; stale?: boolean } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof CaseOperationError && error.caseError.kind === "workflow_node_already_advanced") {
+    // Workflow Runtime V1 UX + Audit Closure: never surface the raw
+    // WORKFLOW_NODE_ALREADY_ADVANCED token or a confusing team-mismatch
+    // error when another checker has simply already acted; `stale: true`
+    // lets the review page show an explicit Refresh affordance instead
+    // of a dead end.
+    return { ok: false, error: "This approval has already moved to the next step. Refresh to see its current status.", stale: true }
+  }
   // An "unknown"-kind CaseOperationError already carries a safe generic
   // message (case-errors.ts, Phase T); attaching the correlation id here
   // is what makes it actionable for support instead of just reassuring.
@@ -111,13 +119,14 @@ async function sendBackOnboardingCaseAction(
 /** Same shape as CaseActionResult, plus the identities the Approve success screen links to (Customer Lifecycle V1 UX pass: "do not require the user to manually find the newly created Customer"). Both are null only if something prevented resolving the just-created customer's key, never fabricated. */
 type ApproveCaseActionResult =
   | { ok: true; onboardingCase: CustomerOnboardingCase; customerKey: string | null; commercialConfigurationId: string | null }
-  | { ok: false; error: string }
+  | { ok: false; error: string; stale?: boolean }
 
-async function approveOnboardingCaseAction(requestId: string, effectiveDate: string): Promise<ApproveCaseActionResult> {
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve; see toCaseActionError's own comment for the stale-approval UX this enables. */
+async function approveOnboardingCaseAction(requestId: string, effectiveDate: string, expectedCurrentNodeKey: string | null = null): Promise<ApproveCaseActionResult> {
   try {
     const actor = await requirePermission("customer", "approve")
     const snapshot = await loadReferenceMasterSnapshot()
-    const onboardingCase = await approveOnboardingCase(requestId, actor.appUserId, snapshot, effectiveDate)
+    const onboardingCase = await approveOnboardingCase(requestId, actor.appUserId, snapshot, effectiveDate, expectedCurrentNodeKey)
     const customer = onboardingCase.customerId ? await getCustomerById(onboardingCase.customerId) : null
     return { ok: true, onboardingCase, customerKey: customer?.key ?? null, commercialConfigurationId: onboardingCase.commercialConfigurationId }
   } catch (error) {
@@ -148,10 +157,18 @@ async function cancelOnboardingCaseAction(requestId: string, reason: string | nu
  * (reject/approve).
  */
 
-type CommercialVersionActionResult = { ok: true; version: CommercialConfigurationVersion } | { ok: false; error: string }
+type CommercialVersionActionResult = { ok: true; version: CommercialConfigurationVersion } | { ok: false; error: string; stale?: boolean }
 
 function toCommercialVersionActionError(error: unknown): CommercialVersionActionResult {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+  if (error instanceof CommercialVersionOperationError && error.commercialVersionError.kind === "workflow_node_already_advanced") {
+    // Workflow Runtime V1 UX + Audit Closure: never surface the raw
+    // WORKFLOW_NODE_ALREADY_ADVANCED token or a confusing team-mismatch
+    // error when another checker has simply already acted; `stale: true`
+    // lets the review page show an explicit Refresh affordance instead
+    // of a dead end.
+    return { ok: false, error: "This approval has already moved to the next step. Refresh to see its current status.", stale: true }
+  }
   if (error instanceof CommercialVersionOperationError && error.commercialVersionError.kind === "unknown") {
     return { ok: false, error: withCorrelationReference(error.message, error) }
   }
@@ -203,11 +220,12 @@ async function rejectCommercialVersionAction(requestId: string, reason: string):
   }
 }
 
-async function approveCommercialVersionAction(requestId: string): Promise<CommercialVersionActionResult> {
+/** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve; see toCommercialVersionActionError's own comment for the stale-approval UX this enables. */
+async function approveCommercialVersionAction(requestId: string, expectedCurrentNodeKey: string | null = null): Promise<CommercialVersionActionResult> {
   try {
     const actor = await requirePermission("commercial_configuration", "approve")
     const snapshot = await loadReferenceMasterSnapshot()
-    const version = await approveVersion(requestId, actor.appUserId, snapshot)
+    const version = await approveVersion(requestId, actor.appUserId, snapshot, expectedCurrentNodeKey)
     return { ok: true, version }
   } catch (error) {
     return toCommercialVersionActionError(error)

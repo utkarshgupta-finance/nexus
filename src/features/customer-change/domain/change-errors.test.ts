@@ -22,6 +22,14 @@ describe("parseChangeError", () => {
     expect(error.changeError.kind).toBe("change_request_self_approval_not_allowed")
   })
 
+  it("Workflow Runtime V1 UX + Audit Closure: maps WORKFLOW_NODE_ALREADY_ADVANCED to its own kind so the action layer can show a friendly stale-approval message instead of this raw token", () => {
+    const parsed = parseChangeError({
+      message: "WORKFLOW_NODE_ALREADY_ADVANCED: this step was already decided by someone else. Refresh to see the current status.",
+      code: "P0001",
+    })
+    expect(parsed.kind).toBe("workflow_node_already_advanced")
+  })
+
   it("maps the CUSTOMER_CHANGE_DRAFT_STALE token (a real concurrent-edit conflict, found via a genuine two-tab retest) to a human-readable message, never raw terms like row_version or database", () => {
     const parsed = parseChangeError({
       message: "CUSTOMER_CHANGE_DRAFT_STALE: This draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes.",
