@@ -1,6 +1,6 @@
 # Nexus Journey Coverage Matrix
 
-Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md). All counts below were regenerated mechanically (by parsing the structured fields of every journey record in that document) as part of the 2026-09-16 reconciliation pass, after several journeys were rewritten from open-gap findings into regression journeys for fixes now confirmed applied to the live database. 782 current-executable journeys across 29 packs; the two FUTURE packs, Forms Hub and MRR Recognition, are excluded from every table here since their lighter-weight record format carries no dimension/priority fields to count. A dimension is counted as "covered" for a journey when that journey's corresponding field is populated with something other than "N/A".
+Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md). All counts below were regenerated mechanically (by parsing the structured fields of every journey record in that document), most recently after Batch 1 execution added K-030 as a regression journey for a real defect found and fixed live (see the Universe document's Pack K). 783 current-executable journeys across 29 packs; the two FUTURE packs, Forms Hub and MRR Recognition, are excluded from every table here since their lighter-weight record format carries no dimension/priority fields to count. A dimension is counted as "covered" for a journey when that journey's corresponding field is populated with something other than "N/A".
 
 This matrix exists to make under-tested areas visible at a glance, not to imply every cell should be non-zero. A pricing-model pack correctly has zero Concurrency coverage of its own (races belong to Pack V, which references pricing-model journeys where relevant); an Audit pack correctly has near-total Audit coverage and near-zero Concurrency coverage. Read gaps in context, not as automatic defects.
 
@@ -18,7 +18,7 @@ This matrix exists to make under-tested areas visible at a glance, not to imply 
 | H | Go Live | 43 | 42 | 26 | 18 | 12 | 8 | 41 | 20 | 39 | 2 |
 | I | Entitlement | 38 | 38 | 30 | 12 | 9 | 9 | 36 | 9 | 32 | 1 |
 | J | Workflow Runtime | 30 | 30 | 14 | 3 | 4 | 0 | 27 | 6 | 18 | 1 |
-| K | Workflow Builder | 29 | 29 | 7 | 7 | 2 | 0 | 18 | 6 | 10 | 0 |
+| K | Workflow Builder | 30 | 30 | 8 | 7 | 3 | 0 | 19 | 7 | 11 | 0 |
 | L | Workflow Versioning | 28 | 28 | 14 | 0 | 6 | 1 | 18 | 8 | 9 | 2 |
 | M | My Work / Approvals / Waiting on Others | 30 | 30 | 8 | 5 | 2 | 0 | 3 | 0 | 14 | 0 |
 | N | Users / Roles / Permissions | 31 | 31 | 9 | 10 | 4 | 6 | 18 | 7 | 16 | 5 |
@@ -37,11 +37,11 @@ This matrix exists to make under-tested areas visible at a glance, not to imply 
 | ACC | Accessibility | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | AA | Cross-Domain Customer Lifecycle | 22 | 22 | 17 | 4 | 7 | 1 | 20 | 7 | 15 | 8 |
 | AB | Security / Direct Action / Server Enforcement | 40 | 40 | 7 | 36 | 5 | 1 | 36 | 10 | 11 | 0 |
-| **Total** | | **782** | **747** | **404** | **187** | **131** | **100** | **624** | **160** | **506** | **109** |
+| **Total** | | **783** | **748** | **405** | **187** | **132** | **100** | **625** | **161** | **507** | **109** |
 
-Recovery/Resilience coverage rose from 155 to 160 versus the pre-reconciliation matrix: five journeys (V-001, V-011, V-012, V-014, V-015) that previously had no recovery path to describe (there was nothing to recover from once data was already silently lost) now describe a real reload-and-reapply recovery path, since the underlying data-loss defect is fixed. One journey (AA-014) moved the other way, from a populated "re-run once the fix ships" note to a correctly-N/A field now that the fix has shipped and there is nothing left to track to closure.
+Recovery/Resilience coverage rose from 155 to 161 across the reconciliation pass and Batch 1 execution: five journeys (V-001, V-011, V-012, V-014, V-015) that previously had no recovery path to describe (there was nothing to recover from once data was already silently lost) now describe a real reload-and-reapply recovery path, since the underlying data-loss defect is fixed; K-030 then added one more (a dedicated recovery-path journey for the Refresh-must-fully-reload finding). One journey (AA-014) moved the other way, from a populated "re-run once the fix ships" note to a correctly-N/A field now that the fix has shipped and there is nothing left to track to closure.
 
-Read alongside Section 3 (Priority), the two dimensions with the thinnest cross-pack coverage are Idempotency (100 of 782, concentrated almost entirely in Pack W by design, since most domain packs delegate idempotency races to the shared cross-cutting pack rather than repeating them) and Historical (109 of 782, concentrated in Pack X plus a handful of domain-specific rename/supersession journeys). Both are intentional concentrations, not neglect: see the anti-duplication note in the Universe document's introduction.
+Read alongside Section 3 (Priority), the two dimensions with the thinnest cross-pack coverage are Idempotency (100 of 783, concentrated almost entirely in Pack W by design, since most domain packs delegate idempotency races to the shared cross-cutting pack rather than repeating them) and Historical (109 of 783, concentrated in Pack X plus a handful of domain-specific rename/supersession journeys). Both are intentional concentrations, not neglect: see the anti-duplication note in the Universe document's introduction.
 
 ## 2. Coverage by pack and automation feasibility
 
@@ -57,7 +57,7 @@ Read alongside Section 3 (Priority), the two dimensions with the thinnest cross-
 | H | 43 | 37 | 6 | 0 |
 | I | 38 | 26 | 10 | 2 |
 | J | 30 | 29 | 1 | 0 |
-| K | 29 | 28 | 1 | 0 |
+| K | 30 | 28 | 2 | 0 |
 | L | 28 | 28 | 0 | 0 |
 | M | 30 | 29 | 1 | 0 |
 | N | 31 | 28 | 3 | 0 |
@@ -76,9 +76,9 @@ Read alongside Section 3 (Priority), the two dimensions with the thinnest cross-
 | ACC | 1 | 0 | 0 | 1 |
 | AA | 22 | 8 | 14 | 0 |
 | AB | 40 | 27 | 12 | 1 |
-| **Total** | **782** | **614** | **136** | **32** |
+| **Total** | **783** | **614** | **137** | **32** |
 
-79% of the catalogue (614 journeys) is fully automatable today (up from 613 pre-reconciliation: AA-014 moved from PARTIAL to FULL now that it is a straightforward same-pattern regression check across all four domains rather than a partially-external, mechanics-owned-elsewhere investigation). The heaviest PARTIAL/MANUAL concentrations are Pack AA (Cross-Domain, 14 of 22 PARTIAL, since these journeys inherently require multi-domain setup a single automated script cannot always assert on cleanly), Pack R (Audit/Timeline, 9 PARTIAL + 3 MANUAL, since several of its journeys require human judgment about display comprehensibility), and Pack S (4 MANUAL, largely the Forms Hub PRODUCT GAP verification journeys, which are inherently "confirm this control does not exist" checks). Pack ACC's single journey is deliberately MANUAL, since keyboard/screen-reader comprehension is a human-judgment check by nature.
+78% of the catalogue (614 journeys) is fully automatable today. AA-014 moved from PARTIAL to FULL during reconciliation (now a straightforward same-pattern regression check across all four domains); K-030 then added one PARTIAL journey (it requires live UI observation of canvas re-rendering, not just an API response code). The heaviest PARTIAL/MANUAL concentrations are Pack AA (Cross-Domain, 14 of 22 PARTIAL, since these journeys inherently require multi-domain setup a single automated script cannot always assert on cleanly), Pack R (Audit/Timeline, 9 PARTIAL + 3 MANUAL, since several of its journeys require human judgment about display comprehensibility), and Pack S (4 MANUAL, largely the Forms Hub PRODUCT GAP verification journeys, which are inherently "confirm this control does not exist" checks). Pack ACC's single journey is deliberately MANUAL, since keyboard/screen-reader comprehension is a human-judgment check by nature.
 
 ## 3. Coverage by priority
 
@@ -94,7 +94,7 @@ Read alongside Section 3 (Priority), the two dimensions with the thinnest cross-
 | H | 43 | 20 | 18 | 5 | 0 |
 | I | 38 | 20 | 13 | 4 | 1 |
 | J | 30 | 8 | 12 | 8 | 2 |
-| K | 29 | 7 | 13 | 8 | 1 |
+| K | 30 | 8 | 13 | 8 | 1 |
 | L | 28 | 13 | 10 | 3 | 2 |
 | M | 30 | 4 | 15 | 10 | 1 |
 | N | 31 | 6 | 15 | 9 | 1 |
@@ -113,11 +113,11 @@ Read alongside Section 3 (Priority), the two dimensions with the thinnest cross-
 | ACC | 1 | 0 | 0 | 1 | 0 |
 | AA | 22 | 9 | 12 | 1 | 0 |
 | AB | 40 | 31 | 7 | 2 | 0 |
-| **Total** | **782** | **246** | **321** | **170** | **45** |
+| **Total** | **783** | **247** | **321** | **170** | **45** |
 
-**Reconciliation-driven priority changes.** Five journeys moved from P0 to P1 during the 2026-09-16 reconciliation pass, all downgraded because the underlying risk they guard is now confirmed fixed rather than open: A-030, E-013, and K-010 (draft optimistic locking, confirmed applied via the live Supabase migration ledger), AA-014 (the cross-domain consistency view of the same fix), and H-043 (Go Live's missing protect-trigger, downgraded rather than closed outright since the gap itself is real, but its blast radius is narrower than first framed: RLS already blocks the anon/authenticated attack surface, leaving only a privileged-database-connection exposure). Total P0 fell from 251 to 246; total P1 rose from 316 to 321. No journey moved to or from P2/P3.
+**Reconciliation-driven priority changes.** Five journeys moved from P0 to P1 during the 2026-09-16 reconciliation pass, all downgraded because the underlying risk they guard is now confirmed fixed rather than open: A-030, E-013, and K-010 (draft optimistic locking, confirmed applied via the live Supabase migration ledger), AA-014 (the cross-domain consistency view of the same fix), and H-043 (Go Live's missing protect-trigger, downgraded rather than closed outright since the gap itself is real, but its blast radius is narrower than first framed: RLS already blocks the anon/authenticated attack surface, leaving only a privileged-database-connection exposure). Total P0 fell from 251 to 246; total P1 rose from 316 to 321. Batch 1 execution then added K-030 as a new P0 journey (a silent-data-loss recovery-path defect, found and fixed live), bringing P0 to 247.
 
-**Risk concentration.** P0 (246 journeys, 31% of the catalogue) remains heavily weighted toward Pack AB (31, direct-action/server-enforcement bypass attempts), Pack H (20, Go Live's single durable live-billing effect), Pack I (20, Entitlement ledger correctness), Pack A (16, the atomic Customer Master creation transaction), Pack C (15), Pack V (14, approval-race row-lock correctness), and Pack L (13, workflow version immutability). This is expected and appropriate for a finance system of record: the majority of P0s cluster exactly where approved financial or identity truth is written, not spread evenly across the catalogue. Packs with a P0 count of 0 or near-0 (Y, ACC, S, O) are precisely the packs least likely to touch approved truth (performance/scale, accessibility, discovery, and team-catalog metadata respectively).
+**Risk concentration.** P0 (247 journeys, 32% of the catalogue) remains heavily weighted toward Pack AB (31, direct-action/server-enforcement bypass attempts), Pack H (20, Go Live's single durable live-billing effect), Pack I (20, Entitlement ledger correctness), Pack A (16, the atomic Customer Master creation transaction), Pack C (15), Pack V (14, approval-race row-lock correctness), and Pack L (13, workflow version immutability). This is expected and appropriate for a finance system of record: the majority of P0s cluster exactly where approved financial or identity truth is written, not spread evenly across the catalogue. Packs with a P0 count of 0 or near-0 (Y, ACC, S, O) are precisely the packs least likely to touch approved truth (performance/scale, accessibility, discovery, and team-catalog metadata respectively).
 
 ## 4. Where the matrix should make you look twice
 

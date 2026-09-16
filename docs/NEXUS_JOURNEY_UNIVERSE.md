@@ -33,7 +33,7 @@ Journey IDs use a pack-letter prefix and a three-digit number, for example `A-01
 
 ## Pack index
 
-Packs A through AB (including ACC, added during gap analysis) are the CURRENT, executable universe (782 journeys). Packs FH and MRR are FUTURE, planned-only coverage for modules that do not exist in the product yet (44 high-level placeholder entries) and are explicitly excluded from the current executable count.
+Packs A through AB (including ACC, added during gap analysis) are the CURRENT, executable universe (783 journeys, including K-030, added during Batch 1 execution as a regression journey for a real defect found and fixed live). Packs FH and MRR are FUTURE, planned-only coverage for modules that do not exist in the product yet (44 high-level placeholder entries) and are explicitly excluded from the current executable count.
 
 | Pack | Name | Journeys |
 |---|---|---|
@@ -47,7 +47,7 @@ Packs A through AB (including ACC, added during gap analysis) are the CURRENT, e
 | H | Go Live | 43 |
 | I | Entitlement | 38 |
 | J | Workflow Runtime | 30 |
-| K | Workflow Builder | 29 |
+| K | Workflow Builder | 30 |
 | L | Workflow Versioning | 28 |
 | M | My Work / Approvals / Waiting on Others | 30 |
 | N | Users / Roles / Permissions | 31 |
@@ -66,10 +66,10 @@ Packs A through AB (including ACC, added during gap analysis) are the CURRENT, e
 | ACC | Accessibility (added during gap analysis) | 1 |
 | AA | Cross-Domain Customer Lifecycle | 22 |
 | AB | Security / Direct Action / Server Enforcement | 40 |
-| **Total, current executable** | | **782** |
+| **Total, current executable** | | **783** |
 | FH | FUTURE: Forms Hub (planned only) | 22 |
 | MRR | FUTURE: MRR Recognition (planned only) | 22 |
-| **Total, including future** | | **826** |
+| **Total, including future** | | **827** |
 
 ## A note on pack V
 
@@ -8478,6 +8478,32 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Dependencies: N/A
 - Related Journeys: V-011, K-018, L-017
 - Notes: Added during gap analysis. Materially distinct from V-011 (concurrent save vs save) and the discard-vs-published-immutability cases, since the failure mode here is save-against-a-deleted-target.
+
+### K-030: Stale-draft Refresh reloads the whole page, not just the error banner (regression)
+- Pack: K - Workflow Builder
+- Business Objective: Prove the Builder's stale-draft Refresh control actually replaces the canvas's own node/edge state with the true current graph, not merely the visible error message, so a subsequent save cannot silently overwrite another admin's real change.
+- Domain: Workflow Builder
+- Object / Record Type: workflow_definition_versions (draft), its nodes/edges, the canvas editor's local React state
+- Starting State: Admin A's canvas has just been rejected with WORKFLOW_VERSION_DRAFT_STALE (as in K-010) after Admin B's concurrent save landed first.
+- Personas: Admin A (recovering from staleness), Admin B (whose change must survive)
+- Preconditions: N/A
+- Regular Path: Admin A clicks Refresh; confirm the canvas now displays Admin B's actual latest node/edge content (not Admin A's stale in-memory copy); Admin A reapplies their own edit against this fresh state and saves; confirm both admins' changes are present afterward.
+- Stress Variant: Repeat the stale-reject-refresh-reapply cycle multiple times in a row (a third, fourth admin change landing between each Refresh) to confirm the canvas is genuinely re-derived fresh every time, not cached from the first refresh.
+- Authorization Variant: N/A
+- Concurrency Variant: This is a direct continuation of K-010's own concurrency scenario, testing the recovery path specifically rather than the initial rejection.
+- Idempotency Variant: N/A
+- Audit/Data Integrity Checks: After Admin A's post-refresh save, the persisted node/edge rows must reflect Admin B's real content plus Admin A's reapplied edit, never a reversion to Admin A's pre-refresh stale copy.
+- Recovery/Resilience Variant: This entire journey is a recovery-path journey.
+- UX Checks: The Refresh control's label and behavior should not imply safety it does not deliver; a control that clears an error without truly reloading state is worse than no control at all, since it creates false confidence.
+- Historical Variant: N/A
+- Expected Business Result: No admin's real, saved change can be silently discarded by another admin's stale-recovery click.
+- Expected Technical Invariants: Refresh forces the canvas's node/edge state to be re-derived from a fresh server fetch (not left in a previously-initialized local state that a changed prop does not automatically reset).
+- Priority: P0
+- Automation Feasibility: PARTIAL
+- Dependencies: K-010
+- Related Journeys: K-010, V-011
+- Notes: Discovered live during Batch 1 execution (2026-09-16) while re-verifying K-010's fix: the Refresh button originally called router.refresh(), which cleared the error banner but left the canvas's own useState-held nodes/edges unchanged (deliberately decoupled from props so unrelated re-renders never wipe an admin's in-progress edits), so a subsequent save silently reverted Admin B's real change back to Admin A's stale copy even though the row_version check matched. Fixed in the same Batch 1 pass by switching Refresh to a full page reload; re-verified live that both admins' changes now survive a full stale-reject-refresh-reapply-save cycle.
+
 ## Pack L: Workflow Versioning
 
 ### L-001: Creating the First Draft Version for a Brand-New Definition

@@ -1,6 +1,6 @@
 # Nexus Journey Execution Plan
 
-Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md) and [NEXUS_JOURNEY_COVERAGE_MATRIX.md](NEXUS_JOURNEY_COVERAGE_MATRIX.md). This plan sequences all 782 current-executable journeys into 32 batches of 25 (the final batch holds 7). No journey has been executed as part of producing this plan; it exists to make later execution efficient and dependency-safe.
+Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md) and [NEXUS_JOURNEY_COVERAGE_MATRIX.md](NEXUS_JOURNEY_COVERAGE_MATRIX.md). This plan originally sequenced all 782 current-executable journeys into 32 batches of 25 (the final batch holds 7); Batch 1 execution added K-030, making Batch 2 a 26-journey batch and the total 783. No journey has been executed as part of producing this plan; it exists to make later execution efficient and dependency-safe.
 
 ## Sequencing rationale
 
@@ -31,14 +31,15 @@ Each batch lists its Batch ID, its 25 (or, for the final batch, 7) Journey IDs i
 **Risk concentration:** P0/P1 concentrated in the whole-graph-replace concurrent-edit risk (K-010) and structural validation edges (K-019 through K-026).
 **Depends on:** None (first batch).
 
-### BATCH 2
-**Journey IDs:** K-026 through K-029, L-001 through L-021
-**Purpose:** Finish Builder authoring coverage, then move into the Workflow Versioning lifecycle: draft, publish, one-draft-per-definition and one-active-per-context uniqueness, and the permanent version-binding guarantee.
+### BATCH 2 (26 journeys; one over the standard 25, see note)
+**Journey IDs:** K-026 through K-030, L-001 through L-021
+**Purpose:** Finish Builder authoring coverage, including K-030 (a regression journey for a real Refresh/stale-recovery data-loss defect found and fixed live during Batch 1, already passing when this batch runs), then move into the Workflow Versioning lifecycle: draft, publish, one-draft-per-definition and one-active-per-context uniqueness, and the permanent version-binding guarantee.
 **Required personas:** Workflow Admin
 **Required fixtures:** At least one workflow definition created in Batch 1.
 **Expected duration:** 3-4 hours
-**Risk concentration:** P0/P1 on publish-immutability and the active-workflow-uniqueness constraint (L-003 through L-010 range).
+**Risk concentration:** P0/P1 on publish-immutability and the active-workflow-uniqueness constraint (L-003 through L-010 range); K-030 is also P0 but is a regression check for an already-fixed defect, not an open risk.
 **Depends on:** Batch 1.
+**Note:** K-030 was discovered and fully resolved during Batch 1's own execution (it directly extends K-010's concurrency scenario). It is placed here rather than retroactively inserted into Batch 1 to avoid disturbing Batch 1's already-executed 25-journey record; running it in Batch 2 will simply reconfirm the fix.
 
 ### BATCH 3
 **Journey IDs:** L-022 through L-028, U-001 through U-018
@@ -315,6 +316,6 @@ Each batch lists its Batch ID, its 25 (or, for the final batch, 7) Journey IDs i
 ## Summary
 
 - 32 batches total: 31 full batches of 25, 1 final batch of 7.
-- Total current-executable journeys sequenced: 782.
+- Total current-executable journeys sequenced: 783 (K-030 added after Batch 1 execution).
 - Estimated total execution duration if run sequentially by a single team: roughly 135-165 hours across the full plan; batches 24-27 (Security and Concurrency) and 7-19 (the full customer-to-approvals chain) are the largest time investments due to multi-session/multi-persona setup overhead.
 - The two FUTURE packs (Forms Hub, MRR Recognition) are intentionally absent from this plan; they have no batches because they are not executable against the current product.
