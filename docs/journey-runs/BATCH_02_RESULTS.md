@@ -160,34 +160,34 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: K-030
 - Journey Name: Stale-Draft Refresh Reloads the Whole Page, Not Just the Error Banner (Regression)
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-16 18:05
+- Completed At: 2026-09-16 18:35
 - Priority: P0
 - Automation Feasibility: PARTIAL
-- Personas: Admin A (recovering from staleness), Admin B (whose change must survive)
-- Test Data / Record References: TBD
-- Starting State: TBD
-- Actions Executed: TBD
-- Expected Result: TBD
-- Actual Result: TBD
-- Regular Path Result: TBD
-- Stress Variant Result: TBD
+- Personas: Admin A (browser session as wf-test.workflow-editor@example.test, recovering from staleness), Admin B (whose changes must survive, simulated via direct service-role RPC calls that fully include existing graph content before adding new content, disclosed here as a simulation since a genuinely independent second cookie-jar browser session was not available in this tool session)
+- Test Data / Record References: "BATCH2 K-Series Builder Mechanics" (Customer Change), a fresh draft version created for this test (id 48d557e9-38ef-4ff2-ad18-b2a0183c282c)
+- Starting State: Admin A's canvas rejected with WORKFLOW_VERSION_DRAFT_STALE after Admin B's concurrent save landed first, repeated twice in a row with a third and fourth real change landing between cycles
+- Actions Executed: 8-step checklist executed live, twice in a row: (1) Admin A added an unsaved local node ("Start"); Admin B's real save landed first (advancing row_version, adding "Admin B Real Change 1"). (2) Admin A clicked Save Draft: rejected with the stale error, Refresh button offered. (3) Admin A clicked Refresh: canvas now showed exactly Admin B's real content ("Admin B Real Change 1"). (4) Admin A's stale local "Start" node was completely gone from the reloaded canvas. (5) Admin A reapplied their edit (added "Start" again) on top of the fresh canvas. (6) Admin A saved: succeeded ("Draft saved."). (7)+(8) Verified via direct database query: both "Admin B Real Change 1" and the reapplied "Start" node were present; no overwrite. Repeated the full cycle a second time (stress variant) with a third and fourth real Admin B change landing in between, to confirm the canvas is genuinely re-derived fresh every time, not cached from the first refresh: after the second Refresh, the canvas showed only Admin B's latest real content (not the content from the first refresh, not Admin A's newer stale local edits), and the final saved graph contained both of Admin B's later real changes plus Admin A's second reapplied edit ("Decision").
+- Expected Result: No admin's real, saved change can be silently discarded by another admin's stale-recovery click; Refresh forces the canvas's node/edge state to be re-derived from a fresh server fetch every time, not left in previously-initialized local state.
+- Actual Result: Confirmed on both cycles. Final persisted graph after the full two-cycle test contained "Admin B Real Change 2", "Admin B Real Change 3" (Admin B's later real changes), and "Decision" (Admin A's second reapplied edit); nothing was ever silently overwritten.
+- Regular Path Result: PASS
+- Stress Variant Result: PASS (repeated the stale-reject-refresh-reapply cycle twice in a row with new real changes landing between cycles; each Refresh showed the genuinely latest state, never a cached copy from an earlier refresh)
 - Authorization Result: N/A
-- Concurrency Result: TBD
+- Concurrency Result: PASS
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: TBD
-- Recovery Result: TBD
-- UX Result: TBD
-- Original Status: TBD
-- Defect IDs: None (regression re-proof of Batch 1 K-010/K-030 fix)
+- Audit/Data Integrity Result: PASS (verified by direct database query after each cycle: the persisted node set always reflected the real latest state plus the reapplied edit, never a reversion to a stale copy)
+- Recovery Result: PASS
+- UX Result: PASS (the Refresh control's behavior matches its label: it genuinely reloads, matching the Batch 1 fix; no false confidence)
+- Original Status: PASS
+- Defect IDs: None (regression re-proof of Batch 1 K-010/K-030 fix; no new defect found)
 - Root Cause: N/A
 - Fix: N/A
 - Fix Commit if applicable: N/A
-- Regression Test: TBD
-- Rerun Result: N/A
+- Regression Test: This IS the regression test for the Batch 1 fix (window.location.reload() in workflow-canvas-editor.tsx's Refresh handler); no code change was needed since the fix already holds.
+- Rerun Result: N/A (nothing needed fixing)
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: Must be executed as a real live regression per the explicit 8-step re-proof checklist, not assumed passed because the underlying defect was fixed in Batch 1.
+- Final Status: PASS
+- Notes: Executed as a real live regression per the explicit 8-step re-proof checklist, not assumed passed because the underlying defect was fixed in Batch 1, per the mission's explicit instruction. The Batch 1 fix (full page reload via window.location.reload()) holds under repeated stress: two consecutive stale-reject-refresh-reapply cycles with new real changes landing between them, with zero silent overwrites. Admin B's saves were simulated via direct RPC calls; the first simulation attempt incorrectly replaced the whole graph instead of including existing content (a test-script bug on my part, not a product issue, since save_workflow_version_graph is a full-replace RPC by design matching how the real UI always sends the complete current canvas), corrected before drawing any conclusion from that cycle.
 
 ---
 
