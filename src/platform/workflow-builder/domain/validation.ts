@@ -67,6 +67,9 @@ function validateWorkflowGraph(
     if (node.nodeType === "end" && (outgoingByKey.get(node.nodeKey)?.length ?? 0) > 0) {
       errors.push(`Node "${node.name}" is an End node but has an outgoing transition; an End node is terminal and must have none.`)
     }
+    if (node.nodeType === "start" && incomingKeys.has(node.nodeKey)) {
+      errors.push(`Node "${node.name}" is a Start node but has an incoming transition; a Start node is an entry point and must have none.`)
+    }
     if (node.responsibleTeamId && !context.validTeamIds.has(node.responsibleTeamId)) {
       errors.push(`Node "${node.name}" references a team that no longer exists or is inactive.`)
     }
