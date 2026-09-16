@@ -29,6 +29,15 @@
 -- matching the same defensive pattern the function already uses for
 -- label (nullif(v_edge ->> 'label', '')) one line above.
 --
+-- Rebased on top of 20260922000000_optimistic_locking_extension.sql's
+-- own redefinition of this same function (which adds the
+-- p_expected_row_version stale-draft check): that migration is applied
+-- first in filename order, so by the time this one runs,
+-- save_workflow_version_graph already has the 6-parameter, row-version-
+-- checked signature. This file must `create or replace` that exact
+-- signature, not the older 5-parameter one, or Postgres creates a second,
+-- dead overload instead of actually fixing the function the app calls.
+--
 -- STAGED, NOT APPLIED. Per this session's working agreement, no
 -- `supabase db push` is run without a specific go-ahead; apply with
 -- `npx supabase db push --linked` once reviewed.
@@ -37,6 +46,7 @@ create or replace function save_workflow_version_graph(
   p_version_id uuid,
   p_nodes jsonb,
   p_edges jsonb,
+  p_expected_row_version integer,
   p_actor_user_id uuid,
   p_actor_context jsonb default null::jsonb
 )
@@ -60,6 +70,10 @@ begin
 
   if v_version.status <> 'draft' then
     raise exception 'WORKFLOW_VERSION_NOT_DRAFT: version % has status %, only a draft may be edited', p_version_id, v_version.status;
+  end if;
+
+  if v_version.row_version <> p_expected_row_version then
+    raise exception 'WORKFLOW_VERSION_DRAFT_STALE: This workflow draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes.';
   end if;
 
   delete from workflow_edges where workflow_version_id = p_version_id;

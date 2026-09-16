@@ -146,6 +146,8 @@ function CommercialVersionPage({
               </div>
             </div>
 
+            {actionError && !isCancelling && !showSubmitPanel ? <p className="text-xs text-destructive">{actionError}</p> : null}
+
             {isCancelling ? (
               <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
                 <label className="text-xs font-medium text-foreground" htmlFor="cancel-version-reason">
