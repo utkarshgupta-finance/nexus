@@ -34,6 +34,7 @@ export default async function WorkflowsRoute() {
           definition,
           latestVersionNumber: latest?.versionNumber ?? null,
           latestVersionStatus: latest?.status ?? null,
+          hasPublishedVersion: versions.some((version) => version.status === "published"),
           updatedByLabel: definition.updatedBy ? (actorLabels.get(definition.updatedBy) ?? null) : null,
         }
       })
@@ -43,6 +44,7 @@ export default async function WorkflowsRoute() {
   }
 
   const canWrite = await hasPermission("workflow_definition", "write")
+  const canPublish = await hasPermission("workflow_definition", "publish")
 
   const navItems: SettingsNavItem[] = []
   if (sessionHasPermission(session, "reference_master", "read")) navItems.push({ href: "/settings/customer-onboarding", label: "Reference Master" })
@@ -58,7 +60,7 @@ export default async function WorkflowsRoute() {
           <p className="p-6 text-xs text-muted-foreground">Workflows could not be read right now. Please try again shortly.</p>
         </div>
       ) : (
-        <WorkflowDefinitionsPage rows={rows} canWrite={canWrite} />
+        <WorkflowDefinitionsPage rows={rows} canWrite={canWrite} canPublish={canPublish} />
       )}
     </AuthGate>
   )

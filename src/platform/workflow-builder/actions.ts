@@ -2,7 +2,7 @@
 
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
-import { createDefinition, createVersion, saveVersionGraph, publishVersion, discardVersion } from "./services/workflow-builder.service"
+import { createDefinition, setDefinitionActive, replaceActiveDefinition, createVersion, saveVersionGraph, publishVersion, discardVersion } from "./services/workflow-builder.service"
 import type { WorkflowAppliesTo, WorkflowNodeDraft, WorkflowEdgeDraft, WorkflowDefinition, WorkflowDefinitionVersion } from "./domain/types"
 
 /**
@@ -17,6 +17,7 @@ import type { WorkflowAppliesTo, WorkflowNodeDraft, WorkflowEdgeDraft, WorkflowD
  */
 
 type CreateDefinitionResult = { ok: true; definition: WorkflowDefinition } | { ok: false; error: string }
+type SetDefinitionActiveResult = { ok: true; definition: WorkflowDefinition } | { ok: false; error: string }
 type CreateVersionResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
 type SaveGraphResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
 type PublishResult = { ok: true; version: WorkflowDefinitionVersion } | { ok: false; error: string }
@@ -46,6 +47,28 @@ async function createWorkflowDefinitionAction(code: string, name: string, applie
     return { ok: true, definition }
   } catch (error) {
     return toError(error, "An unexpected error occurred while creating this workflow.")
+  }
+}
+
+/** Task 3 (Workflow Runtime V1, active workflow uniqueness): plain activate/deactivate. Activating raises a named conflict (never silently picks one) if another workflow already holds this context's active slot; use replaceActiveWorkflowDefinitionAction for the one-click governed swap instead. */
+async function setWorkflowDefinitionActiveAction(definitionId: string, isActive: boolean): Promise<SetDefinitionActiveResult> {
+  try {
+    const actor = await requirePermission("workflow_definition", "publish")
+    const definition = await setDefinitionActive(definitionId, isActive, actor.appUserId)
+    return { ok: true, definition }
+  } catch (error) {
+    return toError(error, "An unexpected error occurred while changing this workflow's active status.")
+  }
+}
+
+/** The governed replacement path (task spec: "do not require database intervention"): deactivates whichever other workflow currently holds this context's active slot and activates this one, atomically. */
+async function replaceActiveWorkflowDefinitionAction(newDefinitionId: string): Promise<SetDefinitionActiveResult> {
+  try {
+    const actor = await requirePermission("workflow_definition", "publish")
+    const definition = await replaceActiveDefinition(newDefinitionId, actor.appUserId)
+    return { ok: true, definition }
+  } catch (error) {
+    return toError(error, "An unexpected error occurred while activating this workflow.")
   }
 }
 
@@ -97,9 +120,11 @@ async function discardWorkflowVersionAction(versionId: string): Promise<DiscardR
 
 export {
   createWorkflowDefinitionAction,
+  setWorkflowDefinitionActiveAction,
+  replaceActiveWorkflowDefinitionAction,
   createWorkflowVersionAction,
   saveWorkflowVersionGraphAction,
   publishWorkflowVersionAction,
   discardWorkflowVersionAction,
 }
-export type { CreateDefinitionResult, CreateVersionResult, SaveGraphResult, PublishResult, DiscardResult }
+export type { CreateDefinitionResult, SetDefinitionActiveResult, CreateVersionResult, SaveGraphResult, PublishResult, DiscardResult }

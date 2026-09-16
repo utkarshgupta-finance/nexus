@@ -13,6 +13,8 @@ import { listAllGoLiveRequests, formatGoLiveRequestId } from "@/features/go-live
 import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorLabels } from "@/platform/audit/server"
+import { getResponsibleTeamIdsByNode } from "@/platform/workflow-builder/server"
+import { getActiveTeamIdsForUser } from "@/platform/team/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
 import { buildMyWorkItems, buildDraftWorkItems } from "./domain/my-work"
 import { buildOperationalQueue } from "./domain/operational-queue"
@@ -30,6 +32,16 @@ import type { OperationalQueueEntry } from "./domain/operational-queue"
  * about who is asking, same as every other platform capability's own
  * server.ts entry point.
  */
+/** Resolves a `teamIdsByNodeKey` lookup (keyed `${workflowVersionId}::${nodeKey}`, see the batched fetch below) for one entry's current position; null current node (no workflow bound, or between Send Back and resubmit) always resolves to "no team restriction" without a lookup. */
+function resolveResponsibleTeamId(
+  teamIdsByNodeKey: Map<string, string | null>,
+  workflowVersionId: string | null,
+  currentNodeKey: string | null
+): string | null {
+  if (!workflowVersionId || !currentNodeKey) return null
+  return teamIdsByNodeKey.get(`${workflowVersionId}::${currentNodeKey}`) ?? null
+}
+
 async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
   const [onboardingEntries, changeRequestEntries, versionEntries, goLiveEntries] = await Promise.all([
     listAllOnboardingEntries(),
@@ -37,6 +49,18 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     listAllVersionEntries(),
     listAllGoLiveRequests(),
   ])
+
+  // Workflow Runtime V1 Sequential Execution: which team is currently
+  // responsible, resolved from each entry's own stored current node
+  // (never re-walked from Start), batched across every distinct
+  // workflow version these entries touch.
+  const workflowVersionIds = [
+    ...onboardingEntries.map((entry) => entry.workflowVersionId),
+    ...changeRequestEntries.map((entry) => entry.workflowVersionId),
+    ...versionEntries.map((entry) => entry.workflowVersionId),
+    ...goLiveEntries.map((entry) => entry.workflowVersionId),
+  ].filter((id): id is string => Boolean(id))
+  const teamIdsByNodeKey = await getResponsibleTeamIdsByNode(workflowVersionIds)
 
   // Batched, not one round trip per entry: this composer runs on every
   // Approvals/My Work page load, and its round-trip count previously grew
@@ -79,6 +103,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/reviews/${entry.requestId}`,
+      responsibleTeamId: resolveResponsibleTeamId(teamIdsByNodeKey, entry.workflowVersionId, entry.currentWorkflowNodeKey),
     })
   }
 
@@ -99,6 +124,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/reviews/change-requests/${entry.requestId}`,
+      responsibleTeamId: resolveResponsibleTeamId(teamIdsByNodeKey, entry.workflowVersionId, entry.currentWorkflowNodeKey),
     })
   })
 
@@ -119,6 +145,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/reviews/commercial-versions/${entry.requestId}`,
+      responsibleTeamId: resolveResponsibleTeamId(teamIdsByNodeKey, entry.workflowVersionId, entry.currentWorkflowNodeKey),
     })
   })
 
@@ -139,6 +166,7 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       href: `/customers/${customer?.key ?? ""}/go-live/${entry.id}`,
+      responsibleTeamId: resolveResponsibleTeamId(teamIdsByNodeKey, entry.workflowVersionId, entry.currentWorkflowNodeKey),
     })
   })
 
@@ -222,8 +250,8 @@ async function loadMyDraftsToContinue(appUserId: string): Promise<MyWorkItem[]> 
  * header for the exact scoping rules).
  */
 async function loadMyWork(appUserId: string, canApprove: boolean): Promise<MyWorkItem[]> {
-  const [items, drafts] = await Promise.all([loadApprovalInbox(), loadMyDraftsToContinue(appUserId)])
-  return [...buildMyWorkItems(items, appUserId, canApprove, new Date()), ...drafts]
+  const [items, drafts, viewerTeamIds] = await Promise.all([loadApprovalInbox(), loadMyDraftsToContinue(appUserId), getActiveTeamIdsForUser(appUserId)])
+  return [...buildMyWorkItems(items, appUserId, canApprove, viewerTeamIds, new Date()), ...drafts]
 }
 
 /**

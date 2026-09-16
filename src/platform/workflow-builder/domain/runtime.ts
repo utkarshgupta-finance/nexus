@@ -10,14 +10,23 @@ import type { WorkflowEdge, WorkflowNode } from "./types"
  * gate." That is no longer accurate. `approve_go_live_request` /
  * `approve_commercial_configuration_version` /
  * `approve_customer_onboarding_case` / `approve_customer_change_request`
- * (see supabase/migrations/20260921000000_workflow_runtime_v1.sql) now
- * run this exact same walk in SQL (`fn_resolve_workflow_responsible_team`)
- * as the real enforcement gate. This TS function is kept as the
- * identical algorithm for pre-approval DISPLAY (so a reviewer sees the
- * responsible team before opening an approval, not only after), not a
- * second, divergent implementation: the RPC's own SQL walk is the
- * ultimate authority at the moment of approval, since only it runs
- * inside the same transaction as the decision.
+ * (see supabase/migrations/20260921000000_workflow_runtime_v1.sql) run
+ * the same bounded Start-to-first-Approval walk in SQL for a request's
+ * FIRST approval; from Sequential Approval Execution
+ * (supabase/migrations/20260925000000_workflow_runtime_v1_sequential_execution.sql)
+ * onward, every request also carries a durable
+ * `current_workflow_node_key`, and each subsequent approve/send_back/
+ * reject is authorized and advanced against that stored position via
+ * `fn_resolve_workflow_next_approval` (resumable from any node), not by
+ * re-walking from Start every time. This TS function stays accurate only
+ * for a PRE-SUBMISSION preview (which team would get the first Approval
+ * node if this were submitted right now): it has no notion of an
+ * in-flight request's current node. Displaying an in-flight request's
+ * actual current responsibility means reading its own
+ * `current_workflow_node_key` and joining `workflow_nodes`, not calling
+ * this function. The RPCs' own SQL walk is the ultimate authority at the
+ * moment of any decision, since only it runs inside the same transaction
+ * as the decision.
  *
  * Bounded on purpose: Start -> optional Decision branches -> the first
  * Approval node reached. Not a general BPM engine. The REQUIRED

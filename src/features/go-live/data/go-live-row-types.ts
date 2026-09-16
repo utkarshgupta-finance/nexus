@@ -10,6 +10,8 @@ type GoLiveRequestRow = {
   customer_confirmation_status: string
   status: string
   workflow_version_id: string | null
+  current_workflow_node_key: string | null
+  workflow_cycle_number: number
   row_version: number
   comment: string | null
   sent_back_reason: string | null

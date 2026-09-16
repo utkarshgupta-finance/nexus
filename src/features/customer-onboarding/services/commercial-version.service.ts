@@ -188,6 +188,9 @@ type ReviewQueueEntry = {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  /** Workflow Runtime V1 Sequential Execution: which Approval node this version is currently sitting at, and the workflow version it is bound to. */
+  workflowVersionId: string | null
+  currentWorkflowNodeKey: string | null
 }
 
 function toReviewQueueEntry(row: {
@@ -198,6 +201,8 @@ function toReviewQueueEntry(row: {
   created_by: string | null
   created_at: string
   updated_at: string
+  workflow_version_id: string | null
+  current_workflow_node_key: string | null
 }): ReviewQueueEntry {
   return {
     requestId: row.request_id,
@@ -207,6 +212,8 @@ function toReviewQueueEntry(row: {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    workflowVersionId: row.workflow_version_id,
+    currentWorkflowNodeKey: row.current_workflow_node_key,
   }
 }
 

@@ -85,6 +85,15 @@ async function listNodesForVersion(versionId: string): Promise<WorkflowNodeRow[]
   return data ?? []
 }
 
+/** Batched across every distinct workflow version an inbox/My Work read touches (Workflow Runtime V1 Sequential Execution), never one query per business row: the same "batched, not per-entry" rule every other Approvals inbox read already follows. */
+async function listNodesForVersions(versionIds: string[]): Promise<WorkflowNodeRow[]> {
+  if (versionIds.length === 0) return []
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("workflow_nodes").select("*").in("workflow_version_id", versionIds)
+  if (error) throw error
+  return data ?? []
+}
+
 type WorkflowEdgeRow = {
   id: string
   workflow_version_id: string
@@ -107,6 +116,29 @@ async function createDefinition(code: string, name: string, appliesTo: string, a
     p_code: code,
     p_name: name,
     p_applies_to: appliesTo,
+    p_actor_user_id: actorUserId,
+  })
+  if (error) throw error
+  return data
+}
+
+/** Activates or deactivates one workflow definition. Raises WORKFLOW_DEFINITION_CONTEXT_ALREADY_ACTIVE (via the RPC) rather than silently picking one if another definition already holds this applies_to's active slot. */
+async function setDefinitionActive(definitionId: string, isActive: boolean, actorUserId: string): Promise<WorkflowDefinitionRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.rpc("set_workflow_definition_active", {
+    p_definition_id: definitionId,
+    p_is_active: isActive,
+    p_actor_user_id: actorUserId,
+  })
+  if (error) throw error
+  return data
+}
+
+/** The governed replacement path: atomically deactivates whichever other definition currently holds this applies_to's active slot (if any) and activates p_new_definition_id. */
+async function replaceActiveDefinition(newDefinitionId: string, actorUserId: string): Promise<WorkflowDefinitionRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.rpc("replace_active_workflow_definition", {
+    p_new_definition_id: newDefinitionId,
     p_actor_user_id: actorUserId,
   })
   if (error) throw error
@@ -162,8 +194,11 @@ export {
   listVersionsForDefinition,
   getVersion,
   listNodesForVersion,
+  listNodesForVersions,
   listEdgesForVersion,
   createDefinition,
+  setDefinitionActive,
+  replaceActiveDefinition,
   createVersion,
   saveVersionGraph,
   publishVersion,

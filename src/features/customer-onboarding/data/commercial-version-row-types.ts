@@ -25,6 +25,9 @@ type CommercialConfigurationVersionRow = {
   cancelled_by: string | null
   cancelled_at: string | null
   cancelled_reason: string | null
+  workflow_version_id: string | null
+  current_workflow_node_key: string | null
+  workflow_cycle_number: number
   row_version: number
   created_at: string
   created_by: string | null

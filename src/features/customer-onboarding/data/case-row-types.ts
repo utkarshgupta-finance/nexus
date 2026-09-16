@@ -16,6 +16,9 @@ type CustomerOnboardingCaseRow = {
   cancelled_reason: string | null
   customer_id: string | null
   commercial_configuration_id: string | null
+  workflow_version_id: string | null
+  current_workflow_node_key: string | null
+  workflow_cycle_number: number
   row_version: number
   created_at: string
   created_by: string | null

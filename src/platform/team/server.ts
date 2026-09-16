@@ -7,5 +7,5 @@ import "server-only"
  * `team.write` check before rendering or mutating what these return.
  */
 
-export { listTeams, listActiveTeams, createTeam, setTeamActive, assignUserToTeam, removeUserFromTeam } from "./services/team.service"
+export { listTeams, listActiveTeams, createTeam, setTeamActive, assignUserToTeam, removeUserFromTeam, getActiveTeamIdsForUser } from "./services/team.service"
 export type { Team } from "./domain/types"

@@ -37,25 +37,32 @@ function whatINeedToDo(reason: MyWorkReason, type: ApprovalInboxItemType): strin
  * onboarding/change-request/commercial-version came back to them). Uses
  * the item's raw `createdBy` id, never the resolved email string.
  *
- * "Pending my approval": Customer Lifecycle V1 has no per-person
- * approval routing yet (docs/CUSTOMER_LIFECYCLE.md: any customer.approve
- * holder may decide any of them), so every `needs_action` item qualifies
- * once this user holds that permission at all, not a subset assigned to
- * them specifically.
+ * "Pending my approval": Workflow Runtime V1 Sequential Execution added
+ * real per-node team routing, replacing Customer Lifecycle V1's older
+ * "any customer.approve holder may decide any of them"
+ * (docs/CUSTOMER_LIFECYCLE.md). A `needs_action` item qualifies only if
+ * this user holds the domain's fixed approve permission AND either the
+ * item names no responsible team (no workflow bound, or a graph with no
+ * Approval node routing) or this user is an active member of that team.
+ * This is what makes Finance's task disappear and Legal's appear the
+ * moment a sequential Approval node advances, instead of every
+ * approve-permission holder seeing every submitted item forever.
  *
  * "Waiting on others" (Platform Scale Closure, Phase K): the flip side
  * of "sent back to me", for a requester checking on their own submitted
  * work: an item they created that is `needs_action` but they cannot
- * decide themselves. Checked only after "pending my approval" so a
- * request its own creator can also approve shows as actionable to them,
- * not merely as "waiting."
+ * decide themselves, whether for lacking the permission entirely or for
+ * not covering the item's current node's team. Checked only after
+ * "pending my approval" so a request its own creator can also approve
+ * shows as actionable to them, not merely as "waiting."
  */
-function buildMyWorkItems(items: ApprovalInboxItem[], appUserId: string, canApprove: boolean, now: Date): MyWorkItem[] {
+function buildMyWorkItems(items: ApprovalInboxItem[], appUserId: string, canApprove: boolean, viewerTeamIds: Set<string>, now: Date): MyWorkItem[] {
   const result: MyWorkItem[] = []
   for (const item of items) {
+    const isResponsibleTeam = item.responsibleTeamId === null || viewerTeamIds.has(item.responsibleTeamId)
     let reason: MyWorkReason | null = null
     if (item.bucket === "sent_back" && item.createdBy === appUserId) reason = "sent_back_to_me"
-    else if (item.bucket === "needs_action" && canApprove) reason = "pending_my_approval"
+    else if (item.bucket === "needs_action" && canApprove && isResponsibleTeam) reason = "pending_my_approval"
     else if (item.bucket === "needs_action" && item.createdBy === appUserId) reason = "waiting_on_others"
     if (!reason) continue
     result.push({

@@ -26,6 +26,8 @@ type ApprovalInboxItem = {
   createdAt: string
   updatedAt: string
   href: string
+  /** Workflow Runtime V1 Sequential Execution: the responsible_team_id of whichever Approval node this item is currently sitting at (null if no workflow is bound, the graph names no team for that node, or no Approval node is in play). My Work (../domain/my-work.ts) gates "pending my approval" on this, not only on the domain's fixed static permission, so a Legal approver no longer sees a request still sitting at Finance. */
+  responsibleTeamId: string | null
 }
 
 export type { ApprovalInboxItemType, ApprovalInboxBucket, ApprovalInboxItem }

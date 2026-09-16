@@ -188,6 +188,9 @@ type ReviewQueueEntry = {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  /** Workflow Runtime V1 Sequential Execution: which Approval node this case is currently sitting at, and the workflow version it is bound to. */
+  workflowVersionId: string | null
+  currentWorkflowNodeKey: string | null
 }
 
 async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.listCasesAwaitingReview>>): Promise<ReviewQueueEntry[]> {
@@ -206,6 +209,8 @@ async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.lis
       createdBy: row.created_by,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      workflowVersionId: row.workflow_version_id,
+      currentWorkflowNodeKey: row.current_workflow_node_key,
     })
   }
   return entries

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatTimestampDate } from "@/lib/date"
-import { createWorkflowDefinitionAction } from "../actions"
+import { createWorkflowDefinitionAction, setWorkflowDefinitionActiveAction, replaceActiveWorkflowDefinitionAction } from "../actions"
 import type { WorkflowAppliesTo, WorkflowDefinition } from "../domain/types"
 
 const APPLIES_TO_LABELS: Record<WorkflowAppliesTo, string> = {
@@ -22,8 +22,14 @@ const APPLIES_TO_LABELS: Record<WorkflowAppliesTo, string> = {
   agreement: "Agreement",
 }
 
-/** Task Phase M: `updatedByLabel` is a pre-resolved display label, never the raw actor id `definition.updatedBy` itself holds. */
-type DefinitionRow = { definition: WorkflowDefinition; latestVersionNumber: number | null; latestVersionStatus: string | null; updatedByLabel: string | null }
+/** Task Phase M: `updatedByLabel` is a pre-resolved display label, never the raw actor id `definition.updatedBy` itself holds. `hasPublishedVersion` looks across every version of this definition (task 3: activating with no published version at all is rejected server-side), not only the latest, which may itself still be a draft. */
+type DefinitionRow = {
+  definition: WorkflowDefinition
+  latestVersionNumber: number | null
+  latestVersionStatus: string | null
+  hasPublishedVersion: boolean
+  updatedByLabel: string | null
+}
 
 /**
  * Settings/Administration -> Workflows (task Phase N/O): Name/Applies
@@ -31,14 +37,27 @@ type DefinitionRow = { definition: WorkflowDefinition; latestVersionNumber: numb
  * spec. Opening a row goes to its version history
  * (`workflows/[definitionId]`), never straight to the canvas: a
  * definition can have more than one version.
+ *
+ * Active/Activate column (Workflow Runtime V1, Task 3: at most one
+ * active workflow per binding context): `canPublish` gates
+ * Activate/Deactivate, matching the same `workflow_definition.publish`
+ * permission publishing already requires, since activating is an
+ * equally consequential runtime-affecting action. "Activate" always
+ * calls the governed replacement RPC (`replaceActiveWorkflowDefinitionAction`),
+ * never the plain one, so a Workflow Admin never has to separately
+ * deactivate whichever other definition currently holds this context's
+ * slot first: one click either activates cleanly (nothing else was
+ * active) or swaps atomically (something else was).
  */
-function WorkflowDefinitionsPage({ rows, canWrite }: { rows: DefinitionRow[]; canWrite: boolean }) {
+function WorkflowDefinitionsPage({ rows, canWrite, canPublish }: { rows: DefinitionRow[]; canWrite: boolean; canPublish: boolean }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [codeDraft, setCodeDraft] = useState("")
   const [nameDraft, setNameDraft] = useState("")
   const [appliesToDraft, setAppliesToDraft] = useState<WorkflowAppliesTo | "">("")
   const [formError, setFormError] = useState<string | null>(null)
+  const [activatingId, setActivatingId] = useState<string | null>(null)
+  const [activateError, setActivateError] = useState<string | null>(null)
 
   function handleCreate() {
     if (!codeDraft.trim() || !nameDraft.trim() || !appliesToDraft) {
@@ -56,6 +75,34 @@ function WorkflowDefinitionsPage({ rows, canWrite }: { rows: DefinitionRow[]; ca
       setNameDraft("")
       setAppliesToDraft("")
       router.push(`/settings/workflows/${result.definition.id}`)
+    })
+  }
+
+  function handleActivate(definitionId: string) {
+    setActivateError(null)
+    setActivatingId(definitionId)
+    startTransition(async () => {
+      const result = await replaceActiveWorkflowDefinitionAction(definitionId)
+      setActivatingId(null)
+      if (!result.ok) {
+        setActivateError(result.error)
+        return
+      }
+      router.refresh()
+    })
+  }
+
+  function handleDeactivate(definitionId: string) {
+    setActivateError(null)
+    setActivatingId(definitionId)
+    startTransition(async () => {
+      const result = await setWorkflowDefinitionActiveAction(definitionId, false)
+      setActivatingId(null)
+      if (!result.ok) {
+        setActivateError(result.error)
+        return
+      }
+      router.refresh()
     })
   }
 
@@ -95,6 +142,8 @@ function WorkflowDefinitionsPage({ rows, canWrite }: { rows: DefinitionRow[]; ca
           </div>
         ) : null}
 
+        {activateError ? <p className="text-xs text-destructive">{activateError}</p> : null}
+
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
@@ -103,19 +152,21 @@ function WorkflowDefinitionsPage({ rows, canWrite }: { rows: DefinitionRow[]; ca
                 <TableHead>Applies To</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Active</TableHead>
                 <TableHead>Last Updated</TableHead>
                 <TableHead>Updated By</TableHead>
+                {canPublish ? <TableHead /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-xs text-muted-foreground">
+                  <TableCell colSpan={canPublish ? 8 : 7} className="text-xs text-muted-foreground">
                     No workflows have been created yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map(({ definition, latestVersionNumber, latestVersionStatus, updatedByLabel }) => (
+                rows.map(({ definition, latestVersionNumber, latestVersionStatus, hasPublishedVersion, updatedByLabel }) => (
                   <TableRow key={definition.id}>
                     <TableCell>
                       <Link href={`/settings/workflows/${definition.id}`} className="font-medium text-foreground underline underline-offset-2">
@@ -133,8 +184,40 @@ function WorkflowDefinitionsPage({ rows, canWrite }: { rows: DefinitionRow[]; ca
                         <span className="text-xs text-muted-foreground">No versions yet</span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Badge variant="ghost" className={definition.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
+                        {definition.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{formatTimestampDate(definition.updatedAt)}</TableCell>
                     <TableCell className="text-muted-foreground">{updatedByLabel ?? "-"}</TableCell>
+                    {canPublish ? (
+                      <TableCell>
+                        {definition.isActive ? (
+                          <PendingButton
+                            size="sm"
+                            variant="outline"
+                            pending={isPending && activatingId === definition.id}
+                            pendingLabel="Deactivating..."
+                            onClick={() => handleDeactivate(definition.id)}
+                          >
+                            Deactivate
+                          </PendingButton>
+                        ) : (
+                          <PendingButton
+                            size="sm"
+                            variant="outline"
+                            pending={isPending && activatingId === definition.id}
+                            pendingLabel="Activating..."
+                            disabled={!hasPublishedVersion}
+                            title={hasPublishedVersion ? undefined : "Publish a version before activating this workflow."}
+                            onClick={() => handleActivate(definition.id)}
+                          >
+                            Activate
+                          </PendingButton>
+                        )}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))
               )}

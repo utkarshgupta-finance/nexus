@@ -45,6 +45,21 @@ async function loadWorkflowGraph(versionId: string): Promise<WorkflowGraph | nul
   }
 }
 
+/**
+ * The responsible_team_id of every (workflowVersionId, nodeKey) pair
+ * across a batch of distinct workflow versions, keyed
+ * `${workflowVersionId}::${nodeKey}` (Workflow Runtime V1 Sequential
+ * Execution: the Approvals inbox/My Work read this to decide whether the
+ * viewer is the current node's responsible team, not only whether they
+ * hold the domain's fixed approve permission). One query per distinct
+ * version in the batch, never one per business row.
+ */
+async function getResponsibleTeamIdsByNode(versionIds: string[]): Promise<Map<string, string | null>> {
+  const distinctVersionIds = [...new Set(versionIds)]
+  const nodeRows = await workflowData.listNodesForVersions(distinctVersionIds)
+  return new Map(nodeRows.map((row) => [`${row.workflow_version_id}::${row.node_key}`, row.responsible_team_id]))
+}
+
 async function createDefinition(code: string, name: string, appliesTo: WorkflowAppliesTo, actorUserId: string): Promise<WorkflowDefinition> {
   const row = await workflowData.createDefinition(code, name, appliesTo, actorUserId)
   return toWorkflowDefinition(row)
@@ -53,6 +68,18 @@ async function createDefinition(code: string, name: string, appliesTo: WorkflowA
 async function createVersion(definitionId: string, actorUserId: string): Promise<WorkflowDefinitionVersion> {
   const row = await workflowData.createVersion(definitionId, actorUserId)
   return toWorkflowDefinitionVersion(row)
+}
+
+/** Task 3 (Workflow Runtime V1): activate/deactivate one workflow definition. Raises a named conflict, never silently picks one, if activating would leave two active definitions for the same binding context. */
+async function setDefinitionActive(definitionId: string, isActive: boolean, actorUserId: string): Promise<WorkflowDefinition> {
+  const row = await workflowData.setDefinitionActive(definitionId, isActive, actorUserId)
+  return toWorkflowDefinition(row)
+}
+
+/** The governed replacement path: swap which definition is active for a binding context in one transaction, so an admin never has to deactivate the old one and activate the new one as two separate, racy steps. */
+async function replaceActiveDefinition(newDefinitionId: string, actorUserId: string): Promise<WorkflowDefinition> {
+  const row = await workflowData.replaceActiveDefinition(newDefinitionId, actorUserId)
+  return toWorkflowDefinition(row)
 }
 
 function toNodeRpcPayload(node: WorkflowNodeDraft): Record<string, unknown> {
@@ -141,7 +168,10 @@ export {
   getDefinition,
   listVersionsForDefinition,
   loadWorkflowGraph,
+  getResponsibleTeamIdsByNode,
   createDefinition,
+  setDefinitionActive,
+  replaceActiveDefinition,
   createVersion,
   saveVersionGraph,
   validateVersionForPublish,

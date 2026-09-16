@@ -20,6 +20,7 @@ function request(overrides: Partial<GoLiveRequest> & { status: GoLiveRequestStat
     prorateFirstMonth: false,
     customerConfirmationStatus: "pending",
     workflowVersionId: null,
+    currentWorkflowNodeKey: null,
     rowVersion: 1,
     comment: null,
     sentBackReason: null,

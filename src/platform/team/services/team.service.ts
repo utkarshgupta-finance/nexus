@@ -40,4 +40,10 @@ async function removeUserFromTeam(userTeamId: string, actorUserId: string): Prom
   await teamData.removeUserFromTeam(userTeamId, actorUserId)
 }
 
-export { listTeams, listActiveTeams, createTeam, setTeamActive, assignUserToTeam, removeUserFromTeam }
+/** Every team this user currently, actively belongs to (task: Workflow Runtime V1 Sequential Execution's My Work team-aware routing). Filters the same all-users grant list every other team read already uses, rather than adding a second query shape. */
+async function getActiveTeamIdsForUser(userId: string): Promise<Set<string>> {
+  const grants = await teamData.listActiveUserTeamGrants()
+  return new Set(grants.filter((grant) => grant.user_id === userId).map((grant) => grant.team_id))
+}
+
+export { listTeams, listActiveTeams, createTeam, setTeamActive, assignUserToTeam, removeUserFromTeam, getActiveTeamIdsForUser }

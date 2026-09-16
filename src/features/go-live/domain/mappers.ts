@@ -14,6 +14,7 @@ function toGoLiveRequest(row: GoLiveRequestRow): GoLiveRequest {
     customerConfirmationStatus: row.customer_confirmation_status as CustomerConfirmationStatus,
     status: row.status as GoLiveRequestStatus,
     workflowVersionId: row.workflow_version_id,
+    currentWorkflowNodeKey: row.current_workflow_node_key,
     rowVersion: row.row_version,
     comment: row.comment,
     sentBackReason: row.sent_back_reason,
