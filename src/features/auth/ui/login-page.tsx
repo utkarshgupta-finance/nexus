@@ -17,7 +17,7 @@ import { signInAction } from "../actions"
  * `redirect()`, which would otherwise redirect before the client has a
  * chance to show a brief loading state.
  */
-function LoginPage() {
+function LoginPage({ redirectTo }: { redirectTo: string }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -33,7 +33,7 @@ function LoginPage() {
         setError(result.error)
         return
       }
-      router.push("/my-work")
+      router.push(redirectTo)
       router.refresh()
     })
   }

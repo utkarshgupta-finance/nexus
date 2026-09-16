@@ -1,3 +1,5 @@
+import { AuthGate } from "@/components/product/auth-gate"
+import { getCurrentNexusSession } from "@/platform/auth/server"
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
 import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext } from "@/features/customers/server"
@@ -9,10 +11,11 @@ import type { GoLiveLineItem } from "@/features/go-live/domain/line-items"
 
 /**
  * Customer Master detail: one record, read-only (task spec §15, §18).
- * Same server-side read boundary as /customers (see that route's own
- * comment): safe today because this table holds only synthetic demo
- * data, wrapped so a missing Supabase credential in this environment
- * shows an honest message instead of crashing the page.
+ * Gated the same way every other governed route is (AuthGate +
+ * `customer.read`, matching /customers, /my-work, and the Change
+ * Customer entry point), wrapped so a missing Supabase credential in
+ * this environment shows an honest message instead of crashing the
+ * page.
  *
  * `dynamic = "force-dynamic"` explicitly, matching /customers/page.tsx's
  * own reasoning: this route already rendered dynamically because a
@@ -24,11 +27,14 @@ import type { GoLiveLineItem } from "@/features/go-live/domain/line-items"
  */
 export const dynamic = "force-dynamic"
 
+const CUSTOMER_READ = { resource: "customer", action: "read" }
+
 export default async function CustomerMasterDetailRoute({
   params,
 }: {
   params: Promise<{ customerKey: string }>
 }) {
+  const session = await getCurrentNexusSession()
   const { customerKey } = await params
 
   let detail: Awaited<ReturnType<typeof getCustomerMasterDetailByKey>> = null
@@ -41,17 +47,21 @@ export default async function CustomerMasterDetailRoute({
 
   if (unavailable) {
     return (
-      <div className="flex flex-1 flex-col">
-        <PageHeader title="Customer" description="Customer Master backend read is not available in this environment right now." />
-      </div>
+      <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/customers/${customerKey}`}>
+        <div className="flex flex-1 flex-col">
+          <PageHeader title="Customer" description="Customer Master backend read is not available in this environment right now." />
+        </div>
+      </AuthGate>
     )
   }
 
   if (!detail) {
     return (
-      <div className="flex flex-1 flex-col">
-        <PageHeader title="Customer not found" description={`No Customer Master record exists for "${customerKey}".`} />
-      </div>
+      <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/customers/${customerKey}`}>
+        <div className="flex flex-1 flex-col">
+          <PageHeader title="Customer not found" description={`No Customer Master record exists for "${customerKey}".`} />
+        </div>
+      </AuthGate>
     )
   }
 
@@ -95,18 +105,20 @@ export default async function CustomerMasterDetailRoute({
   }
 
   return (
-    <CustomerMasterDetail
-      detail={detail}
-      snapshot={context.referenceMasterSnapshot}
-      commercialConfigurationId={context.commercialConfigurations[0]?.id ?? null}
-      changeRequests={context.changeRequests}
-      fieldHistory={context.fieldHistory}
-      fieldHistoryActorLabels={fieldHistoryActorLabels}
-      canDeletePermanently={canDeletePermanently}
-      canManageStatus={canManageStatus}
-      activityEvents={activityEvents}
-      onboardingOrigin={context.onboardingOrigin}
-      lineItems={lineItems}
-    />
+    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/customers/${customerKey}`}>
+      <CustomerMasterDetail
+        detail={detail}
+        snapshot={context.referenceMasterSnapshot}
+        commercialConfigurationId={context.commercialConfigurations[0]?.id ?? null}
+        changeRequests={context.changeRequests}
+        fieldHistory={context.fieldHistory}
+        fieldHistoryActorLabels={fieldHistoryActorLabels}
+        canDeletePermanently={canDeletePermanently}
+        canManageStatus={canManageStatus}
+        activityEvents={activityEvents}
+        onboardingOrigin={context.onboardingOrigin}
+        lineItems={lineItems}
+      />
+    </AuthGate>
   )
 }

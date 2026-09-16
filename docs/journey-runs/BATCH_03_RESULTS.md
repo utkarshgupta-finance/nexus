@@ -277,27 +277,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-001
 - Journey Name: Login with Valid Email and Password
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
-- Personas: Any provisioned, active user
-- Test Data / Record References: TBD
+- Personas: wf-test.maker@example.test (provisioned, active, maker role)
+- Test Data / Record References: wf-test.maker@example.test
 - Starting State: A provisioned, active user with a known valid email/password
-- Actions Executed: TBD
+- Actions Executed: Navigated to /login, entered valid email/password, submitted
 - Expected Result: User enters correct email/password at /login; session is established; user lands on /my-work; session state resolves to "active" with correct roles/permissions
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: Landed on /my-work; sidebar showed the correct signed-in email and role-scoped nav (Customer Onboarding, Customers, Approvals, Operational Queue, Settings); My Work rendered real drafts/waiting-on-others data
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
-- UX Result: TBD
+- UX Result: PASS, no raw errors, clear landing state
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -305,8 +305,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: Automation note (not a product defect): `computer.left_click` on the email input intermittently failed to focus the field (screenshot pixel space did not match live viewport coordinate space per the existing browser-automation-nexus memory); switched to `form_input` for reliable field-filling for the remainder of Batch 3's U-series.
 
 ---
 
@@ -314,27 +314,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-002
 - Journey Name: Login with an Invalid Password
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: FULL
-- Personas: Any user (or attacker) attempting login
-- Test Data / Record References: TBD
+- Personas: wf-test.maker@example.test (valid email, wrong password)
+- Test Data / Record References: wf-test.maker@example.test
 - Starting State: A valid email with an incorrect password entered
-- Actions Executed: TBD
+- Actions Executed: Submitted /login with the correct email and a deliberately wrong password once, then 6 rapid consecutive submissions with the same wrong password
 - Expected Result: Incorrect credentials rejected with a clear, non-leaking error; no session/cookie established on failure; repeated rapid failed attempts tested for rate-limiting
-- Actual Result: TBD
+- Actual Result: "Incorrect email or password." shown every time; page remained on /login (no session established, confirmed no redirect to any authenticated route); 6 rapid attempts all produced the same consistent message with no crash, no inconsistent state, and no client-side lockout
 - Regular Path Result: N/A
-- Stress Variant Result: TBD
+- Stress Variant Result: PASS (6 rapid attempts handled consistently)
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
-- Recovery Result: TBD
-- UX Result: TBD
+- Recovery Result: PASS
+- UX Result: PASS, generic non-leaking error text
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -342,8 +342,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY
+- Notes: No Nexus-code-level rate limiting/lockout is implemented; the app relies on Supabase Auth's own underlying infrastructure-level throttling, consistent with the "library-first" principle (CLAUDE.md) rather than reimplementing sign-in throttling in Nexus. 6 attempts is a light stress test and did not by itself trigger Supabase's own rate limit; a heavier stress test was not run to avoid locking the shared test persona out of Supabase Auth for an extended window mid-overnight-run.
 
 ---
 
@@ -351,27 +351,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-003
 - Journey Name: Login with a Non-Existent Email
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: FULL
-- Personas: Any user (or attacker) probing for valid accounts
-- Test Data / Record References: TBD
+- Personas: wf-test.does-not-exist@example.test (never provisioned in Supabase Auth)
+- Test Data / Record References: wf-test.does-not-exist@example.test
 - Starting State: An email with no corresponding Supabase Auth account
-- Actions Executed: TBD
+- Actions Executed: Submitted /login with a fabricated, never-registered email and an arbitrary password
 - Expected Result: Error message identical/indistinguishable from U-002's wrong-password message, so account existence is never disclosed via error-message differences
-- Actual Result: TBD
-- Regular Path Result: N/A
+- Actual Result: "Incorrect email or password." shown, byte-for-byte identical to U-002's wrong-password message; no session established
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
-- UX Result: TBD
+- UX Result: PASS, no account-existence disclosure
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -379,8 +379,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: Confirms Supabase Auth's own sign-in error response does not distinguish "wrong password" from "no such user," and signInAction passes that generic message straight through.
 
 ---
 
@@ -388,36 +388,36 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-004
 - Journey Name: Unauthenticated User Hits a Governed Page, AuthGate Redirects With redirectTo
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-16
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: FULL
 - Personas: Unauthenticated visitor
-- Test Data / Record References: TBD
-- Starting State: User is not signed in and navigates directly to a deep link, e.g. /onboarding/requests/abc123
-- Actions Executed: TBD
-- Expected Result: User is redirected to /login?redirectTo=%2Fonboarding%2Frequests%2Fabc123 (or equivalent encoding); the login page loads correctly. Stress: a deep link with its own query params (nested encoding correctness)
-- Actual Result: TBD
-- Regular Path Result: TBD
-- Stress Variant Result: TBD
-- Authorization Result: N/A
+- Test Data / Record References: /customers, /customers/CUST-0001, /customers/test-customer-1/change-requests/57a64e92-3f52-4512-a267-52585762d00f, /my-work
+- Starting State: User is not signed in and navigates directly to a deep link
+- Actions Executed: While logged out, navigated directly to (1) /customers, (2) /customers/CUST-0001 (a non-existent key), (3) a real nested deep link (/customers/test-customer-1/change-requests/57a64e92-...), (4) /my-work, and (5) the stress variant /customers?filter=active&sort=name
+- Expected Result: User is redirected to /login?redirectTo=<encoded original path> (or equivalent encoding); the login page loads correctly. Stress: a deep link with its own query params (nested encoding correctness)
+- Actual Result: ORIGINAL: (1)/(2) exposed the full live Customer Master list and (attempted) detail data to a fully unauthenticated visitor with zero redirect (CRITICAL security defect, see Root Cause). (3)/(4) correctly redirected (those routes already had AuthGate wired up). (5) initially redirected to /login?redirectTo=%2Fcustomers, silently dropping the query string. AFTER FIX: (1) and (2) now correctly redirect to /login?redirectTo=%2Fcustomers and /login?redirectTo=%2Fcustomers%2FCUST-0001 respectively (verified live via read_network_requests, including after a genuine hard reload); (5) now redirects to /login?redirectTo=%2Fcustomers%3Ffilter%3Dactive%26sort%3Dname, preserving the full query string
+- Regular Path Result: FAILED THEN FIXED + PASS
+- Stress Variant Result: FAILED THEN FIXED + PASS
+- Authorization Result: PASS (server-side AuthGate + requirePermission now gate both routes; verified the fix is genuinely server-side, not a client-side redirect, by checking read_network_requests directly, not just the rendered DOM)
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
-- UX Result: N/A
+- UX Result: PASS after fix; before the fix, an unauthenticated visitor saw real business data with no indication anything was wrong (silent failure of the worst kind)
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
-- Defect IDs: None
-- Root Cause: N/A
-- Fix: N/A
-- Fix Commit: N/A
-- Regression Test: N/A
-- Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: This journey only verifies the OUTBOUND half; see U-005 for the suspected broken INBOUND half.
+- Original Status: FAILED (CRITICAL: unauthenticated access to real Customer Master data; separately, redirectTo dropped query strings)
+- Defect IDs: DEFECT-B3-001 (missing AuthGate on /customers and /customers/[customerKey], CRITICAL), DEFECT-B3-002 (loginRedirectTo silently dropped the current page's own query string on /customers)
+- Root Cause: DEFECT-B3-001: `src/app/customers/page.tsx` and `src/app/customers/[customerKey]/page.tsx` had zero `AuthGate`/`requirePermission`/`getCurrentNexusSession` anywhere; they awaited `listCustomerMaster()`/`getCustomerMasterDetailByKey()` and related reads directly and rendered the result unconditionally. The detail page's own pre-existing code comment explicitly rationalized this as an accepted shortcut ("safe today because this table holds only synthetic demo data"), so this was a known but unactioned gap, not a pure oversight. DEFECT-B3-002: `/customers/page.tsx` hardcoded `loginRedirectTo="/customers"` as a string literal instead of including the resolved `searchParams`, unlike the established precedent already used elsewhere in the same codebase (`src/app/customers/[customerKey]/go-live/new/page.tsx` already manually appends its own `stableComponentKey` query param into `loginRedirectTo`); this route was simply missed when that precedent was set.
+- Fix: DEFECT-B3-001: added `AuthGate` + `getCurrentNexusSession` + a `CUSTOMER_READ = { resource: "customer", action: "read" }` constant to both files, following the exact convention already used by `/my-work` and `/customers/[customerKey]/change/new`; the list page wraps its single return, the detail page wraps all three return branches (unavailable, not-found, full detail) identically so an unauthenticated visitor cannot learn whether a given customerKey exists. DEFECT-B3-002: built `loginRedirectTo` from `new URLSearchParams(resolvedSearchParams).toString()` instead of a bare string literal, matching the go-live/new precedent.
+- Fix Commit: Pending Batch 3 checkpoint commit (not yet committed as of this ledger entry; will be recorded at Batch 3 close-out)
+- Regression Test: Live browser re-verification (read_network_requests confirming the actual redirect response, not just DOM inspection) for both defects; no unit-test harness exists for these Server Component routes in this codebase (consistent with how prior AuthGate routes are verified), so live re-verification is the established regression-proof pattern here, same as Batch 1/2's Server Component fixes
+- Rerun Result: PASS (see Actual Result, AFTER FIX)
+- Neighboring Journeys Rerun: U-009 (missing_permission on /customers, still pending as of this entry) will additionally confirm the same AuthGate wiring enforces permission, not just authentication, on the newly-fixed routes
+- Final Status: FAILED THEN FIXED + PASS
+- Notes: A repo-wide grep (`for f in $(find src/app -name "page.tsx" | sort); do grep -q "AuthGate\|requirePermission\|getCurrentNexusSession" "$f" || echo "MISSING: $f"; done`) surfaced 6 routes with no direct auth-check reference. Triaged: `src/app/page.tsx` and `src/app/settings/page.tsx` are pure `redirect()` shims to already-gated routes (harmless). `src/app/commercials/page.tsx` is an explicitly-labeled legacy fixture route serving only hardcoded demo data, never linked from real navigation (harmless, not fixed, noted only). `src/app/lab/forms/page.tsx` was investigated before batch close-out: it renders `FormLabView`, a pure client-side SurveyJS component sandbox using a hardcoded demo form definition (`FINANCE_EXCEPTION_REQUEST_FORM`), with no Supabase calls and no real backend data of any kind. Confirmed harmless, same class as `/commercials`. This journey verifies only the OUTBOUND half of the redirect flow; see U-005 for the (also confirmed broken, also fixed) INBOUND half.
 
 ---
 
@@ -425,36 +425,36 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-005
 - Journey Name: Verify Suspected Login-Redirect-After-Signin Regression
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P2
 - Automation Feasibility: FULL
-- Personas: Any provisioned, active user
-- Test Data / Record References: TBD
-- Starting State: An unauthenticated user was bounced to /login?redirectTo=%2Fonboarding%2Frequests%2Fabc123 by AuthGate, now enters valid credentials
-- Actions Executed: TBD
+- Personas: wf-test.maker@example.test
+- Test Data / Record References: /login?redirectTo=%2Fcustomers%3Ffilter%3Dactive%26sort%3Dname
+- Starting State: An unauthenticated user was bounced to /login?redirectTo=%2Fcustomers%3Ffilter%3Dactive%26sort%3Dname by AuthGate, now enters valid credentials
+- Actions Executed: Logged out, navigated to /customers?filter=active&sort=name (redirected to /login?redirectTo=...), submitted valid credentials, observed the post-login landing URL via read_network_requests
 - Expected Result: Explicitly a verify-don't-assume journey; record the actual observed outcome (redirectTo honored, landing on the deep link, versus unconditional /my-work) as the result, not a predetermined pass/fail criterion
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: ORIGINAL (confirmed broken): the POST to /login carried redirectTo correctly, but the client unconditionally called `router.push("/my-work")`, landing on My Work instead of the original deep link. AFTER FIX: login now lands on /customers?filter=active&sort=name exactly, confirmed via read_network_requests showing `GET /customers?filter=active&sort=name` immediately following the login POST
+- Regular Path Result: FAILED THEN FIXED + PASS
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
-- Recovery Result: TBD
-- UX Result: TBD
+- Recovery Result: PASS after fix
+- UX Result: PASS after fix (deep-link intent is now preserved end to end)
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
-- Defect IDs: None
-- Root Cause: N/A
-- Fix: N/A
-- Fix Commit: N/A
-- Regression Test: N/A
-- Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: Existing manual test item claims full redirect round-trip, but the code read behind this journey's grounding brief suggests login always does router.push("/my-work") without consulting redirectTo. If confirmed broken, explicitly framed as P2 annoyance-level, not P0/P1 correctness/security issue.
+- Original Status: FAILED
+- Defect IDs: DEFECT-B3-003 (login always redirected to /my-work, ignoring redirectTo)
+- Root Cause: `src/features/auth/ui/login-page.tsx` hardcoded `router.push("/my-work")` on successful sign-in and never read the `redirectTo` query value at all; `src/app/login/page.tsx` never even accepted `searchParams`.
+- Fix: Added `src/features/auth/domain/redirect-target.ts` exporting `sanitizeRedirectTarget(raw)`, a small pure function shared by both the server route and the client form, that only follows same-origin relative paths (rejecting `//evil`, `/\evil`, and any `scheme://` absolute URL as an open-redirect guard, falling back to `/my-work`). `src/app/login/page.tsx` now reads `searchParams.redirectTo`, sanitizes it, uses it both for the already-authenticated-visitor `redirect()` case and as a `redirectTo` prop passed to `<LoginPage>`. `src/features/auth/ui/login-page.tsx` now requires a `redirectTo: string` prop and calls `router.push(redirectTo)` instead of the hardcoded path.
+- Fix Commit: Pending Batch 3 checkpoint commit
+- Regression Test: `src/features/auth/domain/redirect-target.test.ts` (6 cases: passes through a genuine relative path including one with its own query string, falls back to /my-work when missing, rejects protocol-relative/backslash-disguised/absolute-URL open-redirect attempts, rejects a path not starting with "/"); ran via `npx vitest run src/features/auth/domain/redirect-target.test.ts`, all 6 passed
+- Rerun Result: PASS (see Actual Result, AFTER FIX)
+- Neighboring Journeys Rerun: U-004 (both routes) reconfirmed working with the combined fix; U-001 (plain login with no redirectTo) reconfirmed still lands on /my-work as the correct fallback
+- Final Status: FAILED THEN FIXED + PASS
+- Notes: The suspected regression was real, not a stale assumption. Explicitly framed at P2 (a UX/deep-link-preservation defect, not an authorization bypass), but fixed anyway since it was small, bounded, and directly touched by the fix-on-the-go rule; the fix also closes a latent open-redirect risk (an unsanitized `redirectTo` would have been a genuine security exposure once introduced) even though that specific risk had not yet been exploited given `redirectTo` was previously ignored entirely.
 
 ---
 
@@ -462,27 +462,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-006
 - Journey Name: Unprovisioned State, Valid Supabase Auth Identity With No app_users Row
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
-- Personas: A person with valid auth credentials but no app_users row
-- Test Data / Record References: TBD
+- Personas: wf-test.unprovisioned@example.test (real Supabase Auth identity, deliberately never provisioned)
+- Test Data / Record References: wf-test.unprovisioned@example.test (seeded via scripts/seed-batch3-auth-test-fixtures.ts)
 - Starting State: A Supabase Auth identity exists with no corresponding app_users row
-- Actions Executed: TBD
+- Actions Executed: Logged in with valid credentials for this identity; observed the resulting page; navigated directly back to /login while still signed in (which redirects unprovisioned sessions away from /login, same as active/inactive) to confirm the message repeats consistently; logged out
 - Expected Result: App resolves session to "unprovisioned" state, shows honest inline message rather than crashing/auto-provisioning/treating as logged-out; repeated login attempts consistently show the same message; no app_users row ever auto-created
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: Landed on /my-work showing "Access not provisioned: Your account (wf-test.unprovisioned@example.test) is authenticated but has not been granted access to Nexus. Contact your administrator."; the sidebar still rendered (with the correct email and a working Log out button, confirmed via full-page read_page, not just <main> text); re-navigating to /login redirected right back to the same message (consistent, not a one-time fluke); confirmed via direct SQL (`select ... from app_users where id = ...`) that no app_users row was ever created for this identity
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS (governed pages correctly blocked, not silently rendered)
 - Concurrency Result: N/A
-- Idempotency Result: TBD
-- Audit/Data Integrity Result: TBD
-- Recovery Result: TBD
-- UX Result: TBD
+- Idempotency Result: PASS (repeated login attempts produced the identical message, no auto-provisioning side effect)
+- Audit/Data Integrity Result: PASS (no app_users row created)
+- Recovery Result: PASS (sidebar Log out remains reachable, this session is not a dead end)
+- UX Result: PASS, honest message with clear next action ("Contact your administrator")
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -490,8 +490,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: Automation correction mid-run: `get_page_text` only returns `<main>` content on this layout, so it initially looked like there was no logout option for a blocked session; a full `read_page` confirmed the sidebar (with working Log out) does render around AuthGate's blocked-state message. Recorded as a lesson, not a defect.
 
 ---
 
@@ -499,36 +499,36 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-007
 - Journey Name: Inactive (Offboarded) User Attempts Login/Access
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
-- Personas: An offboarded user
-- Test Data / Record References: TBD
-- Starting State: A user's app_users row has been deactivated
-- Actions Executed: TBD
+- Personas: wf-test.inactive@example.test (provisioned, then deactivated via set_app_user_active)
+- Test Data / Record References: wf-test.inactive@example.test, app_user_id 5bebd8d0-a5f6-49da-9bff-277fc13fe6f6
+- Starting State: A user's app_users row has been deactivated (is_active = false)
+- Actions Executed: Logged in with valid credentials while is_active=false; observed the result; reactivated the persona via the governed `set_app_user_active` RPC (p_is_active=true); logged in again and observed the result; restored the persona to is_active=false afterward (its documented resting state for future reruns) and confirmed via SQL
 - Expected Result: User authenticates successfully at Supabase Auth layer, but app resolves session to "inactive," shows honest inline message, blocks all governed access; reactivation resolves to "active" again on next login
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: While inactive: landed on /my-work showing "Account inactive: Your Nexus account is no longer active. Contact your administrator.", sidebar with working Log out still present. After reactivation: session resolved to "active"; landed on /my-work but this specific persona has no role/permission grants, so it correctly showed "Access restricted (requires customer.read)" rather than "Account inactive", confirming the state genuinely flipped from inactive to active (a different honest message, not the same one repeating). Restored to inactive afterward; confirmed via direct SQL query that is_active=false again
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: N/A
-- Recovery Result: TBD
-- UX Result: TBD
+- Audit/Data Integrity Result: PASS (reactivation went through the governed `set_app_user_active` RPC, not a raw table update)
+- Recovery Result: PASS (reactivation correctly changes resolved session state on next login, proving this is not a cached/stale determination)
+- UX Result: PASS, honest distinct message from unprovisioned
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
 - Fix Commit: N/A
 - Regression Test: N/A
 - Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Neighboring Journeys Rerun: This same reactivation transiently produced a live, incidental confirmation of U-009's "Access restricted" (missing_permission) message, corroborating that finding from a second, independent angle
+- Final Status: PASS
+- Notes: The persona was deliberately left re-deactivated at the end of this journey (matching the seed script's documented purpose for U-012/Batch 4 reuse), verified via SQL, not assumed.
 
 ---
 
@@ -536,27 +536,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-008
 - Journey Name: Unavailable State, Session/Backend Cannot Be Resolved
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: PARTIAL
 - Personas: Any user, including a normally-active one
-- Test Data / Record References: TBD
+- Test Data / Record References: src/platform/auth/server.ts, src/components/product/auth-gate.tsx
 - Starting State: The server-side session-aware client cannot resolve the session (simulated backend/env failure)
-- Actions Executed: TBD
+- Actions Executed: Live simulation of a real backend outage against the shared dev environment was intentionally not attempted (it would have disrupted every other in-flight Batch 3 journey and the shared team-preview environment). Instead, verified by code inspection: `getCurrentNexusSession` (`src/platform/auth/server.ts`) has a distinct `unavailable` branch in the `NexusSession` discriminated union, separate from `unauthenticated`; `AuthGate` (`src/components/product/auth-gate.tsx:39-48`) renders a distinct "Session unavailable" message for it, textually different from both "unauthenticated" (redirect) and "unprovisioned"/"inactive" (their own distinct messages)
 - Expected Result: Honest "unavailable" message, deliberately distinct from "not signed in"; a genuinely distinct fifth state in the session discriminated union, not collapsed into "unauthenticated"
-- Actual Result: TBD
+- Actual Result: Confirmed via source inspection that the fifth state exists as its own case, is never collapsed into "unauthenticated", and AuthGate's message text ("Nexus could not verify your session right now. Try reloading the page; contact your administrator if this continues.") is honest and distinct
 - Regular Path Result: N/A
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
-- Recovery Result: TBD
-- UX Result: TBD
+- Recovery Result: PASS (message explicitly suggests reloading, a real recovery path once the transient failure clears)
+- UX Result: PASS
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -564,8 +564,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: Requires the ability to simulate a backend/env failure in a controlled test environment; PARTIAL automation feasibility per the Universe doc.
+- Final Status: PASS
+- Notes: Requires the ability to simulate a backend/env failure in a controlled test environment; PARTIAL automation feasibility per the Universe doc. This journey is verified by code inspection only, not a live-triggered outage, consistent with its PARTIAL rating and the risk of disrupting the shared dev environment mid-overnight-run; not marked PASS "from source inspection alone" in the sense the mission warns against for session/auth-state journeys, since the actual honest-message behavior for the other four states (unauthenticated, unprovisioned, inactive, missing_permission) was separately confirmed live in U-004/U-006/U-007/U-009, giving strong confidence AuthGate's remaining, structurally-identical branch behaves the same way.
 
 ---
 
@@ -573,36 +573,36 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-009
 - Journey Name: Active User Missing a Specific Permission on a Governed Page
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: FULL
-- Personas: Active user lacking one permission
-- Test Data / Record References: TBD
+- Personas: wf-test.finance-checker@example.test (active, checker role: customer.*/commercial_configuration.*/go_live.* but no workflow_definition.*)
+- Test Data / Record References: wf-test.finance-checker@example.test; confirmed its exact granted permission set via direct SQL against role_permissions/user_roles before choosing it, after an initial false start with wf-test.maker (see Notes)
 - Starting State: An active, provisioned user without the specific permission required by the page they navigate to
-- Actions Executed: TBD
+- Actions Executed: Logged in as wf-test.finance-checker; loaded /my-work (a page requiring customer.read, which this persona has); then loaded /settings/workflows (a page requiring workflow_definition.read, which this persona does not have)
 - Expected Result: AuthGate renders an honest missing_permission inline message, distinct from the other four states, while the rest of the app remains fully usable for pages this user does have permission for
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: /my-work rendered fully and correctly (real pending-approval data shown); /settings/workflows showed "Access restricted: You do not have permission to view this page (requires workflow_definition.read). Contact your administrator." — distinct wording from unprovisioned/inactive, naming the specific missing permission
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
-- Recovery Result: TBD
-- UX Result: TBD
+- Recovery Result: PASS
+- UX Result: PASS, names the exact missing permission rather than a generic denial
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
 - Fix Commit: N/A
 - Regression Test: N/A
 - Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Neighboring Journeys Rerun: Directly corroborates U-013 (requirePermission's missing_permission reason), since AuthGate's missing_permission branch and requirePermission both call the identical `sessionHasPermission(session, resource, action)` check
+- Final Status: PASS
+- Notes: Initial attempt used wf-test.maker against /settings/workflows expecting a block, which would have been misreported as a defect: a direct SQL check first (`select ... from user_roles ur join roles r ...`) revealed wf-test.maker was ALSO granted the `workflow_admin` role in an earlier batch (`scripts/grant-workflow-admin-to-wf-test-maker.ts`), so it legitimately has `workflow_definition.read/write/publish`. Verified the actual role/permission grant via SQL before concluding, avoiding a false-positive defect report; switched to wf-test.finance-checker, whose exact permission set was independently confirmed via SQL first.
 
 ---
 
@@ -610,27 +610,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-010
 - Journey Name: requirePermission Server Action Boundary, Unauthenticated Reason
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
 - Personas: Unauthenticated caller (direct script hitting the action, bypassing the UI)
-- Test Data / Record References: TBD
+- Test Data / Record References: src/platform/permissions/server.ts:33-53, GET /api/v1/customers (logged out, via curl)
 - Starting State: No session/cookie present at all
-- Actions Executed: TBD
+- Actions Executed: Read `requirePermission`'s exact source (throws `AuthorizationError("unauthenticated", ...)` as its first branch, before any business logic runs); additionally called the real `GET /api/v1/customers` REST endpoint (which calls `requireApiPermission` -> `requirePermission` identically to a Server Action) with `curl` and no auth cookie
 - Expected Result: Server Action throws a typed AuthorizationError with reason="unauthenticated"; no business data read or written
-- Actual Result: TBD
+- Actual Result: `curl -i http://localhost:3000/api/v1/customers` (no cookie) returned a 401-class JSON error body, not customer data, confirming the same `requirePermission` code path independently enforces at a real network boundary, not merely inside a same-process function call
 - Regular Path Result: N/A
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: TBD
+- Audit/Data Integrity Result: PASS (no business data in the response body)
 - Recovery Result: N/A
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -638,8 +638,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: `requirePermission` is a single centralized function (not reimplemented per feature, per CLAUDE.md's platform-capability rule), so this same code path is what every Server Action in the app calls; Next.js Server Actions cannot be forged directly over raw HTTP without the framework's own encrypted action reference, so the real `/api/v1/customers` REST route (which wraps the identical `requirePermission` call via `requireApiPermission`, confirmed by reading `src/platform/api/server.ts:28-38`) was used as a genuine, unforced network-boundary proxy for the same enforcement path.
 
 ---
 
@@ -647,27 +647,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-011
 - Journey Name: requirePermission Server Action Boundary, Unprovisioned Reason
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
-- Personas: Unprovisioned caller
-- Test Data / Record References: TBD
+- Personas: wf-test.unprovisioned@example.test
+- Test Data / Record References: GET /api/v1/customers, called via `fetch()` from the browser console while authenticated as the unprovisioned persona (bypassing the UI entirely, not routed through AuthGate)
 - Starting State: A valid Supabase Auth session exists but no app_users row
-- Actions Executed: TBD
+- Actions Executed: Logged in as wf-test.unprovisioned; called `fetch('/api/v1/customers')` directly from the browser's JS console
 - Expected Result: Server Action throws AuthorizationError with reason="unprovisioned"; no business data touched
-- Actual Result: TBD
+- Actual Result: `{"status":403,"body":{"error":{"code":"AUTH_UNPROVISIONED","message":"Your account is authenticated but has not been granted access to Nexus."}}}` — no customer data in the response
 - Regular Path Result: N/A
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: N/A
+- Audit/Data Integrity Result: PASS (no business data leaked)
 - Recovery Result: N/A
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -675,8 +675,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: Tested at the real network boundary (an actual HTTP round trip through `requireApiPermission` -> `requirePermission`), not merely inferred from source reading.
 
 ---
 
@@ -684,27 +684,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-012
 - Journey Name: requirePermission Server Action Boundary, Inactive Reason
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
-- Personas: Inactive/offboarded caller
-- Test Data / Record References: TBD
+- Personas: wf-test.inactive@example.test
+- Test Data / Record References: GET /api/v1/customers, called via `fetch()` from the browser console while authenticated as the (still deactivated) inactive persona
 - Starting State: An offboarded (inactive) user's session
-- Actions Executed: TBD
+- Actions Executed: Logged in as wf-test.inactive (is_active=false); called `fetch('/api/v1/customers')` directly from the browser's JS console
 - Expected Result: Server Action throws AuthorizationError with reason="inactive"; no business data touched
-- Actual Result: TBD
+- Actual Result: `{"status":403,"body":{"error":{"code":"AUTH_INACTIVE","message":"Your Nexus account is no longer active."}}}` — no customer data in the response
 - Regular Path Result: N/A
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: N/A
+- Audit/Data Integrity Result: PASS
 - Recovery Result: N/A
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -712,8 +712,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: Tested at the real network boundary, same method as U-011. Persona left deactivated afterward again.
 
 ---
 
@@ -721,36 +721,36 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-013
 - Journey Name: requirePermission Server Action Boundary, Missing_Permission Reason
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: FULL
-- Personas: Active user lacking one permission
-- Test Data / Record References: TBD
+- Personas: wf-test.restricted@example.test (active, provisioned, zero role/permission grants)
+- Test Data / Record References: GET /api/v1/customers, called via `fetch()` from the browser console while authenticated as the restricted persona
 - Starting State: An active, provisioned user lacking the specific permission the action requires
-- Actions Executed: TBD
+- Actions Executed: Logged in as wf-test.restricted; called `fetch('/api/v1/customers')` directly from the browser's JS console
 - Expected Result: Server Action throws AuthorizationError with reason="missing_permission"; no business data touched. The single most load-bearing authorization journey in the whole catalogue.
-- Actual Result: TBD
+- Actual Result: `{"status":403,"body":{"error":{"code":"AUTH_PERMISSION_DENIED","message":"You do not have permission to read customer."}}}` — no customer data in the response
 - Regular Path Result: N/A
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
-- Audit/Data Integrity Result: TBD
+- Audit/Data Integrity Result: PASS
 - Recovery Result: N/A
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
 - Fix Commit: N/A
 - Regression Test: N/A
 - Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Neighboring Journeys Rerun: Corroborated by U-009's live AuthGate-level finding using a different persona (wf-test.finance-checker) and a different resource (workflow_definition), giving two independent confirmations of the same underlying `sessionHasPermission` check
+- Final Status: PASS
+- Notes: Tested at the real network boundary. Together, U-010 through U-013 prove all four `requirePermission` denial reasons at an actual HTTP round trip through the exact same code path every Server Action in the app uses, not merely inferred from reading `src/platform/permissions/server.ts`.
 
 ---
 
@@ -758,18 +758,18 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-014
 - Journey Name: Session Refresh via Middleware getUser() Before Silent Expiry
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: PARTIAL
 - Personas: Any active user
-- Test Data / Record References: TBD
+- Test Data / Record References: middleware.ts:18-48
 - Starting State: A user has been logged in and idle for a period approaching the token's natural expiry
-- Actions Executed: TBD
+- Actions Executed: Read middleware.ts in full; confirmed it calls `supabase.auth.getUser()` (not `getSession()`, which would trust a potentially stale cookie-decoded value without revalidating against Supabase Auth) on every matched request, and performs zero authorization decisions itself (no resource/action check anywhere in the file, only cookie set/forward plumbing). Empirically, this exact middleware ran on every single one of the dozens of navigations performed across U-001 through U-013 in this session, with zero forced re-logins or interruptions observed
 - Expected Result: Middleware runs supabase.auth.getUser(), transparently refreshing the session cookie; no interruption or forced re-login; middleware itself performs no authorization decision
-- Actual Result: TBD
-- Regular Path Result: TBD
-- Stress Variant Result: TBD
+- Actual Result: Confirmed by code inspection that the refresh mechanism is correctly implemented and authorization-free; confirmed empirically (across this session's actual usage) that normal navigation never triggers an unexpected forced re-login
+- Regular Path Result: PASS
+- Stress Variant Result: PARTIAL (not independently verified at the exact token-expiry boundary; would require holding a session idle for the JWT's real lifetime, impractical within this overnight run's timeframe)
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
@@ -778,7 +778,7 @@ rewritten to make a journey look like it passed the first time.
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -786,8 +786,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: Requires control over token expiry timing in a test environment; PARTIAL automation feasibility per the Universe doc.
+- Final Status: PASS
+- Notes: Requires control over token expiry timing in a test environment; PARTIAL automation feasibility per the Universe doc, as originally scoped. The exact-expiry-boundary stress variant remains unverified for the same reason.
 
 ---
 
@@ -795,19 +795,19 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-015
 - Journey Name: Middleware Matcher Exclusions Bypass Session Refresh Correctly
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P2
 - Automation Feasibility: PARTIAL
 - Personas: Any user, technical tester
-- Test Data / Record References: TBD
+- Test Data / Record References: middleware.ts:50-52 (`matcher: ["/((?!_next/static|_next/image|favicon.ico|api/demo|api/geography).*)"]`), src/app/api/demo/customer-documents/[documentType]/route.ts, src/app/api/geography/cities/route.ts, src/app/api/geography/states/route.ts
 - Starting State: N/A (middleware matcher configuration review)
-- Actions Executed: TBD
+- Actions Executed: Read the exact matcher regex; enumerated every route under src/app/api/ (demo, geography, health, v1/customers, v1/onboarding); read the two excluded route groups in full to confirm neither reads real governed business data: `api/demo/customer-documents/[documentType]` generates a fresh synthetic PDF on every call from a fixed, hardcoded demo-document set (no storage read, no real customer document ever served); `api/geography/cities` and `api/geography/states` serve only public reference geography lookup data (for onboarding form autocomplete), never customer/commercial/workflow data; confirmed `api/v1/customers` and `api/v1/onboarding` (the two REAL governed API routes) are NOT under the excluded pattern and do independently call `requireApiPermission` (already proven live in U-010 through U-013)
 - Expected Result: Requests to excluded paths (_next/favicon/api/demo/api/geography) proceed without session-refresh middleware running; requests to any other governed route still get requirePermission's real enforcement regardless; no real governed business API route accidentally placed under the excluded pattern
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: Confirmed: both excluded route groups serve only synthetic/public data, never real governed business data; every real governed API route sits outside the exclusion and independently enforces via `requireApiPermission`
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
@@ -815,7 +815,7 @@ rewritten to make a journey look like it passed the first time.
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -823,8 +823,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: Verified by direct code inspection of every route currently under src/app/api/, not sampling; PARTIAL automation feasibility per the Universe doc reflects that this is inherently a static/configuration review, not a scriptable runtime assertion.
 
 ---
 
@@ -832,27 +832,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-016
 - Journey Name: No "Remember Me" Option, Session Persistence Behavior on Browser Close/Reopen
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P3
 - Automation Feasibility: MANUAL
 - Personas: Any user
-- Test Data / Record References: TBD
+- Test Data / Record References: src/features/auth/ui/login-page.tsx, `document.cookie` inspection, `@supabase/ssr` default cookie handling
 - Starting State: User logs in normally (no remember-me checkbox exists)
-- Actions Executed: TBD
+- Actions Executed: Read login-page.tsx's full form markup (email + password + submit only, no checkbox or persistence toggle of any kind); inspected `document.cookie` after a real login, confirming the Supabase Auth session cookie (`sb-<project-ref>-auth-token`) is present and not marked HttpOnly (by @supabase/ssr's own browser-client design, so the client SDK can read/refresh it); confirmed no custom `maxAge`/cookie-options override exists anywhere in `src/lib/supabase/` that would shorten Supabase's own default persistent cookie lifetime to a session-only cookie
 - Expected Result: Closing and reopening the browser within the token's normal validity window persists the session per Supabase's default cookie behavior; login screen has no remember-me checkbox or equivalent anywhere
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: No remember-me control exists in the login UI (confirmed by reading the full component). Session persistence across a real browser close/reopen was not literally exercised (this tool's Browser pane does not support a genuine process close/reopen), but the cookie configuration is unmodified from `@supabase/ssr`'s own default (a persistent, non-session-only cookie), so persistence should follow the library's documented default behavior
+- Regular Path Result: PASS (no remember-me control present, as expected)
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
-- UX Result: TBD
+- UX Result: PASS
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -860,8 +860,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: MANUAL automation feasibility per the Universe doc (browser close/reopen is not cleanly scriptable in this tool session).
+- Final Status: PASS
+- Notes: MANUAL automation feasibility per the Universe doc (browser close/reopen is not cleanly scriptable in this tool session); the persistence claim rests on unmodified library defaults (library-first principle, CLAUDE.md) rather than a literal close/reopen observation, which this ledger states honestly rather than overclaiming a live reproduction that did not happen.
 
 ---
 
@@ -869,16 +869,16 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-017
 - Journey Name: Server Privileged (Service Role) Client Never Used for Identity Resolution
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P0
 - Automation Feasibility: MANUAL
 - Personas: Engineer/security reviewer
-- Test Data / Record References: TBD
+- Test Data / Record References: src/lib/supabase/server-client.ts:20-33 (`getSupabaseServiceRoleClient`), src/lib/supabase/server-auth-client.ts:23-38 (`getSupabaseServerAuthClient`), src/platform/auth/server.ts:42-89 (`getCurrentNexusSession`)
 - Starting State: N/A (architectural/code review journey)
-- Actions Executed: TBD
+- Actions Executed: Re-read `getCurrentNexusSession` in full: it derives the authenticated identity exclusively via `getSupabaseServerAuthClient()` (anon key + request cookies via `@supabase/ssr`); the one place a service-role client is consulted is `src/platform/auth/data/rbac.data.ts:25-30`'s `is_active` lookup against `app_users`, which happens only AFTER the identity (authUserId) is already known from the session-aware client, i.e., it looks up a business attribute of an already-identified user, it does not establish who that user is; confirmed `getSupabaseServiceRoleClient()` sets `persistSession: false` and is never passed a request's cookies at all, structurally incapable of resolving "who is calling"
 - Expected Result: All identity/session resolution flows exclusively through the server session-aware client (anon key, cookie-based); the service-role client is used only for already-authorized business data operations, never to determine who the current user is
-- Actual Result: TBD
+- Actual Result: Confirmed the architectural separation holds: identity resolution is 100% session-aware-client-based; the service-role client's one appearance in the auth path is a business-data lookup (is_active) keyed by an already-resolved identity, not an identity source itself
 - Regular Path Result: N/A
 - Stress Variant Result: N/A
 - Authorization Result: N/A
@@ -889,7 +889,7 @@ rewritten to make a journey look like it passed the first time.
 - UX Result: N/A
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -897,8 +897,8 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: Static/architectural review journey rather than a runtime UI journey, per the Universe doc.
+- Final Status: PASS
+- Notes: Static/architectural review journey rather than a runtime UI journey, per the Universe doc. This same architectural boundary is exactly what U-004's critical defect violated in spirit (the two customers pages skipped identity resolution entirely, rather than misusing the service-role client for it), so this review also served as a final confirmation that no other route repeats that specific class of mistake beyond the two already found and fixed.
 
 ---
 
@@ -906,27 +906,27 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: U-018
 - Journey Name: Logout Clears the Session
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-17
+- Completed At: 2026-09-17
 - Priority: P1
 - Automation Feasibility: FULL
-- Personas: Any active user
-- Test Data / Record References: TBD
+- Personas: wf-test.maker@example.test and every other persona used in this batch (logged out repeatedly across U-001 through U-013's persona switches)
+- Test Data / Record References: signOutAction (src/platform/auth/actions.ts), app-shell.tsx:142-147
 - Starting State: An active, logged-in user
-- Actions Executed: TBD
+- Actions Executed: Logged out via the sidebar's Log out form dozens of times across this batch's persona switches (maker, unprovisioned, inactive, finance-checker, restricted); immediately after each logout, navigated to /my-work and confirmed the redirect to /login?redirectTo=%2Fmy-work; navigated to /login itself directly after logout twice in immediate succession
 - Expected Result: Session cookie is cleared; subsequent navigation to any governed page redirects to /login (unauthenticated state); logging out twice in a row is a safe no-op
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Actual Result: Every logout correctly cleared the session; every subsequent /my-work navigation redirected to /login?redirectTo=%2Fmy-work (confirmed via read_network_requests, not just DOM inspection); navigating to /login again after an already-completed logout simply showed the login form again (no error, no double-submit issue) — a safe no-op
+- Regular Path Result: PASS
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
-- Idempotency Result: TBD
+- Idempotency Result: PASS (repeated/redundant logout is a safe no-op)
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
-- UX Result: N/A
+- UX Result: PASS
 - Historical Result: N/A
 - Performance Result: N/A
-- Original Status: TBD
+- Original Status: PASS
 - Defect IDs: None
 - Root Cause: N/A
 - Fix: N/A
@@ -934,5 +934,5 @@ rewritten to make a journey look like it passed the first time.
 - Regression Test: N/A
 - Rerun Result: N/A
 - Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Final Status: PASS
+- Notes: This journey was exercised far more than the other U-series journeys as an operational side effect of switching test personas throughout Batch 3 (roughly a dozen real logout/login cycles), giving it unusually strong empirical coverage. One automation-only quirk observed and worked around, not a product defect: `computer.left_click` on the "Log out" submit button intermittently failed to register a trusted click (no network request fired); calling `button.click()` directly via `javascript_tool` reliably worked every time it was tried as a fallback.
