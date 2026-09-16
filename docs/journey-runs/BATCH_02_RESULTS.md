@@ -20,17 +20,17 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: K-026
 - Journey Name: Start Node Authoring Constraints, No Incoming Edge Expected
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-16 14:20
+- Completed At: 2026-09-16 15:05
 - Priority: P3
 - Automation Feasibility: FULL
-- Personas: Workflow Admin
-- Test Data / Record References: TBD
-- Starting State: TBD
-- Actions Executed: TBD
-- Expected Result: TBD
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Personas: Workflow Admin (wf-test.workflow-admin@example.test)
+- Test Data / Record References: Fresh definition "BATCH2 K-Series Builder Mechanics" (Customer Change) created for Batch 2; throwaway definition k026_direct_rpc_isolation_test created and deleted for the isolated RPC test
+- Starting State: New draft graph, admin attempts to drag an edge TO a Start node from another node
+- Actions Executed: (1) Live browser: created Start + Approval nodes on a fresh draft canvas, dragged an edge from Approval's output handle to Start's input handle; edge rendered successfully. (2) Clicked Save Draft: succeeded ("Draft saved."), confirming save performs no structural validation. (3) Clicked Validate & Publish: client validator produced a wall of disconnection/reachability errors for the OTHER incomplete nodes but never flagged the Start-incoming-edge itself. (4) Direct RPC bypass: built a fully valid 5-node graph (Start -> Decision -> {Approval1 (condition), Approval2 (fallback)}, Approval1 -> End) where Approval2 additionally points back to Start, isolating the one question (does anything reject an edge into Start) from every other rule; called save_workflow_version_graph then publish_workflow_definition_version directly.
+- Expected Result: A Start node should never accept an incoming edge; this should be rejected at validate-time and/or publish-time
+- Actual Result (original): Canvas allowed drawing the edge; Save Draft succeeded; client validator did not flag it; direct RPC publish SUCCEEDED, permanently publishing an immutable version where Start has an incoming edge. Unsafe acceptance, symmetric to Batch 1's K-025 End-node-outgoing-edge defect.
+- Regular Path Result: FAILED (before fix) then PASS (after fix)
 - Stress Variant Result: N/A
 - Authorization Result: N/A
 - Concurrency Result: N/A
@@ -38,16 +38,16 @@ rewritten to make a journey look like it passed the first time.
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
 - UX Result: N/A
-- Original Status: TBD
-- Defect IDs: None
-- Root Cause: N/A
-- Fix: N/A
-- Fix Commit if applicable: N/A
-- Regression Test: N/A
-- Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- Original Status: FAILED
+- Defect IDs: K026-D01
+- Root Cause: Neither src/platform/workflow-builder/domain/validation.ts nor publish_workflow_definition_version checked for edges targeting a Start node. K-025 (Batch 1) added the symmetric End-node-outgoing-edge check but no equivalent check was ever added for Start's incoming edges.
+- Fix: Added a client-side check in validation.ts (Start node with any incoming edge is an error) and a symmetric server-side check in publish_workflow_definition_version (supabase/migrations/20260929000000_publish_validation_start_incoming_edge.sql), mirroring the K-025 fix exactly.
+- Fix Commit if applicable: fa061f2
+- Regression Test: src/platform/workflow-builder/domain/validation.test.ts, "rejects a Start node that has an incoming transition (Batch 2, K-026)"
+- Rerun Result: Reran the exact isolated direct-RPC graph after the fix: publish now rejected with WORKFLOW_INVALID_GRAPH ("has an incoming transition into a Start node; a Start node is an entry point and must have no incoming transitions"). Reran full vitest suite for validation.test.ts: 19/19 pass.
+- Neighboring Journeys Rerun: Diffed the new publish_workflow_definition_version function body against the prior version; confirmed the K-025 (End-node-outgoing-edge) and K-019 (reachability) check logic is byte-for-byte unchanged, only the new K-026 check was inserted between them.
+- Final Status: FAILED THEN FIXED + PASS
+- Notes: Migration applied to the live/shared Supabase database with explicit user authorization via AskUserQuestion, following the same pattern as Batch 1's K-019/K-025 fix. Throwaway RPC-bypass test definitions were created and cleaned up (deleted) via service-role scripts; no throwaway scripts were committed.
 
 ---
 
@@ -55,34 +55,34 @@ rewritten to make a journey look like it passed the first time.
 
 - Journey ID: K-027
 - Journey Name: Read-Only Permission Holder Can View but Never Mutate the Builder Canvas
-- Started At: TBD
-- Completed At: TBD
+- Started At: 2026-09-16 15:05
+- Completed At: 2026-09-16 15:40
 - Priority: P1
 - Automation Feasibility: FULL
-- Personas: Read-only Workflow Viewer
-- Test Data / Record References: TBD
-- Starting State: TBD
-- Actions Executed: TBD
-- Expected Result: TBD
-- Actual Result: TBD
-- Regular Path Result: TBD
+- Personas: Read-only Workflow Viewer (wf-test.workflow-viewer@example.test), Workflow Editor (regression check)
+- Test Data / Record References: BATCH2 K-Series Builder Mechanics, Version 1 draft (id 8f3ec7c6-bab9-4231-bce9-85d1636ff6f0)
+- Starting State: User holds workflow_definition.read only (workflow_viewer_test role)
+- Actions Executed: Logged in as Viewer, opened the workflow list (read succeeded, no Discard/Activate controls shown, correctly gated), opened the draft version's canvas editor, inspected nodes/edges freely, attempted Save Draft directly.
+- Expected Result: Save/Publish/Activate/Discard controls all inert for this user; UI clearly communicates read-only status rather than presenting controls that silently no-op.
+- Actual Result (original): The definition list page correctly hid Discard Draft/Activate controls. But the version CANVAS EDITOR page computed its read-only state purely from `version.status === "published"`, ignoring the viewer's own permissions entirely. For a DRAFT version, the Viewer saw a fully-enabled Add Node panel, Save Draft button, and Validate & Publish button, all looking actionable. Clicking Save Draft did correctly get rejected server-side ("You do not have permission to write workflow_definition"), so no unsafe mutation occurred, but the UX explicitly required by this journey (clear read-only status, no controls that look actionable but aren't) was not met.
+- Regular Path Result: FAILED THEN FIXED + PASS (UX/authorization-surface gap on the canvas editor page specifically)
 - Stress Variant Result: N/A
-- Authorization Result: TBD
+- Authorization Result: PASS (server-side requirePermission correctly rejected the write attempt both before and after the fix; the gap was purely in what the UI presented, not in what it allowed)
 - Concurrency Result: N/A
 - Idempotency Result: N/A
 - Audit/Data Integrity Result: N/A
 - Recovery Result: N/A
-- UX Result: TBD
-- Original Status: TBD
-- Defect IDs: None
-- Root Cause: N/A
-- Fix: N/A
-- Fix Commit if applicable: N/A
-- Regression Test: N/A
-- Rerun Result: N/A
-- Neighboring Journeys Rerun: N/A
-- Final Status: TBD
-- Notes: TBD
+- UX Result: FAILED THEN FIXED + PASS
+- Original Status: FAILED
+- Defect IDs: K027-D01
+- Root Cause: src/app/settings/workflows/[definitionId]/versions/[versionId]/page.tsx computed `isReadOnly` solely from the version's publish status, never checking the viewing session's own workflow_definition.write permission.
+- Fix: Added `sessionHasPermission(session, "workflow_definition", "write")` and combined it with publish status into `isReadOnly`; threaded a `readOnlyReason` ("published" | "no_permission") through to WorkflowCanvasEditor so the header badge/description accurately explains WHY the canvas is read-only instead of always saying "Published, read-only" even when the real reason is a missing permission.
+- Fix Commit if applicable: (pending, committed with this ledger update)
+- Regression Test: Live browser re-verification (no unit-testable layer for this Server Component composition): Viewer now sees "Read-only: you do not have permission to edit workflows" with no Add Node panel and no Save/Publish buttons; Workflow Editor (write, no publish) re-checked immediately after and still sees the full Draft editing UI (Add Node, Save Draft, Validate & Publish), confirming no regression to the write/publish permission split from Batch 1 (K-014/K-015/K-016).
+- Rerun Result: PASS, both personas behave correctly after the fix.
+- Neighboring Journeys Rerun: Re-verified K-014/K-015/K-016 (write-without-publish persona) behavior live via the Workflow Editor persona; unaffected.
+- Final Status: FAILED THEN FIXED + PASS
+- Notes: A real mutation was never at risk (server-side authorization was always correct); the defect was UI-surface honesty, not data integrity. Fixed given it is explicitly named as a UX Check in this P1 journey and the fix was small and bounded.
 
 ---
 

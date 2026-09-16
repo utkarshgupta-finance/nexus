@@ -89,12 +89,14 @@ function WorkflowCanvasEditor({
   initialEdges,
   teams,
   isReadOnly,
+  readOnlyReason = null,
 }: {
   version: WorkflowDefinitionVersion
   initialNodes: FlowNode[]
   initialEdges: Edge[]
   teams: Team[]
   isReadOnly: boolean
+  readOnlyReason?: "published" | "no_permission" | null
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -231,11 +233,17 @@ function WorkflowCanvasEditor({
     <div className="flex flex-1 flex-col">
       <PageHeader
         title={`Workflow Version ${version.versionNumber}`}
-        description={isReadOnly ? "Published, read-only" : "Draft"}
+        description={
+          readOnlyReason === "published"
+            ? "Published, read-only"
+            : readOnlyReason === "no_permission"
+              ? "Read-only: you do not have permission to edit workflows"
+              : "Draft"
+        }
         actions={
           isReadOnly ? (
-            <Badge variant="ghost" className="bg-success/10 text-success">
-              Published
+            <Badge variant="ghost" className={readOnlyReason === "published" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
+              {readOnlyReason === "published" ? "Published" : "Read-only"}
             </Badge>
           ) : (
             <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import type { Edge } from "@xyflow/react"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
+import { sessionHasPermission } from "@/platform/permissions"
 import { loadWorkflowGraph } from "@/platform/workflow-builder/server"
 import { listActiveTeams } from "@/platform/team/server"
 import { WorkflowCanvasEditor } from "@/platform/workflow-builder/ui/workflow-canvas-editor"
@@ -44,11 +45,21 @@ export default async function WorkflowCanvasRoute({
     data: { condition: edge.condition },
   }))
 
-  const isReadOnly = graph.version.status === "published"
+  const canWrite = sessionHasPermission(session, "workflow_definition", "write")
+  const isPublished = graph.version.status === "published"
+  const isReadOnly = isPublished || !canWrite
+  const readOnlyReason: "published" | "no_permission" | null = isPublished ? "published" : !canWrite ? "no_permission" : null
 
   return (
     <AuthGate session={session} requiredPermission={WORKFLOW_READ} loginRedirectTo={`/settings/workflows/${definitionId}/versions/${versionId}`}>
-      <WorkflowCanvasEditor version={graph.version} initialNodes={initialNodes} initialEdges={initialEdges} teams={teams} isReadOnly={isReadOnly} />
+      <WorkflowCanvasEditor
+        version={graph.version}
+        initialNodes={initialNodes}
+        initialEdges={initialEdges}
+        teams={teams}
+        isReadOnly={isReadOnly}
+        readOnlyReason={readOnlyReason}
+      />
     </AuthGate>
   )
 }
