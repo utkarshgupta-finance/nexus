@@ -953,5 +953,5 @@ rewritten to make a journey look like it passed the first time.
 - DEFECTS FIXED: N/A
 - Tests: 909/909 Vitest passing, tsc clean, ESLint clean, production build clean, npm audit 0 vulnerabilities
 - Commits: 82bba22 (ledger scaffold), 932fa29 (full ledger + seed script)
-- Deployment: pending push and Vercel verification (recorded below once complete)
+- Deployment: pushed to team-preview; local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolve to 297c2064af114053e03f928b3c35131f2de17195, deployment state READY, Production untouched
 - Next-batch readiness: Batch 6 READY. Team creation, activation/deactivation, membership grant/revoke, and the historical-grant-record trigger's exact semantics (now proven to apply identically to user_roles, role_permissions, and user_teams) are all confirmed correct. The confirmed gaps (O-011's primary-promotion no-op, N-030's deactivated-role grant gap, O-005's deactivated-team approval gap) do not block Batch 6's own scope (Teams completion + Reference Masters), since none of them represent a foundational correctness failure Batch 6 would depend on; they are recorded for product review.
