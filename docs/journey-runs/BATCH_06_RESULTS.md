@@ -966,3 +966,7 @@ Regression-critical data-integrity guarantees explicitly re-confirmed this batch
 - assign_user_to_team's idempotent pre-check-and-return correctly prevents duplicate active rows under genuine concurrent calls (O-025).
 
 No new migrations were required or applied this batch. All test data (fictional reference_options rows prefixed E2E-TEST-style, two throwaway commercial_components, a throwaway multi-team-membership user) followed the established persona/test-data hygiene rules; only shared real reference values (the "enterprise" Segment, wf_test_leadership's sole membership) were touched, and only after fresh explicit user authorization for each, then fully restored.
+
+**Checkpoint:** npx tsc --noEmit clean, npx vitest run (101 files, 910 tests, all passed), npx eslint . clean, npm run build succeeded, npm audit found 0 vulnerabilities. Secret scan of the diff found no matches. .env.local untouched.
+
+**Deployment parity confirmed:** local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolved to commit baf7026019b64b2e0f856300a7fb467f7461e93f, deployment dpl_G1xWMp1gV21V4wqEgzBkwTQmvcD6, state READY. Production was not touched or promoted.
