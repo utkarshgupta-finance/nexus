@@ -85,6 +85,12 @@ function UserAccessPage({
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6">
         {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
 
+        {entries.length >= 200 ? (
+          <p className="text-xs text-muted-foreground">
+            Showing the first 200 users. If someone you expect to see is missing, they may be beyond this limit; contact IT.
+          </p>
+        ) : null}
+
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
