@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
  * Direct test of getCurrentNexusSession's state-transition logic (Vercel
@@ -34,6 +34,10 @@ describe("getCurrentNexusSession", () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it("missing Supabase Auth env (AUTH_CONFIG_MISSING) resolves to unavailable, never throws", async () => {
     getSupabaseServerAuthClient.mockRejectedValue(new Error("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set"))
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
@@ -65,6 +69,20 @@ describe("getCurrentNexusSession", () => {
 
     expect(session).toEqual({ status: "unavailable" })
     expect(errorSpy).toHaveBeenCalledWith("[auth] AUTH_PROVIDER_ERROR", "fetch failed")
+    errorSpy.mockRestore()
+  })
+
+  it("a Supabase Auth getUser call that never settles (stuck token-refresh lock) resolves to unavailable instead of hanging forever", async () => {
+    vi.useFakeTimers()
+    getSupabaseServerAuthClient.mockResolvedValue(fakeSupabaseClient(() => new Promise(() => {})))
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const sessionPromise = getCurrentNexusSession()
+    await vi.advanceTimersByTimeAsync(8000)
+    const session = await sessionPromise
+
+    expect(session).toEqual({ status: "unavailable" })
+    expect(errorSpy).toHaveBeenCalledWith("[auth] AUTH_PROVIDER_ERROR", "Supabase Auth getUser timed out")
     errorSpy.mockRestore()
   })
 

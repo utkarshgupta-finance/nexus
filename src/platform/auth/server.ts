@@ -5,6 +5,37 @@ import { getActiveGlobalRolesForUser, getActivePermissionsForRoles, getAppUserBy
 import type { NexusSession } from "./domain/types"
 
 /**
+ * Supabase Auth's own token-refresh lock can, under concurrent requests
+ * racing the same soon-to-expire refresh token, leave a later caller's
+ * `getUser()` promise pending forever instead of rejecting (observed in
+ * dev logs as clustered `AuthApiError: Invalid Refresh Token` warnings
+ * from concurrent requests, immediately followed by a request that never
+ * settles). Every other failure mode below is a rejection, already
+ * caught; a hang is not, and without this it leaves every Suspense
+ * boundary built on `getCurrentNexusSession()` stuck on its `loading.tsx`
+ * fallback indefinitely, since React has no way to know the render will
+ * never finish. This bounds that wait so it degrades to the same honest
+ * `unavailable` state a real provider error already produces.
+ */
+const AUTH_PROVIDER_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
+/**
  * TRUSTED, SERVER-ONLY authentication + authorization entry point.
  *
  * `getCurrentNexusSession()` is the one place the rest of the app derives
@@ -50,7 +81,7 @@ async function getCurrentNexusSession(): Promise<NexusSession> {
 
   let authUser: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"]
   try {
-    const result = await supabase.auth.getUser()
+    const result = await withTimeout(supabase.auth.getUser(), AUTH_PROVIDER_TIMEOUT_MS, "Supabase Auth getUser timed out")
     authUser = result.data.user
   } catch (error) {
     console.error("[auth] AUTH_PROVIDER_ERROR", error instanceof Error ? error.message : "unknown error")
