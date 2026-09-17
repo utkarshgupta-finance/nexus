@@ -953,5 +953,5 @@ rewritten to make a journey look like it passed the first time.
 - DEFECTS FIXED: 1 of 1
 - Tests: 909/909 Vitest passing, tsc clean, ESLint clean, production build clean, npm audit 0 vulnerabilities
 - Commits: 7b3874c (ledger scaffold), 2966872 (N-015 fix + full ledger)
-- Deployment: pending push and Vercel verification (recorded below once complete)
+- Deployment: pushed to team-preview; local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolve to 0e969a36140ea6e10da3833a67a9cecab87a5fac, deployment state READY, Production untouched
 - Next-batch readiness: Batch 5 READY. Every user-state/role/permission mechanism this batch tested (provisioning, activation, role grant/revoke, role/permission-level kill switches, mid-session privilege changes in both directions, the full five-state session union) is confirmed correct and defect-free. Batch 5 (Permissions completion + Teams) depends on exactly this foundation, which it now is.
