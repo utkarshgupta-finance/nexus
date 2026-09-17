@@ -936,3 +936,22 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: N/A
 - Final Status: PASS
 - Notes: This journey was exercised far more than the other U-series journeys as an operational side effect of switching test personas throughout Batch 3 (roughly a dozen real logout/login cycles), giving it unusually strong empirical coverage. One automation-only quirk observed and worked around, not a product defect: `computer.left_click` on the "Log out" submit button intermittently failed to register a trusted click (no network request fired); calling `button.click()` directly via `javascript_tool` reliably worked every time it was tried as a fallback.
+
+---
+
+## Batch 3 Final Report
+
+- Journeys planned: 25 (L-022 through L-028, U-001 through U-018)
+- Journeys executed: 25
+- PASS: 21 (L-022, L-023, L-025, L-026, L-028, U-001, U-002, U-003, U-006, U-007, U-008, U-009, U-010, U-011, U-012, U-013, U-014, U-015, U-016, U-017, U-018)
+- FAILED THEN FIXED + PASS: 3 (U-004, U-005, and L-027's own stress sub-test folded into its PASS entry)
+- BLOCKED: 0
+- PRODUCT GAP CONFIRMED: 0
+- EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY: 1 (U-002, no client-side rate limiting by design)
+- NEW JOURNEYS DISCOVERED: 0 (no new stable Journey ID was created; the query-string-drop defect was folded into U-004 as its stress variant, already scoped by the Universe, rather than treated as a distinct new journey)
+- DEFECTS FOUND: 3 (DEFECT-B3-001 unauthenticated Customer Master data exposure on /customers and /customers/[customerKey], CRITICAL; DEFECT-B3-002 loginRedirectTo dropped the current page's query string on /customers; DEFECT-B3-003 login always redirected to /my-work, ignoring redirectTo)
+- DEFECTS FIXED: 3 of 3
+- Tests: 909/909 Vitest passing (including 6 new tests in src/features/auth/domain/redirect-target.test.ts), tsc clean, ESLint clean, production build clean, npm audit 0 vulnerabilities
+- Commits: 4b4f199 (defect fixes + ledger), 0d0cf96 (ledger Fix Commit SHA backfill)
+- Deployment: pushed to team-preview; local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolve to 0d0cf96707a160439e4308a58d01d70e6d998e6f, deployment state READY, Production untouched
+- Next-batch readiness: Batch 4 READY. Authentication/session resolution (the five-state NexusSession union), requirePermission's four denial reasons, and AuthGate's rendering behavior are all now empirically confirmed correct and defect-free at both the page-render boundary and the real network/API boundary. Batch 4 (Users/Roles/Permissions) depends on exactly this foundation being sound, which it now is.
