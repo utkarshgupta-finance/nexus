@@ -936,3 +936,22 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: O-009, O-015
 - Final Status: PASS
 - Notes: This is a clean, real, live, both-directions proof (not just one direction), directly against a genuine logged-in browser session, not merely an RPC-level inference.
+
+---
+
+## Batch 5 Final Report
+
+- Journeys planned: 25 (N-024 through N-031, O-001 through O-017)
+- Journeys executed: 25
+- PASS: 18
+- FAILED THEN FIXED + PASS: 0 (no product code changes this batch; every finding required a genuine design decision, not a bounded fix)
+- BLOCKED: 0
+- PRODUCT GAP CONFIRMED: 6 (N-026 self-access view does not exist, N-027 search/filter does not exist, N-029 no history-viewing UI exists though data is intact, N-030 grant_user_role does not validate role.is_active, N-031 usage.read/entitlement_settlement.read unenforced, O-011 assign_user_to_team cannot promote an existing membership to primary)
+- EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY: 1 (O-005, deactivated team does not block existing members from approving in-flight requests)
+- NEW JOURNEYS DISCOVERED: 0
+- DEFECTS FOUND: 0 formally logged as DEFECT-Bx-### (every finding this batch was classified as a Product Gap or Expected Behavior per the mission's explicit Category F guidance, since each would require an architecture-level decision to resolve, not a bounded code fix)
+- DEFECTS FIXED: N/A
+- Tests: 909/909 Vitest passing, tsc clean, ESLint clean, production build clean, npm audit 0 vulnerabilities
+- Commits: 82bba22 (ledger scaffold), 932fa29 (full ledger + seed script)
+- Deployment: pending push and Vercel verification (recorded below once complete)
+- Next-batch readiness: Batch 6 READY. Team creation, activation/deactivation, membership grant/revoke, and the historical-grant-record trigger's exact semantics (now proven to apply identically to user_roles, role_permissions, and user_teams) are all confirmed correct. The confirmed gaps (O-011's primary-promotion no-op, N-030's deactivated-role grant gap, O-005's deactivated-team approval gap) do not block Batch 6's own scope (Teams completion + Reference Masters), since none of them represent a foundational correctness failure Batch 6 would depend on; they are recorded for product review.
