@@ -634,7 +634,7 @@ rewritten to make a journey look like it passed the first time.
 - Defect IDs: DEFECT-B4-001 (no UI indication that the User Access list caps at 200, low severity, P2)
 - Root Cause: `src/platform/user-access/ui/user-access-page.tsx` rendered the entries table with no length-based messaging at all.
 - Fix: Added a conditional caption above the table, shown only at `entries.length >= 200`.
-- Fix Commit: Pending Batch 4 checkpoint commit
+- Fix Commit: 2966872
 - Regression Test: Type-check + existing test suite (no dedicated unit test added; this is a one-line conditional JSX render with no independent business logic to unit test, consistent with how similar small UI captions are handled elsewhere in this codebase)
 - Rerun Result: Verified via tsc (clean) and manual code reading of the conditional; not independently exercised at 200+ real accounts (impractical)
 - Neighboring Journeys Rerun: N-001 (list rendering) re-confirmed unaffected by the addition
@@ -936,3 +936,22 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: N-022 (contrasting recovery mechanics between role_permissions and roles)
 - Final Status: PASS
 - Notes: wf-test.maker's dual role membership (maker + workflow_admin, acquired in an earlier batch) turned out to be an ideal fixture for this exact isolation test, rather than a problem to work around.
+
+---
+
+## Batch 4 Final Report
+
+- Journeys planned: 25 (U-019, U-020, N-001 through N-023)
+- Journeys executed: 25
+- PASS: 23
+- FAILED THEN FIXED + PASS: 1 (N-015, missing 200-user-cap disclosure)
+- BLOCKED: 0
+- PRODUCT GAP CONFIRMED: 0
+- EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY: 1 (N-022, role_permissions recovery mechanics differ from the Universe doc's literal wording but are architecturally correct)
+- NEW JOURNEYS DISCOVERED: 0
+- DEFECTS FOUND: 1 (DEFECT-B4-001, no UI disclosure of the 200-user list cap, low severity/P2)
+- DEFECTS FIXED: 1 of 1
+- Tests: 909/909 Vitest passing, tsc clean, ESLint clean, production build clean, npm audit 0 vulnerabilities
+- Commits: 7b3874c (ledger scaffold), 2966872 (N-015 fix + full ledger)
+- Deployment: pending push and Vercel verification (recorded below once complete)
+- Next-batch readiness: Batch 5 READY. Every user-state/role/permission mechanism this batch tested (provisioning, activation, role grant/revoke, role/permission-level kill switches, mid-session privilege changes in both directions, the full five-state session union) is confirmed correct and defect-free. Batch 5 (Permissions completion + Teams) depends on exactly this foundation, which it now is.
