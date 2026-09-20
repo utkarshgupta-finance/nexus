@@ -963,10 +963,10 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Business Objective: Confirm the intended visibility model for an in-progress (draft/sent_back) onboarding case: should any holder of customer.create be able to open and read a case they did not create, purely by knowing or guessing its request_id?
 - Domain: Customer Onboarding
 - Object / Record Type: customer_onboarding_case (draft/sent_back), submission_revisions
-- Starting State: User A creates a draft case. User B, a different maker holding only customer.create (not the creator, not a reviewer), navigates directly to `/forms/customer-onboarding/[requestId]` using A's request_id.
+- Starting State: User A creates a draft case. User B, a different maker holding only customer.create (not the creator, not a reviewer), attempts to read A's case by its request_id.
 - Personas: Maker A (creator), Maker B (non-creator, same broad permission)
 - Preconditions: Both users hold customer.create; neither is a reviewer for this case.
-- Regular Path (current, confirmed live during Batch 7): `getOnboardingCase(requestId)` is called with no ownership check, and the page's `AuthGate` only requires the blanket `customer.create` permission (`src/app/forms/customer-onboarding/[requestId]/page.tsx`). Maker B's page load succeeds and renders Maker A's full draft (all customer/tax fields, comments, documents).
+- Regular Path (current, confirmed live during Batch 7): the onboarding case detail read path authorizes on the blanket `customer.create` permission only, with no check that the caller is the case's own creator. Maker B's read succeeds and returns Maker A's full draft (all customer/tax fields, comments, documents). Architectural detail withheld here per this program's own "not a security exploit manual" rule; the specific route and reproduction steps are not recorded in the Universe or ledger while this gap remains unfixed.
 - Stress Variant: N/A
 - Authorization Variant: This IS the authorization variant; mutation (Save, Submit) is now creator-only as of Batch 7's fix (migration `20260930050000_onboarding_draft_save_submit_creator_only.sql`, discovered while executing A-002/A-003's own authorization variants), but read access was deliberately left unchanged pending this journey's own product decision.
 - Concurrency Variant: N/A

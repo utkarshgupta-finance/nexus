@@ -1016,11 +1016,11 @@ add P-013 to Batch 7's scheduled count.
 - Priority: P2
 - Automation Feasibility: FULL
 - Personas: Maker A (creator), Maker B (non-creator, same customer.create permission)
-- Test Data / Record References: Confirmed via direct source reading of `src/app/forms/customer-onboarding/[requestId]/page.tsx` (AuthGate requires only the blanket `customer.create` permission, no ownership check) and `getOnboardingCase`'s own signature (no actor parameter at all)
+- Test Data / Record References: Confirmed via direct source reading of the onboarding case detail route's authorization check and the underlying read service's function signature (architectural detail withheld from this ledger per the mission's own "not a security exploit manual" rule; a specific route/reproduction is not recorded here since this gap is not yet fixed)
 - Starting State: Maker A has a draft case; Maker B holds customer.create but did not create it and is not a reviewer for it
-- Actions Executed: Read the actual route and service code path (not separately live-clicked through in the browser this batch, since the code itself unambiguously shows no ownership check exists to test around)
+- Actions Executed: Read the relevant route and service code path (not separately live-clicked through in the browser this batch, since the code itself unambiguously shows the gap without needing a live reproduction)
 - Expected Result: Undecided pending a product decision (see Universe entry); this journey exists to make the current, real behavior visible, not to assert a specific expected outcome
-- Actual Result: Confirmed: any holder of customer.create can view another maker's full draft (all customer/tax field values, comments, documents) purely by knowing or guessing its request_id. Mutation (Save, Submit) is now creator-only as of this batch's DEFECT-B7-002 fix; read access was deliberately left unchanged.
+- Actual Result: Confirmed at the architectural level: the onboarding case detail read path authorizes on the blanket `customer.create` permission only, with no check that the caller is the case's own creator, so read access to an in-progress draft is not currently scoped to its owner. Mutation (Save, Submit) is now creator-only as of this batch's DEFECT-B7-002 fix; read access was deliberately left unchanged pending a product decision (see Fix below).
 - Regular Result: PASS in the sense that the code path was confirmed and matches this description exactly
 - Stress Result: N/A
 - Authorization Result: This IS the authorization variant (see Actual Result)
