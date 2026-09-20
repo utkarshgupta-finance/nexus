@@ -211,7 +211,7 @@ Allowed Final Status values: PASS / FAILED THEN FIXED + PASS / BLOCKED / BLOCKED
 ## Batch 11 closure summary
 
 - Scheduled: 25 (C-034, C-035, D-001 through D-023)
-- PASS: 18 (C-034, C-035, D-001, D-002, D-005, D-006, D-007, D-008, D-009, D-010, D-011, D-012, D-013, D-014, D-016, D-018, D-020, D-019, D-023)
+- PASS: 19 (C-034, C-035, D-001, D-002, D-005, D-006, D-007, D-008, D-009, D-010, D-011, D-012, D-013, D-014, D-016, D-018, D-020, D-019, D-023)
 - PRODUCT GAP CONFIRMED: 2 groups covering 6 journeys (D-003/D-004/D-015/D-021, one shared finding: no governed deactivate path exists for Commercial Configuration; D-017, the orphaned-but-still-live legacy ungoverned RPC)
 - PRODUCT DECISION REQUIRED: 1 (D-022, recorded as PD-005, the most significant finding this batch: no per-customer data isolation exists anywhere in the current permission model, for any domain, not only Commercial Configuration)
 - No bounded defects found and fixed this batch; the two confirmed product gaps are both genuine absences of a capability (not broken implementations of an existing one) and the one product decision is a platform-wide architectural question, none of which this mission's rules authorize inventing a fix for autonomously.

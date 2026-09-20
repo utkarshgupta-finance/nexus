@@ -251,7 +251,7 @@ Allowed Final Status values: PASS / FAILED THEN FIXED + PASS / BLOCKED / BLOCKED
 ## Batch 13 closure summary
 
 - Scheduled: 25 (E-025 through E-028, F-001 through F-021)
-- PASS: 21 (E-025, E-026, E-027, E-028, F-001, F-002, F-003, F-004, F-005, F-006, F-007, F-008, F-009, F-010, F-011, F-012, F-013, F-015, F-016, F-017, F-018, F-019, F-021 — grouped combined entries counted once per distinct journey ID)
+- PASS: 23 (E-025, E-026, E-027, E-028, F-001, F-002, F-003, F-004, F-005, F-006, F-007, F-008, F-009, F-010, F-011, F-012, F-013, F-015, F-016, F-017, F-018, F-019, F-021 — grouped combined entries counted once per distinct journey ID)
 - PRODUCT GAP CONFIRMED: 2 (F-014, `pricing_rule_parameters` has zero DB-level numeric validation, a documented deliberate architectural deferral rather than a silent oversight; F-020, no support/debug surface exposes the raw `pricing_rule_kind` value)
 - No bounded defects found this batch; both gap findings are honest absences already either documented as deliberate (F-014) or of very low priority/impact (F-020, P3).
 - Real, live-verified finding worth calling out: F-014 empirically confirmed (not merely inferred from code) that a negative commercial rate can be persisted with zero backstop via a direct RPC call, bypassing the TypeScript service layer's `isPositive` check that normally runs immediately before every real approval.
