@@ -27,7 +27,10 @@ beforeEach(() => {
   insertDocumentMetadata.mockReset()
 })
 
-const validPdfBlob = new Blob(["fake pdf bytes"], { type: "application/pdf" })
+// Real PDF magic bytes ("%PDF-1.4..."), not arbitrary text: since the
+// service layer now sniffs actual content (Batch 8 A-023 fix), a fixture
+// claiming to be a PDF must actually start with the real signature.
+const validPdfBlob = new Blob([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34])], { type: "application/pdf" })
 
 describe("uploadOnboardingDocument (Platform Scale Closure, Phase R/U)", () => {
   it("rejects a disallowed file type before ever touching storage", async () => {
@@ -39,6 +42,23 @@ describe("uploadOnboardingDocument (Platform Scale Closure, Phase R/U)", () => {
         category: "tax",
         documentType: "gst_certificate",
         file: { name: "malware.exe", mimeType: "application/x-msdownload", size: 1000, bytes: new Blob(["x"]) },
+        actorUserId: "actor-1",
+      })
+    ).rejects.toBeInstanceOf(InvalidDocumentError)
+
+    expect(uploadDocumentBytes).not.toHaveBeenCalled()
+  })
+
+  it("rejects a file whose real bytes are not a genuine PDF/JPEG, even with an allowed name and claimed MIME type (Batch 8 A-023)", async () => {
+    const { uploadOnboardingDocument, InvalidDocumentError } = await import("./documents.service")
+    const pngBytesDisguisedAsPdf = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: "application/pdf" })
+
+    await expect(
+      uploadOnboardingDocument({
+        requestId: "r1",
+        category: "tax",
+        documentType: "gst_certificate",
+        file: { name: "disguised.pdf", mimeType: "application/pdf", size: 8, bytes: pngBytesDisguisedAsPdf },
         actorUserId: "actor-1",
       })
     ).rejects.toBeInstanceOf(InvalidDocumentError)

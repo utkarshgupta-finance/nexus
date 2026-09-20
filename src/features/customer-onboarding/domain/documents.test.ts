@@ -5,6 +5,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENT_SIZE_LABEL,
   validateAttachmentFile,
+  matchesAllowedAttachmentSignature,
   findPersistedDocument,
 } from "./documents"
 
@@ -90,6 +91,25 @@ describe("attachment validation", () => {
     const wrongType = validateAttachmentFile({ name: "certificate.docx", type: "application/msword", size: 10 }, "PAN Document")
     if (!oversized.valid) expect(oversized.reason).not.toContain("2 MB")
     if (!wrongType.valid) expect(wrongType.reason).not.toContain("2 MB")
+  })
+})
+
+describe("matchesAllowedAttachmentSignature (Batch 8 A-023: real content check, not just a claimed extension/MIME type)", () => {
+  it("accepts real PDF bytes", () => {
+    expect(matchesAllowedAttachmentSignature(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]))).toBe(true)
+  })
+
+  it("accepts real JPEG bytes", () => {
+    expect(matchesAllowedAttachmentSignature(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe(true)
+  })
+
+  it("rejects a PNG's real bytes even if the caller claims a .pdf extension and application/pdf type, closing the disguised-file gap", () => {
+    expect(matchesAllowedAttachmentSignature(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(false)
+  })
+
+  it("rejects arbitrary/empty bytes", () => {
+    expect(matchesAllowedAttachmentSignature(new Uint8Array([]))).toBe(false)
+    expect(matchesAllowedAttachmentSignature(new Uint8Array([0x00, 0x01, 0x02, 0x03]))).toBe(false)
   })
 })
 

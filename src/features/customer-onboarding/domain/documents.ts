@@ -38,6 +38,25 @@ function formatFileSize(bytes: number): string {
   return `${mb.toFixed(1)} MB`
 }
 
+const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46] // "%PDF"
+const JPEG_SIGNATURE = [0xff, 0xd8, 0xff]
+
+function startsWith(bytes: Uint8Array, signature: number[]): boolean {
+  return signature.every((byte, index) => bytes[index] === byte)
+}
+
+/**
+ * Real content check (server-side only: a browser `File`'s reported
+ * `type` and its filename extension are both just labels the client
+ * attached, never the file's actual bytes). Accepts the file if its
+ * first bytes match either allowed format's real signature, regardless
+ * of which one the name/type claimed, since a genuine PDF renamed to
+ * `.jpg` is not a security concern the way a disguised executable is.
+ */
+function matchesAllowedAttachmentSignature(firstBytes: Uint8Array): boolean {
+  return startsWith(firstBytes, PDF_SIGNATURE) || startsWith(firstBytes, JPEG_SIGNATURE)
+}
+
 /**
  * Validates a picked file against type and size rules, immediately (task
  * spec: never deferred to Submit). `documentLabel` is the human-readable
@@ -98,6 +117,7 @@ export {
   ALLOWED_ATTACHMENT_HELP_TEXT,
   formatFileSize,
   validateAttachmentFile,
+  matchesAllowedAttachmentSignature,
   findPersistedDocument,
 }
 export type { AttachmentValidationResult }

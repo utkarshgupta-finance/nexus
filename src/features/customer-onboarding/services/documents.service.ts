@@ -3,7 +3,7 @@ import "server-only"
 import * as documentsData from "../data/documents.data"
 import { toPersistedDocumentMetadata } from "../domain/document-mappers"
 import { buildStoragePath } from "../domain/document-paths"
-import { validateAttachmentFile } from "../domain/documents"
+import { validateAttachmentFile, matchesAllowedAttachmentSignature } from "../domain/documents"
 import { resolveActorLabels } from "@/platform/audit/server"
 import type { PersistedOnboardingDocumentMetadata, PersistedOnboardingDocumentView, OnboardingDocumentType } from "../domain/types"
 
@@ -51,12 +51,23 @@ type UploadOnboardingDocumentInput = {
  * upload UI already checks (../domain/documents.ts's `validateAttachmentFile`):
  * the UI check is a convenience for the honest user, never the enforcement
  * boundary, since a client can always call this Server Action directly
- * with a crafted request bypassing whatever the browser validated.
+ * with a crafted request bypassing whatever the browser validated. That
+ * metadata check alone only re-confirms the filename/reported MIME type,
+ * both just labels the caller attached; a disguised file (real bytes of
+ * a different, disallowed format, renamed with an allowed extension)
+ * would still pass it. This additionally reads the file's own first
+ * bytes and confirms they match a real PDF or JPEG signature, the one
+ * check only the server can perform, since it needs the actual bytes.
  */
 async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): Promise<PersistedOnboardingDocumentMetadata> {
   const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: input.file.size }, "This document")
   if (!validation.valid) {
     throw new InvalidDocumentError(validation.reason)
+  }
+
+  const firstBytes = new Uint8Array(await input.file.bytes.slice(0, 4).arrayBuffer())
+  if (!matchesAllowedAttachmentSignature(firstBytes)) {
+    throw new InvalidDocumentError(`'${input.file.name}' does not appear to be a genuine PDF or JPEG file. Allowed file types are PDF, JPG and JPEG.`)
   }
 
   const documentId = crypto.randomUUID()
