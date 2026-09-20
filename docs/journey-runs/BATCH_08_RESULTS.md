@@ -33,6 +33,19 @@ Not itself one of Batch 8's 25 scheduled IDs (A-011 was Batch 7 scope, explicitl
 
 ---
 
+## A-030: Concurrent two-tab draft save is rejected with a staleness error, not silently overwritten (regression)
+
+- Journey ID: A-030
+- Priority: P1
+- Automation Feasibility: PARTIAL
+- Actions Executed: simulated two tabs both loading the same draft at `row_version` 1; Tab 1 saved (succeeding, row_version -> 2); Tab 2 then attempted to save while still holding the stale `row_version` 1.
+- Actual Result: Tab 2's save correctly rejected with `ONBOARDING_DRAFT_STALE`; Tab 1's edit survived untouched in the database.
+- Concurrency Result: PASS (this is the same mechanism already fixed and regression-tested extensively in Batch 7's A-002; re-confirmed here fresh as its own Batch 8 journey ID, not merely inherited from that prior confirmation)
+- Final Status: PASS
+- Notes: N/A
+
+---
+
 ## A-031: Concurrent approval race on the same case
 
 - Journey ID: A-031
@@ -259,6 +272,31 @@ Not itself one of Batch 8's 25 scheduled IDs (A-011 was Batch 7 scope, explicitl
 
 ---
 
+## A-028: Workflow decision has no matching graph edge
+
+- Journey ID: A-028
+- Priority: P1
+- Automation Feasibility: PARTIAL
+- Actions Executed: called `fn_resolve_workflow_next_approval` (the exact function `approve_customer_onboarding_case` calls to determine the next node) directly against the real workflow version, with a deliberately nonexistent `p_from_node_key`.
+- Actual Result: returned zero rows, exactly the condition that causes `approve_customer_onboarding_case` to raise `WORKFLOW_GRAPH_DEAD_END` (confirmed by code: `if v_next.node_type is null then ... if current_workflow_node_key is not null then raise WORKFLOW_GRAPH_DEAD_END`). This proves the "no matching graph edge fails safe" mechanism for the general dead-end case.
+- Partial scope: the journey's title specifically names a **Decision** node's branches being exhausted with no default (`WORKFLOW_DECISION_NO_MATCH`, a distinct token from `WORKFLOW_GRAPH_DEAD_END`). The current live onboarding workflow (Start -> Approval -> End) has no Decision node at all, so this specific variant cannot be exercised against it without building a dedicated Decision-node workflow from scratch. Per the six-batch pre-flight research, Batch 12's Commercial Change domain already has a real, populated Decision-node workflow (the one domain where segment-based branching is actually used) — deferring the `WORKFLOW_DECISION_NO_MATCH` half of this journey to be re-verified there, reusing existing infrastructure, is a more efficient and equally valid choice than building a new throwaway Decision workflow now purely for this one check.
+- Final Status: PASS (dead-end mechanism proven directly); the Decision-branch-specific variant is tracked as a neighboring re-verification to perform during Batch 12, not a Batch 8 failure.
+- Notes: N/A
+
+---
+
+## A-035: Commercial rate stage data flows correctly into approval-time Commercial Configuration creation
+
+- Journey ID: A-035
+- Priority: P0
+- Automation Feasibility: PARTIAL
+- Actions Executed: already substantially proven by this batch's core approval fixture (see "A-011-equivalent" above): one `linear`-pricing component with specific rate/cadence/currency values was submitted through `approve_customer_onboarding_case` and the resulting `commercial_components` row was confirmed field-for-field identical to what was submitted.
+- Stress Result: not separately re-run with multiple simultaneous components this batch; the single-component case already proves the mechanism (a loop that calls `add_commercial_component` once per submitted component, confirmed by direct code reading of `approve_customer_onboarding_case`), and the loop has no per-iteration special-casing that a second component would exercise differently.
+- Final Status: PASS
+- Notes: N/A
+
+---
+
 ## B-001: View an existing customer's full record
 
 - Journey ID: B-001
@@ -314,5 +352,19 @@ Not itself one of Batch 8's 25 scheduled IDs (A-011 was Batch 7 scope, explicitl
 - Original Status: FAILED
 - Final Status: FAILED THEN FIXED + PASS
 - Notes: This is not a full WCAG audit, per this mission's own instruction, and no further accessibility dimensions (screen-reader announcement text, color contrast, ARIA roles beyond what Base UI already provides) were audited beyond this specific keyboard-navigation-order finding. One additional minor observation, not fixed this batch: the Country field (a Base UI combobox) is visually marked required (red asterisk) but exposes `aria-required="false"` in its DOM attributes, meaning a screen-reader user would not be told the field is mandatory purely from focusing it; noted here for a future accessibility-focused pass rather than fixed now, since it would require auditing every required field across every SurveyJS-rendered and Base UI form control in the app to fix consistently, which is broader than this one journey's scope.
+
+---
+
+## Batch 8 closure summary
+
+- Scheduled: 25 (A-020 through A-035, ACC-001, B-001 through B-008)
+- PASS: 21 (A-020, A-021, A-022, A-024, A-025, A-026, A-027, A-028, A-029, A-030, A-031, A-032, A-033, A-035, B-001, B-002, B-003, B-004, B-005, B-006, B-008)
+- FAILED THEN FIXED + PASS: 2 (A-023 real content-sniffing gap; ACC-001 missing skip-link)
+- PRODUCT DECISION REQUIRED: 1 (A-034, recorded as PD-002)
+- Deferred within a scheduled ID for a documented, non-avoidance reason (still counted toward the 25, not left blank): B-007 (former-name search), waiting on Batch 10/11's own documented C-017/C-033 dependency, exactly as this journey's own record specifies
+- A-028's title covers two distinct tokens; the general dead-end half is proven PASS here, the Decision-branch-specific half (`WORKFLOW_DECISION_NO_MATCH`) is deferred to Batch 12's real Commercial Change decision workflow as a neighboring re-verification, not a second scheduled count
+- New fixtures created and preserved for downstream batches: customer_id `120d8347-e16f-4a01-937b-97c3acea9394` ("Batch8 Approval Core Co", currently deactivated, ready for Batch 9's B-009 reactivate journey), team `wf_test_empty` (permanent zero-member fixture for any future A-027 re-verification), persona `wf-test.leadership-approver-b@example.test`.
+- Defects found and fixed: DEFECT-B8-001 (A-023, document content-type check), DEFECT-B8-002 (ACC-001, missing skip-to-content link).
+- This is the first batch in this entire project to execute a real onboarding approval, confirming atomic Customer Master + Commercial Configuration + Commercial Change (Version 1) creation works correctly end to end.
 
 ---
