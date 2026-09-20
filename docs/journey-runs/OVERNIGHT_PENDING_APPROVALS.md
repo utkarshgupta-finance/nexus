@@ -3,7 +3,7 @@
 Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnight autonomous run (Batches 8-13). Maintained continuously throughout the run. Never erase historical entries; update Status instead.
 
 **Pending approvals: 0**
-**Pending product decisions: 4** (A-036 carried over from Batch 7; PD-002/A-034 from Batch 8; PD-003/B-011 from Batch 9; PD-004/C-030 new this batch)
+**Pending product decisions: 5** (A-036 carried over from Batch 7; PD-002/A-034 from Batch 8; PD-003/B-011 from Batch 9; PD-004/C-030 from Batch 10; PD-005/D-022 new this batch)
 **Pending migrations: 1** (PM-001, found via B-017 in Batch 9)
 **Blocked downstream journeys: 0**
 
@@ -63,6 +63,19 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Downstream effect: does not block Batches 8-13; no fixture in this run relies on this exact narrow timing window outside the two deliberate tests that discovered it.
 - Status: **PENDING**
 
+### PD-005: D-022 — no per-customer data isolation exists anywhere in the current permission model
+
+- Journey ID: D-022
+- Current behavior: `commercial_configurations` (and, by the same established pattern confirmed across every domain investigated in this entire multi-batch project: Customer Master, Customer Change, Customer Onboarding) has no row-level security policy and no application-layer per-customer or per-team scoping code. The only authorization boundary is a single coarse permission per domain (e.g. `commercial_configuration.read`); any holder can read or act on any customer's record by id, with no further narrowing.
+- Business consequence: there is no way today to grant a user (e.g. a regional Finance Analyst) access limited to only their assigned customers/territory; the permission model is entirely all-or-nothing per domain.
+- Technical consequence: none currently broken; this is a missing capability, not a broken invariant. No RLS policy exists to retrofit narrowly; adding one would be a genuine new platform primitive (a customer/territory-scoping dimension threaded through every domain's authorization checks), not a bounded fix to one table.
+- Option A: introduce a real customer/territory-scoping dimension to the permission model (e.g. team-to-customer-segment assignment, enforced via RLS or an equivalent server-side filter), applied consistently across every domain, not just Commercial Configuration.
+- Option B: treat this as an accepted, deliberate simplicity tradeoff for the current stage of the product (every internal user with a given permission is trusted with all customers), revisited only if/when the business actually needs per-territory access control.
+- Recommended default: not offered; this is a foundational platform-architecture decision (whether multi-tenant/territory-scoped access control is a real near-term business requirement) well beyond what should be inferred from a single test journey.
+- Exact question for Utkarsh: does the business need per-customer or per-territory data isolation for any current or near-term role, or is the current all-or-nothing coarse permission model an accepted simplification for now?
+- Downstream effect: does not block Batches 8-13; no fixture in this run relies on customer-scoped access being enforced.
+- Status: **PENDING**
+
 ---
 
 ## Pending Approvals
@@ -93,3 +106,4 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Batch 8 closed: 24/25 resolved (21 PASS, 2 FAILED THEN FIXED + PASS, 1 PRODUCT DECISION REQUIRED/PD-002), B-007 correctly deferred to its own documented dependency.
 - Batch 9 closed: 25/25 resolved (22 PASS, 1 EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY, 1 PRODUCT DECISION REQUIRED/PD-003, 1 PRODUCT GAP CONFIRMED with a parked fix migration/PM-001). A real defect (B-017: `fn_protect_customer_lifecycle`'s UPDATE guard does not protect governed fields from a direct non-RPC write) was found, fixed as a migration, and parked (not applied) per this repo's established precedent for changes to this trigger. A real environment issue (the live `customer_change` workflow's Finance Approval node had zero eligible approvers) was found and fixed by adding a team membership via the sanctioned RPC. Full detail in BATCH_09_RESULTS.md.
 - Batch 10 closed: 25/25 scheduled journeys resolved (23 PASS, 1 PRODUCT DECISION REQUIRED/PD-004, 1 correctly deferred to Batch 12 which naturally has a Decision-node workflow). No new defects found. Two notable non-defect empirical findings: a request's `base_customer_row_version` is never refreshed by send-back/resubmit, so once stale it can only be recovered by recreating the request, never by resubmitting the same one; and `approve_customer_change_request` has no direct `is_active` check, masked in practice by two unrelated mechanisms (creation-time TS guard, deactivation's own row_version bump tripping the staleness guard), recorded as PD-004. Full detail in BATCH_10_RESULTS.md.
+- Batch 11 closed: 25/25 scheduled journeys resolved (18 PASS, 2 product-gap findings covering 6 journeys, 1 PRODUCT DECISION REQUIRED/PD-005). Confirmed no governed deactivate path exists anywhere for Commercial Configuration (affects D-003/D-004/D-015/D-021). Re-confirmed the previously-documented legacy `create_commercial_change_for_configuration` RPC is still live at the database layer but orphaned in the application layer (D-017). Most significant finding: no per-customer/per-territory data isolation exists anywhere in the current permission model, for any domain (D-022, PD-005), a platform-wide architectural question, not a bounded defect. Positive contrast: the Commercial Configuration domain's own lifecycle triggers correctly protect governed financial fields (FX rate, transaction currency, effective_to write-once) against direct-bypass writes, unlike the `customers` table's B-017 gap. Full detail in BATCH_11_RESULTS.md.
