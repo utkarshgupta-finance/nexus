@@ -1184,3 +1184,32 @@ Reasoning: all 25 Batch 7 journeys reached a terminal, honestly-recorded status.
 **Batch 8 is NOT executed as part of this session, per explicit instruction.**
 
 NEXUS END-TO-END BUSINESS JOURNEY VALIDATION BATCH 7 COMPLETE
+
+---
+
+## Addendum: DEFECT-B7-001 authoritative-boundary re-verification (pre-Batch-8, neighboring regression)
+
+Performed at explicit user request before starting Batch 8, per the mission's own instruction not to assume DEFECT-B7-001's closure without empirically re-testing the same class of direct invocation used to discover it. Not a scheduled Batch 7 or Batch 8 journey; does not change either batch's journey count.
+
+**Re-verification of DEFECT-B7-001's three required invariants**, executed fresh via the real application boundary (`submitOnboardingCase` in the TS service layer, the only path a real user's request can reach):
+1. Incomplete onboarding submission: REJECTED ("Customer Details is incomplete...")
+2. Duplicate GST hard-blocker submission: REJECTED ("This GST or PAN already belongs to an existing customer...")
+3. Valid complete onboarding submission: SUCCEEDED (status: submitted)
+
+All three PASS. DEFECT-B7-001 remains closed at the application boundary.
+
+**Direct-RPC-layer verification**: queried live `pg_proc.proacl` (not assumed from migration file text) and made real, unauthenticated HTTP calls to the PostgREST RPC endpoint using only the public anon key (no session, no service-role credential). `submit_customer_onboarding_case` and `save_customer_onboarding_draft` both returned `permission denied for function` (SQLSTATE 42501): confirmed unreachable by any real application user, only by a service-role (backend-only secret) credential, the same higher-trust-tier access already used all session to reproduce the original bug. For these two functions, the TS-layer fix is the genuine authoritative boundary.
+
+**New finding, DEFECT-B7-003** (discovered during this re-verification, not part of the original DEFECT-B7-001):
+- Severity: Critical (latent). `create_customer_onboarding_case`, `cancel_customer_onboarding_case`, `send_back_customer_onboarding_case`, and `approve_customer_onboarding_case` all still carried Postgres's default PUBLIC execute grant. Their original migrations revoked execute from `anon, authenticated` by name but never from `public`, and revoking a named role does not remove the separate grant every role implicitly inherits from PUBLIC. Live proof before the fix: an anonymous call to `create_customer_onboarding_case` returned 401, but with `permission denied for table form_definitions`, not `permission denied for function create_customer_onboarding_case` — the function itself began executing and only failed because an unrelated internal table happened to lack its own anon/authenticated grant. That was accidental protection, not intentional. `approve_customer_onboarding_case` was worse: its live signature has grown two extra parameters since the original revoke was authored, so that revoke silently targeted an overload that no longer exists; the live function had never been revoked from anon/authenticated or public at all.
+- Root cause: incomplete REVOKE statements at each function's original authoring (never named `public`), compounded for `approve_customer_onboarding_case` by a later signature change that created an effectively new, never-revoked function object.
+- Fix: migration `20260930060000_onboarding_rpc_revoke_public_execute.sql`, `revoke all ... from public, anon, authenticated` on all 4 functions using their exact current live signatures (verified via `pg_get_function_identity_arguments`, not assumed from old grant statements), applied to the shared Supabase database with explicit user authorization.
+- Regression: live re-verified post-fix via `pg_proc` privilege query (all 4 now `false` for anon/authenticated) and via real anonymous HTTP calls to all 4 (all 4 now return the correct `permission denied for function <name>`, SQLSTATE 42501). A service-role smoke test (create then cancel a case) confirmed legitimate application traffic is unaffected.
+- Commit: (see COMMITS addendum below)
+
+**Deferred, separately-scoped finding (not fixed this session)**: the same PUBLIC-execute-grant gap was found, by the same read-only privilege query, on 13 additional governed mutation RPCs across three domains not otherwise touched this batch: Customer Change, Commercial Configuration, and Go Live. Architectural detail (which specific functions) is intentionally withheld from this public ledger while the gap remains open, per this program's own "not a security exploit manual" rule. Flagged to the user directly in chat with full severity context; the user explicitly chose to fix only the 4 onboarding-domain functions now and defer the other 13 to a dedicated future security-hardening pass, since responsibly fixing them requires the same per-function live-signature and downstream-dependency verification just performed here, not a blind bulk revoke. This deferred item is a new, distinct, higher-priority finding than A-036 and should be prioritized in whatever batch or dedicated pass addresses it, ahead of routine journey execution.
+
+**Commits (addendum)**:
+- `20260930060000_onboarding_rpc_revoke_public_execute.sql` migration and this addendum, committed and pushed to `team-preview` after this report's original completion.
+
+**Batch 8 status: unchanged, still READY.** This addendum's fix is a database-privilege correction with no application code change, already regression-verified live; it does not block or alter Batch 8's scheduled scope (A-020 through A-035, ACC-001, B-001 through B-008). The deferred 13-function finding is a new, separate, higher-priority item for a future security-hardening pass, not a Batch 8 blocker, since Batch 8 does not depend on the Customer Change, Commercial Configuration, or Go Live RPC grants being corrected first.
