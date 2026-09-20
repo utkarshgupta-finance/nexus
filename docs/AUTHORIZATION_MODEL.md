@@ -626,3 +626,32 @@ gained `go_live.read/create/submit`; `checker` additively gained the full
 every mutation on the new tables is captured by the same `fn_audit_row`
 trigger and actor-identity snapshot as §21. Full business context in
 `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §6.5, §9.
+
+**`usage.read` and `entitlement_settlement.read` are real, independent
+read gates (Product Gap Closure, Batches 3-6, closing N-031).**
+`/customers/[customerKey]/entitlement/[stableComponentKey]` admits a
+session holding any one of `entitlement.read`, `usage.read`, or
+`entitlement_settlement.read` (`AuthGate`'s `requiredPermission` now
+accepts a list of alternatives, checked with "any of" semantics; every
+other call site still passes a single requirement and is unaffected).
+Within the page, each section checks the specific read permission it
+actually shows:
+
+- Commercial Context (line item identity, pricing model, currency):
+  always visible to anyone who reached the page; no financial quantity.
+- Entitlement Sources, Monthly Entitlement Schedule, Monthly Entitlement
+  Ledger: `entitlement.read` (the umbrella permission; unchanged from
+  before this split, so no existing `entitlement.read` holder loses any
+  visibility).
+- Monthly Usage: `entitlement.read` OR `usage.read`. `usage.read` alone
+  now genuinely grants visibility into usage data, closing the exact
+  gap N-031 found (previously it granted nothing).
+- Unbilled Ledger, Unearned Ledger: `entitlement.read` OR
+  `entitlement_settlement.read`, the same "alone now grants something
+  real" fix applied to settlement data.
+
+Write-side gating is unchanged: `entitlement.write`, `usage.write`,
+`usage.finalize`, `entitlement_settlement.write` continue to gate their
+own actions exactly as before; this closure only made the two
+previously-inert read permissions do something, it did not touch which
+permission a write requires.

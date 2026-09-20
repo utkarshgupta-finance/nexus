@@ -28,7 +28,8 @@ function AuthGate({
   children,
 }: {
   session: NexusSession
-  requiredPermission: { resource: string; action: string }
+  /** A single requirement, or a list of alternatives where holding any one of them is sufficient (e.g. a page that admits either a coarse or a finer-grained read permission). */
+  requiredPermission: { resource: string; action: string } | { resource: string; action: string }[]
   loginRedirectTo: string
   children: React.ReactNode
 }) {
@@ -66,12 +67,15 @@ function AuthGate({
     )
   }
 
-  if (!sessionHasPermission(session, requiredPermission.resource, requiredPermission.action)) {
+  const requirements = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]
+  const hasAccess = requirements.some((requirement) => sessionHasPermission(session, requirement.resource, requirement.action))
+  if (!hasAccess) {
+    const requirementLabel = requirements.map((requirement) => `${requirement.resource}.${requirement.action}`).join(" or ")
     return (
       <div className="flex flex-1 flex-col">
         <PageHeader
           title="Access restricted"
-          description={`You do not have permission to view this page (requires ${requiredPermission.resource}.${requiredPermission.action}). Contact your administrator.`}
+          description={`You do not have permission to view this page (requires ${requirementLabel}). Contact your administrator.`}
         />
       </div>
     )

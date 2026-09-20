@@ -28,6 +28,8 @@ import { EntitlementDetailPage } from "@/features/entitlement/ui/entitlement-det
 export const dynamic = "force-dynamic"
 
 const ENTITLEMENT_READ = { resource: "entitlement", action: "read" }
+const USAGE_READ = { resource: "usage", action: "read" }
+const ENTITLEMENT_SETTLEMENT_READ = { resource: "entitlement_settlement", action: "read" }
 
 export default async function EntitlementDetailRoute({ params }: { params: Promise<{ customerKey: string; stableComponentKey: string }> }) {
   const { customerKey, stableComponentKey } = await params
@@ -40,22 +42,42 @@ export default async function EntitlementDetailRoute({ params }: { params: Promi
   const lineItem = lineItems.find((item) => item.stableComponentKey === stableComponentKey)
   if (!lineItem) notFound()
 
-  const [sources, scheduleMonths, usageRows, ledgerRows, unbilledEntries, unearnedEntries, canWriteEntitlement, canWriteUsage, canFinalizeUsage, canSettle] =
-    await Promise.all([
-      listEntitlementSourcesForComponent(stableComponentKey),
-      listScheduleMonthsForComponent(stableComponentKey),
-      listMonthlyUsageForComponent(stableComponentKey),
-      listLedgerRowsForComponent(stableComponentKey),
-      listUnbilledEntriesForComponent(stableComponentKey),
-      listUnearnedEntriesForComponent(stableComponentKey),
-      hasPermission("entitlement", "write"),
-      hasPermission("usage", "write"),
-      hasPermission("usage", "finalize"),
-      hasPermission("entitlement_settlement", "write"),
-    ])
+  const [
+    sources,
+    scheduleMonths,
+    usageRows,
+    ledgerRows,
+    unbilledEntries,
+    unearnedEntries,
+    canReadEntitlement,
+    canReadUsage,
+    canReadSettlement,
+    canWriteEntitlement,
+    canWriteUsage,
+    canFinalizeUsage,
+    canSettle,
+  ] = await Promise.all([
+    listEntitlementSourcesForComponent(stableComponentKey),
+    listScheduleMonthsForComponent(stableComponentKey),
+    listMonthlyUsageForComponent(stableComponentKey),
+    listLedgerRowsForComponent(stableComponentKey),
+    listUnbilledEntriesForComponent(stableComponentKey),
+    listUnearnedEntriesForComponent(stableComponentKey),
+    hasPermission("entitlement", "read"),
+    hasPermission("usage", "read"),
+    hasPermission("entitlement_settlement", "read"),
+    hasPermission("entitlement", "write"),
+    hasPermission("usage", "write"),
+    hasPermission("usage", "finalize"),
+    hasPermission("entitlement_settlement", "write"),
+  ])
 
   return (
-    <AuthGate session={session} requiredPermission={ENTITLEMENT_READ} loginRedirectTo={`/customers/${customerKey}/entitlement/${stableComponentKey}`}>
+    <AuthGate
+      session={session}
+      requiredPermission={[ENTITLEMENT_READ, USAGE_READ, ENTITLEMENT_SETTLEMENT_READ]}
+      loginRedirectTo={`/customers/${customerKey}/entitlement/${stableComponentKey}`}
+    >
       <EntitlementDetailPage
         customerKey={customerKey}
         lineItem={lineItem}
@@ -65,6 +87,9 @@ export default async function EntitlementDetailRoute({ params }: { params: Promi
         ledgerRows={ledgerRows}
         unbilledEntries={unbilledEntries}
         unearnedEntries={unearnedEntries}
+        canViewEntitlement={canReadEntitlement}
+        canViewUsage={canReadEntitlement || canReadUsage}
+        canViewSettlement={canReadEntitlement || canReadSettlement}
         canWriteEntitlement={canWriteEntitlement}
         canWriteUsage={canWriteUsage}
         canFinalizeUsage={canFinalizeUsage}

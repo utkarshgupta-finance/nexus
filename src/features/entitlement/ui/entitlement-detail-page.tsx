@@ -464,6 +464,9 @@ function EntitlementDetailPage({
   ledgerRows,
   unbilledEntries,
   unearnedEntries,
+  canViewEntitlement,
+  canViewUsage,
+  canViewSettlement,
   canWriteEntitlement,
   canWriteUsage,
   canFinalizeUsage,
@@ -477,6 +480,12 @@ function EntitlementDetailPage({
   ledgerRows: MonthlyEntitlementLedgerRow[]
   unbilledEntries: UnbilledLedgerEntry[]
   unearnedEntries: UnearnedLedgerEntry[]
+  /** Entitlement Sources / Monthly Schedule / Ledger sections (entitlement.read; the umbrella permission, unchanged from before this permission split). */
+  canViewEntitlement: boolean
+  /** Monthly Usage section (entitlement.read OR usage.read; usage.read alone now genuinely grants this, not just entitlement.read as before). */
+  canViewUsage: boolean
+  /** Unbilled/Unearned Ledger sections (entitlement.read OR entitlement_settlement.read). */
+  canViewSettlement: boolean
   canWriteEntitlement: boolean
   canWriteUsage: boolean
   canFinalizeUsage: boolean
@@ -551,7 +560,7 @@ function EntitlementDetailPage({
           </dl>
         </section>
 
-        {lineItem.isRecurring ? (
+        {lineItem.isRecurring && canViewEntitlement ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Entitlement Sources</h2>
             <div className="overflow-x-auto rounded-md border">
@@ -615,7 +624,7 @@ function EntitlementDetailPage({
           </section>
         ) : null}
 
-        {lineItem.isRecurring && sortedScheduleMonths.length > 0 ? (
+        {lineItem.isRecurring && canViewEntitlement && sortedScheduleMonths.length > 0 ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Monthly Entitlement Schedule</h2>
             <div className="max-h-64 overflow-y-auto rounded-md border">
@@ -639,178 +648,186 @@ function EntitlementDetailPage({
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Monthly Usage</h2>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Month</TableHead>
-                  <TableHead>Metric</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedUsageRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                      No usage submitted yet.
-                    </TableCell>
+        {canViewUsage ? (
+          <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Monthly Usage</h2>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Month</TableHead>
+                    <TableHead>Metric</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ) : (
-                  sortedUsageRows.map((usage) => (
-                    <TableRow key={usage.id}>
-                      <TableCell>{formatMonthKey(usage.usageMonth)}</TableCell>
-                      <TableCell className="text-muted-foreground">{usage.metric}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{usage.quantity}</TableCell>
-                      <TableCell>
-                        <Badge variant="ghost">{usage.status === "final" ? "Final" : "Draft"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {usage.status === "draft" && usage.isCurrent && canFinalizeUsage ? (
-                          <PendingButton
-                            size="sm"
-                            variant="outline"
-                            pending={finalizingId === usage.id}
-                            pendingLabel="Finalizing..."
-                            onClick={() => handleFinalizeUsage(usage.id)}
-                          >
-                            Finalize
-                          </PendingButton>
-                        ) : null}
+                </TableHeader>
+                <TableBody>
+                  {sortedUsageRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-xs text-muted-foreground">
+                        No usage submitted yet.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          {canWriteUsage ? <SubmitUsageForm lineItem={lineItem} onSubmitted={refresh} /> : null}
-        </section>
+                  ) : (
+                    sortedUsageRows.map((usage) => (
+                      <TableRow key={usage.id}>
+                        <TableCell>{formatMonthKey(usage.usageMonth)}</TableCell>
+                        <TableCell className="text-muted-foreground">{usage.metric}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{usage.quantity}</TableCell>
+                        <TableCell>
+                          <Badge variant="ghost">{usage.status === "final" ? "Final" : "Draft"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {usage.status === "draft" && usage.isCurrent && canFinalizeUsage ? (
+                            <PendingButton
+                              size="sm"
+                              variant="outline"
+                              pending={finalizingId === usage.id}
+                              pendingLabel="Finalizing..."
+                              onClick={() => handleFinalizeUsage(usage.id)}
+                            >
+                              Finalize
+                            </PendingButton>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            {canWriteUsage ? <SubmitUsageForm lineItem={lineItem} onSubmitted={refresh} /> : null}
+          </section>
+        ) : null}
 
-        <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Monthly Entitlement Ledger</h2>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Month</TableHead>
-                  <TableHead className="text-right">Entitlement</TableHead>
-                  <TableHead className="text-right">Usage</TableHead>
-                  <TableHead className="text-right">MUG</TableHead>
-                  <TableHead className="text-right">Consumption</TableHead>
-                  <TableHead className="text-right">Unbilled</TableHead>
-                  <TableHead className="text-right">Unearned</TableHead>
-                  <TableHead>Recognition</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedLedgerRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-xs text-muted-foreground">
-                      No ledger entries yet.
-                    </TableCell>
+        {canViewEntitlement ? (
+          <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Monthly Entitlement Ledger</h2>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Entitlement</TableHead>
+                    <TableHead className="text-right">Usage</TableHead>
+                    <TableHead className="text-right">MUG</TableHead>
+                    <TableHead className="text-right">Consumption</TableHead>
+                    <TableHead className="text-right">Unbilled</TableHead>
+                    <TableHead className="text-right">Unearned</TableHead>
+                    <TableHead>Recognition</TableHead>
                   </TableRow>
-                ) : (
-                  sortedLedgerRows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{formatMonthKey(row.month)}</TableCell>
-                      <TableCell className="text-right">{row.monthlyEntitlementQuantity}</TableCell>
-                      <TableCell className="text-right">{row.actualUsageQuantity}</TableCell>
-                      <TableCell className="text-right">{row.mugQuantity ?? "-"}</TableCell>
-                      <TableCell className="text-right">{row.consumptionQuantity}</TableCell>
-                      <TableCell className="text-right">{row.unbilledQuantity}</TableCell>
-                      <TableCell className="text-right">{row.unearnedQuantity}</TableCell>
-                      <TableCell className="text-muted-foreground">{RECOGNITION_STATUS_LABEL[row.recognitionStatus]}</TableCell>
+                </TableHeader>
+                <TableBody>
+                  {sortedLedgerRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-xs text-muted-foreground">
+                        No ledger entries yet.
+                      </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
+                  ) : (
+                    sortedLedgerRows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>{formatMonthKey(row.month)}</TableCell>
+                        <TableCell className="text-right">{row.monthlyEntitlementQuantity}</TableCell>
+                        <TableCell className="text-right">{row.actualUsageQuantity}</TableCell>
+                        <TableCell className="text-right">{row.mugQuantity ?? "-"}</TableCell>
+                        <TableCell className="text-right">{row.consumptionQuantity}</TableCell>
+                        <TableCell className="text-right">{row.unbilledQuantity}</TableCell>
+                        <TableCell className="text-right">{row.unearnedQuantity}</TableCell>
+                        <TableCell className="text-muted-foreground">{RECOGNITION_STATUS_LABEL[row.recognitionStatus]}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Unbilled Ledger</h2>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Month</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unbilledEntries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                      No open Unbilled quantity.
-                    </TableCell>
+        {canViewSettlement ? (
+          <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Unbilled Ledger</h2>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ) : (
-                  unbilledEntries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{formatMonthKey(entry.month)}</TableCell>
-                      <TableCell className="text-right">{entry.unbilledQuantity}</TableCell>
-                      <TableCell>
-                        <Badge variant="ghost">{LEDGER_ENTRY_STATUS_LABEL[entry.status]}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {entry.status !== "SETTLED" && canSettle ? (
-                          <SettleEntryForm ledgerEntryType="unbilled" entryId={entry.id} onSettled={refresh} />
-                        ) : null}
+                </TableHeader>
+                <TableBody>
+                  {unbilledEntries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-xs text-muted-foreground">
+                        No open Unbilled quantity.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
+                  ) : (
+                    unbilledEntries.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{formatMonthKey(entry.month)}</TableCell>
+                        <TableCell className="text-right">{entry.unbilledQuantity}</TableCell>
+                        <TableCell>
+                          <Badge variant="ghost">{LEDGER_ENTRY_STATUS_LABEL[entry.status]}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {entry.status !== "SETTLED" && canSettle ? (
+                            <SettleEntryForm ledgerEntryType="unbilled" entryId={entry.id} onSettled={refresh} />
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Unearned Ledger</h2>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Month</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unearnedEntries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                      No open Unearned quantity.
-                    </TableCell>
+        {canViewSettlement ? (
+          <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
+            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Unearned Ledger</h2>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ) : (
-                  unearnedEntries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{formatMonthKey(entry.month)}</TableCell>
-                      <TableCell className="text-right">{entry.unearnedQuantity}</TableCell>
-                      <TableCell>
-                        <Badge variant="ghost">{LEDGER_ENTRY_STATUS_LABEL[entry.status]}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {entry.status !== "SETTLED" && canSettle ? (
-                          <SettleEntryForm ledgerEntryType="unearned" entryId={entry.id} onSettled={refresh} />
-                        ) : null}
+                </TableHeader>
+                <TableBody>
+                  {unearnedEntries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-xs text-muted-foreground">
+                        No open Unearned quantity.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
+                  ) : (
+                    unearnedEntries.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{formatMonthKey(entry.month)}</TableCell>
+                        <TableCell className="text-right">{entry.unearnedQuantity}</TableCell>
+                        <TableCell>
+                          <Badge variant="ghost">{LEDGER_ENTRY_STATUS_LABEL[entry.status]}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {entry.status !== "SETTLED" && canSettle ? (
+                            <SettleEntryForm ledgerEntryType="unearned" entryId={entry.id} onSettled={refresh} />
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+        ) : null}
       </div>
     </div>
   )
