@@ -3,8 +3,8 @@
 Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnight autonomous run (Batches 8-13). Maintained continuously throughout the run. Never erase historical entries; update Status instead.
 
 **Pending approvals: 0**
-**Pending product decisions: 3** (A-036 carried over from Batch 7; PD-002/A-034 from Batch 8; PD-003/B-011 new this batch)
-**Pending migrations: 1** (PM-001, found via B-017 this batch)
+**Pending product decisions: 4** (A-036 carried over from Batch 7; PD-002/A-034 from Batch 8; PD-003/B-011 from Batch 9; PD-004/C-030 new this batch)
+**Pending migrations: 1** (PM-001, found via B-017 in Batch 9)
 **Blocked downstream journeys: 0**
 
 ---
@@ -50,6 +50,19 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Downstream effect: does not block Batches 8-13; no fixture in this run relies on creating a version against a deactivated customer outside this one deliberate test.
 - Status: **PENDING**
 
+### PD-004: C-030 — approve_customer_change_request has no direct is_active check
+
+- Journey ID: C-030
+- Current behavior: `approve_customer_change_request` never checks whether the underlying customer is currently active. In the realistic UI-driven scenario, this is masked because (a) creating a NEW request against an inactive customer is blocked at the TS action layer (B-010), and (b) `set_customer_active` itself advances `customers.row_version`, which incidentally trips the unrelated base-staleness guard (`CUSTOMER_CHANGE_STALE_BASE`) for any request already in flight when a deactivation happens. Live-verified directly: a request created, submitted, and approved entirely while the customer was already inactive throughout (no staleness interference) completed successfully with no error, genuinely mutating the inactive customer's governed fields.
+- Business consequence: an already-submitted, in-flight Customer Change Request could, in a narrow but real timing window, still be fully approved and applied against a customer that has since become inactive, with no system-level guardrail against this specific scenario.
+- Technical consequence: none currently broken elsewhere; this is a missing precondition check, not a broken invariant.
+- Option A: add an explicit `is_active` check to `approve_customer_change_request` (and its onboarding/commercial-change equivalents, for consistency), rejecting approval of any change against a currently-inactive customer regardless of when it was created.
+- Option B: leave as-is; an in-flight request completing even after deactivation may be an intentional allowance (e.g. finishing paperwork already underway before a customer was deactivated), especially since deactivation itself is meant to stop new business, not necessarily invalidate decisions already substantially underway.
+- Recommended default: not offered; this depends on the actual business intent behind deactivation (is it a hard freeze on all customer state changes, or only on new relationship activity), which is not something to infer.
+- Exact question for Utkarsh: should Customer Change (and the equivalent Commercial Change/Version) approval be blocked outright once the underlying customer is inactive, regardless of when the request was created or submitted, or is completing an already-in-flight request after deactivation an intentional allowance?
+- Downstream effect: does not block Batches 8-13; no fixture in this run relies on this exact narrow timing window outside the two deliberate tests that discovered it.
+- Status: **PENDING**
+
 ---
 
 ## Pending Approvals
@@ -79,3 +92,4 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Batch 8 in progress: real onboarding approval executed for the first time (A-031/A-032 PASS), a real content-sniffing defect found and fixed (A-023, DEFECT-B8-001, see BATCH_08_RESULTS.md), A-020/A-021/A-022/A-024/A-025/A-026/A-027/A-029/A-033/B-001/B-002 through B-006/B-008 all PASS. Still open within Batch 8 at this point: A-028 (needs a dedicated broken-graph workflow, deferred to avoid the time cost of building one via the Builder UI mid-cycle), A-035's multi-component stress variant (single-component case already proves the core mechanism), ACC-001 (needs real keyboard-only browser interaction, not yet performed), B-007 (depends on a Customer Change rename that has not happened yet, correctly deferred per its own documented dependency on C-017/C-033).
 - Batch 8 closed: 24/25 resolved (21 PASS, 2 FAILED THEN FIXED + PASS, 1 PRODUCT DECISION REQUIRED/PD-002), B-007 correctly deferred to its own documented dependency.
 - Batch 9 closed: 25/25 resolved (22 PASS, 1 EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY, 1 PRODUCT DECISION REQUIRED/PD-003, 1 PRODUCT GAP CONFIRMED with a parked fix migration/PM-001). A real defect (B-017: `fn_protect_customer_lifecycle`'s UPDATE guard does not protect governed fields from a direct non-RPC write) was found, fixed as a migration, and parked (not applied) per this repo's established precedent for changes to this trigger. A real environment issue (the live `customer_change` workflow's Finance Approval node had zero eligible approvers) was found and fixed by adding a team membership via the sanctioned RPC. Full detail in BATCH_09_RESULTS.md.
+- Batch 10 closed: 25/25 scheduled journeys resolved (23 PASS, 1 PRODUCT DECISION REQUIRED/PD-004, 1 correctly deferred to Batch 12 which naturally has a Decision-node workflow). No new defects found. Two notable non-defect empirical findings: a request's `base_customer_row_version` is never refreshed by send-back/resubmit, so once stale it can only be recovered by recreating the request, never by resubmitting the same one; and `approve_customer_change_request` has no direct `is_active` check, masked in practice by two unrelated mechanisms (creation-time TS guard, deactivation's own row_version bump tripping the staleness guard), recorded as PD-004. Full detail in BATCH_10_RESULTS.md.
