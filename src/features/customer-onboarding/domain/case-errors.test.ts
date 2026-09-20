@@ -26,4 +26,24 @@ describe("parseCaseError", () => {
     const parsed = parseCaseError({ message: "SOME_FUTURE_TOKEN_NOT_YET_MAPPED: detail" })
     expect(parsed.kind).toBe("unknown")
   })
+
+  it("maps ONBOARDING_DRAFT_SAVE_NOT_OWNER to its own kind (Batch 7 A-002 authorization variant fix)", () => {
+    const parsed = parseCaseError({
+      message: "ONBOARDING_DRAFT_SAVE_NOT_OWNER: only the creator of case req-1 may edit this draft",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("onboarding_draft_save_not_owner")
+    expect(parsed.message).toBe("only the creator of case req-1 may edit this draft")
+  })
+
+  it("maps ONBOARDING_CASE_SUBMIT_NOT_OWNER to its own kind (Batch 7 A-003 authorization variant fix)", () => {
+    const parsed = parseCaseError({
+      message: "ONBOARDING_CASE_SUBMIT_NOT_OWNER: only the creator of case req-1 may submit it",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("onboarding_case_submit_not_owner")
+    expect(parsed.message).toBe("only the creator of case req-1 may submit it")
+  })
 })

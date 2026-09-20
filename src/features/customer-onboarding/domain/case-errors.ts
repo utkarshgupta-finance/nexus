@@ -16,6 +16,8 @@ type CaseErrorKind =
   | "onboarding_case_not_approvable"
   | "onboarding_case_not_cancellable"
   | "onboarding_case_cancel_not_owner"
+  | "onboarding_draft_save_not_owner"
+  | "onboarding_case_submit_not_owner"
   | "onboarding_case_self_approval_not_allowed"
   | "onboarding_no_draft_revision"
   | "onboarding_no_submitted_revision"
@@ -47,6 +49,8 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   ONBOARDING_SEND_BACK_REASON_REQUIRED: "onboarding_send_back_reason_required",
   ONBOARDING_CASE_NOT_CANCELLABLE: "onboarding_case_not_cancellable",
   ONBOARDING_CASE_CANCEL_NOT_OWNER: "onboarding_case_cancel_not_owner",
+  ONBOARDING_DRAFT_SAVE_NOT_OWNER: "onboarding_draft_save_not_owner",
+  ONBOARDING_CASE_SUBMIT_NOT_OWNER: "onboarding_case_submit_not_owner",
   SELF_APPROVAL_NOT_ALLOWED: "onboarding_case_self_approval_not_allowed",
   WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
