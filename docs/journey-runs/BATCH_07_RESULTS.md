@@ -1043,3 +1043,144 @@ add P-013 to Batch 7's scheduled count.
 - Notes: New journey ID assigned in Pack A (`docs/NEXUS_JOURNEY_UNIVERSE.md`); Coverage Matrix and Execution Plan not separately updated for this single addition beyond the Coverage Matrix's mechanical count regeneration, since the Execution Plan's batch assignments are not affected by a single P2 addition scheduled for a future batch's authorization sweep. Recorded here, not fixed, per this mission's own "classify without inventing policy" instruction for gaps requiring a business decision.
 
 ---
+
+# NEXUS END-TO-END BUSINESS JOURNEY VALIDATION BATCH 7 REPORT
+
+## Summary
+
+- Scheduled journeys: 25 (P-018 through P-023, A-001 through A-019), all present exactly once in this ledger.
+- PASS: 19 (P-018, P-019, P-020, P-021, P-022, P-023, A-001, A-003, A-007, A-008, A-009, A-010, A-012, A-014, A-015, A-016, A-017, A-018, A-019)
+- FAILED THEN FIXED + PASS: 4 (A-002, A-004, A-005, A-006)
+- BLOCKED (deliberately not executed, in-scope decision, not a tooling failure): 1 (A-011)
+- EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY (stale journey premise, current behavior is correct): 1 (A-013)
+- PRODUCT GAP CONFIRMED: 0 among the scheduled 25 (A-036, the one PRODUCT GAP CONFIRMED result this batch, is a new journey, not one of the 25)
+- Non-scheduled work also recorded: P-013 neighbor regression (no defect, evidence only, not counted), A-036 new journey (PRODUCT GAP CONFIRMED, not counted)
+- Real product defects found and fixed: 2 (DEFECT-B7-001, DEFECT-B7-002)
+- Real product gaps found and deliberately left open pending a product decision: 1 (the read-visibility half of DEFECT-B7-002, tracked as A-036)
+
+## Per-journey dimension coverage
+
+| Journey | Regular | Stress | Auth | Concurrency | Idempotency | Audit | Recovery | UX | Historical | Final Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| P-018 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| P-019 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| P-020 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| P-021 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | PASS | PASS |
+| P-022 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| P-023 | N/A | N/A | N/A | PASS | N/A | PASS | N/A | PASS | N/A | PASS |
+| A-001 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| A-002 | PASS | N/A | FAILED→PASS | PASS | N/A | PASS | N/A | N/A | N/A | FAILED THEN FIXED + PASS |
+| A-003 | PASS | N/A | PASS | N/A | PASS | PASS | N/A | N/A | N/A | PASS |
+| A-004 | FAILED→PASS | PASS | N/A | N/A | N/A | FAILED→PASS | PASS | PASS | N/A | FAILED THEN FIXED + PASS |
+| A-005 | FAILED→PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | N/A | FAILED THEN FIXED + PASS |
+| A-006 | FAILED→PASS | PASS | N/A | N/A | N/A | PASS | N/A | PASS | N/A | FAILED THEN FIXED + PASS |
+| A-007 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | N/A | PASS |
+| A-008 | PASS | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | PASS |
+| A-009 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| A-010 | PASS | PASS | N/A | N/A | N/A | PASS | N/A | N/A | PASS | PASS |
+| A-011 | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | BLOCKED (deliberate) |
+| A-012 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | PASS | N/A | PASS |
+| A-013 | N/A | N/A | N/A | N/A | N/A | PASS | PASS | N/A | N/A | EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY |
+| A-014 | PASS | N/A | PASS | N/A | N/A | PASS | N/A | N/A | PASS | PASS |
+| A-015 | N/A | N/A | N/A | N/A | PASS | PASS | N/A | PASS | N/A | PASS |
+| A-016 | N/A | N/A | N/A | N/A | PASS | PASS | N/A | PASS | N/A | PASS |
+| A-017 | N/A | N/A | N/A | N/A | PASS | PASS | N/A | PASS | N/A | PASS |
+| A-018 | PASS | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
+| A-019 | N/A | N/A | PASS | N/A | PASS | PASS | N/A | PASS | N/A | PASS |
+
+(Non-scheduled, recorded for completeness: P-013 neighbor regression, no defect; A-036, PRODUCT GAP CONFIRMED.)
+
+## Defects
+
+**DEFECT-B7-001**
+- Journeys: A-004 (discovery), A-003/A-005/A-006/A-009/A-010 (neighboring confirmation)
+- Severity: Critical (P0). Any authenticated `customer.create` holder calling the real backend directly could create a `submitted` onboarding case with zero data, or with a GST/PAN that exactly duplicates an already-approved customer, entirely bypassing the browser's own field-completeness and duplicate-detection checks.
+- Observed: `submit_customer_onboarding_case` only checked case status (`draft`/`sent_back`) and draft-revision existence. An empty draft was reproduced live: submitted successfully, workflow node advanced.
+- Expected: Server-side field completeness and hard-duplicate checks, matching the browser client's own validation, enforced at the real authoritative boundary.
+- Root cause: All such validation existed exclusively in `customer-onboarding-page.tsx`'s `handleSubmit`, never in the RPC or any server-side service layer.
+- Fix: `validateOnboardingCaseReadyForSubmit` added to `src/features/customer-onboarding/services/case.service.ts`, called from `submitOnboardingCase` before the RPC whenever the current revision is a draft. Reuses existing, already-tested pure functions; scoped to Customer Details, Tax & Registration fields/documents, and GST/PAN hard duplicates.
+- Regression: `case.service.test.ts` (new, 6 tests).
+- Rerun: A-003 (happy path, PASS), A-004 (blocked, PASS), A-005/A-006 (hard duplicates blocked, PASS), A-007/A-008 (soft warnings still non-blocking, PASS), A-009/A-010 (send-back/resubmit re-validates, PASS, including a fresh-duplicate-on-resubmit stress case).
+- Commit: 552d301
+
+**DEFECT-B7-002**
+- Journeys: A-002 (discovery, Authorization Variant), A-003 (same root cause on Submit), A-036 (sibling read-access gap, deliberately not fixed)
+- Severity: High (write half, now fixed) / Medium (read half, A-036, open). Any `customer.create` holder, not only the case's own creator, could edit and submit another maker's in-progress draft merely by knowing its request_id.
+- Observed: `saveOnboardingDraftAction` and `submitOnboardingCaseAction` (and the underlying RPCs) checked only the blanket `customer.create` permission, with no `created_by` comparison, unlike `cancel_customer_onboarding_case`, which already had the correct check.
+- Expected: Only the case's own creator may edit or submit their draft (A-002/A-003's own explicitly scheduled Authorization Variants).
+- Root cause: Save and Submit were never given the same ownership check Cancel already had.
+- Fix: Migration `20260930050000_onboarding_draft_save_submit_creator_only.sql` adds a `created_by` check to `save_customer_onboarding_draft` (`ONBOARDING_DRAFT_SAVE_NOT_OWNER`) and `submit_customer_onboarding_case` (`ONBOARDING_CASE_SUBMIT_NOT_OWNER`), applied to the shared Supabase database with explicit user authorization. Applied at the RPC layer itself, not only the TypeScript service layer, so it holds even against a direct RPC caller.
+- Regression: `case-errors.test.ts` (2 new tests mapping the new tokens).
+- Rerun: Live-verified post-fix: non-creator save/submit rejected; legitimate creator's own save/submit unaffected; A-018/A-019 (cancel ownership, pre-existing, unmodified) confirmed unaffected.
+- Commit: 5e3e495
+- Open remainder: read access to another maker's draft (viewing, not mutating) was deliberately left unfixed pending a product decision, tracked as new journey A-036 (Category F, PRODUCT GAP CONFIRMED, not a bounded defect).
+
+## Product gaps
+
+- **A-036 (new journey)**: Read access to an in-progress onboarding draft is scoped only to the blanket `customer.create` permission, not to the case's own creator. Unlike Save/Submit, there is no established precedent in this codebase for whether draft reads should be creator-scoped, and narrowing it without a product decision risks breaking an undocumented legitimate collaboration path if one exists. Recommended for a future batch's authorization sweep. Full architectural detail is intentionally withheld from this ledger and the Universe document while this gap remains open, per the public-repository "not an exploit manual" rule; it is disclosed to you now in this response and was disclosed via the applied-fix chat exchange for its Save/Submit sibling, but the written record stays at the architectural level until the gap is closed.
+
+## New journeys
+
+- **A-036**: Viewing another maker's draft onboarding case by request_id. Assigned in Pack A, Priority P2, Automation Feasibility FULL. Added to `docs/NEXUS_JOURNEY_UNIVERSE.md` (Pack A, after A-035) and reflected in `docs/NEXUS_JOURNEY_COVERAGE_MATRIX.md`'s mechanically-regenerated counts (Pack A: 35→36 total, Regular +1, Authorization +1, Audit +1; overall Total 783→784). Not added to `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`'s batch assignments, since a single P2 addition does not require rebalancing existing batch scope; scheduled informally for whichever future batch runs the next authorization sweep.
+
+## Reference Master closure (P-018 through P-023)
+
+All six PASS. P-013's server-enforcement boundary (closed in the prior Product Gap Closure segment) was independently re-verified as a neighboring regression, not one of the 25 scheduled journeys: Level 3 existing values remain readable, Level 3 new-value creation remains rejected with `REFERENCE_LIST_SYSTEM_SUPPORTED`, and Level 1 lists remain fully addable. No regression found.
+
+## Customer Onboarding state (explicit confirmations)
+
+- Was any Customer Master record created during Batch 7? **NO.** Confirmed: A-011 was deliberately not executed; every case created this batch remained in draft, submitted, resubmitted, sent_back, or cancelled status; no `customers` table row was inserted by any Batch 7 action. The two pre-existing approved fixtures used as duplicate-detection targets (Test SQL Smoke Co, Test Customer 1) were read-only references from earlier batches, never mutated.
+- Onboarding drafts created this batch: approximately 20 test cases across all A-series scripts (all prefixed or clearly identifiable as Batch 7 fictional test data, e.g. "Batch7 A003 HappyPath Co", "Batch7 A009 SendBack Co"), left in a mix of submitted/resubmitted/sent_back/cancelled/draft states as appropriate to each journey; none approved.
+- Workflow bindings verified: every case created this batch bound once, at creation, to the current published customer_onboarding workflow version (`b2b250c3-...`); the fixture-verification correction (Leadership Approval / WF-TEST Leadership, not Finance Approval / WF-TEST Finance) was made before any A-series journey execution and is documented in this ledger's Fixture verification section.
+- Duplicates tested: GST hard block (A-005), PAN hard block (A-006), combined GST+PAN hard block (A-006 stress), legal name soft non-block (A-007), brand name soft non-block (A-008), all against real pre-existing approved fixtures from earlier batches, never against a customer created by Batch 7 itself.
+- Stage validation verified: server-side Customer Details and Tax & Registration completeness (A-004), full happy path (A-003), send-back/resubmit re-validation including a fresh-duplicate stress case (A-009/A-010), all through the real TypeScript service layer boundary, not only the RPC.
+- Self-approval, illegal state transitions, and cancel ownership all confirmed server-enforced (A-012, A-015 through A-019).
+
+## Persistent ledger
+
+`docs/journey-runs/BATCH_07_RESULTS.md` (this file) contains all 25 scheduled journeys exactly once, the P-013 neighbor regression, the new A-036 journey, and this final report. Committed across four commits (see COMMITS below).
+
+## Tests
+
+- `npx tsc --noEmit`: clean (only pre-existing type errors in a since-deleted throwaway script, not committed).
+- `npx vitest run`: 922/922 tests passing (102 test files), including 6 new tests in `case.service.test.ts` and 2 new tests in `case-errors.test.ts`.
+- `npx eslint .`: clean.
+- `npm run build`: succeeded (dynamic-route warnings for cookie-based auth routes are expected, not errors).
+- `npm audit`: 0 vulnerabilities.
+
+## Commits
+
+- `552d301` Add server-side submit validation for Customer Onboarding cases (DEFECT-B7-001 fix)
+- `5e3e495` Enforce creator-only Save and Submit on Customer Onboarding drafts (DEFECT-B7-002 fix, includes migration `20260930050000_onboarding_draft_save_submit_creator_only.sql`)
+- `0dd2e6c` Batch 7 journey validation ledger, Universe/Coverage Matrix/Execution Plan reconciliation
+- `b1c220b` Redact A-036's exploit mechanic to an architectural-level description
+
+## Deployment
+
+- Local HEAD: `b1c220b5ce25e476071cd4e670261c043e7962a7`
+- `origin/team-preview`: `b1c220b5ce25e476071cd4e670261c043e7962a7` (matches)
+- Vercel Preview deployment `dpl_F7nGe8B5YFPX8Ay3zku1PiFjLzyG`: READY, `githubCommitSha` = `b1c220b5ce25e476071cd4e670261c043e7962a7` (matches), branch alias `nexus-git-team-preview-utkarshgupta-finance.vercel.app` updated, `target: null` (Preview, not Production)
+- `origin/main` (Production): `04aba7a`, confirmed NOT an ancestor relationship with this batch's commits; Production untouched
+- Migration `20260930050000_onboarding_draft_save_submit_creator_only.sql` applied to the shared Supabase database with explicit user authorization; `npx supabase migration list --linked` confirmed local/remote parity afterward
+
+## Batch 7 exit criteria
+
+- [x] Ledger exists with all 25 scheduled IDs present exactly once
+- [x] Every journey has both Original Status and Final Status
+- [x] Every failure preserved historically (A-002, A-004, A-005, A-006 retain Original Status: FAILED)
+- [x] Every fix links to defect/fix/regression evidence (DEFECT-B7-001, DEFECT-B7-002)
+- [x] New journeys recorded separately (A-036), not mixed into the 25-count
+- [x] Ledger committed
+- [x] Checkpoint suite passed (tsc/vitest/eslint/build/audit)
+- [x] Secret scan and hygiene checks passed (no `.env.local`/`.runtime-tests`/`.claude/launch.json` changes, no secrets in diff)
+- [x] Pushed to `team-preview` only; deployment parity confirmed; Production untouched
+
+## Next batch
+
+**Batch 8 READY.**
+
+Reasoning: all 25 Batch 7 journeys reached a terminal, honestly-recorded status. The one BLOCKED journey (A-011) is a deliberate in-scope decision, not an unresolved defect or environment failure, and Batch 8's own scheduled scope (per the Execution Plan) is exactly A-020 through A-035, ACC-001, B-001 through B-008, which includes the full execution of A-011 itself. Both defects found this batch are fixed, regression-tested, and deployed. The one open product gap (A-036) is explicitly scoped as a future authorization-sweep item, not a blocker for Batch 8's own content, since Batch 8 does not depend on onboarding draft read-visibility being resolved first. Batch 8 will be the first batch to execute a real A-011 approval, which will also unblock a fully live (rather than fixture-reused) A-005/A-006 hard-duplicate confirmation for any future regression re-run.
+
+**Batch 8 is NOT executed as part of this session, per explicit instruction.**
+
+NEXUS END-TO-END BUSINESS JOURNEY VALIDATION BATCH 7 COMPLETE
