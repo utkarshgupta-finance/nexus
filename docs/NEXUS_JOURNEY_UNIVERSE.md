@@ -383,30 +383,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: A-011
 - Notes: N/A
 
-### A-013: Approval with no active workflow bound, default approval mechanism
+### A-013: Case creation blocked with no active workflow bound (RECONCILED 2026-09-20, superseded premise)
 - Pack: A - Customer Onboarding
-- Business Objective: Onboarding must remain approvable even when no Workflow Builder graph is configured for this domain.
+- Business Objective: Was originally "onboarding must remain approvable even when no Workflow Builder graph is configured." Migration `20260930000000_workflow_creation_requires_active_definition.sql` (applied before this journey's Batch 7 re-execution) made an active, published workflow mandatory for customer_onboarding case creation itself, raising `WORKFLOW_NO_ACTIVE_DEFINITION` otherwise. A case with `workflow_version_id = null` can therefore no longer be created at all, so the original "workflow-less approval" path this journey described is unreachable. Recorded here as history, not deleted, per this program's own no-renumbering/no-silent-rewrite rule.
 - Domain: Customer Onboarding
 - Object / Record Type: customer_onboarding_case
-- Starting State: No workflow version with applies_to = 'customer_onboarding' is both active and published at case creation time.
-- Personas: Maker, any customer.approve holder
-- Preconditions: workflowVersionId is null on the case (resolved at creation, per grounding).
-- Regular Path: Case is created, submitted, and approved by any user holding customer.approve, with no team-routing constraint applied since there is no graph to route through.
+- Starting State (current, re-verified live in Batch 7): No workflow version with applies_to = 'customer_onboarding' is both active and published.
+- Personas: Maker
+- Preconditions: None (this is now a creation-time invariant, not an approval-time one).
+- Regular Path (current): Maker attempts to create a case; `create_customer_onboarding_case` raises `WORKFLOW_NO_ACTIVE_DEFINITION` before any row is written; case creation fails outright. There is no longer a "default approval mechanism" path to reach, since a case in this state cannot exist.
 - Stress Variant: N/A
-- Authorization Variant: Any customer.approve holder (not tied to a specific team) can approve, confirm this is intentional pre-workflow default behavior, not a bug.
+- Authorization Variant: N/A (superseded; the original variant about any customer.approve holder approving a workflow-less case cannot be exercised since such a case cannot be created)
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Case record shows workflowVersionId = null persisted, distinguishable from a case that had a workflow but finished its graph.
+- Audit/Data Integrity Checks: No `customer_onboarding_cases` row is written on a blocked creation attempt (confirmed live, Batch 7).
 - Recovery/Resilience Variant: N/A
-- UX Checks: UI should not display team-routing information for a workflow-less case (no misleading "pending X team" messaging).
+- UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: Business continuity when no workflow is configured; approval permission alone governs.
-- Expected Technical Invariants: Required permission for approval (customer.approve) is hardcoded server-side independent of workflow existence.
+- Expected Business Result (current): Onboarding cannot begin at all while no workflow is configured for the domain; business continuity now depends on always keeping one workflow active, not on a workflow-less fallback.
+- Expected Technical Invariants (current): `create_customer_onboarding_case` raises `WORKFLOW_NO_ACTIVE_DEFINITION` whenever no row in `workflow_definition_versions` joined to an active `workflow_definitions` row with `applies_to = 'customer_onboarding'` and `status = 'published'` exists.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: A-014, A-027
-- Notes: N/A
+- Notes: Re-executed against current behavior during Batch 7 (see `docs/journey-runs/BATCH_07_RESULTS.md`). Final Status recorded there as EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY: the journey's original premise is stale (Category B, not a product defect), and current behavior (creation-time hard block) is itself the correct, intentional invariant. If a genuine workflow-less-approval fallback is ever wanted as a product decision, it would need a new journey ID, not a reopening of this one.
 
 ### A-014: Workflow version resolved once at creation, unaffected by later publishes
 - Pack: A - Customer Onboarding
@@ -957,6 +957,31 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Dependencies: A-011
 - Related Journeys: A-011, AA-001
 - Notes: Full Commercial internals are out of scope for this pack per the grounding brief; see Pack D/E for deep commercial-side coverage of this same linkage.
+
+### A-036: Viewing another maker's draft onboarding case by request_id (new, discovered Batch 7)
+- Pack: A - Customer Onboarding
+- Business Objective: Confirm the intended visibility model for an in-progress (draft/sent_back) onboarding case: should any holder of customer.create be able to open and read a case they did not create, purely by knowing or guessing its request_id?
+- Domain: Customer Onboarding
+- Object / Record Type: customer_onboarding_case (draft/sent_back), submission_revisions
+- Starting State: User A creates a draft case. User B, a different maker holding only customer.create (not the creator, not a reviewer), navigates directly to `/forms/customer-onboarding/[requestId]` using A's request_id.
+- Personas: Maker A (creator), Maker B (non-creator, same broad permission)
+- Preconditions: Both users hold customer.create; neither is a reviewer for this case.
+- Regular Path (current, confirmed live during Batch 7): `getOnboardingCase(requestId)` is called with no ownership check, and the page's `AuthGate` only requires the blanket `customer.create` permission (`src/app/forms/customer-onboarding/[requestId]/page.tsx`). Maker B's page load succeeds and renders Maker A's full draft (all customer/tax fields, comments, documents).
+- Stress Variant: N/A
+- Authorization Variant: This IS the authorization variant; mutation (Save, Submit) is now creator-only as of Batch 7's fix (migration `20260930050000_onboarding_draft_save_submit_creator_only.sql`, discovered while executing A-002/A-003's own authorization variants), but read access was deliberately left unchanged pending this journey's own product decision.
+- Concurrency Variant: N/A
+- Idempotency Variant: N/A
+- Audit/Data Integrity Checks: No mutation occurs on a read-only view, so nothing is written; the concern is confidentiality of in-progress business data (customer legal name, tax IDs, contact details), not integrity.
+- Recovery/Resilience Variant: N/A
+- UX Checks: N/A
+- Historical Variant: N/A
+- Expected Business Result: Undecided; depends on whether same-team visibility into in-progress drafts is an intended collaboration feature or an oversight.
+- Expected Technical Invariants: Undecided pending product decision; if creator-only read is chosen, `getOnboardingCase`'s caller (the page route) would need a `created_by` check equivalent to what Save/Submit now enforce.
+- Priority: P2 (read-only exposure of pre-submission business data to other holders of the same broad permission, not a mutation risk)
+- Automation Feasibility: FULL
+- Dependencies: A-001, A-002
+- Related Journeys: A-002, A-003, A-019
+- Notes: Discovered during Batch 7 while investigating A-002/A-003's authorization variants (see `docs/journey-runs/BATCH_07_RESULTS.md`, DEFECT-B7-002). Classified as Category F (genuine gap needing a product decision, not a bounded fix): unlike Save/Submit, there is no existing precedent in this codebase for whether onboarding draft reads should be creator-scoped, and narrowing it could break an undocumented legitimate collaboration path if one exists. Scheduled for a future batch's authorization sweep, not fixed in Batch 7.
 
 ## Pack B: Customer Master
 

@@ -81,7 +81,7 @@ Each batch lists its Batch ID, its 25 (or, for the final batch, 7) Journey IDs i
 **Journey IDs:** P-018 through P-023, A-001 through A-019
 **Purpose:** Finish Reference Masters, then begin Customer Onboarding: draft creation through the strict-stage submit validation.
 **Required personas:** reference_master_admin, Maker
-**Required fixtures:** Foundation phase fully complete: at least one active published workflow bound to customer_onboarding is recommended (though onboarding also supports running without one).
+**Required fixtures:** Foundation phase fully complete: an active published workflow bound to customer_onboarding is now mandatory for case creation (`WORKFLOW_NO_ACTIVE_DEFINITION` otherwise, migration `20260930000000_workflow_creation_requires_active_definition.sql`), corrected during Batch 7 execution; the previous "recommended, though onboarding also supports running without one" wording predated that migration and described a workflow-less path that is no longer reachable (see A-013).
 **Expected duration:** 4-5 hours
 **Risk concentration:** P1 on duplicate detection (GST/PAN hard blockers) and stage-validation completeness.
 **Depends on:** Batch 6.
