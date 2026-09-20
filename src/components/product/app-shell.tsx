@@ -181,8 +181,14 @@ function AppShell({ children, session }: { children: React.ReactNode; session: A
 
   return (
     <SidebarProvider style={{ "--sidebar-width": "14rem" } as React.CSSProperties}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:outline focus:outline-2 focus:outline-ring"
+      >
+        Skip to main content
+      </a>
       <AppSidebar session={session} />
-      <SidebarInset>
+      <SidebarInset id="main-content">
         <header className="flex h-11 shrink-0 items-center gap-2 border-b px-3 md:hidden">
           <SidebarTrigger />
           <span className="text-sm font-semibold tracking-tight text-foreground">Nexus</span>
