@@ -237,6 +237,8 @@ into a second backlog.
   scoped out of this program; revisit once MRR Recognition itself is
   designed.
 
+- **Required fields do not consistently expose `aria-required` to assistive technology (found live during Batch 8's ACC-001).** The Country field on Customer Onboarding is visually marked required (a red asterisk) but its underlying Base UI combobox renders `aria-required="false"`, so a screen-reader user is not told the field is mandatory purely from focusing it. Not fixed in that pass, since a proper fix means auditing every required field across both SurveyJS-rendered stages and Base UI form controls app-wide for consistency, broader than the one keyboard-navigation-order finding ACC-001 was scoped to that round (which did get a real fix: a "Skip to main content" link, since the app had none anywhere and every page's tab order forced 7 stops through the sidebar and Log out button first). Revisit as part of a dedicated accessibility pass.
+
 ## Soon (real, but not urgent; revisit within the next few feature rounds)
 
 - **Customer Master has no Human-Friendly ID.** Every other governed

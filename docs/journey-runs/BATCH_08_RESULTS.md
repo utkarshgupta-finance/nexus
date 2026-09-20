@@ -297,3 +297,22 @@ Not itself one of Batch 8's 25 scheduled IDs (A-011 was Batch 7 scope, explicitl
 - Notes: The customer was deliberately left deactivated at the end of this test, intentionally, as the starting fixture for Batch 9's B-009 (reactivate) journey.
 
 ---
+
+## ACC-001: Keyboard-only navigation across a full governed approval flow
+
+- Journey ID: ACC-001
+- Priority: (not a full WCAG audit, per this mission's own explicit instruction)
+- Automation Feasibility: MANUAL
+- Personas: wf-test.maker (real authenticated browser session, real dev server)
+- Actions Executed: real keyboard-only interaction (not code inspection) against a live onboarding case page: focus order inspection from a fresh page load, visible-focus-indicator confirmation, and a focused check of the app's global tab order before reaching any page's actual content.
+- Actual Result: **FAILED** (Original Status). A keyboard-only user tabbing from a fresh page load must pass through all 6 sidebar navigation links plus the "Log out" button (7 tab stops of repeated global chrome) before ever reaching the current page's own stage-navigation or form fields. No mechanism existed anywhere in the app to skip this repeated navigation block. This reproduces on every single page in the app, not just onboarding, since it lives in the shared `AppShell` layout component. Focus IS visible throughout (a real focus ring renders on every stop, confirmed via `getComputedStyle`), and field reachability itself is not blocked (every field remains reachable, just tediously so), so this is a real, bounded UX gap, not a "no mouse-only blocker" hard-stop.
+- Root Cause: `src/components/product/app-shell.tsx`'s shared layout renders the sidebar navigation and page content with no "skip to main content" link, a well-established, standard accessibility affordance (WCAG 2.4.1 Bypass Blocks) that this app never had.
+- Fix: added a "Skip to main content" link as the very first focusable element in the shared shell (visually hidden until focused, standard `sr-only`/`focus:not-sr-only` pattern, fixed-position when visible so it doesn't shift layout), targeting a new `id="main-content"` on the existing `SidebarInset` `<main>` element (not a second nested `<main>`, which would have been an invalid double-landmark).
+- Fix Commit: (see COMMITS in the final report)
+- Regression Test: verified live only (DOM-order inspection confirming the skip link is the first focusable element in the document, confirming it becomes visible on focus via computed style, and confirming activating it navigates to `#main-content` targeting the real `<main>` element). No automated test was added: this codebase has no existing test coverage for `app-shell.tsx` (a Client Component depending on Next.js routing and Sidebar context, not the kind of pure-function/service-layer code this codebase's vitest suite otherwise covers), and this two-line JSX addition does not warrant introducing new UI-component test infrastructure standalone.
+- Rerun Result: confirmed live post-fix: `document.querySelectorAll(...)`'s first focusable element is now the skip link, before "My Work" or any other nav item, on every page (verified on `/my-work`, applies globally since it lives in the shared shell, not a per-page component).
+- Original Status: FAILED
+- Final Status: FAILED THEN FIXED + PASS
+- Notes: This is not a full WCAG audit, per this mission's own instruction, and no further accessibility dimensions (screen-reader announcement text, color contrast, ARIA roles beyond what Base UI already provides) were audited beyond this specific keyboard-navigation-order finding. One additional minor observation, not fixed this batch: the Country field (a Base UI combobox) is visually marked required (red asterisk) but exposes `aria-required="false"` in its DOM attributes, meaning a screen-reader user would not be told the field is mandatory purely from focusing it; noted here for a future accessibility-focused pass rather than fixed now, since it would require auditing every required field across every SurveyJS-rendered and Base UI form control in the app to fix consistently, which is broader than this one journey's scope.
+
+---
