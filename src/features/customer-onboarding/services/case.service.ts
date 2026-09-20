@@ -8,9 +8,16 @@ import { newId } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
 import { extractGovernedCustomerFieldsFromOnboarding } from "../domain/onboarding-customer-field-mapping"
 import { getBusinessDateYear } from "@/lib/date"
+import { evaluateCustomerDetailsStatus, requiredTaxRegistrationFieldKeys, fieldGroupStatus } from "../domain/stage-status"
+import { findPotentialDuplicates, hasHardDuplicateMatch } from "../domain/duplicate-detection"
+import { CUSTOMER_ONBOARDING_FIELD_KEYS } from "../forms/customer-onboarding-form-definition"
+import { listOnboardingDocuments } from "./documents.service"
+import { listCustomerMaster } from "@/features/customers/server"
+import { CaseOperationError } from "../domain/case-errors"
 import type { CommercialRateDraft } from "../domain/commercial-rate"
 import type { CustomerOnboardingCase, OnboardingOrigin } from "../domain/types"
 import type { ReferenceMasterSnapshot } from "@/features/reference-data"
+import type { ExistingCustomerIdentity } from "../domain/duplicate-detection"
 
 /**
  * Application service for the real, database-backed Customer Onboarding
@@ -62,8 +69,91 @@ async function saveOnboardingDraft(
   return toCustomerOnboardingCase(row, revisions)
 }
 
+const REQUIRED_TAX_DOCUMENTS_INDIA = ["gst_certificate", "pan_card", "tan_card"] as const
+const REQUIRED_TAX_DOCUMENTS_NON_INDIA = ["tax_registration", "company_registration"] as const
+
+/**
+ * Server-side mirror of the Submit-time gate the browser UI already
+ * enforces (`customer-onboarding-page.tsx`'s `handleSubmit`), closing a
+ * real gap found live during Batch 7 (A-004/A-005/A-006): calling
+ * `submitOnboardingCase` directly (bypassing the browser) previously hit
+ * no field-completeness or duplicate check at all, since
+ * `submit_customer_onboarding_case` itself only checks case status.
+ * Deliberately reuses the exact same pure, already-unit-tested functions
+ * the client uses (`stage-status.ts`, `duplicate-detection.ts`) rather
+ * than inventing new validation rules, so server and client can never
+ * silently drift apart. Scope: Customer Details and Tax & Registration
+ * field/document completeness, and the GST/PAN hard duplicate blocker;
+ * Commercial Rate completeness and the Legal Entity Name/Commercial Rate
+ * presence checks already run separately at Approve time
+ * (`approveOnboardingCase` below).
+ */
+async function validateOnboardingCaseReadyForSubmit(requestId: string, rawData: Record<string, unknown>): Promise<void> {
+  if (evaluateCustomerDetailsStatus(rawData) !== "complete") {
+    throw new CaseOperationError({
+      kind: "invalid_input",
+      message: "Customer Details is incomplete. Fill in all required fields before submitting.",
+      sqlState: null,
+      cause: "server-side submit validation: customer_details incomplete",
+    })
+  }
+
+  const isIndia = rawData[CUSTOMER_ONBOARDING_FIELD_KEYS.country] === "IN"
+  if (fieldGroupStatus(rawData, requiredTaxRegistrationFieldKeys(isIndia, rawData)) !== "complete") {
+    throw new CaseOperationError({
+      kind: "invalid_input",
+      message: "Tax & Registration is incomplete. Fill in all required fields before submitting.",
+      sqlState: null,
+      cause: "server-side submit validation: tax_registration fields incomplete",
+    })
+  }
+
+  const documents = await listOnboardingDocuments(requestId)
+  const documentTypesPresent = new Set(documents.map((document) => document.documentType))
+  const requiredDocuments = isIndia ? REQUIRED_TAX_DOCUMENTS_INDIA : REQUIRED_TAX_DOCUMENTS_NON_INDIA
+  if (requiredDocuments.some((documentType) => !documentTypesPresent.has(documentType))) {
+    throw new CaseOperationError({
+      kind: "invalid_input",
+      message: "Required Tax & Registration documents are missing. Upload all required documents before submitting.",
+      sqlState: null,
+      cause: "server-side submit validation: tax_registration documents incomplete",
+    })
+  }
+
+  const [taxIdentities, customers] = await Promise.all([listApprovedCaseTaxIdentity(), listCustomerMaster()])
+  const taxByCustomerId = new Map(taxIdentities.map((identity) => [identity.customerId, identity]))
+  const existingCustomers: ExistingCustomerIdentity[] = customers.map(({ record }) => ({
+    customerId: record.id,
+    customerKey: record.key,
+    customerName: record.name,
+    gstNumber: taxByCustomerId.get(record.id)?.gstNumber ?? null,
+    pan: taxByCustomerId.get(record.id)?.pan ?? null,
+    legalEntityName: record.name,
+    brandName: record.brandName,
+  }))
+  const candidate = {
+    gstNumber: typeof rawData[CUSTOMER_ONBOARDING_FIELD_KEYS.gstNumber] === "string" ? (rawData[CUSTOMER_ONBOARDING_FIELD_KEYS.gstNumber] as string) : null,
+    pan: typeof rawData[CUSTOMER_ONBOARDING_FIELD_KEYS.pan] === "string" ? (rawData[CUSTOMER_ONBOARDING_FIELD_KEYS.pan] as string) : null,
+    legalEntityName: null,
+    brandName: null,
+  }
+  const matches = findPotentialDuplicates(candidate, existingCustomers)
+  if (hasHardDuplicateMatch(matches)) {
+    throw new CaseOperationError({
+      kind: "invalid_input",
+      message: "This GST or PAN already belongs to an existing customer. Duplicate legal entities cannot be onboarded.",
+      sqlState: null,
+      cause: "server-side submit validation: hard duplicate GST/PAN match",
+    })
+  }
+}
+
 /** Serves both a first Submit and a post-send-back Resubmit: the RPC itself derives which one applies from the case's current status. */
 async function submitOnboardingCase(requestId: string, actorUserId: string): Promise<CustomerOnboardingCase> {
+  const draft = await caseData.getLatestRevisionForRequest(requestId)
+  if (draft && draft.status === "draft") {
+    await validateOnboardingCaseReadyForSubmit(requestId, draft.raw_data ?? {})
+  }
   const row = await caseData.submitCase(requestId, actorUserId)
   const revisions = await caseData.listRevisionsForRequest(requestId)
   return toCustomerOnboardingCase(row, revisions)
