@@ -14,7 +14,7 @@ import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { resolveActorLabels } from "@/platform/audit/server"
 import { getResponsibleTeamIdsByNode } from "@/platform/workflow-builder/server"
-import { getActiveTeamIdsForUser } from "@/platform/team/server"
+import { getActiveTeamIdsForUser, listTeams, countActiveMembersByTeam, listActiveUserTeamGrants } from "@/platform/team/server"
 import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
 import { buildMyWorkItems, buildDraftWorkItems } from "./domain/my-work"
 import { buildOperationalQueue } from "./domain/operational-queue"
@@ -270,13 +270,48 @@ async function loadOperationalQueue(): Promise<OperationalQueueEntry[]> {
   const onboardingIds = items.filter((item) => item.type === "onboarding").map((item) => item.requestId)
   const changeRequestIds = items.filter((item) => item.type === "change_request").map((item) => item.requestId)
 
-  const [onboardingSendBackCounts, changeRequestSendBackCounts] = await Promise.all([
+  const [onboardingSendBackCounts, changeRequestSendBackCounts, activeMemberCountsByTeamId, teams] = await Promise.all([
     getOnboardingSendBackCounts(onboardingIds),
     getChangeRequestSendBackCounts(changeRequestIds),
+    countActiveMembersByTeam(),
+    listTeams(),
   ])
   const sentBackCountsByRequestId = new Map([...onboardingSendBackCounts, ...changeRequestSendBackCounts])
+  const teamNamesById = new Map(teams.map((team) => [team.id, team.name]))
 
-  return buildOperationalQueue(items, sentBackCountsByRequestId, new Date())
+  return buildOperationalQueue(items, sentBackCountsByRequestId, activeMemberCountsByTeamId, teamNamesById, new Date())
 }
 
-export { loadApprovalInbox, loadMyWork, loadOperationalQueue }
+type TeamRemovalImpact = {
+  teamId: string | null
+  teamName: string | null
+  remainingActiveMembers: number
+  pendingApprovalCount: number
+}
+
+/**
+ * Pre-removal impact check (Product Gap Closure, O-018): computed before
+ * a team membership removal is confirmed, so an admin sees a real,
+ * current number, not a guess, when the removal would leave pending
+ * governed work with no eligible approver. `pendingApprovalCount` is
+ * only ever non-zero when `remainingActiveMembers` would be zero: a team
+ * that keeps at least one other active member after this removal has no
+ * orphaned-work risk to warn about. Reuses the exact same
+ * `loadApprovalInbox` read every other operational surface already
+ * shares, no new query shape.
+ */
+async function checkTeamRemovalImpact(userTeamId: string): Promise<TeamRemovalImpact> {
+  const [grants, teams, items] = await Promise.all([listActiveUserTeamGrants(), listTeams(), loadApprovalInbox()])
+  const grant = grants.find((candidate) => candidate.id === userTeamId)
+  if (!grant) return { teamId: null, teamName: null, remainingActiveMembers: 0, pendingApprovalCount: 0 }
+
+  const remainingActiveMembers = grants.filter((candidate) => candidate.team_id === grant.team_id && candidate.id !== userTeamId).length
+  const pendingApprovalCount =
+    remainingActiveMembers === 0 ? items.filter((item) => item.bucket === "needs_action" && item.responsibleTeamId === grant.team_id).length : 0
+  const teamName = teams.find((team) => team.id === grant.team_id)?.name ?? null
+
+  return { teamId: grant.team_id, teamName, remainingActiveMembers, pendingApprovalCount }
+}
+
+export { loadApprovalInbox, loadMyWork, loadOperationalQueue, checkTeamRemovalImpact }
+export type { TeamRemovalImpact }

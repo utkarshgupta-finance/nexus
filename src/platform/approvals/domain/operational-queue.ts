@@ -13,6 +13,10 @@ type OperationalQueueEntry = {
   ageDays: number
   sentBackCount: number
   href: string
+  /** The team currently responsible for this item, resolved from its own current node (null if no workflow is bound or no team is named for that node). */
+  responsibleTeamName: string | null
+  /** False when responsibleTeamName is set but that team currently has zero active members (Product Gap Closure, O-018): this item cannot be acted on by anyone until an admin restores an eligible member. True whenever no specific team is required at all. */
+  hasEligibleApprover: boolean
 }
 
 /**
@@ -30,8 +34,21 @@ type OperationalQueueEntry = {
  * send-back concept at all (always 0, simply absent from the map),
  * Onboarding and Customer Change each source theirs from a different
  * table, and this function should not need to know that.
+ *
+ * `activeMemberCountsByTeamId`/`teamNamesById` (Product Gap Closure,
+ * O-018) surface which pending items currently have zero eligible
+ * approvers, the same "what is currently stuck, and why" this view
+ * already exists for, rather than a new dashboard: a team dropping to
+ * zero active members while work is pending was previously invisible
+ * anywhere in the product.
  */
-function buildOperationalQueue(items: ApprovalInboxItem[], sentBackCountsByRequestId: Map<string, number>, now: Date): OperationalQueueEntry[] {
+function buildOperationalQueue(
+  items: ApprovalInboxItem[],
+  sentBackCountsByRequestId: Map<string, number>,
+  activeMemberCountsByTeamId: Map<string, number>,
+  teamNamesById: Map<string, string>,
+  now: Date
+): OperationalQueueEntry[] {
   return items
     .filter((item) => item.bucket !== "completed")
     .map((item) => ({
@@ -44,6 +61,8 @@ function buildOperationalQueue(items: ApprovalInboxItem[], sentBackCountsByReque
       ageDays: ageInDays(item.updatedAt, now),
       sentBackCount: sentBackCountsByRequestId.get(item.requestId) ?? 0,
       href: item.href,
+      responsibleTeamName: item.responsibleTeamId ? (teamNamesById.get(item.responsibleTeamId) ?? null) : null,
+      hasEligibleApprover: !item.responsibleTeamId || (activeMemberCountsByTeamId.get(item.responsibleTeamId) ?? 0) > 0,
     }))
     .sort((a, b) => b.ageDays - a.ageDays)
 }

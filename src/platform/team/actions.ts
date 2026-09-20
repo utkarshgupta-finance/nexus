@@ -3,8 +3,10 @@
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import { createTeam, setTeamActive } from "./services/team.service"
-import { assignUserToTeam as assignUserToTeamService, removeUserFromTeam as removeUserFromTeamService } from "./services/team.service"
+import { assignUserToTeam as assignUserToTeamService, removeUserFromTeam as removeUserFromTeamService, setPrimaryTeamMembership } from "./services/team.service"
 import { TeamOperationError } from "./domain/errors"
+import { checkTeamRemovalImpact } from "@/platform/approvals/server"
+import type { TeamRemovalImpact } from "@/platform/approvals/server"
 
 /**
  * Real, database-backed Team Master mutations (task Phase K). Every
@@ -64,5 +66,43 @@ async function removeUserFromTeamAction(userTeamId: string): Promise<TeamActionR
   }
 }
 
-export { createTeamAction, setTeamActiveAction, assignUserToTeamAction, removeUserFromTeamAction }
+type TeamRemovalImpactActionResult = { ok: true; impact: TeamRemovalImpact } | { ok: false; error: string }
+
+/**
+ * Read-only pre-removal check (Product Gap Closure, O-018), called
+ * before `removeUserFromTeamAction` actually runs: warn but allow, never
+ * silently allow and never absolutely block. Gated on the same
+ * `team.write` the real removal itself requires, since this only exists
+ * to inform that specific mutation, not as a general-purpose read.
+ */
+async function checkTeamRemovalImpactAction(userTeamId: string): Promise<TeamRemovalImpactActionResult> {
+  try {
+    await requirePermission("team", "write")
+    const impact = await checkTeamRemovalImpact(userTeamId)
+    return { ok: true, impact }
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while checking this removal's impact." }
+  }
+}
+
+async function setPrimaryTeamMembershipAction(userId: string, teamId: string): Promise<TeamActionResult> {
+  try {
+    const actor = await requirePermission("team", "write")
+    await setPrimaryTeamMembership(userId, teamId, actor.appUserId)
+    return { ok: true }
+  } catch (error) {
+    return toActionError(error, "An unexpected error occurred while updating the primary team.")
+  }
+}
+
+export {
+  createTeamAction,
+  setTeamActiveAction,
+  assignUserToTeamAction,
+  removeUserFromTeamAction,
+  setPrimaryTeamMembershipAction,
+  checkTeamRemovalImpactAction,
+}
+export type { TeamRemovalImpactActionResult }
 export type { TeamActionResult }

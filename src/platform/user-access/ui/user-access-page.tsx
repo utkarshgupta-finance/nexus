@@ -19,7 +19,7 @@ import {
   grantUserRoleAction,
   revokeUserRoleAction,
 } from "../actions"
-import { assignUserToTeamAction, removeUserFromTeamAction } from "@/platform/team/actions"
+import { assignUserToTeamAction, removeUserFromTeamAction, setPrimaryTeamMembershipAction, checkTeamRemovalImpactAction } from "@/platform/team/actions"
 import type { Team } from "@/platform/team/server"
 import { labelForUserAccessEntry } from "../domain/user-access"
 import type { UserAccessEntry } from "../domain/user-access"
@@ -76,6 +76,32 @@ function UserAccessPage({
       setEditingDisplayNameFor(null)
       router.refresh()
     })
+  }
+
+  /**
+   * Warn but allow, never silently allow and never absolutely block
+   * (Product Gap Closure, O-018): checks the real, current impact of
+   * this specific removal before it happens, and only interrupts with a
+   * confirmation when it would actually leave pending governed work with
+   * no eligible approver on the team. A removal with no such risk
+   * proceeds immediately, exactly as before this fix.
+   */
+  async function handleRemoveTeam(authUserId: string, userTeamId: string) {
+    setActionError(null)
+    const impactResult = await checkTeamRemovalImpactAction(userTeamId)
+    if (!impactResult.ok) {
+      setActionError(impactResult.error)
+      return
+    }
+    const { impact } = impactResult
+    if (impact.pendingApprovalCount > 0) {
+      const teamLabel = impact.teamName ?? "this team"
+      const confirmed = window.confirm(
+        `This change will leave ${impact.pendingApprovalCount} pending approval${impact.pendingApprovalCount === 1 ? "" : "s"} with no eligible approver on ${teamLabel}. Remove this membership anyway?`
+      )
+      if (!confirmed) return
+    }
+    runAction(authUserId, () => removeUserFromTeamAction(userTeamId))
   }
 
   return (
@@ -179,13 +205,26 @@ function UserAccessPage({
                               entry.teams.map((team) => (
                                 <Badge key={team.userTeamId} variant="ghost" className="gap-1 bg-muted text-muted-foreground">
                                   {team.teamName}
-                                  {team.isPrimary ? <span className="text-[0.65rem] text-muted-foreground">(Primary)</span> : null}
+                                  {team.isPrimary ? (
+                                    <span className="text-[0.65rem] text-muted-foreground">(Primary)</span>
+                                  ) : canManageTeams ? (
+                                    <button
+                                      type="button"
+                                      className="text-[0.65rem] underline-offset-2 hover:underline disabled:no-underline"
+                                      disabled={rowBusy}
+                                      onClick={() =>
+                                        entry.appUserId && runAction(entry.authUserId, () => setPrimaryTeamMembershipAction(entry.appUserId as string, team.teamId))
+                                      }
+                                    >
+                                      Make Primary
+                                    </button>
+                                  ) : null}
                                   {canManageTeams ? (
                                     <button
                                       type="button"
                                       aria-label={`Remove ${team.teamName}`}
                                       disabled={rowBusy}
-                                      onClick={() => runAction(entry.authUserId, () => removeUserFromTeamAction(team.userTeamId))}
+                                      onClick={() => handleRemoveTeam(entry.authUserId, team.userTeamId)}
                                     >
                                       <XIcon className="size-3" />
                                     </button>

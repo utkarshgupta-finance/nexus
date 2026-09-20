@@ -71,5 +71,21 @@ async function removeUserFromTeam(userTeamId: string, actorUserId: string): Prom
   return data
 }
 
-export { listTeams, listActiveTeams, listActiveUserTeamGrants, createTeam, setTeamActive, assignUserToTeam, removeUserFromTeam }
+async function setPrimaryTeamMembership(userId: string, teamId: string, actorUserId: string): Promise<UserTeamGrantRow> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.rpc("set_primary_team_membership", { p_user_id: userId, p_team_id: teamId, p_actor_user_id: actorUserId })
+  if (error) throw new TeamOperationError(parseTeamError(error))
+  return data
+}
+
+export {
+  listTeams,
+  listActiveTeams,
+  listActiveUserTeamGrants,
+  createTeam,
+  setTeamActive,
+  assignUserToTeam,
+  removeUserFromTeam,
+  setPrimaryTeamMembership,
+}
 export type { TeamRow, UserTeamGrantRow }
