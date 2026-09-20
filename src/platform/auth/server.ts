@@ -5,17 +5,31 @@ import { getActiveGlobalRolesForUser, getActivePermissionsForRoles, getAppUserBy
 import type { NexusSession } from "./domain/types"
 
 /**
- * Supabase Auth's own token-refresh lock can, under concurrent requests
- * racing the same soon-to-expire refresh token, leave a later caller's
- * `getUser()` promise pending forever instead of rejecting (observed in
- * dev logs as clustered `AuthApiError: Invalid Refresh Token` warnings
- * from concurrent requests, immediately followed by a request that never
- * settles). Every other failure mode below is a rejection, already
- * caught; a hang is not, and without this it leaves every Suspense
- * boundary built on `getCurrentNexusSession()` stuck on its `loading.tsx`
- * fallback indefinitely, since React has no way to know the render will
- * never finish. This bounds that wait so it degrades to the same honest
- * `unavailable` state a real provider error already produces.
+ * DEFECT-B6-001: `getUser()` was observed capable of never settling
+ * (neither resolving nor rejecting), which leaves every Suspense boundary
+ * built on `getCurrentNexusSession()` stuck on its `loading.tsx` fallback
+ * indefinitely, since React has no way to know the render will never
+ * finish. Every other failure mode below is a rejection, already caught;
+ * a hang is not. Dev logs showed clustered `AuthApiError: Invalid Refresh
+ * Token` warnings from concurrent requests immediately before one such
+ * hang, but the exact causal mechanism inside `@supabase/auth-js` was not
+ * isolated: this project's client passes no `lock` option, so it runs the
+ * SDK's "lockless coordination" default path (no `navigator.locks`/
+ * `processLock`), which rules out the classic lock-deadlock explanation.
+ * This timeout is a defensive bound on the symptom (a hang, from any
+ * cause), not a fix for a diagnosed race.
+ *
+ * This bounds only Nexus's own wait; it does not cancel the underlying
+ * Supabase request. `supabase-js` v2's `getUser()` takes no
+ * `AbortSignal`/cancellation parameter, and the SDK's own `dispose()` API
+ * documents in-flight fetches as running to completion, not aborted, so
+ * there is nothing to invoke here. If the original call later settles,
+ * its `.then`/`.catch` below fire against an already-settled outer
+ * promise, which is a silent no-op under native Promise semantics: no
+ * crash, no unhandled rejection. The only residual cost is one
+ * already-in-flight request per timed-out call continuing in the
+ * background until it naturally resolves; nothing accumulates per
+ * request beyond that.
  */
 const AUTH_PROVIDER_TIMEOUT_MS = 8000
 

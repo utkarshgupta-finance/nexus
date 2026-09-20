@@ -25,11 +25,13 @@ explicit instruction. Batch 7 was not executed.
    Batch 3 (unauthenticated Customer Master exposure, a query string
    silently dropped on login redirect, login ignoring a requested
    redirect target), 1 in Batch 4 (missing disclosure that the User
-   Access list caps at 200 rows), and 1 in Batch 6 (an incidental hang
-   in `getCurrentNexusSession` under Supabase Auth's own token-refresh
-   lock, found during concurrent RPC stress rather than from a specific
-   formal journey). Batch 5 found zero code defects; every deviation
-   there was classified as a genuine architecture-level Product Gap.
+   Access list caps at 200 rows), and 1 in Batch 6 (`getCurrentNexusSession`
+   had no bounded path if `getUser()` never settled, found during
+   concurrent RPC stress rather than from a specific formal journey;
+   clustered refresh-token errors are a suspected, not proven, trigger,
+   see the Batch 6 ledger's PROVEN/SUSPECTED/NOT PROVEN breakdown).
+   Batch 5 found zero code defects; every deviation there was classified
+   as a genuine architecture-level Product Gap.
 
 4. **Product Gaps requiring a product-owner decision.** 11 confirmed,
    never improvised as an unbounded architecture change: see OPEN
@@ -129,7 +131,7 @@ explicit instruction. Batch 7 was not executed.
 | FAILED THEN FIXED + PASS | 0 |
 | EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY | 0 |
 | PRODUCT GAP CONFIRMED | 5 (O-018, O-020, O-023, P-012, P-013) |
-| Defects found/fixed | 1 incidental: `getCurrentNexusSession` could hang forever under Supabase Auth's token-refresh lock, fixed with an 8 second timeout (DEFECT-B6-001) |
+| Defects found/fixed | 1 incidental: `getCurrentNexusSession` had no bounded path if `getUser()` never settled; fixed with an 8 second timeout. Trigger (clustered refresh-token errors) is a suspected, not proven, cause; see ledger for full PROVEN/SUSPECTED/NOT PROVEN breakdown (DEFECT-B6-001) |
 | Key commits | ab66dc2 (scaffold), baf7026 (full ledger + fix), 17a9e5f (deployment parity backfill) |
 | Ledger | `docs/journey-runs/BATCH_06_RESULTS.md` |
 
