@@ -19602,6 +19602,31 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Related Journeys: AB-006, AB-007
 - Notes: This is the most direct, generalized statement of the pack's core thesis: a Server Action's own indirection is not authorization by itself, only requirePermission inside it is.
 
+### AB-041: Governed backend-only RPC must not grant PostgreSQL execute privilege to anon/authenticated (new, discovered Batch 7 closure)
+- Pack: AB - Security / Direct Action / Server Enforcement
+- Business Objective: Every governed mutation RPC intended as backend-only (called exclusively via getSupabaseServiceRoleClient()) must be explicitly unreachable by the anon/authenticated Postgres roles at the database grant level, not merely "safe in practice" because some unrelated internal table happens to lack its own grant.
+- Domain: Cross-domain (found across Customer Onboarding, Customer Change, Commercial Configuration, Customer Master, Go Live)
+- Object / Record Type: pg_proc entries for any function matching a governed-mutation name pattern
+- Starting State: A migration creates or replaces a governed mutation RPC and revokes execute from anon/authenticated by name, but never from PUBLIC, leaving Postgres's default PUBLIC execute grant in place (every role implicitly inherits PUBLIC's privileges, so naming anon/authenticated specifically does not remove it).
+- Personas: Any authenticated Nexus user (any role, any permission set), tested via the public anon key with no session at all for the base case
+- Preconditions: None; this is a database-privilege state, not an application-level condition.
+- Regular Path: `select * from list_governed_rpc_grant_violations();` (migration 20260930070000_governed_rpc_revoke_public_execute_sweep.sql) returns zero rows; a raw PostgREST call to any governed backend-only RPC using only the public anon key returns `permission denied for function <name>` (SQLSTATE 42501).
+- Stress Variant: N/A
+- Authorization Variant: This IS the authorization variant.
+- Concurrency Variant: N/A
+- Idempotency Variant: Re-running the guard query after any future migration touching one of these functions must still return zero rows.
+- Audit/Data Integrity Checks: No mutation occurs when correctly denied; no table is ever reached.
+- Recovery/Resilience Variant: N/A
+- UX Checks: N/A
+- Historical Variant: 18 functions were found with this latent gap during Batch 7's post-completion closure investigation (4 Customer Onboarding functions fixed first via migration 20260930060000, then 14 more found and fixed via migration 20260930070000 after a name-prefix search proved incomplete and a full-schema `authenticated_execute = true` query was used instead); none had ever been actually exploited, since each happened to fail on a missing internal table grant first, but that was accidental, not intentional, protection.
+- Expected Business Result: A new governed mutation RPC can never silently accumulate this exact gap again without the guard query surfacing it.
+- Expected Technical Invariants: `list_governed_rpc_grant_violations()` (pattern-matches function names against a governed-mutation-verb regex, not a hardcoded list, specifically so a newly-added function is caught automatically) always returns zero rows in a healthy database state.
+- Priority: P0
+- Automation Feasibility: FULL
+- Dependencies: N/A
+- Related Journeys: AB-040
+- Notes: Regression tooling: `scripts/verify-governed-rpc-grants.ts` (run via `npx tsx --env-file=.env.local scripts/verify-governed-rpc-grants.ts`) calls the guard function and fails loudly on any violation. Recommended to run before applying any migration that creates, replaces, or changes the signature of a governed mutation RPC. See `docs/journey-runs/BATCH_07_RESULTS.md` (DEFECT-B7-003) for the full discovery and fix narrative.
+
 
 ---
 

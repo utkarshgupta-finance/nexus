@@ -1207,9 +1207,87 @@ All three PASS. DEFECT-B7-001 remains closed at the application boundary.
 - Regression: live re-verified post-fix via `pg_proc` privilege query (all 4 now `false` for anon/authenticated) and via real anonymous HTTP calls to all 4 (all 4 now return the correct `permission denied for function <name>`, SQLSTATE 42501). A service-role smoke test (create then cancel a case) confirmed legitimate application traffic is unaffected.
 - Commit: (see COMMITS addendum below)
 
-**Deferred, separately-scoped finding (not fixed this session)**: the same PUBLIC-execute-grant gap was found, by the same read-only privilege query, on 13 additional governed mutation RPCs across three domains not otherwise touched this batch: Customer Change, Commercial Configuration, and Go Live. Architectural detail (which specific functions) is intentionally withheld from this public ledger while the gap remains open, per this program's own "not a security exploit manual" rule. Flagged to the user directly in chat with full severity context; the user explicitly chose to fix only the 4 onboarding-domain functions now and defer the other 13 to a dedicated future security-hardening pass, since responsibly fixing them requires the same per-function live-signature and downstream-dependency verification just performed here, not a blind bulk revoke. This deferred item is a new, distinct, higher-priority finding than A-036 and should be prioritized in whatever batch or dedicated pass addresses it, ahead of routine journey execution.
+**Update, superseded by the full closure below**: the 13-function finding originally deferred here (Customer Change, Commercial Configuration, Go Live) was subsequently investigated and fixed in full, plus 5 more functions the first pass missed. See the "NEXUS GOVERNED RPC TRUST-BOUNDARY CLOSURE" section below for the complete audit, fix, and verification.
 
 **Commits (addendum)**:
 - `20260930060000_onboarding_rpc_revoke_public_execute.sql` migration and this addendum, committed and pushed to `team-preview` after this report's original completion.
 
-**Batch 8 status: unchanged, still READY.** This addendum's fix is a database-privilege correction with no application code change, already regression-verified live; it does not block or alter Batch 8's scheduled scope (A-020 through A-035, ACC-001, B-001 through B-008). The deferred 13-function finding is a new, separate, higher-priority item for a future security-hardening pass, not a Batch 8 blocker, since Batch 8 does not depend on the Customer Change, Commercial Configuration, or Go Live RPC grants being corrected first.
+---
+
+# NEXUS GOVERNED RPC TRUST-BOUNDARY CLOSURE
+
+Performed at explicit user request as a pre-overnight blocker before Batches 8-13. Not a scheduled journey batch; adds one new stable journey (AB-041) and extends DEFECT-B7-003 (opened in the addendum above for the first 4 functions) to its full scope. Does not change Batch 7's or Batch 8's scheduled journey counts.
+
+Full function-by-function detail (exact names, call sites, and the verification methodology used) is intentionally not reproduced in this public ledger, per this program's own rule that authorization defects are documented at an architectural level, for reproducibility of the invariant, not as a step-by-step guide. That detail lives in this session's own record and in the fix migration's inline comments (which necessarily name each function to apply the correct `REVOKE`/`GRANT`, but do not narrate a discovery or verification methodology).
+
+## Audit summary
+
+A systematic, capability-based query (not a name-prefix guess, which was tried first and proved incomplete) found 18 functions in the `public` schema still exposing PostgreSQL execute privilege to the `anon`/`authenticated` roles via Postgres's default PUBLIC grant, the same class of gap already fixed for 4 Customer Onboarding functions in the addendum above. All 18 are `SECURITY INVOKER`.
+
+Classification of all 18, per the mission's required categories:
+- **SAFE BACKEND-ONLY, GRANT FIX REQUIRED: 16.** Spanning Customer Change, Commercial Configuration, Customer Master, and Go Live. Every one confirmed backend-only by architecture: its only call site in the codebase is a `*.data.ts` repository file using `getSupabaseServiceRoleClient()` (the same `server-only`-guarded, never-client-bundled pattern already established for every other governed RPC in this codebase). None are reachable from any browser/client component. The single most severe instance is a narrowly-permissioned Customer Master mutation whose TypeScript-layer permission gate (never granted broadly, by this project's own governance rule) was fully bypassable at the database layer before this fix.
+- **INTENTIONALLY CLIENT-CALLABLE WITH AUTHORITATIVE INTERNAL AUTHORIZATION: 0.**
+- **CLIENT-CALLABLE BUT AUTHORIZATION GAP: 0.**
+- **NEEDS PRODUCT/ARCHITECTURE DECISION: 0.**
+- **NO ISSUE: 2.** Two Postgres trigger functions (zero declared arguments, only ever invoked automatically via a `CREATE TRIGGER` attachment, no application call site at all). Revoking their PUBLIC grant has no effect on trigger firing (governed by the underlying table's own privileges, not the trigger function's own grant); included as zero-risk defensive hardening only.
+
+None of the 16 real governed-mutation functions were ever actually exploited: each happened to fail on an unrelated internal table's own missing grant before reaching any real mutation, the same accidental-not-intentional protection pattern already documented for the original 4-function onboarding fix.
+
+## Fix
+
+Migration `20260930070000_governed_rpc_revoke_public_execute_sweep.sql`: `revoke all ... from public, anon, authenticated` on all 18 functions, using each function's exact current live signature (verified directly against the database, never assumed from an old grant statement, since the prior addendum already proved a function's signature can drift silently past an old revoke). Applied to the shared Supabase database. No business logic changed.
+
+## Live verification
+
+Verified, after the fix: the guard query (below) returns zero violations; every one of the 16 real governed RPCs now denies an unauthenticated call at the function level rather than an incidental table level; the 2 trigger functions are no longer resolvable as callable RPC endpoints at all. Legitimate trusted-server traffic was independently confirmed still works for each affected domain (Customer Change, Commercial Configuration, Customer Master, Go Live), tested only against pre-existing, clearly fictional test fixtures from earlier sessions, never a real customer or business record; no new data was left behind.
+
+## Regression coverage
+
+- `scripts/verify-governed-rpc-grants.ts` (new, permanent, not a throwaway script): calls the database's own guard function and fails loudly, printing every violation, if any exist. Run via `npx tsx --env-file=.env.local scripts/verify-governed-rpc-grants.ts` before applying any migration that touches a governed mutation RPC.
+- `list_governed_rpc_grant_violations()` (SQL, added in the fix migration): the systemic guard itself, restricted to `service_role`. Pattern-based rather than a hardcoded function list, specifically because a hardcoded list is exactly what let this gap accumulate silently across 18 functions over many migrations; a new governed mutation RPC matching the naming convention is caught automatically without anyone needing to remember to add it to a list.
+- New journey **AB-041** added to `docs/NEXUS_JOURNEY_UNIVERSE.md` (Pack AB: Security / Direct Action / Server Enforcement), reflected in `docs/NEXUS_JOURNEY_COVERAGE_MATRIX.md`'s mechanically-regenerated counts (Pack AB: 40->41 total; overall Total 784->785). Not added to `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`'s batch assignments, since it is a standalone, always-re-runnable database-state check, not tied to any specific batch's fixture setup.
+- No vitest-level regression test was added: this codebase's test suite is entirely mocked unit tests with no live-database test harness, and mocking the privilege check would only test the mock, not the real database state. The live guard script and SQL function are the actual regression mechanism, matching the mission's own instruction to prefer a systemic guard over relying on remembered REVOKE statements.
+
+## Defect record
+
+**DEFECT-B7-003** (opened in the prior addendum for 4 functions, extended here to its full scope):
+- Total RPCs audited: 18 (confirmed exhaustive against the entire `public` schema by capability, not a sample)
+- Backend-only RPCs fixed: 16 real governed-mutation functions (4 from the prior addendum's onboarding fix + 14 more across Customer Change, Commercial Configuration, Customer Master, and Go Live) + 2 trigger functions hardened defensively (no behavior change)
+- Intentionally client-callable RPCs found: 0
+- Authorization gaps found requiring a different fix: 0 (every function was either already correctly backend-only in intent, just missing the PUBLIC revoke, or a harmless trigger function)
+- No-issue RPCs: 2 (the trigger functions)
+- Migrations: `20260930070000_governed_rpc_revoke_public_execute_sweep.sql`, extending `20260930060000_onboarding_rpc_revoke_public_execute.sql`
+- Regression coverage: `scripts/verify-governed-rpc-grants.ts` + `list_governed_rpc_grant_violations()` SQL guard function, both permanent
+- Live verification: see above, all PASS
+- Severity: Critical (latent, never actually exploited, as explained above)
+- Root cause: every affected function's original migration wrote `revoke execute ... from anon, authenticated` without also naming `public`; revoking a named role never removes the separate default grant every role implicitly inherits from PUBLIC
+- Fix commit: (see COMMITS below)
+
+## Tests
+
+- `npx tsc --noEmit`: clean.
+- `npx vitest run`: 922/922 passing (no test changes; this closure is a pure database-privilege and tooling addition).
+- `npx eslint .`: clean.
+- `npm run build`: succeeded.
+- `npm audit`: 0 vulnerabilities.
+- Secret scan: clean. `.env.local`, `.runtime-tests`, `.claude/launch.json` all untouched.
+
+## Commits
+
+- Migration `20260930070000_governed_rpc_revoke_public_execute_sweep.sql` + `scripts/verify-governed-rpc-grants.ts`; Universe/Coverage Matrix docs (AB-041); this ledger section (see git log for exact SHAs at push time).
+
+## Deployment
+
+- Pushed to `team-preview` only. Local HEAD, `origin/team-preview`, and the Vercel Preview deployment's `githubCommitSha` all verified to match at push time; `origin/main` (Production) confirmed unrelated/untouched.
+
+## Final call
+
+**TOTAL RPCS AUDITED: 18**
+**BACKEND-ONLY RPCS FIXED: 16** (plus 2 trigger functions hardened defensively)
+**INTENTIONALLY CLIENT-CALLABLE RPCS: 0**
+**AUTHORIZATION GAPS FOUND (needing a different fix): 0**
+**NO-ISSUE RPCS: 2** (the trigger functions)
+
+**OVERNIGHT BATCHES 8-13 READY.**
+
+NEXUS GOVERNED RPC TRUST-BOUNDARY CLOSURE COMPLETE
