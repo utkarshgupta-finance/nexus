@@ -303,6 +303,36 @@ into a second backlog.
   informal "Last Updated by" columns. Build a cross-entity audit viewer
   once a real compliance/support need to search audit history by actor
   or time range (not by customer) appears; the data already supports it.
+  Covers N-029 (a user's role grant/revoke history) and O-023 (a user's
+  team membership history): both confirmed the underlying `user_roles`/
+  `user_teams` data is fully correct and immutable, only the viewing
+  surface is missing (Product Gap Triage, Batches 3-6).
+- **No self-service "My Access" view exists.** A user with no special
+  permission has no way to see their own current roles, teams, or
+  derived permissions short of asking an admin, or, if they happen to
+  hold `user_access.read`/`write` themselves, finding their own row in
+  the all-users admin list. The underlying data already resolves
+  correctly everywhere else (roles, teams, permission unions); only a
+  new "self" scoped route and query are missing. Build once a material
+  volume of "why can't I do X" support requests appears that an admin
+  currently has to manually look up each time (N-026, Product Gap
+  Triage, Batches 3-6).
+- **Invoice Frequency cadence has no freeze mechanism, unlike Currency's
+  `fx_snapshot_rate`.** `commercial_components.billing_cadence` stores
+  only an opaque code string; the one function that would resolve a live
+  numeric cadence value (`getInvoiceFrequencyCadence`) has zero real
+  call sites anywhere in the codebase (confirmed by grep, most recently
+  during the Batches 3-6 triage). This is currently a latent gap, not a
+  live one: no feature today derives a real financial outcome from a
+  numeric cadence value, so there is nothing to retroactively revalue.
+  Decide whether cadence needs the same freeze-at-creation-time
+  treatment `fx_snapshot_rate` already gives currency
+  (`docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md` §22a) only at the moment a
+  real caller is added for `getInvoiceFrequencyCadence`, or any other
+  code begins deriving a live financial outcome (an invoice schedule, a
+  billing calculation) from the numeric cadence value; do not decide it
+  implicitly by leaving the question unexamined once that happens (P-012,
+  Product Gap Triage, Batches 3-6).
 - **Documents platform duplication assessed, not generalized (NEXUS
   FULL PRODUCT READINESS, Phase 15).** `docs/ARCHITECTURE.md` §4 names
   `attachments` as a shared platform capability, but no
@@ -338,7 +368,10 @@ into a second backlog.
   My Requests, Approvals, My Work) is small and simple enough that
   composing raw `components/ui/table` primitives per page remains correct;
   do not adopt TanStack Table or similar until a list genuinely needs
-  those features.
+  those features. Covers N-027 (User Access list search/filter) and
+  O-020 (Team Master list search/filter): both confirmed low current
+  impact given today's low user/team count (Product Gap Triage, Batches
+  3-6).
 - **Index the remaining `created_by`/`updated_by` columns on backend/
   reconciliation tables** (`usage_facts`, `earned_results`,
   `billing_calculations`, `commercial_components`, and similar) once a

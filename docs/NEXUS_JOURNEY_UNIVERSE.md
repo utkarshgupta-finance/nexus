@@ -10693,27 +10693,27 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: A role exists with is_active = false.
 - Personas: user_access_admin
 - Preconditions: N/A
-- Regular Path: Admin attempts to grant the deactivated role to a user via grant_user_role (or the role does not even appear as selectable in the UI); confirm whether the RPC layer itself rejects it or only the UI hides it (a direct-call variant belongs in Pack AB).
+- Regular Path: Admin attempts to grant the deactivated role to a user via grant_user_role (or the role does not even appear as selectable in the UI); confirm the RPC layer itself rejects it, not only the UI hiding it (a direct-call variant belongs in Pack AB).
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
-- Idempotency Variant: N/A
-- Audit/Data Integrity Checks: N/A
-- Recovery/Resilience Variant: N/A
+- Idempotency Variant: Re-granting an already-active grant is unaffected by this check (only a genuinely new insert is validated against roles.is_active).
+- Audit/Data Integrity Checks: A rejected grant attempt inserts no row; the role's own historical grant records, if any, remain untouched.
+- Recovery/Resilience Variant: Reactivating the role (roles.is_active = true) immediately allows a fresh grant on the very next call, with no other admin action needed.
 - UX Checks: Deactivated roles do not appear in the grant-role selector at all.
 - Historical Variant: N/A
 - Expected Business Result: Deactivated roles cannot be handed out going forward, even though existing holders' access is separately governed by the role's is_active flag (N-023).
-- Expected Technical Invariants: N/A
+- Expected Technical Invariants: [CLOSED, Product Gap Closure Batches 3-6] grant_user_role rejects a target role with is_active = false with ROLE_INACTIVE before insert, matching migration 20260930010000_grant_user_role_requires_active_role.sql. Confirmed live: an inactive-role grant is rejected, a reactivated role's grant succeeds immediately, and history is never rewritten.
 - Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: N-023, AB-023
-- Notes: If the RPC itself does not block this, it is a real gap worth flagging in PRODUCT GAP NOTES, not assumed away.
+- Notes: Originally confirmed as a real gap (Batch 5): the RPC did not block this, only the UI hid it. Closed in the Product Gap Closure pass following the Batches 3-6 triage; re-run this journey to confirm the fix, not to rediscover the original gap.
 
 
-### N-031: usage.read and entitlement_settlement.read are seeded but unenforced anywhere
+### N-031: usage.read and entitlement_settlement.read are real, independent read gates
 - Pack: N - Users / Roles / Permissions
-- Business Objective: Prove, as a UI-level regression check, that granting only usage.read or only entitlement_settlement.read does not grant page access, since direct code inspection during the 2026-09-16 reconciliation pass confirmed the entitlement/usage/settlement page (`src/app/customers/[customerKey]/entitlement/[stableComponentKey]/page.tsx`) gates entry solely on `entitlement.read` via AuthGate, and grepping the full codebase found zero `requirePermission`/`hasPermission` call sites for `usage.read` or `entitlement_settlement.read` anywhere.
+- Business Objective: Prove that granting only usage.read or only entitlement_settlement.read grants exactly the narrower visibility those names promise, never the full entitlement page and never nothing.
 - Domain: Users / Roles / Permissions, Entitlement
 - Object / Record Type: permissions, role_permissions
 - Starting State: A user exists with no entitlement-related permissions.
@@ -10721,20 +10721,20 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Preconditions: Grantor holds user_access.write.
 - Regular Path: Grant the target user only usage.read (not entitlement.read), and separately, in another run, only entitlement_settlement.read (not entitlement.read). Attempt to view the entitlement/usage pages and the settlement page respectively.
 - Stress Variant: N/A
-- Authorization Variant: This is the authorization variant; the entire point is to see which permission string actually gates the page.
+- Authorization Variant: This is the authorization variant; the entire point is to see which permission string actually gates each section.
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Record exactly which permission check the page and its Server Actions actually perform, and confirm whether it matches the name of the permission granted.
+- Audit/Data Integrity Checks: Confirm the page-level AuthGate admits a session holding any of entitlement.read/usage.read/entitlement_settlement.read, and that each section (Entitlement Sources/Schedule/Ledger vs Monthly Usage vs Unbilled/Unearned Ledger) checks the specific permission documented in AUTHORIZATION_MODEL.md §23.
 - Recovery/Resilience Variant: N/A
-- UX Checks: If the granted permission does nothing, the user experience is a confusing denial despite being told they were given read access; worth a UX note regardless of the outcome.
+- UX Checks: A user with only usage.read sees the page and the Monthly Usage section, nothing else; no confusing full denial, no false full access.
 - Historical Variant: N/A
-- Expected Business Result: Confirmed by direct code inspection (2026-09-16): a user granted only usage.read or only entitlement_settlement.read is denied page access, since the page's AuthGate checks entitlement.read exclusively; this journey exists to keep proving that live, not to discover it fresh each run.
-- Expected Technical Invariants: The permission string an admin is told they are granting should be the one actually enforced; today it is not, for these two specific strings. This is a real, still-open product gap, not a stale assumption; category A in the reconciliation pass's classification.
+- Expected Business Result: [CLOSED, Product Gap Closure Batches 3-6] Confirmed live: a usage.read-only user reaches the page and sees exactly Commercial Context (always visible) and Monthly Usage, none of the entitlement/settlement sections. An entitlement.read holder is completely unaffected (still sees everything, per AUTHORIZATION_MODEL.md §23's permission-to-section mapping).
+- Expected Technical Invariants: AuthGate's requiredPermission now accepts a list of alternatives ("any of" semantics); the entitlement page passes all three read permissions as alternatives, then gates each section individually. See AUTHORIZATION_MODEL.md §23 for the exact mapping.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: I-025, I-026
-- Notes: Reconciled 2026-09-16, still a real current gap (category A, not fixed): confirmed via direct grep across src/ that no requirePermission/hasPermission call anywhere uses "usage" + "read" or "entitlement_settlement" + "read". Do not fix in this pass; flagged for product review.
+- Notes: Reconciled 2026-09-16 as a confirmed gap (category A at the time), then decided and closed in the Product Gap Closure pass following the Batches 3-6 triage (decision: wire up real gates rather than remove the two permissions). Re-run this journey to confirm the new section-visibility mapping, not to rediscover the original gap.
 ## Pack O: Teams
 
 ### O-001: Create a new team
@@ -10995,22 +10995,22 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: User has at least one active team membership, none flagged primary.
 - Personas: team_admin
 - Preconditions: N/A
-- Regular Path: Admin flags one of the user's active memberships as is_primary = true; that membership is now distinguished in the UI.
+- Regular Path: Admin flags one of the user's active memberships as is_primary = true (via the "Make Primary" control on /settings/user-access, backed by set_primary_team_membership); that membership is now distinguished in the UI, and any previous primary membership is demoted to a non-primary active membership, never removed.
 - Stress Variant: N/A
 - Authorization Variant: N/A
-- Concurrency Variant: N/A
-- Idempotency Variant: Re-setting the same membership as primary is a no-op.
-- Audit/Data Integrity Checks: N/A
+- Concurrency Variant: The RPC locks the user's active rows (SELECT ... FOR UPDATE) before revoking/inserting, so two concurrent promote calls for the same user serialize rather than racing.
+- Idempotency Variant: Re-setting the same membership as primary is a no-op (returns the existing row unchanged).
+- Audit/Data Integrity Checks: Confirm the user remains an active member of BOTH the old and new primary team after promotion (only the primary designation moves); confirm at most one active primary per user throughout (uq_user_teams_one_active_primary).
 - Recovery/Resilience Variant: N/A
-- UX Checks: N/A
-- Historical Variant: N/A
-- Expected Business Result: User has a clear default team association.
-- Expected Technical Invariants: N/A
+- UX Checks: The "Make Primary" control appears only on non-primary active team badges; disappears from the old primary team's badge and appears there instead after a swap.
+- Historical Variant: The old primary row is revoked (not deleted) and a new non-primary row is inserted for that same team, preserving full history per fn_protect_team_grant's immutable-grant-record invariant.
+- Expected Business Result: [CLOSED, Product Gap Closure Batches 3-6] User has a clear default team association, and admins can actually change it after the fact.
+- Expected Technical Invariants: set_primary_team_membership (migration 20260930030000, corrected by 20260930040000) atomically revokes the old primary row and reinserts it as non-primary (never dropping the membership), then revokes and reinserts the target row as primary. Confirmed live: the previous primary team remains an active, non-primary membership after a promotion, not removed.
 - Priority: P3
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: O-012, O-013
-- Notes: N/A
+- Notes: Originally confirmed as a real gap (Batch 5): assign_user_to_team's idempotency check silently no-op'd a promotion attempt with no error. Closed in the Product Gap Closure pass; the invariant (one primary per user, globally, per the existing uq_user_teams_one_active_primary partial unique index) was already unambiguous, so no product decision was needed, only the missing swap mechanism.
 
 ### O-012: Attempt to set two teams as primary for the same user
 - Pack: O - Teams
@@ -11162,30 +11162,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: O-009, O-015
 - Notes: Directly corresponds to PERMISSION-CHANGE scenario 9.
 
-### O-018: Last remaining active member of a team removed while a request waits at that team's node (real, unhandled gap) (PERMISSION-CHANGE scenario 10)
+### O-018: Last remaining active member of a team removed while a request waits at that team's node (warn but allow) (PERMISSION-CHANGE scenario 10)
 - Pack: O - Teams
-- Business Objective: Surface the real, confirmed gap that removing the last active member of a responsible team orphans any request sitting at that team's node, with no automatic remediation.
+- Business Objective: When removing the last active member of a responsible team would orphan pending work, warn the admin with a real, current count before the removal completes, but never block the removal outright, and always keep the orphaned state visible afterward until an admin recovers it.
 - Domain: Team, Workflow
 - Object / Record Type: user_teams, workflow request
 - Starting State: Team X has exactly one active member, M; a request sits at an Approval node whose responsible team is Team X.
 - Personas: team_admin, M
 - Preconditions: N/A
-- Regular Path: Admin revokes M's Team X membership (leaving Team X with zero active members); the request remains stuck at its current node; no automatic reassignment, alert, or escalation occurs; nobody can approve it until an admin manually assigns a new member to Team X.
-- Stress Variant: Multiple requests simultaneously stuck at Team X's node when this happens.
+- Regular Path: Admin attempts to revoke M's Team X membership. Before the removal completes, checkTeamRemovalImpactAction computes the real, current pending-approval count for Team X; if removing M would leave zero active members and at least one pending item, a confirmation dialog shows "This change will leave N pending approval(s) with no eligible approver on Team X. Remove this membership anyway?" and requires explicit confirmation. If confirmed (or if there was no risk to warn about), the removal proceeds exactly as before; the request itself is never auto-reassigned or auto-cancelled.
+- Stress Variant: Multiple requests simultaneously stuck at Team X's node: the warning's count reflects the real total, and the Operational Queue surfaces every one of them individually, not just the first.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: The request's status and node remain unchanged, correctly showing it as still pending, not silently cancelled or auto-approved.
-- Recovery/Resilience Variant: Admin assigns a new active member to Team X; that new member can now see and act on the previously stuck request.
-- UX Checks: No proactive warning is currently shown to the admin at the moment they remove the last member, per current behavior; confirm and document this rather than assume a warning exists.
+- Audit/Data Integrity Checks: The request's status and node remain unchanged, correctly showing it as still pending, not silently cancelled or auto-approved. The membership removal itself remains fully auditable through the existing user_teams historical-grant mechanism (fn_protect_team_grant); no separate, redundant audit event is invented for the warning/confirmation step itself.
+- Recovery/Resilience Variant: Admin assigns a new active member to Team X; that new member can now see and act on the previously stuck request. Separately, the Operational Queue (/operations/queue) surfaces every currently-stuck item with a "No eligible approver" badge, its responsible team's name, and a summary count, discoverable at any later time, not only at the moment of removal.
+- UX Checks: The warning is shown only when removal would genuinely leave zero eligible approvers with real pending work; a removal with no such risk proceeds with no interruption, exactly as before this fix.
 - Historical Variant: N/A
-- Expected Business Result: This is a genuine, currently-unhandled operational risk: a team can be emptied out while carrying live approval responsibility, and the platform does not prevent or flag it.
-- Expected Technical Invariants: N/A
+- Expected Business Result: [CLOSED, Product Gap Closure Batches 3-6, decision: warn but allow] A team can still be emptied out while carrying live approval responsibility (administrative flexibility is preserved), but the admin sees a real warning first, and the orphaned state is never invisible afterward.
+- Expected Technical Invariants: checkTeamRemovalImpact (src/platform/approvals/server.ts) computes remainingActiveMembers and pendingApprovalCount from the same loadApprovalInbox read every other operational surface shares; OperationalQueueEntry.hasEligibleApprover/responsibleTeamName (src/platform/approvals/domain/operational-queue.ts) surface the same signal on an existing, already-discoverable page rather than a new dashboard.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: O-005, O-009, N-007
-- Notes: Directly corresponds to PERMISSION-CHANGE scenario 10; recommend flagging in PRODUCT GAP NOTES as a real, disclosed-by-inference risk worth a proactive admin warning.
+- Notes: Directly corresponds to PERMISSION-CHANGE scenario 10. Originally recorded as a real, unhandled gap (Batch 6); the Product Gap Closure triage classified it as needing a product decision among block/warn/passive-indicator, and the decision (warn but allow, plus a passive Operational Queue indicator) was implemented and confirmed live: revoking a real team's last two members while a real item was pending correctly showed "1 item has no eligible approver" with the team name and recovery guidance, then cleared immediately on restoring membership.
 
 ### O-019: User moves from one team to a different team between two approval levels of the same workflow (PERMISSION-CHANGE scenario 11)
 - Pack: O - Teams
@@ -11666,28 +11666,28 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 
 ### P-013: Attempt to add a new Level 3 System-Supported option (Commercial Nature)
 - Pack: P - Reference Masters
-- Business Objective: Confirm the UI never allows adding a new Level 3 value, since these are tied to real code behavior.
+- Business Objective: Confirm neither the UI nor the RPC layer ever allows adding a new Level 3 value, since these are tied to real code behavior.
 - Domain: Reference Master
 - Object / Record Type: reference_options row, list = Commercial Nature
 - Starting State: Commercial Nature list shows its fixed system-supported set (e.g. Recurring, One-Time, Milestone-Based).
 - Personas: Reference Master Admin
 - Preconditions: Admin holds reference_master.write.
-- Regular Path: Admin opens the Commercial Nature category in Reference Master UI; no "Add" control is present or, if a generic add attempt is made via direct action call, it is rejected.
+- Regular Path: Admin opens the Commercial Nature category in Reference Master UI; no "Add" control is present. A direct add_reference_option RPC call for any of the five Level 3 list_keys (commercial_nature, pricing_model, invoice_timing, slab_method, revenue_recognition_method), bypassing the UI entirely, is now rejected server-side with REFERENCE_LIST_SYSTEM_SUPPORTED.
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: No insert audit row is created since no insert occurs.
+- Audit/Data Integrity Checks: No insert audit row is created since no insert occurs, for both the UI-omission path and the direct-RPC-rejection path.
 - Recovery/Resilience Variant: N/A
 - UX Checks: UI clearly presents Level 3 categories as view/activate/deactivate only (no add affordance), an honest UX signal rather than a disabled/broken button.
 - Historical Variant: N/A
-- Expected Business Result: Level 3 taxonomy stays aligned with actual coded behavior; no orphaned values with no corresponding code path can be created.
-- Expected Technical Invariants: addStandardOptionAction is either not wired to Level 3 categories in the UI, or rejects them server-side if invoked directly.
+- Expected Business Result: [CLOSED, Product Gap Closure Batches 3-6] Level 3 taxonomy stays aligned with actual coded behavior; no orphaned values with no corresponding code path can be created, enforced at the authoritative server boundary, not only by the UI.
+- Expected Technical Invariants: add_reference_option (migration 20260930020000_add_reference_option_level3_enforcement.sql) rejects any of the five Level 3 list_keys before insert, regardless of caller. Read access, existing options, and existing references are unaffected; set_reference_option_active (Activate/Deactivate) is deliberately untouched, since Level 3 values may still be deactivated/reactivated.
 - Priority: P1
-- Automation Feasibility: PARTIAL
+- Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: P-014, P-015
-- Notes: Automation should attempt the direct server action call (not just check UI absence) to confirm server-side enforcement, not merely UI omission.
+- Notes: Originally confirmed as a real gap (Batch 6): the UI hid the control but a direct RPC call succeeded unrejected. Closed in the Product Gap Closure pass; the correct behavior was already fully decided and documented (SETTINGS_ARCHITECTURE.md §3), so no product decision was needed, only server-side enforcement matching the already-documented invariant. Automation Feasibility upgraded from PARTIAL to FULL now that the direct server-action/RPC call path is the primary regression check, not merely a UI-absence check.
 
 ### P-014: Deactivate a Level 3 System-Supported value (Pricing Models)
 - Pack: P - Reference Masters

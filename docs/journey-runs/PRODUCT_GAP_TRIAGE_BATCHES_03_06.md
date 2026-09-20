@@ -1,9 +1,13 @@
 # Product Gap Triage: Batches 3-6
 
-Triage-only document. No product behavior, migration, authorization rule,
-workflow, reference data, or team/role data was changed to produce this
-report. This is docs-only analysis of the 11 journeys across Batches 3-6
-whose Final Status is PRODUCT GAP CONFIRMED.
+Originally a triage-only document (no product behavior changed to
+produce it): docs-only analysis of the 11 journeys across Batches 3-6
+whose Final Status is PRODUCT GAP CONFIRMED. A subsequent Product Gap
+Closure pass then implemented the FIX NOW gaps and the two decisions
+below; see IMPLEMENTATION OUTCOME at the end of this document for what
+actually happened. The triage classifications and reasoning below are
+preserved exactly as originally written, not rewritten as if the
+implementation had already happened at triage time.
 
 ## Mechanical verification of the gap count
 
@@ -1217,3 +1221,123 @@ document is available to the team; Preview will rebuild automatically
 on push (a documentation-only build with no behavioral difference from
 the prior deployment), and Production remains untouched and was never
 a target.
+
+## IMPLEMENTATION OUTCOME (Product Gap Closure pass)
+
+Added after the triage above was acted on. The classifications and
+reasoning above are unchanged; this section records what actually
+happened.
+
+- **N-030: CLOSED.** `grant_user_role` now rejects a target role with
+  `roles.is_active = false` (`ROLE_INACTIVE`) before insert, matching
+  migration `20260930010000_grant_user_role_requires_active_role.sql`.
+  Evidence: a live throwaway-persona test confirmed an inactive-role
+  grant is rejected, an identical grant against the same role
+  immediately succeeds once reactivated, and a pre-existing active
+  grant for an unrelated user is untouched. Regression coverage:
+  live-verified against the real database (the invariant lives entirely
+  in SQL); re-run alongside N-008/N-013/N-023 whenever role-grant
+  mechanics are next touched.
+- **P-013: CLOSED.** `add_reference_option` now rejects all five Level 3
+  list_keys (`commercial_nature`, `pricing_model`, `invoice_timing`,
+  `slab_method`, `revenue_recognition_method`) with
+  `REFERENCE_LIST_SYSTEM_SUPPORTED` before insert, matching migration
+  `20260930020000_add_reference_option_level3_enforcement.sql`.
+  Evidence: a live test confirmed a direct RPC call for `commercial_nature`
+  is now rejected, while a Level 1 list (`segment`) is unaffected and
+  still accepts a new value. Read access, existing options, and existing
+  references are unaffected; `set_reference_option_active` was
+  deliberately left untouched.
+- **O-011: CLOSED.** The primary-team invariant was already unambiguous
+  (one active primary per user, globally, enforced by the pre-existing
+  `uq_user_teams_one_active_primary` partial unique index on `user_id`
+  alone; `assign_user_to_team`'s own code comment already documented the
+  intended revoke-then-reinsert mechanism for switching primary between
+  two teams), so no product decision was needed. A new
+  `set_primary_team_membership` RPC
+  (`20260930030000_set_primary_team_membership.sql`) atomically promotes
+  an existing membership to primary. Live regression testing caught a
+  real bug in the first version of this RPC before it was relied on:
+  promoting a new primary team fully revoked the user's previous primary
+  team membership instead of demoting it to a non-primary active
+  membership, silently removing the user from a team that was never
+  supposed to be touched. Corrected the same day
+  (`20260930040000_fix_set_primary_team_membership_demotion.sql`) and
+  re-verified: the previous primary team now correctly remains an
+  active, non-primary membership after a promotion. Confirmed live
+  through the real `/settings/user-access` UI against a genuine
+  multi-team test persona: clicking "Make Primary" swapped the primary
+  designation and left the old primary team intact as a non-primary
+  active membership, then the same control correctly reverted it back.
+  A minimal "Make Primary" control was added to the User Access UI; unit
+  tests were not added for this RPC's SQL logic (the invariant lives
+  entirely in the database function, mirroring N-030/P-013), but the
+  live regression evidence above, including the bug catch and fix,
+  stands as the record of correctness.
+- **N-031: CLOSED.** Decision (Option 1 from the triage, made by
+  Utkarsh): wire up `usage.read` and `entitlement_settlement.read` as
+  real, independent read gates rather than removing them.
+  Permission-to-surface mapping (documented in full in
+  `docs/AUTHORIZATION_MODEL.md` §23): `AuthGate`'s `requiredPermission`
+  now accepts a list of alternatives (`entitlement.read` OR
+  `usage.read` OR `entitlement_settlement.read` admits the page at all,
+  backward-compatible for every other call site which still passes a
+  single requirement); within the page, Entitlement Sources/Schedule/
+  Ledger check `entitlement.read`, Monthly Usage checks `entitlement.read`
+  OR `usage.read`, and Unbilled/Unearned Ledger check `entitlement.read`
+  OR `entitlement_settlement.read`; Commercial Context (identifying
+  metadata only) remains always visible. Write-side gating
+  (`entitlement.write`, `usage.write`, `usage.finalize`,
+  `entitlement_settlement.write`) is completely unchanged. Evidence: a
+  live throwaway persona granted only `usage.read` reached the page and
+  saw exactly Commercial Context and Monthly Usage, none of the
+  entitlement/settlement sections, confirmed against a real customer's
+  real entitlement/usage data.
+- **O-018: CLOSED.** Decision (Option 2 from the triage, made by
+  Utkarsh): warn but allow, never silently allow and never absolutely
+  block. Warning behavior: `checkTeamRemovalImpactAction` computes the
+  real, current impact before a team membership removal completes; if
+  it would leave zero active members on the team with at least one
+  pending item responsible to it, a confirmation dialog states the
+  exact current count ("This change will leave N pending approval(s)
+  with no eligible approver on Team X. Remove this membership anyway?")
+  and requires explicit confirmation; a removal with no such risk
+  proceeds with no interruption. Orphan visibility behavior: the
+  Operational Queue (`/operations/queue`, an existing, already-
+  discoverable admin surface, not a new dashboard) now shows a summary
+  banner ("N item(s) have no eligible approver"), a per-item
+  "No eligible approver" badge next to the responsible team's name, and
+  static recovery guidance. Recovery behavior: unchanged from before,
+  assigning a new active member to the team immediately makes the
+  stuck item actionable again; no auto-reassignment was invented.
+  Evidence: live-verified against the real, pre-existing WF-TEST Legal
+  team and its real pending item (CCR-000055): revoking both of Legal's
+  active members produced "1 item has no eligible approver" with the
+  correct team name and item on the Operational Queue; restoring both
+  memberships (to their exact prior state, including primary flags)
+  immediately cleared it. Regression coverage: `operational-queue.test.ts`
+  gained cases for `hasEligibleApprover`/`responsibleTeamName` (present
+  team with members, present team with zero members, no team at all,
+  team entirely absent from the count map). The membership removal
+  itself remains auditable through the existing `user_teams` historical-
+  grant mechanism; no new, separate audit event was invented for the
+  warning step itself, per the mission's own instruction.
+
+**DEFERRED ITEMS, tracking confirmed:**
+
+- N-027, O-020: tracked in `docs/TECH_DEBT.md`'s existing shared
+  `DataTable` entry ("Later" section), now cross-referencing both
+  journey IDs explicitly.
+- N-029, O-023: tracked in `docs/TECH_DEBT.md`'s existing "No global
+  audit/history viewer exists" entry ("Later" section), now
+  cross-referencing both journey IDs explicitly.
+- N-026: a new `docs/TECH_DEBT.md` entry was added ("No self-service
+  'My Access' view exists," "Later" section) since none existed before.
+- P-012: a new `docs/TECH_DEBT.md` entry was added ("Invoice Frequency
+  cadence has no freeze mechanism," "Later" section) since none existed
+  before, stating the exact trigger (a real caller for
+  `getInvoiceFrequencyCadence`, or any other live financial derivation
+  from the numeric cadence value).
+
+No deferred item was implemented in this pass, per the mission's
+explicit instruction.
