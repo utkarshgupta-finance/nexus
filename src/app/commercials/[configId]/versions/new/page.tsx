@@ -7,6 +7,7 @@ import { requirePermissionForCustomer, hasPermissionForCustomer } from "@/platfo
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { createVersionFromActive, listVersionsForConfiguration } from "@/features/customer-onboarding/services/commercial-version.service"
 import { CommercialVersionOperationError } from "@/features/customer-onboarding/domain/commercial-version-errors"
+import type { CommercialVersionChangeCategory } from "@/features/customer-onboarding/domain/commercial-version-types"
 
 /**
  * "Create New Version" entry point (Customer Lifecycle V1, task
@@ -15,12 +16,26 @@ import { CommercialVersionOperationError } from "@/features/customer-onboarding/
  * always creates one real, persisted Commercial Configuration Version
  * whose draft is seeded from the configuration's current active
  * Components, and immediately redirects to its own stable URL.
+ *
+ * PD-006 final business decision (Product Decision Closure): the
+ * `?category=` query param is the only UI entry point for choosing a
+ * category other than the default `amendment` (the "Record a
+ * Correction" button on the Commercial Configuration page links here
+ * with `category=correction`). Validated against the same closed set
+ * the database itself enforces (`commercial_changes.change_category`
+ * check constraint); an unrecognized or missing value always falls back
+ * to `amendment`, never silently accepts an arbitrary string.
  */
 export const dynamic = "force-dynamic"
 
 const COMMERCIAL_CONFIGURATION_WRITE = { resource: "commercial_configuration", action: "write" }
+const VALID_CHANGE_CATEGORIES: readonly CommercialVersionChangeCategory[] = ["renewal", "amendment", "correction", "other"]
 
-async function CreateAndRedirect({ configId }: { configId: string }) {
+function resolveChangeCategory(raw: string | undefined): CommercialVersionChangeCategory {
+  return VALID_CHANGE_CATEGORIES.find((category) => category === raw) ?? "amendment"
+}
+
+async function CreateAndRedirect({ configId, category }: { configId: string; category: CommercialVersionChangeCategory }) {
   const configuration = await commercialConfigurationService.getCommercialConfiguration(configId)
   if (!configuration) notFound()
 
@@ -38,7 +53,7 @@ async function CreateAndRedirect({ configId }: { configId: string }) {
    */
   let redirectTarget: string
   try {
-    const version = await createVersionFromActive(configId, "amendment", actor.appUserId)
+    const version = await createVersionFromActive(configId, category, actor.appUserId)
     redirectTarget = `/commercials/${configId}/versions/${version.requestId}`
   } catch (error) {
     if (!(error instanceof CommercialVersionOperationError)) throw error
@@ -79,8 +94,16 @@ async function CreateAndRedirect({ configId }: { configId: string }) {
   return null
 }
 
-export default async function NewCommercialConfigurationVersionRoute({ params }: { params: Promise<{ configId: string }> }) {
+export default async function NewCommercialConfigurationVersionRoute({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ configId: string }>
+  searchParams: Promise<{ category?: string }>
+}) {
   const { configId } = await params
+  const { category: rawCategory } = await searchParams
+  const category = resolveChangeCategory(rawCategory)
   const session = await getCurrentNexusSession()
 
   // PD-005 follow-up (Product Decision Closure): scope the gate itself by
@@ -98,7 +121,7 @@ export default async function NewCommercialConfigurationVersionRoute({ params }:
       loginRedirectTo={`/commercials/${configId}/versions/new`}
       additionalAccessGranted={canAccessThisConfiguration}
     >
-      <CreateAndRedirect configId={configId} />
+      <CreateAndRedirect configId={configId} category={category} />
     </AuthGate>
   )
 }

@@ -153,9 +153,14 @@ function CustomerCommercialConfigurationHeader({
           <p className="font-mono text-[0.7rem] text-muted-foreground">{configuration.key}</p>
         </div>
         {canCreateVersion ? (
-          <Button variant="outline" size="sm" render={<Link href={`/commercials/${configuration.id}/versions/new`} />}>
-            Create New Version
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" render={<Link href={`/commercials/${configuration.id}/versions/new?category=correction`} />}>
+              Record a Correction
+            </Button>
+            <Button variant="outline" size="sm" render={<Link href={`/commercials/${configuration.id}/versions/new`} />}>
+              Create New Version
+            </Button>
+          </div>
         ) : null}
       </div>
 

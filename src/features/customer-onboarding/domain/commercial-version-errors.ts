@@ -27,6 +27,7 @@ type CommercialVersionErrorKind =
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
   | "commercial_version_draft_stale"
+  | "commercial_version_effective_date_out_of_order"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -57,6 +58,12 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
   COMMERCIAL_VERSION_DRAFT_STALE: "commercial_version_draft_stale",
   COMMERCIAL_VERSION_CUSTOMER_INACTIVE: "commercial_version_customer_inactive",
+  // PD-006 final business decision (Product Decision Closure): found
+  // unmapped via live retest of the amendment/renewal contrast case,
+  // this real, already-enforced guard (20260913070000, unchanged by
+  // this decision) always fell through to a generic "An unexpected
+  // error occurred," hiding the RPC's own specific, useful message.
+  COMMERCIAL_VERSION_EFFECTIVE_DATE_OUT_OF_ORDER: "commercial_version_effective_date_out_of_order",
 }
 
 const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {
