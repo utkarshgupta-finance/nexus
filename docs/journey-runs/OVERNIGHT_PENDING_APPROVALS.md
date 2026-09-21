@@ -3,9 +3,10 @@
 Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnight autonomous run (Batches 8-13). Maintained continuously throughout the run. Never erase historical entries; update Status instead.
 
 **Pending approvals: 0**
-**Pending product decisions: 6** (A-036 carried over from Batch 7; PD-002/A-034 from Batch 8; PD-003/B-011 from Batch 9; PD-004/C-030 from Batch 10; PD-005/D-022 from Batch 11; PD-006/E-015 new this batch)
-**Pending migrations: 1** (PM-001, found via B-017 in Batch 9)
+**Pending product decisions: 6** (A-036 carried over from Batch 7; PD-002/A-034 from Batch 8; PD-003/B-011 from Batch 9; PD-004/C-030 from Batch 10; PD-005/D-022 from Batch 11; PD-006/E-015 from Batch 12). None block Batch 14. See "Morning Catch-Up Decision Cards" below for plain-English summaries.
+**Pending migrations: 0** (PM-001 RESOLVED 2026-09-21, applied and live-verified — see entry below)
 **Blocked downstream journeys: 0**
+**Morning catch-up (2026-09-21): PM-001 applied and verified; B-007 and C-027 both executed to a final result. See the Log for full detail.**
 
 ---
 
@@ -74,7 +75,8 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Recommended default: not offered; this is a foundational platform-architecture decision (whether multi-tenant/territory-scoped access control is a real near-term business requirement) well beyond what should be inferred from a single test journey.
 - Exact question for Utkarsh: does the business need per-customer or per-territory data isolation for any current or near-term role, or is the current all-or-nothing coarse permission model an accepted simplification for now?
 - Downstream effect: does not block Batches 8-13; no fixture in this run relies on customer-scoped access being enforced.
-- Status: **PENDING**
+- **Morning catch-up re-classification (2026-09-21):** re-examined against `docs/AUTHORIZATION_MODEL.md` directly rather than treating this as an open architectural mystery. §5 states explicitly: "Immediate implementation supports global (`scope_resource_id IS NULL`) assignment only. No scoped assignment is created yet." §18 restates this under "Current limitations, honestly stated": "Global permissions only... Scoped authorization (a role limited to one customer, one business unit) is still the documented future extension in §5, not built." The architecture document ALREADY documents a specific, ready-to-build extension path (`user_roles.scope_resource_id`, already present as a column, pointing at the Resource Registry; a future `org_scopes` hierarchy table explicitly named as "the right future extension"). This means the correct classification is **INTENDED CURRENT MODEL**, not an accidental architectural gap and not a security defect: this is a consciously documented, deliberate V1 scope decision with a pre-designed extension path, not something that silently fell through the cracks. The overnight report's framing of this as "the most significant finding of the entire run" was more alarmed than the evidence supports; downgrading that framing here. The real open question is unchanged (does the business need to activate the documented extension now), but it should be read as "when, if ever, should we build the already-designed extension," not "we discovered an unintended hole."
+- Status: **PENDING** (re-classified, not resolved; still requires Utkarsh's business-timing call)
 
 ### PD-006: E-015 — "correction" category cannot backdate past the currently active period's start
 
@@ -88,6 +90,84 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Exact question for Utkarsh: should the `correction` change category be exempt from the effective-date-ordering guard so it can reach back further than the currently active period's start, or is the current bounded-to-the-current-period behavior an intentional safeguard against reopening already-settled history?
 - Downstream effect: does not block Batches 8-13; no fixture in this run relies on a true historical backdated correction succeeding.
 - Status: **PENDING**
+
+---
+
+## Morning Catch-Up Decision Cards (2026-09-21, plain English)
+
+Six product-policy questions came out of the overnight run. None of them block any work already scheduled (Batches 8-13 are done; none block Batch 14 either). These are things worth 10 minutes of your time whenever convenient, not urgent fires.
+
+### Decision 1 — Can other people see a customer's paperwork before it's finalized?
+
+- **Journey:** A-036 (carried over from an earlier session)
+- **Domain:** Customer Onboarding
+- **What happens today:** Anyone with permission to create a new customer can also open and read someone else's in-progress, not-yet-approved customer application, including legal name, tax IDs, and contact details.
+- **Why this came up:** Editing someone else's draft is already blocked; nobody checked whether just viewing it should be too.
+- **Business risk if left as-is:** Sensitive pre-approval paperwork is visible more broadly than it needs to be, though only to people who already have onboarding access.
+- **Option A:** Only the person who started the application can view it until it's submitted.
+- **Option B:** Keep it visible to anyone with onboarding access, as an intentional "team can help each other" feature.
+- **My recommendation:** Option A (restrict to the creator), since it's the safer default and matches how editing already works. But this is genuinely your call.
+- **Blocks Batch 14?** No. **Blocks any later known batch?** No. **Safe to defer?** Yes.
+
+### Decision 2 — Should there be a sanity check on backdating a new customer's contract start date?
+
+- **Journey:** A-034
+- **Domain:** Onboarding approval
+- **What happens today:** When approving a new customer, the system will accept literally any start date, including one 6+ years in the past, with zero pushback.
+- **Why this came up:** No one had tested an extreme date before.
+- **Business risk if left as-is:** A typo in a date field could quietly create a contract that's backdated years, with real billing consequences, and nothing would stop it.
+- **Option A:** Add a reasonable guardrail (e.g. "date can't be more than X days in the past or Y years in the future").
+- **Option B:** Leave it open, since the system elsewhere supports intentional backdated corrections.
+- **My recommendation:** None offered — this depends entirely on what date ranges are actually normal in your business, which I can't guess.
+- **Blocks Batch 14?** No. **Blocks any later known batch?** No. **Safe to defer?** Yes.
+
+### Decision 3 — Should you be able to start a pricing change for a customer who's been deactivated?
+
+- **Journey:** B-011
+- **Domain:** Commercial pricing
+- **What happens today:** For general customer-detail changes, the system blocks you from starting a new request if the customer is inactive. For pricing/commercial changes specifically, it doesn't — that door is still open.
+- **Why this came up:** These two similar features were built at different times and ended up with different rules.
+- **Business risk if left as-is:** Someone could keep amending pricing terms for a customer that's supposedly "off," which may or may not be what you want.
+- **Option A:** Make pricing changes follow the same rule as general changes (blocked for inactive customers).
+- **Option B:** Leave it as an intentional exception (e.g. to let someone finish paperwork that was already in progress).
+- **My recommendation:** Option A, for consistency, but this is your call on what "inactive" is supposed to mean.
+- **Blocks Batch 14?** No. **Blocks any later known batch?** No. **Safe to defer?** Yes.
+
+### Decision 4 — Same question, but for approving (not just starting) a change on a now-inactive customer
+
+- **Journey:** C-030
+- **Domain:** Customer changes
+- **What happens today:** If a change request was already submitted before a customer was deactivated, it can still be approved afterward, no questions asked. In practice this rarely comes up today because of an unrelated technical coincidence, but there's no real rule stopping it.
+- **Why this came up:** We tested what happens if deactivation and an in-flight change overlap in time.
+- **Business risk if left as-is:** In a narrow timing window, a change could still be applied to a customer that's already been marked inactive.
+- **Option A:** Block approval outright once a customer is inactive, no matter when the request was started.
+- **Option B:** Allow it, on the theory that "inactive" should stop new requests, not kill ones already underway.
+- **My recommendation:** None offered — depends on what "deactivate" is supposed to mean for your business.
+- **Blocks Batch 14?** No. **Blocks any later known batch?** No. **Safe to defer?** Yes.
+
+### Decision 5 — Can a "Finance Analyst" role be limited to only certain customers, or does every role see everything?
+
+- **Journey:** D-022
+- **Domain:** Whole system, not just one feature
+- **What happens today:** This is confirmed, by design, in your own architecture notes, not a bug: every permission in Nexus today is all-or-nothing. If someone can view customer records at all, they can view every customer's records. There's no way today to say "this person can only see customers in Region X" or "only see Customer Y." Your own project documentation already flags this as a known, deliberate first-version limitation, with a designed (but not-yet-built) path to add it later if you ever need it.
+- **Why this came up:** We went looking for this specifically and confirmed it's true everywhere, not just in one place.
+- **Business risk if left as-is:** None right now — this was a conscious choice for version 1, not an accident, and the system currently has very few real users anyway. The only risk is if you later hire people who should only see a subset of customers and this isn't built yet.
+- **Option A:** Build the "limit access to specific customers/regions" capability now.
+- **Option B:** Leave it as-is until you actually have a role that needs it.
+- **My recommendation:** Option B — this was clearly a deliberate choice, not an oversight, and building it before you need it would be guessing at requirements you don't have yet.
+- **Blocks Batch 14?** No. **Blocks any later known batch?** No. **Safe to defer?** Yes, indefinitely, until there's a real need.
+
+### Decision 6 — Should "fixing a past pricing mistake" be able to reach further back in time?
+
+- **Journey:** E-015
+- **Domain:** Commercial pricing
+- **What happens today:** There's a "correction" option for fixing pricing mistakes, but it can only backdate as far as the start of the customer's CURRENT pricing period. If a mistake happened several pricing changes ago, you can't use this feature to fix it retroactively that far back — only within the current period.
+- **Why this came up:** We tested trying to correct something from a while back and hit this wall.
+- **Business risk if left as-is:** A "correction" tool that can't actually correct older mistakes might be confusing or insufficient if that scenario ever comes up.
+- **Option A:** Let corrections reach further back in time than the current period.
+- **Option B:** Keep it limited to the current period, on the theory that reopening older, possibly-already-invoiced periods is intentionally risky and should require a different process.
+- **My recommendation:** None offered — depends on whether you'd ever actually want to reopen old, possibly-already-billed periods through this tool.
+- **Blocks Batch 14?** No. **Blocks any later known batch?** No. **Safe to defer?** Yes.
 
 ---
 
@@ -108,7 +188,8 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Affected journey/chain: B-017 only, directly. No other Batch 8-13 journey depends on this fix being applied; it is a defense-in-depth database-layer gap, not a currently-reachable application-layer hole (the real app only ever reaches `customers` through the two sanctioned RPCs and RLS-gated roles).
 - Tests already passing: none yet (the fix has not been applied; a regression test will be authored once it is).
 - Exact resume instruction: review `supabase/migrations/20260930080000_fix_customer_lifecycle_guard_governed_field_write_protection.sql`, then run `npx supabase db push --linked` (requires `supabase login` or `SUPABASE_ACCESS_TOKEN` and the project database password) once approved. After applying, live-verify against a disposable test customer that the guard now holds and that the two sanctioned writer RPCs still succeed unchanged; add automated regression coverage if this codebase's test infrastructure is extended to support live-database trigger tests.
-- Status: **PARKED**
+- **RESOLVED 2026-09-21 (morning catch-up).** Utkarsh gave explicit go-ahead in chat after reviewing the finding and fix summary. Applied via `npx supabase db push --linked`; `npx supabase migration list --linked` confirms `20260930080000` now shows `remote` matching `local` (all 84 migrations in sync). Live-verified against a disposable test customer: a direct governed-field UPDATE is now rejected (`"...may only be changed by a sanctioned writer RPC..."`), a direct `is_active` UPDATE is now rejected, direct DELETE remains rejected (unchanged), a non-governed system column (`updated_by`) remains directly settable (correctly unaffected), and both sanctioned writer RPCs (`approve_customer_change_request` full 3-node approval chain; `set_customer_active` deactivate/reactivate/idempotent-no-op) still work exactly as before, including correct `customer_field_history` writes. Full vitest suite (927 tests) still passes. See `docs/journey-runs/BATCH_09_RESULTS.md`'s Morning Catch-Up Outcome section on B-017 for the complete verification record.
+- Status: **RESOLVED**
 
 ---
 
@@ -122,3 +203,4 @@ Created at the start of the NEXUS END-TO-END BUSINESS JOURNEY VALIDATION overnig
 - Batch 11 closed: 25/25 scheduled journeys resolved (18 PASS, 2 product-gap findings covering 6 journeys, 1 PRODUCT DECISION REQUIRED/PD-005). Confirmed no governed deactivate path exists anywhere for Commercial Configuration (affects D-003/D-004/D-015/D-021). Re-confirmed the previously-documented legacy `create_commercial_change_for_configuration` RPC is still live at the database layer but orphaned in the application layer (D-017). Most significant finding: no per-customer/per-territory data isolation exists anywhere in the current permission model, for any domain (D-022, PD-005), a platform-wide architectural question, not a bounded defect. Positive contrast: the Commercial Configuration domain's own lifecycle triggers correctly protect governed financial fields (FX rate, transaction currency, effective_to write-once) against direct-bypass writes, unlike the `customers` table's B-017 gap. Full detail in BATCH_11_RESULTS.md.
 - Batch 12 closed: 25/25 scheduled journeys resolved (21 PASS, 1 PRODUCT DECISION REQUIRED/PD-006, 2 product-gap findings). E-021 empirically corrected the journey universe's own prior assumption about Decision-node routing timing (resolved at submission, not draft creation, for Commercial Configuration Version). E-023 confirmed concurrent drafts are structurally impossible (a unique constraint enforces exactly one open version per configuration at a time), a stronger safety property than the journey anticipated. E-015 found `correction`-category changes cannot backdate past the currently active period's start, recorded as PD-006. C-027 (deferred from Batch 10) remains unresolved: the real Decision-node workflow in this domain also has an unconditional Default edge, making `WORKFLOW_DECISION_NO_MATCH` structurally unreachable without purpose-building a broken graph, judged disproportionate effort this run. Full detail in BATCH_12_RESULTS.md.
 - Batch 13 closed (FINAL SCHEDULED BATCH OF THIS OVERNIGHT RUN, Batch 14 not executed per exact scope): 25/25 scheduled journeys resolved (21 PASS, 2 product-gap findings, no new product decisions). F-014 empirically confirmed (not merely inferred) that a negative commercial rate can be persisted with zero backstop via a direct RPC call, bypassing the TS service layer's validation, though this is a documented deliberate architectural deferral per the migration's own comment, not a silent oversight. F-020 confirmed no support/debug surface exposes the raw `pricing_rule_kind` value anywhere (P3, low impact). C-027 remains unresolved (see Batch 12's note above). Full detail in BATCH_13_RESULTS.md.
+- **Morning catch-up (2026-09-21):** baseline re-verified (local HEAD, `origin/team-preview`, Vercel Preview, and the stable Git-branch alias all matched `b0b975f`; all migrations in sync except the one known parked one). PM-001 reviewed exhaustively (byte-diffed against live RPC bodies, cross-checked against the full 25-field governed-field registry, exhaustively confirmed no other code path writes to `customers` via UPDATE), then applied with Utkarsh's explicit real-time authorization after an initial ambiguous tool response; live-verified correct (governed-field/`is_active` direct writes now rejected, DELETE still rejected, both sanctioned RPCs unaffected, full test suite green). B-007 executed for the first time: former-name search confirmed working end to end through real production code (multi-rename customer, correct merge/labeling, current name correctly excluded from former-name results), with one precise minor finding (the display picks the most-recently-changed historical value, not necessarily the one that most specifically matches the search term, when a customer has overlapping-substring historical names). C-027 executed for the first time, closing this project's last remaining "needs a broken Decision-node graph" gap: with Utkarsh's explicit authorization for the brief, reversible live-workflow swap this required, built a dedicated probe workflow, confirmed `WORKFLOW_DECISION_NO_MATCH` fires correctly with zero state corruption, then restored the original active workflow, confirmed via direct query. All six pending product decisions re-reviewed and reframed in plain business English as decision cards; PD-005 specifically re-classified from "architectural gap" to "intended current model with a documented, unbuilt extension path," based on direct evidence in `docs/AUTHORIZATION_MODEL.md` §5/§18 rather than inference. No decision blocks Batch 14.
