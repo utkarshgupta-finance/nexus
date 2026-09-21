@@ -162,6 +162,22 @@ async function validateOnboardingCaseReadyForSubmit(requestId: string, rawData: 
   }
 }
 
+/**
+ * PD-005 follow-up (Product Decision Closure): the business_unit value
+ * recorded on this case's own submitted form data, or null if there is
+ * none yet (a case's own business_unit is a raw form field, not a
+ * normalized column, since a case has no resolved `customers` row of
+ * its own until approval). Used to scope reviewer actions before a real
+ * customer exists to scope by, matching the same pattern
+ * `toReviewQueueEntries` already uses to read a case's display fields.
+ */
+async function getOnboardingCaseBusinessUnit(requestId: string): Promise<string | null> {
+  const latest = await caseData.getLatestRevisionForRequest(requestId)
+  const values = latest?.status === "submitted" && latest.effective_data ? latest.effective_data.values : (latest?.raw_data ?? {})
+  const businessUnit = values[CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit]
+  return typeof businessUnit === "string" && businessUnit.length > 0 ? businessUnit : null
+}
+
 /** Serves both a first Submit and a post-send-back Resubmit: the RPC itself derives which one applies from the case's current status. */
 async function submitOnboardingCase(requestId: string, actorUserId: string): Promise<CustomerOnboardingCase> {
   const draft = await caseData.getLatestRevisionForRequest(requestId)
@@ -295,6 +311,17 @@ type ReviewQueueEntry = {
   /** Workflow Runtime V1 Sequential Execution: which Approval node this case is currently sitting at, and the workflow version it is bound to. */
   workflowVersionId: string | null
   currentWorkflowNodeKey: string | null
+  /**
+   * PD-005 follow-up (Product Decision Closure): `customerId` is set only
+   * once the case has been approved into a real Customer Master row
+   * (`approve_customer_onboarding_case`); before that it is null and
+   * `businessUnit`, the case's own raw form field, is the only scoping
+   * signal available. Callers filtering this list for scoped visibility
+   * must check both, exactly like `hasPermissionForCustomer`/
+   * `hasPermissionForBusinessUnit` already do for the single-case reads.
+   */
+  customerId: string | null
+  businessUnit: string | null
 }
 
 async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.listCasesAwaitingReview>>): Promise<ReviewQueueEntry[]> {
@@ -304,6 +331,7 @@ async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.lis
     const revisions = revisionsByRequestId.get(row.request_id) ?? []
     const latest = revisions[revisions.length - 1]
     const values = latest?.status === "submitted" && latest.effective_data ? latest.effective_data.values : (latest?.raw_data ?? {})
+    const businessUnit = values[CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit]
     entries.push({
       requestId: row.request_id,
       caseNumber: row.case_number,
@@ -315,6 +343,8 @@ async function toReviewQueueEntries(rows: Awaited<ReturnType<typeof caseData.lis
       updatedAt: row.updated_at,
       workflowVersionId: row.workflow_version_id,
       currentWorkflowNodeKey: row.current_workflow_node_key,
+      customerId: row.customer_id,
+      businessUnit: typeof businessUnit === "string" && businessUnit.length > 0 ? businessUnit : null,
     })
   }
   return entries
@@ -384,6 +414,12 @@ async function approveOnboardingCase(
           mug_threshold_value: mapped.mugThresholdValue,
         }
       })
+
+      // PD-002 (Product Decision Closure, end-to-end verification fix):
+      // must be its own prior statement/transaction, not something
+      // approveCase's own RPC could do itself; see
+      // ensureOnboardingEffectiveDateException's own header for why.
+      await caseData.ensureOnboardingEffectiveDateException(requestId, effectiveDate, actorUserId)
 
       const row = await caseData.approveCase({
         requestId,
@@ -464,5 +500,6 @@ export {
   getOnboardingOriginForCustomer,
   listApprovedCaseTaxIdentity,
   approveOnboardingEffectiveDateException,
+  getOnboardingCaseBusinessUnit,
 }
 export type { ReviewQueueEntry, ApprovedCaseTaxIdentity, OnboardingSendBackEntry, OnboardingFieldCommentEntry, MyOnboardingRequestEntry }

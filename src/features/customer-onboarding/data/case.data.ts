@@ -116,13 +116,43 @@ type OnboardingEffectiveDateExceptionRow = {
 }
 
 /**
+ * PD-002 (Product Decision Closure, end-to-end verification fix,
+ * supabase/migrations/20260930140000_fix_onboarding_effective_date_exception_atomicity.sql):
+ * durably records, in its own statement/transaction, that this case's
+ * chosen effective_date is before its onboarding date. Must be called
+ * BEFORE `approveCase` whenever finalizing an approval: a Postgres RPC
+ * call is one implicit transaction, so `approveCase`'s own
+ * ONBOARDING_EFFECTIVE_DATE_EXCEPTION_PENDING raise would otherwise roll
+ * back an exception row it tried to insert in that same call, and the
+ * row would never actually persist for a BU Head/Finance Head to act on.
+ * Returns null (not an error) when the date is not actually backdated,
+ * so callers may call this unconditionally before every finalizing
+ * approve, not only the backdated ones.
+ */
+async function ensureOnboardingEffectiveDateException(
+  requestId: string,
+  effectiveDate: string,
+  actorUserId: string
+): Promise<OnboardingEffectiveDateExceptionRow | null> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.rpc("ensure_onboarding_effective_date_exception", {
+    p_request_id: requestId,
+    p_effective_date: effectiveDate,
+    p_actor_user_id: actorUserId,
+  })
+  if (error) throw new CaseOperationError(parseCaseError(error))
+  return (data as OnboardingEffectiveDateExceptionRow | null) ?? null
+}
+
+/**
  * PD-002 (A-034, Batches 1-13 Ledger Audit product decision closure):
  * records one role's sign-off on a pending backdated-effective-date
  * exception (supabase/migrations/20260930120000_onboarding_effective_date_exception_approval.sql).
- * The exception row itself is created lazily by approve_customer_onboarding_case
- * the first time it detects a backdated effective_date; calling this
- * before that has happened is a genuine ordering error, surfaced as
- * ONBOARDING_EXCEPTION_NOT_FOUND, not silently accepted.
+ * The exception row itself is created durably by
+ * `ensureOnboardingEffectiveDateException` (see above), never by this
+ * RPC or by `approveCase` itself; calling this before that has happened
+ * is a genuine ordering error, surfaced as ONBOARDING_EXCEPTION_NOT_FOUND,
+ * not silently accepted.
  */
 async function approveOnboardingEffectiveDateException(
   caseRequestId: string,
@@ -294,6 +324,7 @@ export {
   submitCase,
   sendBackCase,
   approveCase,
+  ensureOnboardingEffectiveDateException,
   cancelCase,
   getCaseByRequestId,
   getCaseByCustomerId,

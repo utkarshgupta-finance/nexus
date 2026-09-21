@@ -22,6 +22,8 @@ const listRevisionsForRequest = vi.fn()
 const listApprovedCases = vi.fn()
 const listRevisionsForRequests = vi.fn()
 const getCaseByRequestId = vi.fn()
+const ensureOnboardingEffectiveDateException = vi.fn()
+const approveCase = vi.fn()
 
 vi.mock("../data/case.data", () => ({
   getLatestRevisionForRequest: (...args: unknown[]) => getLatestRevisionForRequest(...args),
@@ -30,6 +32,8 @@ vi.mock("../data/case.data", () => ({
   listApprovedCases: (...args: unknown[]) => listApprovedCases(...args),
   listRevisionsForRequests: (...args: unknown[]) => listRevisionsForRequests(...args),
   getCaseByRequestId: (...args: unknown[]) => getCaseByRequestId(...args),
+  ensureOnboardingEffectiveDateException: (...args: unknown[]) => ensureOnboardingEffectiveDateException(...args),
+  approveCase: (...args: unknown[]) => approveCase(...args),
 }))
 
 const listOnboardingDocuments = vi.fn()
@@ -42,7 +46,7 @@ vi.mock("@/features/customers/server", () => ({
   listCustomerMaster: (...args: unknown[]) => listCustomerMaster(...args),
 }))
 
-import { submitOnboardingCase, getOnboardingCase } from "./case.service"
+import { submitOnboardingCase, getOnboardingCase, approveOnboardingCase } from "./case.service"
 
 const COMPLETE_CUSTOMER_DETAILS = {
   customer_legal_entity_name: "Batch7 Test Co",
@@ -213,5 +217,53 @@ describe("getOnboardingCase creator-only draft visibility (PD-001, A-036)", () =
     listRevisionsForRequest.mockResolvedValue([])
     const result = await getOnboardingCase("no-such-request", "maker-a")
     expect(result).toBeNull()
+  })
+})
+
+/**
+ * PD-002 (Product Decision Closure, end-to-end verification fix,
+ * supabase/migrations/20260930140000_fix_onboarding_effective_date_exception_atomicity.sql):
+ * live-testing found that `approve_customer_onboarding_case` could never
+ * durably create the `onboarding_effective_date_exceptions` row itself,
+ * since a Postgres RPC call is one implicit transaction and the row's
+ * insert was in the same statement as the raise that then rolled it
+ * back. The fix moves that durable creation to its own RPC
+ * (`ensureOnboardingEffectiveDateException`), which the service must
+ * call as a genuinely separate, prior statement before `approveCase`.
+ * This guards that ordering at the TypeScript call-site level, so a
+ * future refactor cannot silently drop or reorder it.
+ */
+describe("approveOnboardingCase calls ensureOnboardingEffectiveDateException before approveCase (PD-002)", () => {
+  const APPROVABLE_REVISION = {
+    ...SUBMITTED_REVISION_ROW,
+    effective_data: {
+      values: {
+        customer_legal_entity_name: "PD-002 Regression Co",
+        commercial_rate: { billingCurrency: "INR", components: [{ id: "c-1", nature: "non_recurring", pricingModel: "flat_fee", amount: 1000, invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: null }, revenueRecognition: { method: "full_recognition" } }] },
+      },
+    },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getLatestRevisionForRequest.mockResolvedValue(APPROVABLE_REVISION)
+    listRevisionsForRequest.mockResolvedValue([APPROVABLE_REVISION])
+    ensureOnboardingEffectiveDateException.mockResolvedValue(null)
+    approveCase.mockResolvedValue({ request_id: "req-1", status: "approved" })
+  })
+
+  it("calls ensureOnboardingEffectiveDateException, and only then approveCase, on every finalizing approval", async () => {
+    await approveOnboardingCase("req-1", "checker-1", {} as never, "2026-01-01")
+
+    expect(ensureOnboardingEffectiveDateException).toHaveBeenCalledWith("req-1", "2026-01-01", "checker-1")
+    expect(approveCase).toHaveBeenCalledTimes(1)
+    expect(ensureOnboardingEffectiveDateException.mock.invocationCallOrder[0]).toBeLessThan(approveCase.mock.invocationCallOrder[0])
+  })
+
+  it("still calls approveCase even for an ordinary, non-backdated effective_date (ensure is a safe no-op there)", async () => {
+    await approveOnboardingCase("req-1", "checker-1", {} as never, "2099-01-01")
+
+    expect(ensureOnboardingEffectiveDateException).toHaveBeenCalledWith("req-1", "2099-01-01", "checker-1")
+    expect(approveCase).toHaveBeenCalledTimes(1)
   })
 })
