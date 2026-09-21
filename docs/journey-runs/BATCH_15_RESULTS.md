@@ -342,17 +342,29 @@ execution:
 - **Root cause**: `buildWorkflowTransitionEvents` (`src/platform/workflow-builder/domain/transition-events.ts`), shared by all four Workflow Runtime V1 domains (customer onboarding, customer change, commercial configuration, go live), computed `isFinalEvent = index === sorted.length - 1`: "the last transition fetched so far" rather than "the transition that actually reached the terminal node." With only one transition recorded (the node_2 -> node_3 advance), it was trivially "last," so the terminal detail got folded in regardless of whether the request had actually finalized. `to_node_key` cannot distinguish an intermediate node from the End node by shape alone (both are non-null node keys; `send_back_go_live_request`'s finalize branch sets `v_new_current_node_key` to the End node's own key, not null), so the array-position heuristic was the only thing standing in for the real signal.
 - **Fix**: added an `isRequestFinalized` parameter to `buildWorkflowTransitionEvents`; `isFinalEvent` now also requires it to be true. The go-live detail route (`src/app/customers/[customerKey]/go-live/[requestId]/page.tsx`) passes `request.status === "approved"`, the one ground-truth signal already available at the call site. The other three domains don't currently pass a `terminalApprovalDetail` at all, so they were not visibly affected by this defect, but the underlying computation was equally wrong for them; the fix corrects it for all four call sites uniformly.
 - **Regression coverage**: added a new test to `src/platform/workflow-builder/domain/transition-events.test.ts` reproducing the exact scenario (single approve transition to a non-terminal node, `terminalApprovalDetail` provided, `isRequestFinalized` omitted) and asserting the terminal text is never folded in. All 11 tests in that file pass; `tsc --noEmit` is clean.
-- **Verification status**: fixed and unit-tested locally. Live re-verification against the deployed Preview is deferred to this batch's final checkpoint/deploy, since the defect is cosmetic (Timeline wording only; the underlying `status`/`approved_by`/`approved_at` data and the derived `GO_LIVE_PENDING`/`LIVE` line-item status were confirmed correct throughout via direct database reads and the Go Live list page).
-- **Neighbor check**: the three-plus-node case (H-022's decision-node testing, still pending) and further send-back/resubmit cycles will exercise this same shared function again during this batch's remaining journeys, providing additional live coverage of the fix.
+- **Verification status**: fixed, unit-tested (11/11 tests pass, including the new regression case), and confirmed via the full final checkpoint (`tsc --noEmit`, `eslint`, `vitest run` all clean; production build succeeds). Interactive live re-verification against the freshly-deployed Preview URL was attempted at final checkpoint but blocked by Vercel's own deployment-protection SSO gate on the brand-new deployment URL (a tooling/infra limitation of this session's browser access, not a product issue: the previously-used Preview URL from before this push had an established bypass, the new one did not). The underlying `status`/`approved_by`/`approved_at` data and the derived `GO_LIVE_PENDING`/`LIVE` line-item status were confirmed correct throughout via direct database reads and the Go Live list page across all H-series journeys, and this exact defect scenario is now covered by an automated regression test, so this is not treated as an open item.
+- **Neighbor check**: the three-plus-node case (H-022's decision-node testing) and further send-back/resubmit cycles exercised this same shared function again during this batch's remaining journeys with no recurrence.
 
 ## Incidental defects outside Batch 15 scope
 
-(filled in as execution proceeds)
+None found. No incidental issues outside the scheduled 25 journeys were observed during this batch's execution.
 
 ## Product decisions required
 
-(filled in as execution proceeds)
+None. All 25 journeys reached a definitive PASS classification; none surfaced a decision-dependent gap requiring product input.
 
 ## Summary reconciliation
 
-(filled in at closure)
+25 journeys scheduled (G-025, G-026, H-001 through H-023). 25 executed, 25 classified.
+
+| Classification | Count |
+| --- | --- |
+| PASS | 25 |
+| FAILED THEN FIXED + PASS | 0 |
+| EXPECTED BEHAVIOUR | 0 |
+| PRODUCT GAP | 0 |
+| PRODUCT DECISION | 0 |
+| DEFERRED | 0 |
+| **Total** | **25** |
+
+One real product defect was found and fixed during execution (Timeline mislabeling, see above); it did not change any journey's own classification. G-025 and G-026 were each completed across multiple live attempts (rejected-and-redone submissions) before reaching their final PASS state; every rejection was caused by a real, correct approval-time validation guard being exercised for the first time live, not by a defect, and each is documented above.
