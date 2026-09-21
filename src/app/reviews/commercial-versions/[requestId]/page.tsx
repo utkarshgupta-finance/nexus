@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
-import { hasPermission } from "@/platform/permissions/server"
+import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { loadVersion, getCommercialVersionDiff, loadCommercialVersionTimeline } from "@/features/customer-onboarding/server"
 import { CommercialVersionReviewPage } from "@/features/customer-onboarding/ui/commercial-version-review-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
@@ -29,9 +29,15 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
 
   const canDecide = await hasPermission("commercial_configuration", "approve")
 
+  // PD-005 follow-up (Product Decision Closure): resolve the owning
+  // customer once, outside the display-only try/catch below, so the
+  // scoped read check below it is never silently skipped by a display
+  // failure.
+  const configuration = await commercialConfigurationService.getCommercialConfiguration(version.commercialConfigurationId)
+  const canAccessThisVersion = configuration ? await hasPermissionForCustomer("commercial_configuration", "read", configuration.customerId) : false
+
   let customerName = "Commercial Configuration Version Review"
   try {
-    const configuration = await commercialConfigurationService.getCommercialConfiguration(version.commercialConfigurationId)
     const customer = configuration ? await getCustomerById(configuration.customerId) : null
     customerName = customer?.name ?? customerName
   } catch {
@@ -55,7 +61,12 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
   const timeline = await loadCommercialVersionTimeline(requestId)
 
   return (
-    <AuthGate session={session} requiredPermission={COMMERCIAL_CONFIGURATION_READ} loginRedirectTo={`/reviews/commercial-versions/${requestId}`}>
+    <AuthGate
+      session={session}
+      requiredPermission={COMMERCIAL_CONFIGURATION_READ}
+      loginRedirectTo={`/reviews/commercial-versions/${requestId}`}
+      additionalAccessGranted={canAccessThisVersion}
+    >
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
         <CommercialVersionReviewPage
           requestId={requestId}

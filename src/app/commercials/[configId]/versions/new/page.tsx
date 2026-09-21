@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
+import { PageHeader } from "@/components/product/page-header"
 import { getCurrentNexusSession } from "@/platform/auth/server"
-import { requirePermission } from "@/platform/permissions/server"
+import { requirePermissionForCustomer, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { createVersionFromActive, listVersionsForConfiguration } from "@/features/customer-onboarding/services/commercial-version.service"
 import { CommercialVersionOperationError } from "@/features/customer-onboarding/domain/commercial-version-errors"
@@ -23,7 +24,7 @@ async function CreateAndRedirect({ configId }: { configId: string }) {
   const configuration = await commercialConfigurationService.getCommercialConfiguration(configId)
   if (!configuration) notFound()
 
-  const actor = await requirePermission("commercial_configuration", "write")
+  const actor = await requirePermissionForCustomer("commercial_configuration", "write", configuration.customerId)
 
   /**
    * Real defect found via live retest: visiting this bare route while a
@@ -40,11 +41,38 @@ async function CreateAndRedirect({ configId }: { configId: string }) {
     const version = await createVersionFromActive(configId, "amendment", actor.appUserId)
     redirectTarget = `/commercials/${configId}/versions/${version.requestId}`
   } catch (error) {
-    if (!(error instanceof CommercialVersionOperationError) || error.commercialVersionError.kind !== "commercial_version_already_open") throw error
-    const versions = await listVersionsForConfiguration(configId)
-    const openVersion = versions.find((existing) => existing.status === "draft" || existing.status === "submitted")
-    if (!openVersion) throw error
-    redirectTarget = `/commercials/${configId}/versions/${openVersion.requestId}`
+    if (!(error instanceof CommercialVersionOperationError)) throw error
+
+    if (error.commercialVersionError.kind === "commercial_version_already_open") {
+      const versions = await listVersionsForConfiguration(configId)
+      const openVersion = versions.find((existing) => existing.status === "draft" || existing.status === "submitted")
+      if (!openVersion) throw error
+      redirectTarget = `/commercials/${configId}/versions/${openVersion.requestId}`
+      redirect(redirectTarget)
+      return null
+    }
+
+    /**
+     * PD-003 (Product Decision Closure, manual UX verification fix):
+     * live-testing found this bare create-and-redirect route had no
+     * catch for the real, working server-side block
+     * (COMMERCIAL_VERSION_CUSTOMER_INACTIVE), so the honest RPC
+     * rejection surfaced as a raw "This page couldn't load" crash
+     * instead of an explained state, matching Customer Change's own
+     * wording for the identical rule (`createChangeRequestAction`).
+     */
+    if (error.commercialVersionError.kind === "commercial_version_customer_inactive") {
+      return (
+        <div className="flex flex-1 flex-col">
+          <PageHeader
+            title="Customer is inactive"
+            description="This customer is inactive. Reactivate the customer before creating a new Commercial Configuration Version."
+          />
+        </div>
+      )
+    }
+
+    throw error
   }
 
   redirect(redirectTarget)
@@ -55,8 +83,21 @@ export default async function NewCommercialConfigurationVersionRoute({ params }:
   const { configId } = await params
   const session = await getCurrentNexusSession()
 
+  // PD-005 follow-up (Product Decision Closure): scope the gate itself by
+  // the configuration's customer, matching the scoped check CreateAndRedirect
+  // now enforces before the actual mutation.
+  const configuration = await commercialConfigurationService.getCommercialConfiguration(configId)
+  const canAccessThisConfiguration = configuration
+    ? await hasPermissionForCustomer("commercial_configuration", "write", configuration.customerId)
+    : false
+
   return (
-    <AuthGate session={session} requiredPermission={COMMERCIAL_CONFIGURATION_WRITE} loginRedirectTo={`/commercials/${configId}/versions/new`}>
+    <AuthGate
+      session={session}
+      requiredPermission={COMMERCIAL_CONFIGURATION_WRITE}
+      loginRedirectTo={`/commercials/${configId}/versions/new`}
+      additionalAccessGranted={canAccessThisConfiguration}
+    >
       <CreateAndRedirect configId={configId} />
     </AuthGate>
   )

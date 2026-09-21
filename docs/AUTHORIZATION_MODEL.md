@@ -176,11 +176,26 @@ described below.
 screen for granting a scoped role (today, `grant_scoped_user_role` is
 callable but has no dedicated Settings screen; the existing User Access
 page's role-grant control still only performs a global grant). Tracked
-in `docs/TECH_DEBT.md`, not silently left inconsistent. Full read/write
-enforcement has been applied to Customer Master and Commercial
-Configuration; Customer Onboarding, Customer Change, and Commercial
-Change still rely on the coarse global permission only pending the same
-integration, also tracked in `docs/TECH_DEBT.md`.
+in `docs/TECH_DEBT.md`, not silently left inconsistent.
+
+**Domain coverage completed (Product Decision Closure Phase 3,
+2026-09-21):** full read/write enforcement now covers all five domains
+PD-005 named: Customer Master, Customer Onboarding, Customer Change,
+Commercial Configuration, and Commercial Change. Onboarding scopes by
+the resolved customer once approval creates one, or by the case's own
+`business_unit` form field before that (`hasPermissionForBusinessUnit`/
+`requirePermissionForBusinessUnit`, `fn_user_has_business_unit_scoped_
+permission`, `supabase/migrations/20260930130000_scoped_authorization_
+bulk_and_business_unit_checks.sql`). Customer Master's own list/search
+surface (`src/app/customers/page.tsx`) and the shared Approvals inbox/
+My Work/Operational Queue composer (`src/platform/approvals/server.ts`,
+via the new bulk `getVisibleCustomerIds`/`getVisibleBusinessUnits`/
+`hasAnyPermission`) are now genuinely row-filtered for a scoped caller,
+not only gated at the page level; the direct-ID onboarding API route
+(`/api/v1/onboarding/[id]`) is scoped the same way as its browser
+counterpart. Go-live entries in the shared list composer remain
+deliberately unscoped, since go-live was never one of PD-005's five
+named domains; tracked in `docs/TECH_DEBT.md`.
 
 ## 6. Enforcement layers
 
@@ -412,11 +427,16 @@ UI" limitation, below), never relaxing `canReadSettings`'s own check.
   resolved by `fn_user_has_customer_scoped_permission`/
   `hasPermissionForCustomer`/`requirePermissionForCustomer` for Business
   Unit, Territory, and specific-Customer scope. Full detail in §5.
-  Remaining, explicitly tracked (not silently left inconsistent, see
+  Domain coverage completed 2026-09-21 (Product Decision Closure Phase
+  3): enforcement now spans all five domains PD-005 named (Customer
+  Master, Customer Onboarding, Customer Change, Commercial
+  Configuration, Commercial Change), including list/search filtering
+  and direct-ID access, not only detail-page gating. Remaining,
+  explicitly tracked (not silently left inconsistent, see
   `docs/TECH_DEBT.md`): no dedicated admin UI screen for granting a
-  scoped role yet (RPC-only); enforcement applied to Customer Master and
-  Commercial Configuration reads so far, not yet to Customer Onboarding,
-  Customer Change, or Commercial Change.
+  scoped role yet (RPC-only); go-live list entries in the shared
+  Approvals/My Work/Operational Queue composer remain unscoped, since
+  go-live was never one of PD-005's five named domains.
 - **Self-service provisioning UI: CLOSED (Platform Operating Expansion,
   Phase J).** The User Access module (`/settings/user-access`) is now a
   real Settings screen for exactly this: `provision_app_user` creates the

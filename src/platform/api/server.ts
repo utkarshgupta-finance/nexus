@@ -2,7 +2,7 @@ import "server-only"
 
 import { NextResponse } from "next/server"
 
-import { requirePermission } from "@/platform/permissions/server"
+import { requirePermission, requirePermissionForCustomer, requirePermissionForBusinessUnit } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import type { ActiveNexusUser } from "@/platform/auth"
 import { ApplicationError, toApplicationErrorResponse, toUnexpectedErrorResponse } from "@/platform/errors"
@@ -29,6 +29,41 @@ import { codeForDenialReason, httpStatusForCode } from "./domain/status"
 async function requireApiPermission(resource: string, action: string, correlationId: string): Promise<ActiveNexusUser> {
   try {
     return await requirePermission(resource, action)
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      throw new ApplicationError(codeForDenialReason(error.reason), error.message, correlationId)
+    }
+    throw error
+  }
+}
+
+/**
+ * PD-005 follow-up (Product Decision Closure): the API-layer counterpart
+ * to `requireApiPermission`, for a route whose resource is scoped to one
+ * customer (the direct-ID onboarding/change-request/commercial-version
+ * reads). Same error-shaping contract: callers only ever catch
+ * `ApplicationError`.
+ */
+async function requireApiPermissionForCustomer(resource: string, action: string, customerId: string, correlationId: string): Promise<ActiveNexusUser> {
+  try {
+    return await requirePermissionForCustomer(resource, action, customerId)
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      throw new ApplicationError(codeForDenialReason(error.reason), error.message, correlationId)
+    }
+    throw error
+  }
+}
+
+/** Same as `requireApiPermissionForCustomer`, for the pre-customer-existence onboarding case reads (scoped by business_unit instead). */
+async function requireApiPermissionForBusinessUnit(
+  resource: string,
+  action: string,
+  businessUnit: string | null,
+  correlationId: string
+): Promise<ActiveNexusUser> {
+  try {
+    return await requirePermissionForBusinessUnit(resource, action, businessUnit)
   } catch (error) {
     if (error instanceof AuthorizationError) {
       throw new ApplicationError(codeForDenialReason(error.reason), error.message, correlationId)
@@ -68,4 +103,4 @@ async function handleApiV1Request(
   }
 }
 
-export { requireApiPermission, handleApiV1Request, jsonError }
+export { requireApiPermission, requireApiPermissionForCustomer, requireApiPermissionForBusinessUnit, handleApiV1Request, jsonError }

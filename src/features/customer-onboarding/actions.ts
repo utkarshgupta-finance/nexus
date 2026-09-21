@@ -1,6 +1,6 @@
 "use server"
 
-import { requirePermission } from "@/platform/permissions/server"
+import { requirePermission, requirePermissionForCustomer, requirePermissionForBusinessUnit } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import { withCorrelationReference } from "@/platform/errors"
 import { CaseOperationError } from "./domain/case-errors"
@@ -18,6 +18,7 @@ import {
   cancelOnboardingCase,
   listApprovedCaseTaxIdentity,
   approveOnboardingEffectiveDateException,
+  getOnboardingCaseBusinessUnit,
 } from "./services/case.service"
 import {
   createVersionFromActive,
@@ -26,6 +27,7 @@ import {
   rejectVersion,
   approveVersion,
   cancelVersion,
+  loadVersion,
 } from "./services/commercial-version.service"
 import { uploadOnboardingDocument, getOnboardingDocumentDownloadUrl } from "./services/documents.service"
 import { findPotentialDuplicates } from "./domain/duplicate-detection"
@@ -110,7 +112,11 @@ async function sendBackOnboardingCaseAction(
   fieldComments?: { fieldKey: string; comment: string }[]
 ): Promise<CaseActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    // PD-005 follow-up (Product Decision Closure): a case has no
+    // resolved customer yet pre-approval, so scoping here uses the
+    // case's own business_unit form field, not a customer id.
+    const businessUnit = await getOnboardingCaseBusinessUnit(requestId)
+    const actor = await requirePermissionForBusinessUnit("customer", "approve", businessUnit)
     const onboardingCase = await sendBackOnboardingCase(requestId, reason, targetStageKey, actor.appUserId, fieldComments)
     return { ok: true, onboardingCase }
   } catch (error) {
@@ -126,7 +132,11 @@ type ApproveCaseActionResult =
 /** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve; see toCaseActionError's own comment for the stale-approval UX this enables. */
 async function approveOnboardingCaseAction(requestId: string, effectiveDate: string, expectedCurrentNodeKey: string | null = null): Promise<ApproveCaseActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    // PD-005 follow-up (Product Decision Closure): same business_unit
+    // scoping as sendBackOnboardingCaseAction, for the same reason (no
+    // resolved customer exists until this call itself creates one).
+    const businessUnit = await getOnboardingCaseBusinessUnit(requestId)
+    const actor = await requirePermissionForBusinessUnit("customer", "approve", businessUnit)
     const snapshot = await loadReferenceMasterSnapshot()
     const onboardingCase = await approveOnboardingCase(requestId, actor.appUserId, snapshot, effectiveDate, expectedCurrentNodeKey)
     const customer = onboardingCase.customerId ? await getCustomerById(onboardingCase.customerId) : null
@@ -213,8 +223,10 @@ function toCommercialVersionActionError(error: unknown): CommercialVersionAction
  */
 async function createCommercialVersionAction(commercialConfigurationId: string, changeCategory: CommercialVersionChangeCategory): Promise<CommercialVersionActionResult> {
   try {
-    const actor = await requirePermission("commercial_configuration", "write")
     const configuration = await commercialConfigurationService.getCommercialConfiguration(commercialConfigurationId)
+    const actor = configuration
+      ? await requirePermissionForCustomer("commercial_configuration", "write", configuration.customerId)
+      : await requirePermission("commercial_configuration", "write")
     const customer = configuration ? await getCustomerById(configuration.customerId) : null
     if (customer && !customer.is_active) {
       return { ok: false, error: "This customer is inactive. Reactivate the customer before creating a new Commercial Configuration Version." }
@@ -226,13 +238,30 @@ async function createCommercialVersionAction(commercialConfigurationId: string, 
   }
 }
 
+/**
+ * PD-005 follow-up (Product Decision Closure): every write below except
+ * create (which already resolves the configuration directly) needs one
+ * extra lookup, via `loadVersion` then `getCommercialConfiguration`, to
+ * resolve which customer this version belongs to before the scoped
+ * check can run.
+ */
+async function resolveVersionCustomerId(requestId: string): Promise<string | null> {
+  const version = await loadVersion(requestId)
+  if (!version) return null
+  const configuration = await commercialConfigurationService.getCommercialConfiguration(version.commercialConfigurationId)
+  return configuration?.customerId ?? null
+}
+
 async function saveCommercialVersionDraftAction(
   requestId: string,
   commercialRate: CommercialRateDraft,
   expectedRowVersion: number
 ): Promise<CommercialVersionActionResult> {
   try {
-    const actor = await requirePermission("commercial_configuration", "write")
+    const customerId = await resolveVersionCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("commercial_configuration", "write", customerId)
+      : await requirePermission("commercial_configuration", "write")
     const version = await saveVersionDraft(requestId, commercialRate, expectedRowVersion, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
@@ -242,7 +271,10 @@ async function saveCommercialVersionDraftAction(
 
 async function submitCommercialVersionAction(requestId: string, reason: string, effectiveDate: string): Promise<CommercialVersionActionResult> {
   try {
-    const actor = await requirePermission("commercial_configuration", "write")
+    const customerId = await resolveVersionCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("commercial_configuration", "write", customerId)
+      : await requirePermission("commercial_configuration", "write")
     const version = await submitVersion(requestId, reason, effectiveDate, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
@@ -252,7 +284,10 @@ async function submitCommercialVersionAction(requestId: string, reason: string, 
 
 async function rejectCommercialVersionAction(requestId: string, reason: string): Promise<CommercialVersionActionResult> {
   try {
-    const actor = await requirePermission("commercial_configuration", "approve")
+    const customerId = await resolveVersionCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("commercial_configuration", "approve", customerId)
+      : await requirePermission("commercial_configuration", "approve")
     const version = await rejectVersion(requestId, reason, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
@@ -263,7 +298,10 @@ async function rejectCommercialVersionAction(requestId: string, reason: string):
 /** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve; see toCommercialVersionActionError's own comment for the stale-approval UX this enables. */
 async function approveCommercialVersionAction(requestId: string, expectedCurrentNodeKey: string | null = null): Promise<CommercialVersionActionResult> {
   try {
-    const actor = await requirePermission("commercial_configuration", "approve")
+    const customerId = await resolveVersionCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("commercial_configuration", "approve", customerId)
+      : await requirePermission("commercial_configuration", "approve")
     const snapshot = await loadReferenceMasterSnapshot()
     const version = await approveVersion(requestId, actor.appUserId, snapshot, expectedCurrentNodeKey)
     return { ok: true, version }
@@ -275,7 +313,10 @@ async function approveCommercialVersionAction(requestId: string, expectedCurrent
 /** Task Phase C: only a draft version may be discarded, gated the same as create/save/submit. */
 async function cancelCommercialVersionAction(requestId: string, reason: string | null): Promise<CommercialVersionActionResult> {
   try {
-    const actor = await requirePermission("commercial_configuration", "write")
+    const customerId = await resolveVersionCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("commercial_configuration", "write", customerId)
+      : await requirePermission("commercial_configuration", "write")
     const version = await cancelVersion(requestId, reason, actor.appUserId)
     return { ok: true, version }
   } catch (error) {

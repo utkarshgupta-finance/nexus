@@ -1,6 +1,6 @@
 "use server"
 
-import { requirePermission } from "@/platform/permissions/server"
+import { requirePermissionForCustomer } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 
 import { setCustomerActive } from "./data/customers.data"
@@ -25,7 +25,7 @@ type EligibilityActionResult = { ok: true; eligibility: DeletionEligibility } | 
 /** Computed lazily, only when the "Permanently Delete Customer" panel is opened: gated the same as the delete itself, since eligibility detail (Commercial Configuration counts, approved Change Request counts) is only meaningful to someone who could actually act on it. */
 async function checkCustomerDeletionEligibilityAction(customerId: string): Promise<EligibilityActionResult> {
   try {
-    await requirePermission("customer", "delete_permanent")
+    await requirePermissionForCustomer("customer", "delete_permanent", customerId)
     const eligibility = await getCustomerDeletionEligibility(customerId)
     return { ok: true, eligibility }
   } catch (error) {
@@ -45,7 +45,7 @@ function toDeletionActionError(error: unknown): DeletionActionResult {
 
 async function deleteCustomerPermanentlyAction(customerId: string, reason: string): Promise<DeletionActionResult> {
   try {
-    const actor = await requirePermission("customer", "delete_permanent")
+    const actor = await requirePermissionForCustomer("customer", "delete_permanent", customerId)
     const row = await deleteCustomerPermanently(customerId, reason, actor.appUserId)
     return { ok: true, audit: toCustomerDeletionAudit(row) }
   } catch (error) {
@@ -68,7 +68,7 @@ type DeactivateActionResult = { ok: true } | { ok: false; error: string }
  */
 async function deactivateCustomerAction(customerId: string, reason: string): Promise<DeactivateActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    const actor = await requirePermissionForCustomer("customer", "approve", customerId)
     await setCustomerActive(customerId, false, reason, actor.appUserId)
     return { ok: true }
   } catch (error) {
@@ -81,7 +81,7 @@ async function deactivateCustomerAction(customerId: string, reason: string): Pro
 /** Symmetric to deactivate: same permission, same reason requirement, same audit mechanism. Never available through Permanent Delete's own panel, only as its own standalone action. */
 async function reactivateCustomerAction(customerId: string, reason: string): Promise<DeactivateActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    const actor = await requirePermissionForCustomer("customer", "approve", customerId)
     await setCustomerActive(customerId, true, reason, actor.appUserId)
     return { ok: true }
   } catch (error) {

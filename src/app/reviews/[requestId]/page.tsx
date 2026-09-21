@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
-import { hasPermission } from "@/platform/permissions/server"
+import { hasPermission, hasPermissionForCustomer, hasPermissionForBusinessUnit } from "@/platform/permissions/server"
 import { getOnboardingCase, listOnboardingDocumentsWithUploader, loadOnboardingRequestTimeline } from "@/features/customer-onboarding/server"
 import { ReviewDetailPage } from "@/features/customer-onboarding/ui/review-detail-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
@@ -36,6 +36,12 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
   }
 
   const canApprove = await hasPermission("customer", "approve")
+  // PD-005 follow-up (Product Decision Closure): scope by the resolved
+  // customer once approval has created one; before that, by the case's
+  // own business_unit form field (there is no customer to scope by yet).
+  const canAccessThisCase = onboardingCase.customerId
+    ? await hasPermissionForCustomer("customer", "read", onboardingCase.customerId)
+    : await hasPermissionForBusinessUnit("customer", "read", (onboardingCase.currentRevision.data["business_unit"] as string | undefined) ?? null)
 
   let documents: PersistedOnboardingDocumentView[] = []
   try {
@@ -47,7 +53,7 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
   const timeline = await loadOnboardingRequestTimeline(requestId, actorUserId)
 
   return (
-    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/${requestId}`}>
+    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/${requestId}`} additionalAccessGranted={canAccessThisCase}>
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
         <ReviewDetailPage requestId={requestId} onboardingCase={onboardingCase} canApprove={canApprove} documents={documents} timeline={timeline} />
       </ReferenceMasterSnapshotProvider>

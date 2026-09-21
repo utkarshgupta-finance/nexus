@@ -1,5 +1,6 @@
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
+import { getVisibleCustomerIds, hasAnyPermission } from "@/platform/permissions/server"
 import { CustomersPage } from "@/features/customers/ui/customers-page"
 import { listCustomerMaster, findCustomersByFormerName, filterCustomerMasterEntries, EMPTY_FILTERS } from "@/features/customers/server"
 import type { CustomerMasterListEntry, FormerNameSearchResult, CustomerSearchFilters, CustomerStatusFilter } from "@/features/customers/server"
@@ -67,13 +68,31 @@ export default async function CustomersRoute({
     customerMasterUnavailable = true
   }
 
+  // PD-005 follow-up (Product Decision Closure): a global customer.read
+  // holder sees every row unchanged (visibleIds === null, no filtering).
+  // A Business Unit/Territory/Customer-scoped holder only ever sees
+  // customers within their granted scope; the list itself is filtered
+  // here, not just the page gated, since a scoped user must never be
+  // able to discover an out-of-scope customer's existence through this
+  // list even if they could not open its detail page directly.
+  const [visibleCustomerIds, canAccessThisPage] = await Promise.all([
+    getVisibleCustomerIds("customer", "read"),
+    hasAnyPermission("customer", "read"),
+  ])
+  if (visibleCustomerIds !== null) {
+    allEntries = allEntries.filter((entry) => visibleCustomerIds.has(entry.record.id))
+  }
+
   const customerMasterEntries = filterCustomerMasterEntries(allEntries, filters)
 
   let formerNameMatches: FormerNameSearchResult[] = []
   if (!customerMasterUnavailable && filters.query.trim()) {
     try {
       const shownIds = new Set(customerMasterEntries.map((entry) => entry.record.id))
-      const rawMatches = await findCustomersByFormerName(filters.query)
+      const rawMatchesUnfiltered = await findCustomersByFormerName(filters.query)
+      // Same scope filter as the main list above: a scoped user's
+      // former-name search must never surface an out-of-scope customer.
+      const rawMatches = visibleCustomerIds === null ? rawMatchesUnfiltered : rawMatchesUnfiltered.filter((match) => visibleCustomerIds.has(match.entry.record.id))
       formerNameMatches = filterCustomerMasterEntries(
         rawMatches.map((match) => match.entry),
         { ...filters, query: "" }
@@ -94,7 +113,7 @@ export default async function CustomersRoute({
   }
 
   return (
-    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={loginRedirectTo}>
+    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={loginRedirectTo} additionalAccessGranted={canAccessThisPage}>
       <CustomersPage
         customerMasterEntries={customerMasterEntries}
         customerMasterUnavailable={customerMasterUnavailable}

@@ -1,6 +1,6 @@
 "use server"
 
-import { requirePermission } from "@/platform/permissions/server"
+import { requirePermission, requirePermissionForCustomer } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import { withCorrelationReference } from "@/platform/errors"
 import { getCustomerById } from "@/features/customers/server"
@@ -14,6 +14,7 @@ import {
   rejectChangeRequest,
   approveChangeRequest,
   cancelChangeRequest,
+  loadChangeRequest,
 } from "./services/change-request.service"
 import type { CustomerChangeRequest } from "./domain/types"
 
@@ -51,7 +52,7 @@ function toActionError(error: unknown): ChangeRequestActionResult {
 /** Task Phase I: a new Change Request may not be opened against an inactive customer (churn/inactive is not the same as "no longer real"; a Change Request implies ongoing operational activity). Reactivate first, if this is genuinely still an active relationship. */
 async function createChangeRequestAction(customerId: string): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "change_request")
+    const actor = await requirePermissionForCustomer("customer", "change_request", customerId)
     const customer = await getCustomerById(customerId)
     if (customer && !customer.is_active) {
       return { ok: false, error: "This customer is inactive. Reactivate the customer before creating a Change Request." }
@@ -63,9 +64,26 @@ async function createChangeRequestAction(customerId: string): Promise<ChangeRequ
   }
 }
 
+/**
+ * PD-005 follow-up (Product Decision Closure): every write below except
+ * create (which already has customerId as a direct parameter) needs one
+ * extra lookup to resolve which customer this request belongs to,
+ * before the scoped permission check can run. A missing request is
+ * surfaced by the mutation's own RPC exactly as before (this lookup
+ * failing to find a row is not itself treated as an authorization
+ * decision); only the resolved customerId feeds the scoped check.
+ */
+async function resolveChangeRequestCustomerId(requestId: string): Promise<string | null> {
+  const changeRequest = await loadChangeRequest(requestId)
+  return changeRequest?.customerId ?? null
+}
+
 async function saveChangeDraftAction(requestId: string, rawData: Record<string, unknown>, expectedRowVersion: number): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "change_request")
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("customer", "change_request", customerId)
+      : await requirePermission("customer", "change_request")
     const changeRequest = await saveChangeDraft(requestId, rawData, expectedRowVersion, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {
@@ -76,7 +94,10 @@ async function saveChangeDraftAction(requestId: string, rawData: Record<string, 
 /** Serves both a first Submit and a post-send-back Resubmit; see services/change-request.service.ts's own comment. */
 async function submitChangeRequestAction(requestId: string, reason: string, effectiveDate: string): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "change_request")
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("customer", "change_request", customerId)
+      : await requirePermission("customer", "change_request")
     const changeRequest = await submitChangeRequest(requestId, reason, effectiveDate, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {
@@ -86,7 +107,8 @@ async function submitChangeRequestAction(requestId: string, reason: string, effe
 
 async function sendBackChangeRequestAction(requestId: string, reason: string): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    const actor = customerId ? await requirePermissionForCustomer("customer", "approve", customerId) : await requirePermission("customer", "approve")
     const changeRequest = await sendBackChangeRequest(requestId, reason, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {
@@ -96,7 +118,8 @@ async function sendBackChangeRequestAction(requestId: string, reason: string): P
 
 async function rejectChangeRequestAction(requestId: string, reason: string): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    const actor = customerId ? await requirePermissionForCustomer("customer", "approve", customerId) : await requirePermission("customer", "approve")
     const changeRequest = await rejectChangeRequest(requestId, reason, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {
@@ -107,7 +130,8 @@ async function rejectChangeRequestAction(requestId: string, reason: string): Pro
 /** `expectedCurrentNodeKey` (Workflow Runtime V1 UX + Audit Closure): the Approval node the review page had open when the checker clicked Approve, echoed back so a stale-page approval gets a clear "already moved on" message instead of a raw team-mismatch error. Purely a UX input, never authorization: the RPC's own current-node/team check is the only thing that ever actually decides whether this approval is allowed. */
 async function approveChangeRequestAction(requestId: string, expectedCurrentNodeKey: string | null = null): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "approve")
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    const actor = customerId ? await requirePermissionForCustomer("customer", "approve", customerId) : await requirePermission("customer", "approve")
     const changeRequest = await approveChangeRequest(requestId, actor.appUserId, expectedCurrentNodeKey)
     return { ok: true, changeRequest }
   } catch (error) {
@@ -118,7 +142,10 @@ async function approveChangeRequestAction(requestId: string, expectedCurrentNode
 /** Task Phase G: only a draft Change Request may be discarded, gated the same as create/save/submit since discarding one's own draft is a creation-time decision, not a reviewer one. */
 async function cancelChangeRequestAction(requestId: string, reason: string | null): Promise<ChangeRequestActionResult> {
   try {
-    const actor = await requirePermission("customer", "change_request")
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    const actor = customerId
+      ? await requirePermissionForCustomer("customer", "change_request", customerId)
+      : await requirePermission("customer", "change_request")
     const changeRequest = await cancelChangeRequest(requestId, reason, actor.appUserId)
     return { ok: true, changeRequest }
   } catch (error) {

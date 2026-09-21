@@ -12,6 +12,7 @@ import { formatChangeRequestId } from "@/features/customer-change"
 import { listAllGoLiveRequests, formatGoLiveRequestId } from "@/features/go-live/server"
 import { getCustomersByIds } from "@/features/customers/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
+import { getVisibleCustomerIds, getVisibleBusinessUnits } from "@/platform/permissions/server"
 import { resolveActorLabels } from "@/platform/audit/server"
 import { getResponsibleTeamIdsByNode } from "@/platform/workflow-builder/server"
 import { getActiveTeamIdsForUser, listTeams, countActiveMembersByTeam, listActiveUserTeamGrants } from "@/platform/team/server"
@@ -43,12 +44,62 @@ function resolveResponsibleTeamId(
 }
 
 async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
-  const [onboardingEntries, changeRequestEntries, versionEntries, goLiveEntries] = await Promise.all([
+  const [rawOnboardingEntries, rawChangeRequestEntries, rawVersionEntries, goLiveEntries] = await Promise.all([
     listAllOnboardingEntries(),
     listAllChangeRequestEntries(),
     listAllVersionEntries(),
     listAllGoLiveRequests(),
   ])
+
+  // Batched, not one round trip per entry: this composer runs on every
+  // Approvals/My Work page load, and its round-trip count previously grew
+  // linearly with the number of onboarding/change-request/version entries.
+  const rawVersionConfigurations = await Promise.all(
+    rawVersionEntries.map((entry) => commercialConfigurationService.getCommercialConfiguration(entry.commercialConfigurationId))
+  )
+
+  // PD-005 follow-up (Product Decision Closure): this is the shared read
+  // path behind Approvals inbox, My Work, and Operational Queue, so it is
+  // the one place a scoped user's cross-customer list leak would show up
+  // regardless of which of those three pages they visited. Onboarding
+  // entries scope by customerId once approved, or businessUnit before
+  // that (mirroring the single-case read in /reviews/[requestId]); change
+  // requests and commercial versions always have a resolved customer.
+  // Go-live entries are deliberately left unfiltered here: PD-005 named
+  // exactly five domains (Customer Master, Customer Onboarding, Customer
+  // Change, Commercial Configuration, Commercial Change) and go-live was
+  // not one of them, so extending scoping to it would be exactly the kind
+  // of unrelated RBAC-surface expansion this closure was told not to do.
+  const [visibleCustomerIdsForCustomerRead, visibleBusinessUnitsForCustomerRead, visibleCustomerIdsForCommercialRead] = await Promise.all([
+    getVisibleCustomerIds("customer", "read"),
+    getVisibleBusinessUnits("customer", "read"),
+    getVisibleCustomerIds("commercial_configuration", "read"),
+  ])
+
+  const onboardingEntries =
+    visibleCustomerIdsForCustomerRead === null
+      ? rawOnboardingEntries
+      : rawOnboardingEntries.filter((entry) => {
+          if (entry.customerId) return visibleCustomerIdsForCustomerRead.has(entry.customerId)
+          if (entry.businessUnit) return visibleBusinessUnitsForCustomerRead === null || visibleBusinessUnitsForCustomerRead.has(entry.businessUnit)
+          return false
+        })
+
+  const changeRequestEntries =
+    visibleCustomerIdsForCustomerRead === null
+      ? rawChangeRequestEntries
+      : rawChangeRequestEntries.filter((entry) => visibleCustomerIdsForCustomerRead.has(entry.customerId))
+
+  const versionEntries: typeof rawVersionEntries = []
+  const versionConfigurations: typeof rawVersionConfigurations = []
+  rawVersionEntries.forEach((entry, index) => {
+    const configuration = rawVersionConfigurations[index]
+    const isVisible =
+      visibleCustomerIdsForCommercialRead === null || (configuration ? visibleCustomerIdsForCommercialRead.has(configuration.customerId) : false)
+    if (!isVisible) return
+    versionEntries.push(entry)
+    versionConfigurations.push(configuration)
+  })
 
   // Workflow Runtime V1 Sequential Execution: which team is currently
   // responsible, resolved from each entry's own stored current node
@@ -62,12 +113,6 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
   ].filter((id): id is string => Boolean(id))
   const teamIdsByNodeKey = await getResponsibleTeamIdsByNode(workflowVersionIds)
 
-  // Batched, not one round trip per entry: this composer runs on every
-  // Approvals/My Work page load, and its round-trip count previously grew
-  // linearly with the number of onboarding/change-request/version entries.
-  const versionConfigurations = await Promise.all(
-    versionEntries.map((entry) => commercialConfigurationService.getCommercialConfiguration(entry.commercialConfigurationId))
-  )
   const customerIds = [
     ...changeRequestEntries.map((entry) => entry.customerId),
     ...versionConfigurations.map((configuration) => configuration?.customerId).filter((id): id is string => Boolean(id)),

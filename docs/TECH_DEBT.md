@@ -17,17 +17,17 @@ into a second backlog.
   `grant_user_role`. Build a scope picker (Business Unit / Territory /
   Customer / Global) alongside the existing role dropdown once a real
   admin needs to grant a scoped role through the UI rather than a script.
-- **Scoped authorization not yet applied to Customer Onboarding, Customer
-  Change, or Commercial Change (PD-005, Batches 1-13 Ledger Audit product
-  decision closure).** `hasPermissionForCustomer`/
-  `requirePermissionForCustomer` are applied to Customer Master and
-  Commercial Configuration reads; these three domains still gate on the
-  coarse global permission only (`docs/AUTHORIZATION_MODEL.md` §5). Each
-  domain's read checkpoints ultimately resolve to a `customer_id` the
-  same way Commercial Configuration's did, so the same pattern applies
-  directly; do this before scoped authorization is considered complete
-  platform-wide, not only when a real scoped user reports being blocked
-  somewhere unexpected.
+- **Go-Live list entries are not customer-scope filtered in the shared
+  Approvals inbox/My Work/Operational Queue composer (PD-005 follow-up,
+  Product Decision Closure Phase 3, 2026-09-21).** `loadApprovalInbox`
+  (`src/platform/approvals/server.ts`) now scopes onboarding,
+  Customer Change, and Commercial Version entries by the caller's
+  visible customer ids/business units, but deliberately leaves go-live
+  entries unfiltered: PD-005 named exactly five domains (Customer
+  Master, Customer Onboarding, Customer Change, Commercial
+  Configuration, Commercial Change) and go-live was not one of them.
+  Extend the same filter to go-live entries if/when go-live is brought
+  into PD-005's scope by a real business decision.
 - **Go Live and Entitlement Source creation share the already-accepted
   create-with-client-UUID idempotency gap (NEXUS FULL PRODUCT
   READINESS).** `create_go_live_request` and `create_entitlement_source`

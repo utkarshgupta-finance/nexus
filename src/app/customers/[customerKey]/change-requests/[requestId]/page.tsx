@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
+import { hasPermissionForCustomer } from "@/platform/permissions/server"
 import { getCustomerByKey } from "@/features/customers/server"
 import { loadChangeRequest, getCurrentGovernedValues } from "@/features/customer-change/server"
 import { ChangeRequestPage } from "@/features/customer-change/ui/change-request-page"
@@ -30,6 +31,7 @@ export default async function CustomerChangeRequestRoute({ params }: { params: P
   if (!changeRequest || changeRequest.customerId !== customer.id) notFound()
 
   const currentValues = await getCurrentGovernedValues(customer.id)
+  const canAccessThisChangeRequest = await hasPermissionForCustomer("customer", "change_request", customer.id)
 
   let snapshot: ReferenceMasterSnapshot
   try {
@@ -39,7 +41,12 @@ export default async function CustomerChangeRequestRoute({ params }: { params: P
   }
 
   return (
-    <AuthGate session={session} requiredPermission={CUSTOMER_CHANGE_REQUEST} loginRedirectTo={`/customers/${customerKey}/change-requests/${requestId}`}>
+    <AuthGate
+      session={session}
+      requiredPermission={CUSTOMER_CHANGE_REQUEST}
+      loginRedirectTo={`/customers/${customerKey}/change-requests/${requestId}`}
+      additionalAccessGranted={canAccessThisChangeRequest}
+    >
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
         <ChangeRequestPage
           requestId={requestId}

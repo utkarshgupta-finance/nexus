@@ -22,6 +22,7 @@ type CommercialVersionErrorKind =
   | "commercial_version_no_draft_revision"
   | "commercial_version_reject_reason_required"
   | "commercial_version_already_open"
+  | "commercial_version_customer_inactive"
   | "workflow_team_required"
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
@@ -55,6 +56,7 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
   COMMERCIAL_VERSION_DRAFT_STALE: "commercial_version_draft_stale",
+  COMMERCIAL_VERSION_CUSTOMER_INACTIVE: "commercial_version_customer_inactive",
 }
 
 const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {

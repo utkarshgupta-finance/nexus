@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
+import { hasPermissionForCustomer } from "@/platform/permissions/server"
+import { commercialConfigurationService } from "@/features/commercial/server"
 import { loadVersion } from "@/features/customer-onboarding/server"
 import { CommercialVersionPage } from "@/features/customer-onboarding/ui/commercial-version-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
@@ -25,6 +27,12 @@ export default async function CommercialConfigurationVersionRoute({ params }: { 
   const version = await loadVersion(requestId)
   if (!version || version.commercialConfigurationId !== configId) notFound()
 
+  // PD-005 follow-up (Product Decision Closure): a version always
+  // belongs to one commercial_configuration, which belongs to one
+  // customer; scope by that customer.
+  const configuration = await commercialConfigurationService.getCommercialConfiguration(configId)
+  const canAccessThisVersion = configuration ? await hasPermissionForCustomer("commercial_configuration", "write", configuration.customerId) : false
+
   let snapshot: ReferenceMasterSnapshot
   try {
     snapshot = await loadReferenceMasterSnapshot()
@@ -33,7 +41,12 @@ export default async function CommercialConfigurationVersionRoute({ params }: { 
   }
 
   return (
-    <AuthGate session={session} requiredPermission={COMMERCIAL_CONFIGURATION_WRITE} loginRedirectTo={`/commercials/${configId}/versions/${requestId}`}>
+    <AuthGate
+      session={session}
+      requiredPermission={COMMERCIAL_CONFIGURATION_WRITE}
+      loginRedirectTo={`/commercials/${configId}/versions/${requestId}`}
+      additionalAccessGranted={canAccessThisVersion}
+    >
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
         <CommercialVersionPage requestId={requestId} configId={configId} initialVersion={version} />
       </ReferenceMasterSnapshotProvider>
