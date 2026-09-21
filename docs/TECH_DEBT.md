@@ -8,6 +8,26 @@ into a second backlog.
 
 ## Now (worth doing soon, not urgent)
 
+- **No admin UI screen for granting a scoped role (PD-005, Batches 1-13
+  Ledger Audit product decision closure).** `grant_scoped_user_role`
+  (`supabase/migrations/20260930110000_scoped_authorization_foundation.sql`)
+  is real and enforced, but only callable directly; the existing User
+  Access page's role-grant control (`src/platform/user-access/ui/
+  user-access-page.tsx`) still only performs a global grant via
+  `grant_user_role`. Build a scope picker (Business Unit / Territory /
+  Customer / Global) alongside the existing role dropdown once a real
+  admin needs to grant a scoped role through the UI rather than a script.
+- **Scoped authorization not yet applied to Customer Onboarding, Customer
+  Change, or Commercial Change (PD-005, Batches 1-13 Ledger Audit product
+  decision closure).** `hasPermissionForCustomer`/
+  `requirePermissionForCustomer` are applied to Customer Master and
+  Commercial Configuration reads; these three domains still gate on the
+  coarse global permission only (`docs/AUTHORIZATION_MODEL.md` §5). Each
+  domain's read checkpoints ultimately resolve to a `customer_id` the
+  same way Commercial Configuration's did, so the same pattern applies
+  directly; do this before scoped authorization is considered complete
+  platform-wide, not only when a real scoped user reports being blocked
+  somewhere unexpected.
 - **Go Live and Entitlement Source creation share the already-accepted
   create-with-client-UUID idempotency gap (NEXUS FULL PRODUCT
   READINESS).** `create_go_live_request` and `create_entitlement_source`

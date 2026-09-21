@@ -104,7 +104,7 @@ history is queryable directly from `user_roles`/`role_permissions`
 without joining `audit_log` at all. Full column shape in
 `docs/DATA_ARCHITECTURE.md` §13.
 
-## 5. Scope: immediate model and extension path
+## 5. Scope: model and current implementation [PD-005, IMPLEMENTED, 2026-09-21]
 
 A role assignment can be global or scoped. Scope is carried as a single
 nullable column, `scope_resource_id`, referencing
@@ -115,25 +115,72 @@ would only duplicate what the registry already knows. `NULL` means global
 assignment; a non-null value scopes the assignment to that resource,
 whatever type it is.
 
-**Immediate implementation supports global (`scope_resource_id IS NULL`)
-assignment only.** No scoped assignment is created yet.
+**Implemented (PD-005, Batches 1-13 Ledger Audit product decision
+closure):** the business decision was made not to keep global-only
+authorization. Three scope tiers are now real and enforced, in addition
+to global: **Business Unit**, **Territory/Geography**, and **specific
+Customer**. See `supabase/migrations/20260930110000_scoped_authorization_
+foundation.sql` for the full schema and RPCs. In summary:
 
-**Extension path, preserved but not built:** Nexus may eventually need
-hierarchical organizational scope, conceptually
-`organization -> legal entity -> business unit -> customer -> module`. Three
-approaches were considered:
+- `customer`, `business_unit`, and `territory` are now registered
+  `resource_types`. `customer` was previously and deliberately excluded
+  from the Resource Registry (§2 below still describes that original
+  scope for the *unscoped* Master Data tables); it is added here
+  specifically so a customer can be a scope target.
+- `business_unit_resources` (business_unit value -> resource id) and
+  `territory_resources` (country value -> resource id) are new, small
+  lookup tables giving an already-existing business value (the
+  `business_unit` reference list; `customers.country`) a stable resource
+  identity. **Structural prerequisite, honestly noted:** no dedicated
+  Territory/Geography entity exists in Nexus yet, so `customers.country`
+  is used as the current best-available proxy; these lookup tables are
+  backfilled only from values already present on real customer rows,
+  never invented, and kept current by a trigger on `customers` insert/
+  update.
+- `grant_scoped_user_role(user_id, role_id, scope_business_unit,
+  scope_territory, scope_customer_id, actor_user_id)` grants a role
+  scoped to exactly one of the three tiers. `grant_user_role` (global)
+  is unchanged and still the right call for a global grant.
+- `fn_user_has_customer_scoped_permission(user_id, resource, action,
+  customer_id)` is the actual check: true if the user holds a global
+  grant for that permission, OR a scoped grant matching that specific
+  customer, its business_unit, or its territory. TypeScript callers
+  reach this through `hasPermissionForCustomer`/
+  `requirePermissionForCustomer` (`src/platform/permissions/server.ts`),
+  siblings of the existing `hasPermission`/`requirePermission` that a
+  global holder passes through unchanged (no extra database call).
+
+**Design choice, stated honestly:** the `org_scopes` nested-hierarchy
+table originally proposed below (approach 3) was NOT built. Nexus has no
+real BU-contains-territory-contains-customer org chart to populate a
+parent/child tree with; business_unit and country are independent
+columns on `customers`, not a nesting relationship, and building one
+would mean inventing an org chart that does not exist. Instead, each
+scope tier is resolved independently and a user's access is the union of
+every grant that matches: this still delivers the requested
+Global -> BU -> Territory -> Customer hierarchy (each tier strictly
+narrower than the one before), just without a fabricated containment
+tree. If Nexus later has a real nested org chart, `org_scopes` remains
+buildable purely additively on top of this, exactly as originally
+described below.
+
+**Original three-approaches analysis (preserved for context):**
 
 | Approach | Verdict |
 |---|---|
 | A dedicated assignment table per scope type | Rejected. Defeats the goal of an open, configurable scope list; a new scope type would need a new table and a migration. |
-| A flat scope reference with no hierarchy (the model adopted) | Correct starting point, but alone cannot express "access to legal entity B implies access to business units under B" without enumerating every child at assignment time. |
-| A scope hierarchy table (`org_scopes`: `resource_id`, `parent_resource_id`), with an optional closure table as a later performance optimization | The right future extension. Not built today. |
+| A flat scope reference with no hierarchy (the model adopted for each individual tier) | Correct starting point; PD-005 resolves "access to legal entity B implies access to business units under B" by NOT requiring it, rather than by enumerating children, since no such nesting exists in the real data. |
+| A scope hierarchy table (`org_scopes`: `resource_id`, `parent_resource_id`), with an optional closure table as a later performance optimization | Remains the right future extension IF a real nested org chart is ever needed. Not built; §5 above explains why not built now. |
 
-Because `scope_resource_id` already points into the Resource Registry, the
-hierarchy table above can be added later purely additively: it FKs to
-`resources.resource_id` the same way `user_roles.scope_resource_id` does,
-and only the permission-check query needs to learn to walk parent scopes.
-`user_roles` and `role_permissions` are never touched.
+**Not yet built as part of this decision closure:** an admin-facing UI
+screen for granting a scoped role (today, `grant_scoped_user_role` is
+callable but has no dedicated Settings screen; the existing User Access
+page's role-grant control still only performs a global grant). Tracked
+in `docs/TECH_DEBT.md`, not silently left inconsistent. Full read/write
+enforcement has been applied to Customer Master and Commercial
+Configuration; Customer Onboarding, Customer Change, and Commercial
+Change still rely on the coarse global permission only pending the same
+integration, also tracked in `docs/TECH_DEBT.md`.
 
 ## 6. Enforcement layers
 
@@ -359,11 +406,17 @@ UI" limitation, below), never relaxing `canReadSettings`'s own check.
 
 ## 18. Current limitations, honestly stated
 
-- **Global permissions only.** `user_roles.scope_resource_id` is never
-  populated by this round; every grant is global, matching §5's own
-  "immediate implementation supports global assignment only." Scoped
-  authorization (a role limited to one customer, one business unit) is
-  still the documented future extension in §5, not built.
+- **Scoped authorization: IMPLEMENTED (PD-005, Batches 1-13 Ledger Audit
+  product decision closure, 2026-09-21).** `user_roles.scope_resource_id`
+  can now be populated via `grant_scoped_user_role` and is genuinely
+  resolved by `fn_user_has_customer_scoped_permission`/
+  `hasPermissionForCustomer`/`requirePermissionForCustomer` for Business
+  Unit, Territory, and specific-Customer scope. Full detail in §5.
+  Remaining, explicitly tracked (not silently left inconsistent, see
+  `docs/TECH_DEBT.md`): no dedicated admin UI screen for granting a
+  scoped role yet (RPC-only); enforcement applied to Customer Master and
+  Commercial Configuration reads so far, not yet to Customer Onboarding,
+  Customer Change, or Commercial Change.
 - **Self-service provisioning UI: CLOSED (Platform Operating Expansion,
   Phase J).** The User Access module (`/settings/user-access`) is now a
   real Settings screen for exactly this: `provision_app_user` creates the

@@ -4,6 +4,7 @@ import { getCurrentNexusSession } from "@/platform/auth/server"
 import type { ActiveNexusUser } from "@/platform/auth"
 import { AuthorizationError } from "./domain/errors"
 import { sessionHasPermission } from "./domain/has-permission"
+import { userHasCustomerScopedPermission } from "./data/scoped-permission.data"
 
 /**
  * TRUSTED, SERVER-ONLY authorization entry point, reusable by any future
@@ -52,4 +53,51 @@ async function requirePermission(resource: string, action: string): Promise<Acti
   return session
 }
 
-export { hasPermission, requirePermission }
+/**
+ * PD-005 (D-022, Batches 1-13 Ledger Audit product decision closure):
+ * the customer-record-aware sibling of `hasPermission`/`requirePermission`.
+ * A holder of the plain global permission passes exactly as before (the
+ * fast, already-resolved `sessionHasPermission` check, no extra
+ * database round trip). A user who does NOT hold the global permission
+ * may still pass if they hold a Business Unit, Territory, or specific
+ * Customer scoped grant that covers this exact customer record
+ * (`fn_user_has_customer_scoped_permission`); a user with neither is
+ * denied. This is the server-side enforcement point: it is never
+ * sufficient to only filter what a list UI renders (CLAUDE.md's "not
+ * only in the UI" principle applies to scope exactly as it already does
+ * to permissions generally).
+ */
+async function hasPermissionForCustomer(resource: string, action: string, customerId: string): Promise<boolean> {
+  const session = await getCurrentNexusSession()
+  if (session.status !== "active") return false
+  if (sessionHasPermission(session, resource, action)) return true
+  return userHasCustomerScopedPermission(session.appUserId, resource, action, customerId)
+}
+
+/** Deny-by-default enforcement, scoped variant of `requirePermission`. See `hasPermissionForCustomer` above for the resolution order. */
+async function requirePermissionForCustomer(resource: string, action: string, customerId: string): Promise<ActiveNexusUser> {
+  const session = await getCurrentNexusSession()
+
+  if (session.status === "unauthenticated") {
+    throw new AuthorizationError("unauthenticated", "You must be signed in to perform this action.")
+  }
+  if (session.status === "unavailable") {
+    throw new AuthorizationError("unavailable", "Nexus could not verify your session right now. Please try again.")
+  }
+  if (session.status === "unprovisioned") {
+    throw new AuthorizationError("unprovisioned", "Your account is authenticated but has not been granted access to Nexus.")
+  }
+  if (session.status === "inactive") {
+    throw new AuthorizationError("inactive", "Your Nexus account is no longer active.")
+  }
+  if (!sessionHasPermission(session, resource, action)) {
+    const scoped = await userHasCustomerScopedPermission(session.appUserId, resource, action, customerId)
+    if (!scoped) {
+      throw new AuthorizationError("missing_permission", `You do not have permission to ${action} ${resource} for this customer.`)
+    }
+  }
+
+  return session
+}
+
+export { hasPermission, requirePermission, hasPermissionForCustomer, requirePermissionForCustomer }

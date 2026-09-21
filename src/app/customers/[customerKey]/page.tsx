@@ -3,7 +3,7 @@ import { getCurrentNexusSession } from "@/platform/auth/server"
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
 import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext } from "@/features/customers/server"
-import { hasPermission } from "@/platform/permissions/server"
+import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { resolveActorLabels } from "@/platform/audit/server"
 import { listCurrentLineItemsForCustomer } from "@/features/go-live/server"
 import type { CustomerActivityEvent } from "@/features/customers/server"
@@ -70,10 +70,15 @@ export default async function CustomerMasterDetailRoute({
   // Reference Master snapshot all previously ran twice, once here and
   // once again inside the Activity timeline builder (Platform Scale
   // Closure, Phase V).
-  const [context, canDeletePermanently, canManageStatus] = await Promise.all([
+  const [context, canDeletePermanently, canManageStatus, canReadThisCustomer] = await Promise.all([
     loadCustomerDetailContext(detail.record.id),
     hasPermission("customer", "delete_permanent"),
     hasPermission("customer", "approve"),
+    // PD-005 (D-022, Batches 1-13 Ledger Audit product decision closure):
+    // a global customer.read holder passes as before; a Business
+    // Unit/Territory/Customer-scoped holder now also passes, only for a
+    // customer within their granted scope.
+    hasPermissionForCustomer("customer", "read", detail.record.id),
   ])
 
   // Go Live tab summary (NEXUS FULL PRODUCT READINESS, Phase 2): Go Live
@@ -105,7 +110,7 @@ export default async function CustomerMasterDetailRoute({
   }
 
   return (
-    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/customers/${customerKey}`}>
+    <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/customers/${customerKey}`} additionalAccessGranted={canReadThisCustomer}>
       <CustomerMasterDetail
         detail={detail}
         snapshot={context.referenceMasterSnapshot}

@@ -25,12 +25,23 @@ function AuthGate({
   session,
   requiredPermission,
   loginRedirectTo,
+  additionalAccessGranted,
   children,
 }: {
   session: NexusSession
   /** A single requirement, or a list of alternatives where holding any one of them is sufficient (e.g. a page that admits either a coarse or a finer-grained read permission). */
   requiredPermission: { resource: string; action: string } | { resource: string; action: string }[]
   loginRedirectTo: string
+  /**
+   * PD-005 (D-022, Batches 1-13 Ledger Audit product decision closure):
+   * an already-resolved answer from an async, record-scoped check
+   * (`hasPermissionForCustomer`) that this synchronous, session-only
+   * gate cannot compute itself. Pass `true` only after the caller has
+   * genuinely resolved scoped access server-side for the specific
+   * record being rendered; never derive it from anything client-supplied.
+   * Every other caller omits this and behaves exactly as before.
+   */
+  additionalAccessGranted?: boolean
   children: React.ReactNode
 }) {
   if (session.status === "unauthenticated") {
@@ -68,7 +79,7 @@ function AuthGate({
   }
 
   const requirements = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]
-  const hasAccess = requirements.some((requirement) => sessionHasPermission(session, requirement.resource, requirement.action))
+  const hasAccess = requirements.some((requirement) => sessionHasPermission(session, requirement.resource, requirement.action)) || additionalAccessGranted === true
   if (!hasAccess) {
     const requirementLabel = requirements.map((requirement) => `${requirement.resource}.${requirement.action}`).join(" or ")
     return (

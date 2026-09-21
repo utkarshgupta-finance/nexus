@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
-import { hasPermission } from "@/platform/permissions/server"
+import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { commercialConfigurationService } from "@/features/commercial/server"
 import { getCustomerById } from "@/features/customers/server"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
@@ -64,6 +64,11 @@ export default async function CommercialConfigurationPage({ params }: { params: 
   }
 
   const canCreateVersion = await hasPermission("commercial_configuration", "write")
+  // PD-005 (D-022, Batches 1-13 Ledger Audit product decision closure): a
+  // global commercial_configuration.read holder passes as before; a
+  // Business Unit/Territory/Customer-scoped holder now also passes, only
+  // for a configuration whose owning customer is within their scope.
+  const canReadThisConfiguration = configuration ? await hasPermissionForCustomer("commercial_configuration", "read", configuration.customerId) : false
 
   /** changeId -> approving actor's resolved display label (task Phase M: never a raw UUID), for the Version History "Approved By" column: only versions created through the governed draft/submit/approve lifecycle have a commercial_configuration_versions row at all, so this map is naturally empty/partial for the older immediate-promotion path, never fabricated for it. */
   let approvedByChangeId: Map<string, string | null> = new Map()
@@ -81,7 +86,12 @@ export default async function CommercialConfigurationPage({ params }: { params: 
   }
 
   return (
-    <AuthGate session={session} requiredPermission={COMMERCIAL_CONFIGURATION_READ} loginRedirectTo={`/commercials/${configId}`}>
+    <AuthGate
+      session={session}
+      requiredPermission={COMMERCIAL_CONFIGURATION_READ}
+      loginRedirectTo={`/commercials/${configId}`}
+      additionalAccessGranted={canReadThisConfiguration}
+    >
       {unavailable ? (
         <div className="p-6 text-sm text-destructive">Commercial Configuration could not be reached. Try again shortly.</div>
       ) : configuration ? (
