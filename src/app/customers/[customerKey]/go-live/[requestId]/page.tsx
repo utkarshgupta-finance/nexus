@@ -49,7 +49,8 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
     transitionInputs.transitions,
     transitionInputs.nodeDisplayByKey,
     actorLabels,
-    "line item is now Live"
+    "line item is now Live",
+    request.status === "approved"
   )
   const timelineEvents = buildGoLiveTimeline(request, sendBacks, actorLabels, workflowTransitionEvents)
   const lineItem = lineItems.find((item) => item.stableComponentKey === request.stableComponentKey) ?? null

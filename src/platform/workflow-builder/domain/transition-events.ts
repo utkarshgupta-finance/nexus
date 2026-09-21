@@ -50,16 +50,23 @@ type WorkflowNodeDisplay = { nodeName: string; teamName: string | null }
  * `terminalApprovalDetail`, when given, is folded into the single final
  * approval line instead of adding a second "Approved" line (Go Live's
  * own domain-specific nuance: approval also means the line item is now
- * Live). Returns `[]` if this request was never actually routed through
- * an Approval node (no workflow bound, or a workflow with none) so the
- * caller falls back to its own pre-existing decided/sent-back events
- * exactly as before Workflow Runtime V1 Sequential Execution.
+ * Live). Folding requires `isRequestFinalized` to be true: a real defect
+ * found via live H-020/H-021 multi-node testing had this folded onto the
+ * chronologically-last transition fetched so far even when that
+ * transition only advanced to the next Approval node (request still
+ * `submitted`), since `to_node_key` looks identical in shape whether it
+ * names an intermediate node or the terminal End node. Returns `[]` if
+ * this request was never actually routed through an Approval node (no
+ * workflow bound, or a workflow with none) so the caller falls back to
+ * its own pre-existing decided/sent-back events exactly as before
+ * Workflow Runtime V1 Sequential Execution.
  */
 function buildWorkflowTransitionEvents(
   transitions: WorkflowTransitionRecord[],
   nodeDisplayByKey: Map<string, WorkflowNodeDisplay>,
   actorLabels: Map<string, string | null>,
-  terminalApprovalDetail?: string
+  terminalApprovalDetail?: string,
+  isRequestFinalized?: boolean
 ): RequestTimelineEvent[] {
   const decidable = transitions.filter((transition) => transition.action !== "submit" && transition.fromNodeKey !== null)
   if (decidable.length === 0) return []
@@ -84,7 +91,7 @@ function buildWorkflowTransitionEvents(
 
     const nodeName = nodeDisplayByKey.get(transition.fromNodeKey as string)?.nodeName ?? "Approval step"
     const actorEmail = actorLabels.get(transition.actorUserId) ?? null
-    const isFinalEvent = index === sorted.length - 1
+    const isFinalEvent = index === sorted.length - 1 && Boolean(isRequestFinalized)
 
     if (transition.action === "approve") {
       events.push({

@@ -87,7 +87,8 @@ describe("buildWorkflowTransitionEvents", () => {
       [transition({ fromNodeKey: "node_leadership", toNodeKey: "node_end", actorUserId: "leadership-user" })],
       NODE_DISPLAY,
       ACTOR_LABELS,
-      "line item is now Live"
+      "line item is now Live",
+      true
     )
     expect(events).toHaveLength(1)
     expect(events[0].summary).toBe("Leadership Approval approved: line item is now Live")
@@ -101,10 +102,24 @@ describe("buildWorkflowTransitionEvents", () => {
       ],
       NODE_DISPLAY,
       ACTOR_LABELS,
-      "line item is now Live"
+      "line item is now Live",
+      true
     )
     expect(events[0].summary).toBe("Finance Approval approved")
     expect(events[1].summary).toBe("Legal Approval approved: line item is now Live")
+  })
+
+  it("never folds the terminal detail onto an intermediate node advance just because it is the only transition recorded so far, even though its to_node_key looks like any other node key (real defect found via live H-020/H-021 multi-node testing: a mid-workflow advance was mislabeled 'line item is now Live' while the request was still status=submitted)", () => {
+    const events = buildWorkflowTransitionEvents(
+      [transition({ fromNodeKey: "node_finance", toNodeKey: "node_legal", actorUserId: "finance-user" })],
+      NODE_DISPLAY,
+      ACTOR_LABELS,
+      "line item is now Live"
+      // isRequestFinalized omitted: the request has not actually reached status=approved yet.
+    )
+    expect(events).toHaveLength(1)
+    expect(events[0].summary).toBe("Finance Approval approved")
+    expect(events[0].summary).not.toContain("line item is now Live")
   })
 
   it("orders events chronologically regardless of input order", () => {
