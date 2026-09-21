@@ -642,12 +642,25 @@ function calculateDesignationMugSummary(
  * summed. Worked example from the task correction, MUG = 150 against rows
  * 1-100 @100 and 101-250 @90: Whole Quantity = 150 x 90 = 13,500; Progressive
  * = (100 x 100) + (50 x 90) = 14,500.
+ *
+ * Band membership is evaluated against each row's own continuous lower bound
+ * (`row.from - 1`, exclusive), not the stored integer `from` itself
+ * (Batch 14, G-019): rows are contiguous by construction
+ * (`recalculateSlabFroms`, `to = nextRow.from - 1`), so a fractional quantity
+ * strictly between two integer boundaries (e.g. 100.5, between a first row's
+ * `to = 100` and a second row's `from = 101`) still belongs to the second
+ * row, matching the same continuous range the two integer boundaries
+ * jointly describe. Using `quantity >= row.from` here previously matched no
+ * row at all for such a quantity (100.5 is not >= 101), silently returning
+ * null instead of pricing it; integer quantities are unaffected, since
+ * `quantity > row.from - 1` and `quantity >= row.from` agree for every
+ * integer value.
  */
 function calculateSlabAmountForQuantity(rows: SlabRow[], method: SlabMethod, quantity: number): number | null {
   if (rows.length === 0) return null
 
   if (method === "whole_quantity") {
-    const band = rows.find((row) => row.from !== null && quantity >= row.from && (row.to === null || quantity <= row.to))
+    const band = rows.find((row) => row.from !== null && quantity > row.from - 1 && (row.to === null || quantity <= row.to))
     if (!band || band.rate === null) return null
     return quantity * band.rate
   }
@@ -655,9 +668,10 @@ function calculateSlabAmountForQuantity(rows: SlabRow[], method: SlabMethod, qua
   let total = 0
   for (const row of rows) {
     if (row.from === null || row.rate === null) return null
-    if (quantity < row.from) break
+    const lowerExclusive = row.from - 1
+    if (quantity <= lowerExclusive) break
     const bandTop = row.to === null ? quantity : Math.min(row.to, quantity)
-    const unitsInBand = bandTop - row.from + 1
+    const unitsInBand = bandTop - lowerExclusive
     if (unitsInBand > 0) total += unitsInBand * row.rate
   }
   return total

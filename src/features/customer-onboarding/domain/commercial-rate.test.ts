@@ -683,6 +683,14 @@ describe("calculateSlabAmountForQuantity (task correction §1's worked example)"
     const incompleteRows = [{ id: "1", from: 1, to: 100, rate: 100, mug: null }]
     expect(calculateSlabAmountForQuantity(incompleteRows, "whole_quantity", 150)).toBeNull()
   })
+
+  it("Batch 14 (G-019): a fractional quantity between two integer band boundaries still resolves, Whole Quantity uses the second band's rate (100.5 x 90 = 9,045)", () => {
+    expect(calculateSlabAmountForQuantity(rows, "whole_quantity", 100.5)).toBe(9045)
+  })
+
+  it("Batch 14 (G-019): a fractional quantity between two integer band boundaries still resolves, Progressive splits the 0.5 unit into the second band ((100 x 100) + (0.5 x 90) = 10,045)", () => {
+    expect(calculateSlabAmountForQuantity(rows, "progressive", 100.5)).toBe(10045)
+  })
 })
 
 describe("calculateMugValue (task correction §1, §3: a calculated reference, never a fabricated one)", () => {

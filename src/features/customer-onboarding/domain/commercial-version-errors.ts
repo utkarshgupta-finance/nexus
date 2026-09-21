@@ -28,6 +28,8 @@ type CommercialVersionErrorKind =
   | "workflow_node_already_advanced"
   | "commercial_version_draft_stale"
   | "commercial_version_effective_date_out_of_order"
+  | "commercial_version_effective_date_adjacent_to_open_component_start"
+  | "commercial_version_effective_date_conflicts_with_history"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -64,6 +66,20 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   // this decision) always fell through to a generic "An unexpected
   // error occurred," hiding the RPC's own specific, useful message.
   COMMERCIAL_VERSION_EFFECTIVE_DATE_OUT_OF_ORDER: "commercial_version_effective_date_out_of_order",
+  // Real defect found via a live, rolled-back reproduction (20260930170000):
+  // this specific edge case (a version's effective_date exactly one day
+  // after an existing open component's own effective_from) used to reach
+  // the RPC's bulk-close step and fail on a raw check constraint violation
+  // instead of raising a named token at all, so it fell through to the
+  // generic "An unexpected error occurred" below.
+  COMMERCIAL_VERSION_EFFECTIVE_DATE_ADJACENT_TO_OPEN_COMPONENT_START: "commercial_version_effective_date_adjacent_to_open_component_start",
+  // Found unmapped alongside the two tokens directly above, while
+  // debugging the same live approval failure (Batch 14): a correction
+  // whose effective_date falls inside a component's already-recorded
+  // history (20260930160000/20260930170000) also fell through to the
+  // generic "An unexpected error occurred" instead of surfacing its own
+  // specific, useful message.
+  COMMERCIAL_VERSION_EFFECTIVE_DATE_CONFLICTS_WITH_HISTORY: "commercial_version_effective_date_conflicts_with_history",
 }
 
 const SQLSTATE_KINDS: Record<string, CommercialVersionErrorKind> = {
