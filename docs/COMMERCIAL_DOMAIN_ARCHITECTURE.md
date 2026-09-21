@@ -1464,7 +1464,7 @@ component's `stableComponentKey` is `null` on the draft
 `coalesce(p_stable_component_key, p_new_commercial_component_id)` mints a
 fresh identity for it, exactly as designed.
 
-## 23a. Historical `correction` backdating: current scope and future Invoicing/MRR dependency [PD-006, DESIGN DRAFT, 2026-09-21]
+## 23a. Historical `correction` backdating: current scope and future Invoicing/MRR dependency [PD-006, IMPLEMENTED, 2026-09-21]
 
 **Decision (PD-006, Batches 1-13 Ledger Audit product decision closure):**
 a Commercial Change with `change_category = 'correction'` may use an
@@ -1522,6 +1522,70 @@ designed or built as part of this decision closure):
 **Not built as part of this decision closure:** invoice creation, credit
 notes, debit notes, MRR restatement, accounting-period controls, or ERP
 integration. This section is documentation of a future dependency only.
+
+**Final business decision (PD-006, Product Decision Closure Phase 4,
+2026-09-21): a correction may move the affected component's own
+historical start date backward.** Example: a component recorded as
+starting 1 July is corrected to show it should have started 1 June.
+Implemented in `supabase/migrations/20260930150000_correction_category
+_retroactive_start_date.sql` and its follow-up fix,
+`20260930160000_fix_retroactive_correction_overlap_with_prior_history.sql`.
+
+`commercial_components` remains exactly as immutable as §22a already
+documents: `effective_from` can never change on an existing row
+(`fn_protect_commercial_component_lifecycle`, 20260908210000). This
+decision therefore never updates an existing row. Instead, when a
+correction's own effective_date is earlier than the earliest
+`effective_from` ever recorded for that `stable_component_key`, the
+existing row(s) are left completely untouched, and a NEW row is
+inserted covering the previously-missing historical gap, closed exactly
+where the earliest existing row already begins. A reader walking the
+full `stable_component_key` chain chronologically sees the true,
+corrected start date; a reader looking at either individual row sees
+exactly what was recorded and when, in full. This is the "append, never
+rewrite" principle §22a already establishes, applied to a start date
+instead of an end date.
+
+A correction's effective_date is only accepted in exactly two shapes: (a)
+strictly before the earliest effective_from ever recorded for the
+component (a genuine backward extension, safe by construction since it
+starts before everything), or (b) on/after the currently open period's
+own start (the ordinary forward supersession every other category
+already uses). A target date that would fall inside territory an
+existing row already covers is rejected explicitly
+(`COMMERCIAL_VERSION_EFFECTIVE_DATE_CONFLICTS_WITH_HISTORY`), never
+silently accepted.
+
+**Real defect found and fixed during this decision's own live retest:**
+the first implementation (20260930150000) only checked whether a
+CURRENTLY OPEN row had a later effective_from; it never considered an
+already-closed historical row that might sit between a correction's new
+target date and the currently-open period. A second correction reaching
+further back than a first one produced two overlapping
+`commercial_components` rows for the same `stable_component_key`
+against a fictional test configuration. The follow-up migration
+(20260930160000) fixes this by resolving each component's full existing
+history first, exactly as described above; those specific overlapping
+test rows themselves cannot be corrected retroactively (the same
+immutability that makes this whole mechanism safe also means a defect's
+own by-product cannot be erased after the fact), and remain in the
+shared database as fictional test data with no real customer or
+financial impact, alongside the fix that prevents the same overlap from
+recurring.
+
+**UI entry point:** the "Create New Version" bare route
+(`/commercials/[configId]/versions/new`) accepts an optional
+`?category=` query param, validated against the same closed set the
+database itself enforces; a "Record a Correction" button on the
+Commercial Configuration page links here with `category=correction`.
+Before this, no UI control of any kind existed for choosing a category
+other than the hardcoded default `amendment`.
+
+The future Invoicing/MRR Recognition dependency documented above remains
+exactly as stated: nothing about this final decision builds an invoice,
+credit/debit note, MRR restatement, accounting-period control, or ERP
+integration; the same controlled-adjustment requirement applies whenever
+those modules are eventually built.
 
 ## 23. What this document is not
 
