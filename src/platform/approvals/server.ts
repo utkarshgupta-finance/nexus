@@ -44,7 +44,7 @@ function resolveResponsibleTeamId(
 }
 
 async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
-  const [rawOnboardingEntries, rawChangeRequestEntries, rawVersionEntries, goLiveEntries] = await Promise.all([
+  const [rawOnboardingEntries, rawChangeRequestEntries, rawVersionEntries, rawGoLiveEntries] = await Promise.all([
     listAllOnboardingEntries(),
     listAllChangeRequestEntries(),
     listAllVersionEntries(),
@@ -65,16 +65,25 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
   // entries scope by customerId once approved, or businessUnit before
   // that (mirroring the single-case read in /reviews/[requestId]); change
   // requests and commercial versions always have a resolved customer.
-  // Go-live entries are deliberately left unfiltered here: PD-005 named
-  // exactly five domains (Customer Master, Customer Onboarding, Customer
-  // Change, Commercial Configuration, Commercial Change) and go-live was
-  // not one of them, so extending scoping to it would be exactly the kind
-  // of unrelated RBAC-surface expansion this closure was told not to do.
-  const [visibleCustomerIdsForCustomerRead, visibleBusinessUnitsForCustomerRead, visibleCustomerIdsForCommercialRead] = await Promise.all([
-    getVisibleCustomerIds("customer", "read"),
-    getVisibleBusinessUnits("customer", "read"),
-    getVisibleCustomerIds("commercial_configuration", "read"),
-  ])
+  //
+  // Go-live entries were originally left unfiltered here (PD-005 named
+  // exactly five domains and go-live was not one of them). A follow-up
+  // authorization check (Product Decision Closure, PD-005 go-live
+  // verification, 2026-09-21) found this left a real customer-identifying
+  // information disclosure in this shared composer, not harmless tech
+  // debt, though the underlying go-live record itself stayed protected by
+  // its own separate, already-correct route-level authorization. Fixed by
+  // scoping go-live entries the same way version/change-request entries
+  // already are, reusing the exact same getVisibleCustomerIds mechanism,
+  // no new authorization model. Full detail in
+  // docs/journey-runs/OVERNIGHT_PENDING_APPROVALS.md's PD-005 entry.
+  const [visibleCustomerIdsForCustomerRead, visibleBusinessUnitsForCustomerRead, visibleCustomerIdsForCommercialRead, visibleCustomerIdsForGoLiveRead] =
+    await Promise.all([
+      getVisibleCustomerIds("customer", "read"),
+      getVisibleBusinessUnits("customer", "read"),
+      getVisibleCustomerIds("commercial_configuration", "read"),
+      getVisibleCustomerIds("go_live", "read"),
+    ])
 
   const onboardingEntries =
     visibleCustomerIdsForCustomerRead === null
@@ -89,6 +98,11 @@ async function loadApprovalInbox(): Promise<ApprovalInboxItem[]> {
     visibleCustomerIdsForCustomerRead === null
       ? rawChangeRequestEntries
       : rawChangeRequestEntries.filter((entry) => visibleCustomerIdsForCustomerRead.has(entry.customerId))
+
+  const goLiveEntries =
+    visibleCustomerIdsForGoLiveRead === null
+      ? rawGoLiveEntries
+      : rawGoLiveEntries.filter((entry) => visibleCustomerIdsForGoLiveRead.has(entry.customerId))
 
   const versionEntries: typeof rawVersionEntries = []
   const versionConfigurations: typeof rawVersionConfigurations = []
