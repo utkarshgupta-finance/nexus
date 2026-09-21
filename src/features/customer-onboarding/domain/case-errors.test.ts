@@ -46,4 +46,15 @@ describe("parseCaseError", () => {
     expect(parsed.kind).toBe("onboarding_case_submit_not_owner")
     expect(parsed.message).toBe("only the creator of case req-1 may submit it")
   })
+
+  it("maps ONBOARDING_EFFECTIVE_DATE_EXCEPTION_PENDING to its own kind (PD-002, Batches 1-13 Ledger Audit product decision closure)", () => {
+    const parsed = parseCaseError({
+      message:
+        "ONBOARDING_EFFECTIVE_DATE_EXCEPTION_PENDING: effective_date 2026-01-01 is before this case's onboarding date 2026-06-01; both a BU Head and a Finance Head must approve (bu_head approved: f, finance_head approved: f)",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("onboarding_effective_date_exception_pending")
+    expect(parsed.message).toContain("both a BU Head and a Finance Head must approve")
+  })
 })

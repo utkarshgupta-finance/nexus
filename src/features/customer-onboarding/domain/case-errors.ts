@@ -26,6 +26,10 @@ type CaseErrorKind =
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
   | "onboarding_draft_stale"
+  | "onboarding_effective_date_exception_pending"
+  | "onboarding_exception_invalid_role"
+  | "onboarding_exception_not_found"
+  | "onboarding_exception_team_not_configured"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -56,6 +60,10 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
   ONBOARDING_DRAFT_STALE: "onboarding_draft_stale",
+  ONBOARDING_EFFECTIVE_DATE_EXCEPTION_PENDING: "onboarding_effective_date_exception_pending",
+  ONBOARDING_EXCEPTION_INVALID_ROLE: "onboarding_exception_invalid_role",
+  ONBOARDING_EXCEPTION_NOT_FOUND: "onboarding_exception_not_found",
+  ONBOARDING_EXCEPTION_TEAM_NOT_CONFIGURED: "onboarding_exception_team_not_configured",
 }
 
 const SQLSTATE_KINDS: Record<string, CaseErrorKind> = {

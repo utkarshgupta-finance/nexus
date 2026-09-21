@@ -104,6 +104,38 @@ async function approveCase(input: ApproveCaseInput): Promise<CustomerOnboardingC
   })
 }
 
+type OnboardingEffectiveDateExceptionRow = {
+  id: string
+  case_request_id: string
+  effective_date: string
+  onboarding_date: string
+  bu_head_approved_by: string | null
+  bu_head_approved_at: string | null
+  finance_head_approved_by: string | null
+  finance_head_approved_at: string | null
+}
+
+/**
+ * PD-002 (A-034, Batches 1-13 Ledger Audit product decision closure):
+ * records one role's sign-off on a pending backdated-effective-date
+ * exception (supabase/migrations/20260930120000_onboarding_effective_date_exception_approval.sql).
+ * The exception row itself is created lazily by approve_customer_onboarding_case
+ * the first time it detects a backdated effective_date; calling this
+ * before that has happened is a genuine ordering error, surfaced as
+ * ONBOARDING_EXCEPTION_NOT_FOUND, not silently accepted.
+ */
+async function approveOnboardingEffectiveDateException(
+  caseRequestId: string,
+  role: "bu_head" | "finance_head",
+  actorUserId: string
+): Promise<OnboardingEffectiveDateExceptionRow> {
+  return callSingleRowRpc<OnboardingEffectiveDateExceptionRow>("approve_onboarding_effective_date_exception", {
+    p_case_request_id: caseRequestId,
+    p_role: role,
+    p_actor_user_id: actorUserId,
+  })
+}
+
 /** Only a draft may be cancelled, and only by its creator (cancel_customer_onboarding_case enforces both server-side). */
 async function cancelCase(requestId: string, reason: string | null, actorUserId: string): Promise<CustomerOnboardingCaseRow> {
   return callSingleRowRpc<CustomerOnboardingCaseRow>("cancel_customer_onboarding_case", {
@@ -276,5 +308,6 @@ export {
   listSendBacksForRequest,
   listSendBacksForRequests,
   listFieldCommentsForRequest,
+  approveOnboardingEffectiveDateException,
 }
-export type { CreateCaseInput, SaveDraftInput, SendBackInput, SendBackFieldComment, ApproveCaseInput }
+export type { CreateCaseInput, SaveDraftInput, SendBackInput, SendBackFieldComment, ApproveCaseInput, OnboardingEffectiveDateExceptionRow }

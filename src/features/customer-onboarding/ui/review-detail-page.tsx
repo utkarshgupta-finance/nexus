@@ -327,19 +327,27 @@ function ReviewDetailPage({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-foreground" htmlFor="effective-date">
-                    Commercial Effective From
-                  </label>
-                  <Input id="effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="effective-date">
+                      Commercial Effective From
+                    </label>
+                    <Input id="effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
+                  </div>
+                  <PendingButton size="sm" onClick={handleApprove} pending={pendingAction === "approve"} pendingLabel="Approving...">
+                    Approve
+                  </PendingButton>
+                  <Button size="sm" variant="outline" onClick={() => setIsSendingBack(true)} disabled={pendingAction !== null}>
+                    Send Back
+                  </Button>
                 </div>
-                <PendingButton size="sm" onClick={handleApprove} pending={pendingAction === "approve"} pendingLabel="Approving...">
-                  Approve
-                </PendingButton>
-                <Button size="sm" variant="outline" onClick={() => setIsSendingBack(true)} disabled={pendingAction !== null}>
-                  Send Back
-                </Button>
+                {effectiveDate < onboardingCase.createdAt.slice(0, 10) && (
+                  <p className="text-xs text-amber-600">
+                    This date is before the case&apos;s own onboarding date ({onboardingCase.createdAt.slice(0, 10)}). Approving will require BU Head and
+                    Finance Head sign-off before the Commercial Configuration finalizes (PD-002).
+                  </p>
+                )}
               </div>
             )}
           </section>

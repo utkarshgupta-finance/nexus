@@ -7,6 +7,7 @@ import { CaseOperationError } from "./domain/case-errors"
 import { CommercialVersionOperationError } from "./domain/commercial-version-errors"
 import { loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { getCustomerById, listCustomerMaster } from "@/features/customers/server"
+import { commercialConfigurationService } from "@/features/commercial/server"
 
 import {
   createOnboardingCase,
@@ -16,6 +17,7 @@ import {
   approveOnboardingCase,
   cancelOnboardingCase,
   listApprovedCaseTaxIdentity,
+  approveOnboardingEffectiveDateException,
 } from "./services/case.service"
 import {
   createVersionFromActive,
@@ -134,6 +136,30 @@ async function approveOnboardingCaseAction(requestId: string, effectiveDate: str
   }
 }
 
+type ExceptionActionResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * PD-002 (A-034, Batches 1-13 Ledger Audit product decision closure):
+ * records one role's (BU Head or Finance Head) sign-off on a pending
+ * backdated-effective-date exception. Gated on `customer.approve` (the
+ * same permission the onboarding Checker role holds) plus the RPC's own
+ * real team-membership check (`fn_require_workflow_team_membership`
+ * against the `bu_head`/`finance_head` team, never a fabricated
+ * approval): a `customer.approve` holder who is not actually a member of
+ * the relevant team is still rejected server-side.
+ */
+async function approveOnboardingEffectiveDateExceptionAction(caseRequestId: string, role: "bu_head" | "finance_head"): Promise<ExceptionActionResult> {
+  try {
+    const actor = await requirePermission("customer", "approve")
+    await approveOnboardingEffectiveDateException(caseRequestId, role, actor.appUserId)
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof CaseOperationError) return { ok: false, error: error.caseError.message }
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while recording this approval." }
+  }
+}
+
 /** Task Phase C: only a draft may be discarded, gated the same as create/save/submit since discarding one's own draft is a creation-time decision, not a reviewer one. */
 async function cancelOnboardingCaseAction(requestId: string, reason: string | null): Promise<CaseActionResult> {
   try {
@@ -176,9 +202,23 @@ function toCommercialVersionActionError(error: unknown): CommercialVersionAction
   return { ok: false, error: "An unexpected error occurred while updating this Commercial Configuration Version." }
 }
 
+/**
+ * PD-003 (B-011, Batches 1-13 Ledger Audit product decision closure):
+ * a new Commercial Configuration Version may not be opened against an
+ * inactive customer, mirroring createChangeRequestAction's identical
+ * check for Customer Change. Server-side here (this Server Action never
+ * runs in the browser); the RPC itself also now rejects this
+ * independently (see the same task's migration), so a direct/RPC bypass
+ * of this action is blocked too, not just the UI path.
+ */
 async function createCommercialVersionAction(commercialConfigurationId: string, changeCategory: CommercialVersionChangeCategory): Promise<CommercialVersionActionResult> {
   try {
     const actor = await requirePermission("commercial_configuration", "write")
+    const configuration = await commercialConfigurationService.getCommercialConfiguration(commercialConfigurationId)
+    const customer = configuration ? await getCustomerById(configuration.customerId) : null
+    if (customer && !customer.is_active) {
+      return { ok: false, error: "This customer is inactive. Reactivate the customer before creating a new Commercial Configuration Version." }
+    }
     const version = await createVersionFromActive(commercialConfigurationId, changeCategory, actor.appUserId)
     return { ok: true, version }
   } catch (error) {
@@ -341,5 +381,14 @@ export {
   checkForDuplicateCustomersAction,
   uploadOnboardingDocumentAction,
   getOnboardingDocumentDownloadUrlAction,
+  approveOnboardingEffectiveDateExceptionAction,
 }
-export type { CaseActionResult, ApproveCaseActionResult, CommercialVersionActionResult, DuplicateCheckActionResult, UploadDocumentActionResult, DownloadUrlActionResult }
+export type {
+  CaseActionResult,
+  ApproveCaseActionResult,
+  CommercialVersionActionResult,
+  DuplicateCheckActionResult,
+  UploadDocumentActionResult,
+  DownloadUrlActionResult,
+  ExceptionActionResult,
+}
