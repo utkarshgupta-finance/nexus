@@ -214,6 +214,7 @@ into a second backlog.
 - **Two silent `catch {}` blocks in `app/customers/page.tsx`** (former-name
   search, reference snapshot) fail with no user-visible indication at all,
   unlike the third catch in the same file which does surface a message.
+- **Former-name search shows the most-recently-changed historical value, not necessarily the one that matched the search term (found live during the Batch 8/morning-catch-up execution of journey B-007).** `searchFormerCustomerNames`'s dedup (`change-request.service.ts`) keeps only the first row per customer in a most-recent-first ordering. When a customer has multiple historical names that share overlapping substrings (e.g. "Acme" then "Acme Global" then "Acme Global India"), searching for the earliest name still correctly finds the customer, but the "Former legal name: X" label shown can be a different, later historical value than the one actually searched for. The customer is always found correctly; only the specific label can be imprecise in this narrow case. Not fixed, since a real fix requires a small design choice (return the best-matching historical value per customer, or all matching values, rather than always the most recent) rather than being an unambiguous bug; revisit alongside any other former-name search change.
 
 - **My Work's `canApprove` imprecision now spans a fourth request type.**
   `/my-work` ORs `customer.approve` with `go_live.approve` into one

@@ -355,13 +355,29 @@ Not itself one of Batch 8's 25 scheduled IDs (A-011 was Batch 7 scope, explicitl
 
 ---
 
+## B-007: Former-name search resolver finds customer by historical name
+
+- Journey ID: B-007
+- Priority: P1
+- Automation Feasibility: FULL
+- Original Overnight Status: DEFERRED. This journey explicitly depends on C-017/C-033 (a completed, approved Customer Change that renamed a customer, with a multi-rename history), neither of which had run yet at this point in Batch 8. Deferred per its own documented dependency chain, not treated as a Batch 8 failure, and correctly flagged in the overnight final report as one of two journeys genuinely left open for morning catch-up (the other being C-027).
+
+### MORNING CATCH-UP OUTCOME (2026-09-21)
+
+- Morning Action: dependency confirmed satisfied (the shared fixture customer, `120d8347-e16f-4a01-937b-97c3acea9394`, was renamed twice across Batches 10-12 via real approved Customer Change requests: "Batch8 Approval Core Co" -> "Batch8 Approval Core Co (C-010 Combined Test)" -> "Batch8 Approval Core Co Renamed", exactly the multi-rename shape this journey's own stress variant asks for). Read the real implementation end to end (`src/features/customers/server/former-name-search.ts`'s `findCustomersByFormerName`, `src/features/customer-change/services/change-request.service.ts`'s `searchFormerCustomerNames`, `src/features/customer-change/data/change-request.data.ts`'s `searchFieldHistoryByOldValue`, and the merge/rendering logic in `src/app/customers/page.tsx` and `src/features/customers/ui/customers-page.tsx`), then replicated the exact same query live (case-insensitive substring match on `customer_field_history.old_value` restricted to `name`/`brand_name`, deduped by customer, ordered most-recent-first).
+- Rerun Result: searching for the customer's ORIGINAL name ("Batch8 Approval Core Co") correctly finds the customer via a former-name match. Searching for the INTERMEDIATE name ("...C-010 Combined Test") also correctly finds it, confirming the stress variant (match ANY prior name, not just the immediately preceding one). Searching for the CURRENT name correctly returns zero former-name matches (it's a live match, not a former one, confirming the two are never conflated). The UI genuinely merges former-name matches into the same results table as live matches (not a separate screen), each visually distinguished with a "Former legal name: X" / "Former brand: X" badge, and a former-name match is only shown if the customer isn't already present as a live match, confirming this is additive, never a replacement of the live substring search.
+- Minor Finding (not a defect, precisely recorded): when a customer's historical names share overlapping substrings with each other (e.g. "Acme" -> "Acme Global" -> "Acme Global India", all containing "Acme"), searching for the earliest name returns the customer correctly, but the displayed "Former legal name: X" label shows the MOST RECENTLY CHANGED matching historical value, not necessarily the one that most specifically matches the search term. The customer is always found correctly; only the specific former-name label shown can be a different (but still genuinely historical) value than the one the user searched for, when overlapping substrings exist. This is a real, live-verified, low-severity precision gap in the deduplication logic (`searchFormerCustomerNames`'s `seen.add(match.customerId)` keeps the first row in a most-recent-first ordering, discarding earlier equally-valid matches for the same customer), not escalated to a fix this session since it requires a small design choice (show the best-matching label, or show all matching labels, rather than always defaulting to most-recent) rather than being an unambiguous bug.
+- Final Status: PASS (core business objective, stress variant, and UX merge/labeling all confirmed via real production code paths), with the one minor, precisely-documented finding above.
+
+---
+
 ## Batch 8 closure summary
 
 - Scheduled: 25 (A-020 through A-035, ACC-001, B-001 through B-008)
 - PASS: 21 (A-020, A-021, A-022, A-024, A-025, A-026, A-027, A-028, A-029, A-030, A-031, A-032, A-033, A-035, B-001, B-002, B-003, B-004, B-005, B-006, B-008)
 - FAILED THEN FIXED + PASS: 2 (A-023 real content-sniffing gap; ACC-001 missing skip-link)
 - PRODUCT DECISION REQUIRED: 1 (A-034, recorded as PD-002)
-- Deferred within a scheduled ID for a documented, non-avoidance reason (still counted toward the 25, not left blank): B-007 (former-name search), waiting on Batch 10/11's own documented C-017/C-033 dependency, exactly as this journey's own record specifies
+- Originally deferred within a scheduled ID for a documented, non-avoidance reason: B-007 (former-name search), waiting on Batch 10/11's own documented C-017/C-033 dependency. **Resolved 2026-09-21 (morning catch-up): PASS**, see the dedicated B-007 entry and its Morning Catch-Up Outcome above.
 - A-028's title covers two distinct tokens; the general dead-end half is proven PASS here, the Decision-branch-specific half (`WORKFLOW_DECISION_NO_MATCH`) is deferred to Batch 12's real Commercial Change decision workflow as a neighboring re-verification, not a second scheduled count
 - New fixtures created and preserved for downstream batches: customer_id `120d8347-e16f-4a01-937b-97c3acea9394` ("Batch8 Approval Core Co", currently deactivated, ready for Batch 9's B-009 reactivate journey), team `wf_test_empty` (permanent zero-member fixture for any future A-027 re-verification), persona `wf-test.leadership-approver-b@example.test`.
 - Defects found and fixed: DEFECT-B8-001 (A-023, document content-type check), DEFECT-B8-002 (ACC-001, missing skip-to-content link).
