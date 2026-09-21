@@ -58,6 +58,25 @@ describe("approveChangeRequest self-approval control", () => {
   })
 })
 
+describe("approveChangeRequest is intentionally is_active-agnostic (PD-004, Batches 1-13 Ledger Audit product decision closure)", () => {
+  it("does not pre-check customers.is_active before calling the RPC: a valid in-flight request may still be approved after the underlying customer later becomes inactive (C-030, PD-004: 'do not block approval merely because the customer became inactive after the request was validly created')", async () => {
+    const { approveChangeRequest } = await import("./change-request.data")
+    rpcMock.mockResolvedValueOnce({ data: { request_id: "r1", status: "approved" }, error: null })
+
+    const result = await approveChangeRequest("r1", "checker-1")
+
+    expect(result.status).toBe("approved")
+    // The RPC call carries no is_active/customer-status parameter of any
+    // kind. If a future change adds one, this assertion documents the
+    // intentional absence so that change is a deliberate, visible diff
+    // here rather than a silent regression of PD-004's decided behavior.
+    const [, rpcArgs] = rpcMock.mock.calls[0]
+    expect(rpcArgs).not.toHaveProperty("p_is_active")
+    expect(rpcArgs).not.toHaveProperty("p_customer_is_active")
+    expect(rpcArgs).toEqual({ p_request_id: "r1", p_actor_user_id: "checker-1", p_expected_current_node_key: null })
+  })
+})
+
 describe("rejectChangeRequest self-approval control", () => {
   it("blocks rejection when the actor is the same user who created the request", async () => {
     const { rejectChangeRequest } = await import("./change-request.data")
