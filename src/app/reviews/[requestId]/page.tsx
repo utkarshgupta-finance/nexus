@@ -18,7 +18,12 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
   const { requestId } = await params
   const session = await getCurrentNexusSession()
 
-  const onboardingCase = await getOnboardingCase(requestId)
+  // PD-001 (A-036): a draft is only readable by its own creator through
+  // this route too (a reviewer never has a legitimate reason to open
+  // someone else's still-drafting case by guessing/reusing a request id).
+  // Once the case leaves draft, normal customer.read visibility applies.
+  const actorUserId = session.status === "active" ? session.appUserId : ""
+  const onboardingCase = await getOnboardingCase(requestId, actorUserId)
   if (!onboardingCase) {
     notFound()
   }
@@ -39,7 +44,7 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
     documents = []
   }
 
-  const timeline = await loadOnboardingRequestTimeline(requestId)
+  const timeline = await loadOnboardingRequestTimeline(requestId, actorUserId)
 
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/${requestId}`}>

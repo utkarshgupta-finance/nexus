@@ -29,7 +29,12 @@ export default async function CustomerOnboardingCaseRoute({ params }: { params: 
   const { requestId } = await params
   const session = await getCurrentNexusSession()
 
-  const onboardingCase = await getOnboardingCase(requestId)
+  // PD-001 (A-036): while the case is in draft, only its own creator may
+  // read it. actorUserId is only available for an active session; any
+  // other status safely resolves to "" (never matches a real created_by),
+  // matching this route's pre-existing "fetch first, AuthGate decides
+  // rendering" pattern without changing that ordering.
+  const onboardingCase = await getOnboardingCase(requestId, session.status === "active" ? session.appUserId : "")
   if (!onboardingCase) {
     notFound()
   }

@@ -44,9 +44,23 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "")
 }
 
-async function getOnboardingCase(requestId: string): Promise<CustomerOnboardingCase | null> {
+/**
+ * PD-001 (A-036, Batches 1-13 Ledger Audit product decision closure):
+ * while a case is still in `draft`, only its own creator may read it,
+ * matching the creator-only Save/Submit/Cancel guard already enforced by
+ * DEFECT-B7-002. Once a case leaves `draft` (submitted, sent_back,
+ * resubmitted, approved, cancelled), normal `customer.read`/`customer.approve`
+ * visibility applies exactly as before; this check only ever narrows the
+ * draft window. `actorUserId` must be the server-derived actor
+ * (`requirePermission`/`getCurrentNexusSession`), never a client-supplied
+ * value. A denied read returns `null`, identical to a genuinely
+ * nonexistent request id, so a non-creator cannot distinguish "no such
+ * draft" from "someone else's draft" through this path.
+ */
+async function getOnboardingCase(requestId: string, actorUserId: string): Promise<CustomerOnboardingCase | null> {
   const [row, revisions] = await Promise.all([caseData.getCaseByRequestId(requestId), caseData.listRevisionsForRequest(requestId)])
   if (!row || revisions.length === 0) return null
+  if (row.status === "draft" && row.created_by !== actorUserId) return null
   return toCustomerOnboardingCase(row, revisions)
 }
 
@@ -426,6 +440,11 @@ async function listApprovedCaseTaxIdentity(): Promise<ApprovedCaseTaxIdentity[]>
   return identities
 }
 
+/** PD-002 (A-034, Batches 1-13 Ledger Audit product decision closure): thin passthrough, no business logic beyond the RPC call itself, matching this service's own established shape. */
+async function approveOnboardingEffectiveDateException(caseRequestId: string, role: "bu_head" | "finance_head", actorUserId: string) {
+  return caseData.approveOnboardingEffectiveDateException(caseRequestId, role, actorUserId)
+}
+
 export {
   getOnboardingCase,
   createOnboardingCase,
@@ -444,5 +463,6 @@ export {
   approveOnboardingCase,
   getOnboardingOriginForCustomer,
   listApprovedCaseTaxIdentity,
+  approveOnboardingEffectiveDateException,
 }
 export type { ReviewQueueEntry, ApprovedCaseTaxIdentity, OnboardingSendBackEntry, OnboardingFieldCommentEntry, MyOnboardingRequestEntry }

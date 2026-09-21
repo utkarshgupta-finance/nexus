@@ -21,6 +21,7 @@ const submitCase = vi.fn()
 const listRevisionsForRequest = vi.fn()
 const listApprovedCases = vi.fn()
 const listRevisionsForRequests = vi.fn()
+const getCaseByRequestId = vi.fn()
 
 vi.mock("../data/case.data", () => ({
   getLatestRevisionForRequest: (...args: unknown[]) => getLatestRevisionForRequest(...args),
@@ -28,6 +29,7 @@ vi.mock("../data/case.data", () => ({
   listRevisionsForRequest: (...args: unknown[]) => listRevisionsForRequest(...args),
   listApprovedCases: (...args: unknown[]) => listApprovedCases(...args),
   listRevisionsForRequests: (...args: unknown[]) => listRevisionsForRequests(...args),
+  getCaseByRequestId: (...args: unknown[]) => getCaseByRequestId(...args),
 }))
 
 const listOnboardingDocuments = vi.fn()
@@ -40,7 +42,7 @@ vi.mock("@/features/customers/server", () => ({
   listCustomerMaster: (...args: unknown[]) => listCustomerMaster(...args),
 }))
 
-import { submitOnboardingCase } from "./case.service"
+import { submitOnboardingCase, getOnboardingCase } from "./case.service"
 
 const COMPLETE_CUSTOMER_DETAILS = {
   customer_legal_entity_name: "Batch7 Test Co",
@@ -146,5 +148,70 @@ describe("submitOnboardingCase server-side validation (Product Gap Closure, Batc
     listRevisionsForRequest.mockResolvedValue([SUBMITTED_REVISION_ROW])
     await submitOnboardingCase("req-1", "actor-1")
     expect(submitCase).toHaveBeenCalledWith("req-1", "actor-1")
+  })
+})
+
+/**
+ * PD-001 (A-036, Batches 1-13 Ledger Audit product decision closure):
+ * getOnboardingCase now only returns a draft to its own creator; every
+ * other status is readable by any caller, exactly as before this
+ * change. A denied read returns null, identical to a genuinely
+ * nonexistent request id.
+ */
+describe("getOnboardingCase creator-only draft visibility (PD-001, A-036)", () => {
+  function caseRow(overrides: Partial<Record<string, unknown>>) {
+    return {
+      request_id: "req-1",
+      case_number: 1,
+      status: "draft",
+      current_stage_key: "customer_details",
+      sent_back_reason: null,
+      sent_back_at: null,
+      sent_back_by: null,
+      sent_back_target_stage_key: null,
+      approved_by: null,
+      approved_at: null,
+      cancelled_by: null,
+      cancelled_at: null,
+      cancelled_reason: null,
+      customer_id: null,
+      commercial_configuration_id: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      created_by: "maker-a",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      workflow_version_id: null,
+      current_workflow_node_key: null,
+      ...overrides,
+    }
+  }
+
+  const ONE_REVISION = [{ revision_number: 1, status: "draft", raw_data: {}, effective_data: null, row_version: 1, created_by: "maker-a", created_at: "2026-01-01T00:00:00.000Z", updated_by: "maker-a", updated_at: "2026-01-01T00:00:00.000Z", submitted_by: null, submitted_at: null }]
+
+  it("returns the case to its own creator while still a draft", async () => {
+    getCaseByRequestId.mockResolvedValue(caseRow({}))
+    listRevisionsForRequest.mockResolvedValue(ONE_REVISION)
+    const result = await getOnboardingCase("req-1", "maker-a")
+    expect(result?.requestId).toBe("req-1")
+  })
+
+  it("returns null (identical to not-found) for a non-creator while the case is still a draft", async () => {
+    getCaseByRequestId.mockResolvedValue(caseRow({}))
+    listRevisionsForRequest.mockResolvedValue(ONE_REVISION)
+    const result = await getOnboardingCase("req-1", "maker-b")
+    expect(result).toBeNull()
+  })
+
+  it("returns the case to a non-creator once it has left draft (submitted), matching normal customer.read visibility", async () => {
+    getCaseByRequestId.mockResolvedValue(caseRow({ status: "submitted" }))
+    listRevisionsForRequest.mockResolvedValue(ONE_REVISION)
+    const result = await getOnboardingCase("req-1", "maker-b")
+    expect(result?.requestId).toBe("req-1")
+  })
+
+  it("returns null for a genuinely nonexistent request id, indistinguishable from a denied draft read", async () => {
+    getCaseByRequestId.mockResolvedValue(null)
+    listRevisionsForRequest.mockResolvedValue([])
+    const result = await getOnboardingCase("no-such-request", "maker-a")
+    expect(result).toBeNull()
   })
 })

@@ -14,8 +14,8 @@ import type { OnboardingTimelineEvent } from "../domain/timeline"
  * email in one batched lookup, and hands off to the pure builder.
  * Mirrors ../../customers/server/activity.ts's own shape exactly.
  */
-async function loadOnboardingRequestTimeline(requestId: string): Promise<OnboardingTimelineEvent[]> {
-  const onboardingCase = await getOnboardingCase(requestId)
+async function loadOnboardingRequestTimeline(requestId: string, actorUserId: string): Promise<OnboardingTimelineEvent[]> {
+  const onboardingCase = await getOnboardingCase(requestId, actorUserId)
   if (!onboardingCase) return []
 
   const [revisions, sendBacks, transitionInputs] = await Promise.all([
