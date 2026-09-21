@@ -14,11 +14,23 @@ picked.
 **BATCHES 1-13 LEDGER AUDIT: COMPLETE**
 
 All 326 scheduled journeys across Batches 1-13 are accounted for, every one has a
-final outcome in an existing Nexus classification, no historical failure was ever
-overwritten, and every defect/product-gap/decision found during this audit to be
-under-documented has now been corrected with a minimal, additive documentation
-fix (no historical text deleted or rewritten). Ten real documentation
-inconsistencies were found and fixed; none required a code, database, or
+final outcome in an existing Nexus classification, no individual journey's
+Original Status, Final Status, Actual Result, or other execution-history field
+was ever deleted or rewritten, and every defect/product-gap/decision found
+during this audit to be under-documented has now been corrected. This audit
+made **19 individual documentation corrections across 7 distinct issue
+categories** (missing/placeholder commit-hash citations; a missing closure
+summary; closure-summary count/list miscounts; a stale pre-execution premise
+never corrected as promised; later gap-closures never cross-referenced back to
+their originating batch ledger; a cross-batch aggregate report omitting a real
+finding and undercounting its distinct-findings total; and one stale
+cross-document claim never regenerated after the gap it described had closed)
+across 10 files. Every correction either (a) appended new text below unchanged
+original content, or (b) replaced an aggregate summary count, a decision-record
+narrative, or a pre-execution grounding-brief premise. In every case where text
+was replaced rather than appended, the replaced line was a summary/count/premise
+statement, never an individual journey's own status or result field; those 5
+replacements are itemized in Section 4. None required a code, database, or
 migration change.
 
 ## 1. Reconciliation table
