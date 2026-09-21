@@ -1464,6 +1464,65 @@ component's `stableComponentKey` is `null` on the draft
 `coalesce(p_stable_component_key, p_new_commercial_component_id)` mints a
 fresh identity for it, exactly as designed.
 
+## 23a. Historical `correction` backdating: current scope and future Invoicing/MRR dependency [PD-006, DESIGN DRAFT, 2026-09-21]
+
+**Decision (PD-006, Batches 1-13 Ledger Audit product decision closure):**
+a Commercial Change with `change_category = 'correction'` may use an
+effective_date earlier than the start of the currently active commercial
+period, exempt from the effective-date-ordering guard that still applies
+unchanged to every other category (`renewal`, `amendment`, `other`). See
+`supabase/migrations/20260930100000_correction_category_exempt_from_effective_date_ordering.sql`.
+
+**What this decision covers today:** the correction is recorded as a
+normal, governed Commercial Change: it goes through the same
+draft/submit/approve workflow as any other change, and it preserves
+commercial version history exactly as every other category already does
+(§22a: the previous open component set is closed via `effective_to`,
+never deleted or overwritten; a brand-new `commercial_changes` row and
+brand-new `commercial_components` rows are inserted). Nothing about this
+decision rewrites or destroys a previously approved Commercial Version
+as though it had never existed.
+
+**What this decision explicitly does NOT cover (future module
+dependency, not a current blocker):** Nexus does not yet have an
+Invoicing module or an MRR Recognition module (`docs/COMMERCIAL_MIGRATION
+_10_BILLING_INVOICE_RECONCILIATION_DESIGN.md` covers billing/reconciliation
+design, not a built, live invoicing engine; §"No live billing engine"
+above already documents this absence for the domain generally). This
+means today, a historical correction has no mechanism to reconcile
+against an invoice or revenue-recognition record that may already exist
+for the period it corrects, because no such record exists in this
+system yet to reconcile against.
+
+**Documented requirement for when Invoicing/MRR Recognition are built**
+(a future module dependency, tracked here so it is not lost, not
+designed or built as part of this decision closure):
+
+- If a historical correction affects a period that has already been
+  invoiced or recognized for MRR, Nexus must never silently rewrite the
+  original invoice or the historical accounting/recognition record.
+- The original commercial version, the original invoice, and the
+  original recognition history must all remain preserved, exactly as
+  this document's append-only principle already requires for commercial
+  version history itself.
+- The financial difference the historical correction creates must be
+  calculated/identified as its own fact, not blended invisibly into the
+  original record.
+- That difference must be handled through a controlled adjustment
+  mechanism (a credit note, debit note, additional invoice, or
+  equivalent), not a direct edit to the original invoice or recognition
+  entry.
+- The commercial correction and its corresponding billing/accounting
+  adjustment must remain traceable to each other.
+- The exact workflow, approval routing, and Finance/ERP integration for
+  that adjustment mechanism are explicitly deferred to whenever the
+  Invoicing and MRR Recognition modules are actually designed; this
+  section states the requirement they must satisfy, not their design.
+
+**Not built as part of this decision closure:** invoice creation, credit
+notes, debit notes, MRR restatement, accounting-period controls, or ERP
+integration. This section is documentation of a future dependency only.
+
 ## 23. What this document is not
 
 Not a database schema. Not an implementation. Not a decision on Flowable,
