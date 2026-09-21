@@ -77,7 +77,7 @@ rewritten to make a journey look like it passed the first time.
 - Defect IDs: K027-D01
 - Root Cause: src/app/settings/workflows/[definitionId]/versions/[versionId]/page.tsx computed `isReadOnly` solely from the version's publish status, never checking the viewing session's own workflow_definition.write permission.
 - Fix: Added `sessionHasPermission(session, "workflow_definition", "write")` and combined it with publish status into `isReadOnly`; threaded a `readOnlyReason` ("published" | "no_permission") through to WorkflowCanvasEditor so the header badge/description accurately explains WHY the canvas is read-only instead of always saying "Published, read-only" even when the real reason is a missing permission.
-- Fix Commit if applicable: (pending, committed with this ledger update)
+- Fix Commit if applicable: 0491261 (backfilled 2026-09-21, Batches 1-13 Ledger Audit; verified against git log, "Fix K-027: Builder canvas now reflects actual write permission")
 - Regression Test: Live browser re-verification (no unit-testable layer for this Server Component composition): Viewer now sees "Read-only: you do not have permission to edit workflows" with no Add Node panel and no Save/Publish buttons; Workflow Editor (write, no publish) re-checked immediately after and still sees the full Draft editing UI (Add Node, Save Draft, Validate & Publish), confirming no regression to the write/publish permission split from Batch 1 (K-014/K-015/K-016).
 - Rerun Result: PASS, both personas behave correctly after the fix.
 - Neighboring Journeys Rerun: Re-verified K-014/K-015/K-016 (write-without-publish persona) behavior live via the Workflow Editor persona; unaffected.
@@ -147,7 +147,7 @@ rewritten to make a journey look like it passed the first time.
 - Defect IDs: K029-D01
 - Root Cause: src/platform/workflow-builder/actions.ts's toSaveError only special-cased WORKFLOW_VERSION_DRAFT_STALE with a friendly message; WORKFLOW_VERSION_NOT_FOUND (raised by save_workflow_version_graph when the target draft no longer exists) fell through to the generic stripErrorToken path, which shows the raw exception detail verbatim.
 - Fix: Added a WORKFLOW_VERSION_NOT_FOUND branch to toSaveError returning "This draft no longer exists. It was likely discarded by another admin. Refresh to start a new draft." and flagging stale=true so the existing Refresh control (already built for K-010/K-030) appears.
-- Fix Commit if applicable: (pending, committed with this ledger update)
+- Fix Commit if applicable: 925915e (backfilled 2026-09-21, Batches 1-13 Ledger Audit; verified against git log, "Fix K-029: friendly message when saving a concurrently-discarded draft")
 - Regression Test: Live re-verification (no unit-testable layer, this is Server Action error-mapping copy): recreated a fresh draft, repeated the exact discard-then-save race, confirmed the new friendly message and Refresh button appear; clicked Refresh and confirmed it lands cleanly (a 404, since the draft is genuinely gone) rather than a raw error or a stuck page; confirmed a brand-new draft can be created normally afterward.
 - Rerun Result: PASS
 - Neighboring Journeys Rerun: Verified by code inspection that the pre-existing WORKFLOW_VERSION_DRAFT_STALE branch (K-010/K-030) is untouched, since the fix added a new independent branch rather than modifying the existing one.
@@ -853,6 +853,7 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: N/A
 - Final Status: EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY
 - Notes: This is a case where testing surfaced that the Journey Universe's own grounding brief was wrong about the current product, not that the product has a defect. Per the mission's defect-handling rules for Category B, the original execution result (agreement IS selectable, contradicting the "reserved/unused" premise) is preserved here rather than silently rewritten; docs/NEXUS_JOURNEY_UNIVERSE.md should be corrected in a follow-up pass, not in this ledger.
+- **Ledger audit follow-up (2026-09-21, Batches 1-13 Ledger Audit):** the promised `docs/NEXUS_JOURNEY_UNIVERSE.md` correction above had never actually been applied; it is corrected now (L-019's title, Business Objective, Regular/Stress Variant text, and Expected Business Result all updated to state "agreement" is a normal selectable value). This ledger entry's own original empirical finding is unchanged.
 
 ---
 
@@ -917,9 +918,28 @@ rewritten to make a journey look like it passed the first time.
 - Defect IDs: K-L021-D01
 - Root Cause: All four create_* RPCs (create_customer_onboarding_case, create_customer_change_request, create_commercial_configuration_version, create_go_live_request) resolve the active published workflow version via `select wdv.id ... where wd.is_active and wdv.status='published' order by version_number desc limit 1` with no check that the query actually returned a row, then insert that (possibly null) value directly into the request's workflow_version_id column.
 - Fix: Added a `if v_workflow_version_id is null then raise exception 'WORKFLOW_NO_ACTIVE_DEFINITION: ...'` guard to all four RPCs, immediately after resolution and before any insert, in supabase/migrations/20260930000000_workflow_creation_requires_active_definition.sql. Also reordered each function so the shared create_request_with_draft() call (which creates a requests/draft row) now happens AFTER this check, not before, so a rejected creation never leaves an orphaned draft/request row behind either (an improvement beyond the minimal fix).
-- Fix Commit if applicable: (pending, committed with this ledger update)
+- Fix Commit if applicable: d0f58d8 (backfilled 2026-09-21, Batches 1-13 Ledger Audit; verified against git log, "Fix L-021: reject request creation with no active workflow definition")
 - Regression Test: Live re-verification via direct RPC (no unit-testable layer for this SQL-only logic): reran the exact L-021 scenario after the fix, confirmed create_customer_change_request now raises WORKFLOW_NO_ACTIVE_DEFINITION and creates no row at all (verified: `resulting row: null`). Regression-checked all four domains' NORMAL success path (active definition present) still works: customer_onboarding, customer_change, and go_live all still create successfully with a valid workflow_version_id; commercial_configuration's regression check hit an unrelated pre-existing constraint (uq_commercial_configuration_versions_one_open_per_config, blocking a second open version for a commercial configuration that already had one from pre-existing September 14 test data, unrelated to this fix and confirmed by inspecting that constraint's definition and the pre-existing row's timestamp).
 - Rerun Result: PASS. WORKFLOW_NO_ACTIVE_DEFINITION correctly raised; no orphaned row created; original active definition restored and verified.
 - Neighboring Journeys Rerun: L-006 (activate with no published version), L-011/L-012/L-013 (version/definition-level in-flight binding), and the normal request-creation path for 3 of 4 domains all reran clean after the fix.
 - Final Status: FAILED THEN FIXED + PASS
 - Notes: This defect was more severe than the journey's own framing suggested: it is not merely "confirm the failure mode" but an actual cross-domain data-integrity hole (silently creates permanently-broken, unroutable requests) affecting all four workflow-bound domains, not just customer_change. Migration applied to the live/shared Supabase database with explicit user authorization via AskUserQuestion. The real active customer_change definition was temporarily deactivated for this test (with explicit user authorization) and fully restored and verified afterward.
+
+---
+
+## Batch 2 Final Report
+
+**Added 2026-09-21 (Batches 1-13 Ledger Audit).** This section was never written when Batch 2 originally closed; every count below is derived mechanically from the 26 per-journey "Final Status" fields recorded above, not estimated.
+
+- Journeys planned: 26 (K-026 through K-030, L-001 through L-021)
+- Journeys executed: 26
+- PASS: 21 (K-028, K-030, L-001, L-002, L-003, L-004, L-005, L-006, L-007, L-008, L-009, L-010, L-011, L-012, L-013, L-014, L-015, L-016, L-017, L-018, L-020)
+- FAILED THEN FIXED + PASS: 4 (K-026, K-027, K-029, L-021)
+- BLOCKED: 0
+- PRODUCT GAP CONFIRMED: 0
+- EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY: 1 (L-019, "agreement" is a normal selectable applies_to value, not reserved/hidden as the journey's original premise assumed; docs/NEXUS_JOURNEY_UNIVERSE.md corrected in this same audit pass, see L-019's own Notes above)
+- NEW JOURNEYS DISCOVERED: 0
+- DEFECTS FOUND: 4 (K026-D01 Start node accepts an incoming edge; K027-D01 Builder canvas read-only state ignores actual write permission; K029-D01 concurrent-discard save leaks a raw exception; K-L021-D01 all four domain create RPCs insert a request with a null workflow_version_id when no active definition exists)
+- DEFECTS FIXED: 4 of 4. Fix commits, backfilled in this audit pass from `git log` since the original entries recorded them as placeholders: K-026 = `fa061f2`, K-027 = `0491261`, K-029 = `925915e`, L-021 = `d0f58d8`.
+- Tests / deployment parity at Batch 2's original close: not separately captured in this ledger at the time (the gap this Final Report closes); the batch-completion commit is `d13b63d` ("Record K-029 and K-030 results, complete all 26 Batch 2 journeys"), immediately followed by Batch 3's own scaffold commit `e3e46ac`. Not reconstructed retroactively here since a historical test/deploy snapshot cannot be verified after the fact; current baseline deployment parity is confirmed as of this audit in the audit's own final report.
+- Next-batch readiness: Batch 3 proceeded from this state per its own ledger's "Required fixtures: Published workflow version(s) from Batch 2," confirmed satisfied.

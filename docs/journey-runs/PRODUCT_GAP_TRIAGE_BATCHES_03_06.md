@@ -1276,7 +1276,11 @@ happened.
   stands as the record of correctness.
 - **N-031: CLOSED.** Decision (Option 1 from the triage, made by
   Utkarsh): wire up `usage.read` and `entitlement_settlement.read` as
-  real, independent read gates rather than removing them.
+  real, independent read gates rather than removing them. Fix commit:
+  `444226a` ("Make usage.read and entitlement_settlement.read real read
+  gates"), backfilled 2026-09-21 (Batches 1-13 Ledger Audit); this hash
+  was not previously cited in this document or in
+  `docs/journey-runs/BATCH_05_RESULTS.md`.
   Permission-to-surface mapping (documented in full in
   `docs/AUTHORIZATION_MODEL.md` §23): `AuthGate`'s `requiredPermission`
   now accepts a list of alternatives (`entitlement.read` OR

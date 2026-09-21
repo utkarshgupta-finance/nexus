@@ -12,7 +12,7 @@ Covers the six-batch overnight run executed while Utkarsh was unavailable, immed
 - **FAILED THEN FIXED + PASS:** 2 (both Batch 8: DEFECT-B8-001 document content-sniffing gap, DEFECT-B8-002 missing skip-to-content link)
 - **EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY:** 1 (B-010)
 - **PRODUCT DECISION REQUIRED:** 5 new this run (PD-002 through PD-006), plus 1 carried over from Batch 7 (PD-001/A-036) = 6 total open
-- **PRODUCT GAP CONFIRMED (documented, not autonomously fixed):** 10 journeys across 4 distinct findings (B-017/DEFECT-B9-001 with a parked fix migration; the Commercial Configuration deactivate-path absence spanning D-003/D-004/D-015/D-021; the legacy ungoverned Commercial Change RPC spanning D-017/E-020; F-014's pricing-parameter validation gap; F-020's support-debuggability gap)
+- **PRODUCT GAP CONFIRMED (documented, not autonomously fixed):** 10 journeys across 6 distinct findings (B-017/DEFECT-B9-001 with a parked fix migration; the Commercial Configuration deactivate-path absence spanning D-003/D-004/D-015/D-021; the legacy ungoverned Commercial Change RPC spanning D-017/E-020; E-022's minimum-rate-row validation gap; F-014's pricing-parameter validation gap; F-020's support-debuggability gap). **[Corrected 2026-09-21, Batches 1-13 Ledger Audit]** this line originally said "4 distinct findings" and omitted E-022 entirely from both this count and the enumerated findings below; E-022 was always a real PRODUCT GAP CONFIRMED result in `BATCH_12_RESULTS.md` (22 PASS + 1 PD-006 + 2 PRODUCT GAP [E-020, E-022] = 25), it was simply never carried into this report.
 - **Deferred, not executed this run (carried to the morning catch-up list):** 2 (B-007, C-027)
 - **Real defects found and fixed with regression coverage, live-verified:** 2 (both Batch 8)
 - **Real defect found, fix designed and staged, application parked pending user approval:** 1 (DEFECT-B9-001, B-017)
@@ -106,6 +106,12 @@ Nothing was blocked overnight; every push succeeded and every batch closed clean
 - **Journey:** F-020
 - **Category:** Low-priority (P3) support-debuggability gap
 - **Status:** PRODUCT GAP CONFIRMED, documented, not escalated further.
+
+### No minimum-rate-row validation appears to exist for pricing components
+- **Journey:** E-022
+- **Category:** Product gap, low confidence (code-reading evidence only, not live-confirmed)
+- **Finding:** reading the relevant service-layer and RPC code found no check enforcing a minimum number of rate rows for a pricing component; this was not independently reproduced live during Batch 12.
+- **Status:** PRODUCT GAP CONFIRMED, documented; not escalated further given the low-confidence, code-reading-only basis. **Added 2026-09-21, Batches 1-13 Ledger Audit**, since this finding existed in `BATCH_12_RESULTS.md`'s own closure summary but was never carried into this report.
 
 ---
 

@@ -8981,16 +8981,16 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: L-007
 - Notes: N/A
 
-### L-019: Applies_To Check Constraint Rejects Invalid Values, "Agreement" Confirmed Reserved/Unused
+### L-019: Applies_To Check Constraint Rejects Invalid Values, "Agreement" Is a Normal Selectable Value
 - Pack: L - Workflow Versioning
-- Business Objective: Confirm the applies_to check constraint's exact allowed set, and separately confirm "agreement" is never actually selectable in the real product UI despite existing in the DB constraint.
+- Business Objective: Confirm the applies_to check constraint's exact allowed set, and confirm "agreement" is a normal, UI-selectable applies_to value like the other four.
 - Domain: N/A (constraint-level test)
 - Object / Record Type: workflow_definitions.applies_to
 - Starting State: N/A
 - Personas: Workflow Admin
 - Preconditions: N/A
-- Regular Path: Attempt to create a definition with applies_to="invoice_approval" (or any value outside the confirmed set); rejected by the check constraint. Separately, confirm the product's definition-creation UI offers no "agreement" option in its context selector, even though the DB constraint would technically permit it.
-- Stress Variant: A direct API call attempts applies_to="agreement"; confirm whether the DB constraint alone allows this (since it is listed as a valid constraint value) even though the UI never exposes it, an intentional reserved-for-future-use gap.
+- Regular Path: Attempt to create a definition with applies_to="invoice_approval" (or any value outside the confirmed set); rejected by the check constraint. Separately, confirm the product's definition-creation UI's "Applies To" dropdown lists "Agreement" alongside Customer Onboarding, Customer Change, Commercial Configuration, and Go Live, as a normal, selectable, fifth option.
+- Stress Variant: A direct API call attempts applies_to="agreement"; confirm the DB constraint accepts it, consistent with the UI already exposing it as a normal option, not a hidden/reserved value.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
@@ -8998,8 +8998,8 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Recovery/Resilience Variant: N/A
 - UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: N/A
-- Expected Technical Invariants: Exactly the five documented values are ever valid at the constraint level; only four are reachable through the actual product UI.
+- Expected Business Result: [CORRECTED, Batches 1-13 Ledger Audit, 2026-09-21] Confirmed live during Batch 2 (`docs/journey-runs/BATCH_02_RESULTS.md`, journey L-019): "agreement" is accepted at the DB layer and is directly selectable in the live Create Workflow UI, exactly like any other applies_to value (Batch 1's own "BATCH1 K-Series Builder Mechanics" fixture already legitimately uses applies_to=Agreement end to end). This journey's original premise ("agreement" reserved/UI-hidden) did not match the product and is corrected here; the empirical finding that surfaced the correction remains recorded, unaltered, in Batch 2's own ledger entry.
+- Expected Technical Invariants: Exactly the five documented values are ever valid at the constraint level; all five, including "agreement", are reachable through the actual product UI.
 - Priority: P3
 - Automation Feasibility: FULL
 - Dependencies: N/A

@@ -1274,7 +1274,7 @@ Verified, after the fix: the guard query (below) returns zero violations; every 
 
 ## Commits
 
-- Migration `20260930070000_governed_rpc_revoke_public_execute_sweep.sql` + `scripts/verify-governed-rpc-grants.ts`; Universe/Coverage Matrix docs (AB-041); this ledger section (see git log for exact SHAs at push time).
+- Migration `20260930070000_governed_rpc_revoke_public_execute_sweep.sql` + `scripts/verify-governed-rpc-grants.ts`; Universe/Coverage Matrix docs (AB-041); this ledger section. Exact SHAs, backfilled 2026-09-21 (Batches 1-13 Ledger Audit) from `git log`: `4d2cb0f` ("Revoke latent PUBLIC execute grant on 4 Customer Onboarding RPCs", the addendum's first-pass finding) and `b967a5e` ("Governed RPC Trust-Boundary Closure: revoke PUBLIC execute grant sweep", the full 16-RPC/2-trigger sweep).
 
 ## Deployment
 

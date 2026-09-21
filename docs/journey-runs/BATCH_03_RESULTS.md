@@ -943,11 +943,12 @@ rewritten to make a journey look like it passed the first time.
 
 - Journeys planned: 25 (L-022 through L-028, U-001 through U-018)
 - Journeys executed: 25
-- PASS: 21 (L-022, L-023, L-025, L-026, L-028, U-001, U-002, U-003, U-006, U-007, U-008, U-009, U-010, U-011, U-012, U-013, U-014, U-015, U-016, U-017, U-018)
-- FAILED THEN FIXED + PASS: 3 (U-004, U-005, and L-027's own stress sub-test folded into its PASS entry)
+- PASS: 22 (L-022, L-023, L-024, L-025, L-026, L-027, L-028, U-001, U-003, U-006, U-007, U-008, U-009, U-010, U-011, U-012, U-013, U-014, U-015, U-016, U-017, U-018)
+- FAILED THEN FIXED + PASS: 2 (U-004, U-005)
 - BLOCKED: 0
 - PRODUCT GAP CONFIRMED: 0
 - EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY: 1 (U-002, no client-side rate limiting by design)
+- **Ledger audit correction (2026-09-21, Batches 1-13 Ledger Audit):** the counts above were miscounted at original write time (PASS omitted L-024 and L-027, double-counted U-002 against both PASS and EXPECTED BEHAVIOR, and the FAILED THEN FIXED + PASS count of 3 included a nonexistent third case attributed to L-027, whose own Final Status was always plain PASS with no failure history). Corrected here to match the per-journey Final Status fields above (22 + 2 + 1 = 25, unchanged actual results, count-label fix only).
 - NEW JOURNEYS DISCOVERED: 0 (no new stable Journey ID was created; the query-string-drop defect was folded into U-004 as its stress variant, already scoped by the Universe, rather than treated as a distinct new journey)
 - DEFECTS FOUND: 3 (DEFECT-B3-001 unauthenticated Customer Master data exposure on /customers and /customers/[customerKey], CRITICAL; DEFECT-B3-002 loginRedirectTo dropped the current page's query string on /customers; DEFECT-B3-003 login always redirected to /my-work, ignoring redirectTo)
 - DEFECTS FIXED: 3 of 3

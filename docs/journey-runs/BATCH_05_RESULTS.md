@@ -270,6 +270,7 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: N-002 (UI correctly hides unprovisioned/inactive-equivalent state, same "UI-only gate, RPC allows more" shape)
 - Final Status: PRODUCT GAP CONFIRMED
 - Notes: One of the mission's explicit "known open questions to treat as genuine empirical tests," confirmed real via direct RPC bypass, exactly as the Universe doc anticipated. Practical impact today is bounded: a dormant grant for a deactivated role contributes zero effective permissions (per N-023) while the role stays deactivated, but if the role were LATER reactivated, this silently-created grant would become live without a fresh, intentional grant decision — worth fixing in a dedicated pass. The throwaway role and its one (now-revoked) grant row persist permanently as harmless, clearly-named test data, since roles/user_roles rows referenced by a historical grant can never be hard-deleted (confirmed while attempting cleanup).
+- **Later closure (2026-09-21, Batches 1-13 Ledger Audit; cross-referenced, not re-executed as part of Batch 5):** this gap was subsequently CLOSED in the Product Gap Closure pass that followed Batches 3-6 (commit `acfc5ba`, "Reject granting a deactivated role," matching migration `20260930010000_grant_user_role_requires_active_role.sql`). Full decision record and implementation evidence in `docs/journey-runs/PRODUCT_GAP_TRIAGE_BATCHES_03_06.md` ("N-030: CLOSED"). This entry's own PRODUCT GAP CONFIRMED result above is left unchanged, since it correctly reflects the state at the time Batch 5 executed.
 
 ---
 
@@ -307,6 +308,7 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: I-025, I-026 (referenced by the Universe doc as related; not separately re-run in this batch, out of Batch 5's scope)
 - Final Status: PRODUCT GAP CONFIRMED
 - Notes: The Universe doc's own framing was correct and remains correct today; this journey exists specifically to keep proving that live on each pass rather than assuming it, and it holds.
+- **Later closure (2026-09-21, Batches 1-13 Ledger Audit; cross-referenced, not re-executed as part of Batch 5):** this gap was subsequently CLOSED in the Product Gap Closure pass that followed Batches 3-6 (commit `444226a`, "Make usage.read and entitlement_settlement.read real read gates"). Full decision record and implementation evidence in `docs/journey-runs/PRODUCT_GAP_TRIAGE_BATCHES_03_06.md` ("N-031: CLOSED") and `docs/AUTHORIZATION_MODEL.md` §23; this commit hash did not previously appear in either document, backfilled here from `git log`. This entry's own PRODUCT GAP CONFIRMED result above is left unchanged, since it correctly reflects the state at the time Batch 5 executed.
 
 ---
 
@@ -714,6 +716,7 @@ rewritten to make a journey look like it passed the first time.
 - Neighboring Journeys Rerun: O-012, O-013
 - Final Status: PRODUCT GAP CONFIRMED
 - Notes: This is the most significant functional finding in the O-series: not merely a missing convenience feature, but a genuinely silent no-op (the call reports success with no error while the requested change never applies), which is a worse failure mode than an honest rejection.
+- **Later closure (2026-09-21, Batches 1-13 Ledger Audit; cross-referenced, not re-executed as part of Batch 5):** this gap was subsequently CLOSED in the Product Gap Closure pass that followed Batches 3-6 (commit `39c6c05`, "Add atomic primary-team promotion RPC," matching migration `20260930030000_set_primary_team_membership.sql`). Live regression during that closure caught and fixed a real bug in the new RPC's first version (it fully revoked the previous primary instead of demoting it), corrected the same day. Full decision record and implementation evidence in `docs/journey-runs/PRODUCT_GAP_TRIAGE_BATCHES_03_06.md` ("O-011: CLOSED"). This entry's own PRODUCT GAP CONFIRMED result above is left unchanged, since it correctly reflects the state at the time Batch 5 executed.
 
 ---
 
