@@ -9,6 +9,7 @@ import {
   toUnbilledLedgerEntry,
   toUnearnedLedgerEntry,
   toSettlementRecord,
+  toSettlementAdjustment,
 } from "../domain/mappers"
 import { allocateEvenly } from "../domain/allocation"
 import { computeMonthlyLedger } from "../domain/consumption"
@@ -24,6 +25,7 @@ import type {
   UnbilledLedgerEntry,
   UnearnedLedgerEntry,
   SettlementRecord,
+  SettlementAdjustment,
   AllocationTreatment,
 } from "../domain/types"
 import type { CreateEntitlementSourceInput } from "../data/entitlement.data"
@@ -257,6 +259,22 @@ async function listSettlementRecords(ledgerEntryType: "unbilled" | "unearned", l
   return rows.map(toSettlementRecord)
 }
 
+async function reverseSettlement(
+  settlementId: string,
+  reversalReference: string,
+  reversalQuantity: number,
+  reason: string,
+  actorUserId: string
+): Promise<SettlementAdjustment> {
+  const row = await entitlementData.reverseSettlement(settlementId, reversalReference, reversalQuantity, reason, actorUserId)
+  return toSettlementAdjustment(row)
+}
+
+async function listSettlementAdjustments(originalSettlementId: string): Promise<SettlementAdjustment[]> {
+  const rows = await entitlementData.listSettlementAdjustments(originalSettlementId)
+  return rows.map(toSettlementAdjustment)
+}
+
 export {
   createEntitlementSource,
   cancelEntitlementSource,
@@ -275,5 +293,7 @@ export {
   listOpenUnearnedEntriesForCustomer,
   recordSettlement,
   listSettlementRecords,
+  reverseSettlement,
+  listSettlementAdjustments,
 }
 export type { AllocationPreview }

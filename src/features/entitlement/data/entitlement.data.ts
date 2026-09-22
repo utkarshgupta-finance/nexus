@@ -10,6 +10,7 @@ import type {
   UnbilledLedgerEntryRow,
   UnearnedLedgerEntryRow,
   SettlementRecordRow,
+  SettlementAdjustmentRow,
 } from "./entitlement-row-types"
 import type { MonthlyAllocationEntry } from "../domain/allocation"
 
@@ -269,6 +270,33 @@ async function listSettlementRecords(ledgerEntryType: "unbilled" | "unearned", l
   return data ?? []
 }
 
+async function reverseSettlement(
+  settlementId: string,
+  reversalReference: string,
+  reversalQuantity: number,
+  reason: string,
+  actorUserId: string
+): Promise<SettlementAdjustmentRow> {
+  return callSingleRowRpc<SettlementAdjustmentRow>("reverse_settlement", {
+    p_settlement_id: settlementId,
+    p_reversal_reference: reversalReference,
+    p_reversal_quantity: reversalQuantity,
+    p_reason: reason,
+    p_actor_user_id: actorUserId,
+  })
+}
+
+async function listSettlementAdjustments(originalSettlementId: string): Promise<SettlementAdjustmentRow[]> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("settlement_adjustments")
+    .select("*")
+    .eq("original_settlement_id", originalSettlementId)
+    .order("reversed_at", { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 export {
   createEntitlementSource,
   cancelEntitlementSource,
@@ -287,5 +315,7 @@ export {
   listOpenUnbilledEntriesForCustomer,
   listOpenUnearnedEntriesForCustomer,
   listSettlementRecords,
+  reverseSettlement,
+  listSettlementAdjustments,
 }
 export type { CreateEntitlementSourceInput, SubmitMonthlyUsageInput, UpsertMonthlyEntitlementLedgerInput }

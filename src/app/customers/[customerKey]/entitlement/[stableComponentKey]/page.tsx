@@ -12,8 +12,29 @@ import {
   listLedgerRowsForComponent,
   listUnbilledEntriesForComponent,
   listUnearnedEntriesForComponent,
+  listSettlementRecords,
+  listSettlementAdjustments,
 } from "@/features/entitlement/server"
 import { EntitlementDetailPage } from "@/features/entitlement/ui/entitlement-detail-page"
+import type { SettlementRecord, SettlementAdjustment } from "@/features/entitlement/server"
+
+type SettlementHistoryEntry = { record: SettlementRecord; adjustments: SettlementAdjustment[] }
+
+async function loadSettlementHistory(
+  entries: { id: string }[],
+  ledgerEntryType: "unbilled" | "unearned"
+): Promise<Record<string, SettlementHistoryEntry[]>> {
+  const perEntry = await Promise.all(
+    entries.map(async (entry) => {
+      const records = await listSettlementRecords(ledgerEntryType, entry.id)
+      const withAdjustments = await Promise.all(
+        records.map(async (record) => ({ record, adjustments: await listSettlementAdjustments(record.id) }))
+      )
+      return [entry.id, withAdjustments] as const
+    })
+  )
+  return Object.fromEntries(perEntry)
+}
 
 /**
  * Customer -> Entitlement & Usage detail (Go Live + Entitlement Ledger,
@@ -72,6 +93,11 @@ export default async function EntitlementDetailRoute({ params }: { params: Promi
     hasPermission("entitlement_settlement", "write"),
   ])
 
+  const canReadAnySettlement = canReadEntitlement || canReadSettlement
+  const [unbilledSettlementHistory, unearnedSettlementHistory] = canReadAnySettlement
+    ? await Promise.all([loadSettlementHistory(unbilledEntries, "unbilled"), loadSettlementHistory(unearnedEntries, "unearned")])
+    : [{}, {}]
+
   return (
     <AuthGate
       session={session}
@@ -87,6 +113,8 @@ export default async function EntitlementDetailRoute({ params }: { params: Promi
         ledgerRows={ledgerRows}
         unbilledEntries={unbilledEntries}
         unearnedEntries={unearnedEntries}
+        unbilledSettlementHistory={unbilledSettlementHistory}
+        unearnedSettlementHistory={unearnedSettlementHistory}
         canViewEntitlement={canReadEntitlement}
         canViewUsage={canReadEntitlement || canReadUsage}
         canViewSettlement={canReadEntitlement || canReadSettlement}

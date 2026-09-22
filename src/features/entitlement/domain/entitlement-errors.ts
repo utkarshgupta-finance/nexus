@@ -18,6 +18,8 @@ type EntitlementErrorKind =
   | "settlement_invalid_ledger_entry_type"
   | "settlement_ledger_entry_not_found"
   | "settlement_exceeds_outstanding"
+  | "settlement_not_found"
+  | "settlement_reversal_exceeds_settled"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -41,6 +43,8 @@ const NAMED_TOKEN_KINDS: Record<string, EntitlementErrorKind> = {
   SETTLEMENT_INVALID_LEDGER_ENTRY_TYPE: "settlement_invalid_ledger_entry_type",
   SETTLEMENT_LEDGER_ENTRY_NOT_FOUND: "settlement_ledger_entry_not_found",
   SETTLEMENT_EXCEEDS_OUTSTANDING: "settlement_exceeds_outstanding",
+  SETTLEMENT_NOT_FOUND: "settlement_not_found",
+  SETTLEMENT_REVERSAL_EXCEEDS_SETTLED: "settlement_reversal_exceeds_settled",
 }
 
 const SQLSTATE_KINDS: Record<string, EntitlementErrorKind> = {

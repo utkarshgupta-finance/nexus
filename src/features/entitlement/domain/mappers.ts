@@ -7,6 +7,7 @@ import type {
   UnbilledLedgerEntryRow,
   UnearnedLedgerEntryRow,
   SettlementRecordRow,
+  SettlementAdjustmentRow,
 } from "../data/entitlement-row-types"
 import type {
   EntitlementSource,
@@ -19,6 +20,7 @@ import type {
   UnbilledLedgerEntry,
   UnearnedLedgerEntry,
   SettlementRecord,
+  SettlementAdjustment,
 } from "./types"
 
 function toEntitlementSource(row: EntitlementSourceRow): EntitlementSource {
@@ -142,6 +144,20 @@ function toSettlementRecord(row: SettlementRecordRow): SettlementRecord {
   }
 }
 
+function toSettlementAdjustment(row: SettlementAdjustmentRow): SettlementAdjustment {
+  return {
+    id: row.id,
+    originalSettlementId: row.original_settlement_id,
+    ledgerEntryType: row.ledger_entry_type as SettlementAdjustment["ledgerEntryType"],
+    ledgerEntryId: row.ledger_entry_id,
+    reversalReference: row.reversal_reference,
+    reversedQuantity: row.reversed_quantity,
+    reason: row.reason,
+    reversedBy: row.reversed_by,
+    reversedAt: row.reversed_at,
+  }
+}
+
 export {
   toEntitlementSource,
   toEntitlementScheduleMonth,
@@ -150,4 +166,5 @@ export {
   toUnbilledLedgerEntry,
   toUnearnedLedgerEntry,
   toSettlementRecord,
+  toSettlementAdjustment,
 }

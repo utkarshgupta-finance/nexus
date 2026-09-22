@@ -124,6 +124,19 @@ type SettlementRecord = {
   createdAt: string
 }
 
+/** Product Decision Closure (Batch 17 I-024, 2026-09-22). An immutable, additive reversal of a prior SettlementRecord; the original is never mutated. */
+type SettlementAdjustment = {
+  id: string
+  originalSettlementId: string
+  ledgerEntryType: "unbilled" | "unearned"
+  ledgerEntryId: string
+  reversalReference: string
+  reversedQuantity: number
+  reason: string
+  reversedBy: string | null
+  reversedAt: string
+}
+
 /** Human-Friendly ID: "ES-000123". */
 function formatEntitlementSourceId(sourceNumber: number): string {
   return `ES-${String(sourceNumber).padStart(6, "0")}`
@@ -142,4 +155,5 @@ export type {
   UnbilledLedgerEntry,
   UnearnedLedgerEntry,
   SettlementRecord,
+  SettlementAdjustment,
 }

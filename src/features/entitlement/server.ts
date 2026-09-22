@@ -19,6 +19,7 @@ export {
   listOpenUnbilledEntriesForCustomer,
   listOpenUnearnedEntriesForCustomer,
   listSettlementRecords,
+  listSettlementAdjustments,
 } from "./services/entitlement.service"
 export type { AllocationPreview } from "./services/entitlement.service"
 export { formatEntitlementSourceId } from "./domain/types"
@@ -30,6 +31,7 @@ export type {
   UnbilledLedgerEntry,
   UnearnedLedgerEntry,
   SettlementRecord,
+  SettlementAdjustment,
   AllocationTreatment,
 } from "./domain/types"
 export type { MonthlyAllocationEntry } from "./domain/allocation"

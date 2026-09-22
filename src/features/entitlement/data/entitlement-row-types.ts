@@ -105,8 +105,21 @@ type SettlementRecordRow = {
   created_at: string
 }
 
+type SettlementAdjustmentRow = {
+  id: string
+  original_settlement_id: string
+  ledger_entry_type: string
+  ledger_entry_id: string
+  reversal_reference: string
+  reversed_quantity: number
+  reason: string
+  reversed_by: string | null
+  reversed_at: string
+}
+
 export type {
   EntitlementSourceRow,
+  SettlementAdjustmentRow,
   EntitlementScheduleMonthRow,
   MonthlyUsageRow,
   MonthlyEntitlementLedgerRow,

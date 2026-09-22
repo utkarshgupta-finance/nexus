@@ -12,8 +12,9 @@ import {
   submitMonthlyUsage,
   finalizeMonthlyUsage,
   recordSettlement,
+  reverseSettlement,
 } from "./services/entitlement.service"
-import type { EntitlementSource, MonthlyUsage, SettlementRecord, AllocationTreatment } from "./domain/types"
+import type { EntitlementSource, MonthlyUsage, SettlementRecord, SettlementAdjustment, AllocationTreatment } from "./domain/types"
 import type { CreateEntitlementSourceInput } from "./data/entitlement.data"
 import type { MonthlyAllocationEntry } from "./domain/allocation"
 import type { AllocationPreview } from "./services/entitlement.service"
@@ -136,6 +137,23 @@ async function recordSettlementAction(
   }
 }
 
+type ReverseSettlementActionResult = { ok: true; adjustment: SettlementAdjustment } | { ok: false; error: string }
+
+async function reverseSettlementAction(
+  settlementId: string,
+  reversalReference: string,
+  reversalQuantity: number,
+  reason: string
+): Promise<ReverseSettlementActionResult> {
+  try {
+    const actor = await requirePermission("entitlement_settlement", "write")
+    const adjustment = await reverseSettlement(settlementId, reversalReference, reversalQuantity, reason, actor.appUserId)
+    return { ok: true, adjustment }
+  } catch (error) {
+    return toEntitlementActionError(error, "An unexpected error occurred while reversing this settlement.")
+  }
+}
+
 export {
   createEntitlementSourceAction,
   cancelEntitlementSourceAction,
@@ -144,6 +162,7 @@ export {
   submitMonthlyUsageAction,
   finalizeMonthlyUsageAction,
   recordSettlementAction,
+  reverseSettlementAction,
 }
 export type {
   EntitlementSourceActionResult,
@@ -151,4 +170,5 @@ export type {
   GenerateScheduleActionResult,
   SubmitMonthlyUsageActionResult,
   RecordSettlementActionResult,
+  ReverseSettlementActionResult,
 }

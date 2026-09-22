@@ -20,6 +20,7 @@ import {
   submitMonthlyUsageAction,
   finalizeMonthlyUsageAction,
   recordSettlementAction,
+  reverseSettlementAction,
 } from "../actions"
 import { formatEntitlementSourceId } from "../domain/types"
 import type {
@@ -29,6 +30,8 @@ import type {
   MonthlyEntitlementLedgerRow,
   UnbilledLedgerEntry,
   UnearnedLedgerEntry,
+  SettlementRecord,
+  SettlementAdjustment,
   AllocationTreatment,
 } from "../domain/types"
 import type { AllocationPreview } from "../services/entitlement.service"
@@ -455,6 +458,118 @@ function SettleEntryForm({
   )
 }
 
+type SettlementHistoryEntry = { record: SettlementRecord; adjustments: SettlementAdjustment[] }
+
+function ReverseSettlementForm({
+  settlement,
+  reversibleRemaining,
+  onReversed,
+}: {
+  settlement: SettlementRecord
+  reversibleRemaining: number
+  onReversed: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [reversalReference, setReversalReference] = useState("")
+  const [reversalQuantity, setReversalQuantity] = useState("")
+  const [reason, setReason] = useState("")
+  const [isPending, setIsPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function handleReverse() {
+    const quantity = Number(reversalQuantity)
+    if (!reversalReference.trim() || !reason.trim() || !Number.isFinite(quantity) || quantity <= 0) {
+      setError("A Reversal Reference, Reason, and a positive Reversal Quantity are all required.")
+      return
+    }
+    runAction(
+      () => reverseSettlementAction(settlement.id, reversalReference.trim(), quantity, reason.trim()),
+      setIsPending,
+      setError,
+      () => {
+        setOpen(false)
+        setReversalReference("")
+        setReversalQuantity("")
+        setReason("")
+        onReversed()
+      }
+    )
+  }
+
+  if (!open) {
+    return (
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        Reverse
+      </Button>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border p-2">
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      <p className="text-xs text-muted-foreground">Up to {reversibleRemaining} still reversible on this settlement.</p>
+      <Input placeholder="Reversal reference" value={reversalReference} onChange={(event) => setReversalReference(event.target.value)} />
+      <Input type="number" min="0" placeholder="Reversal quantity" value={reversalQuantity} onChange={(event) => setReversalQuantity(event.target.value)} />
+      <Input placeholder="Reason" value={reason} onChange={(event) => setReason(event.target.value)} />
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+        <PendingButton size="sm" pending={isPending} pendingLabel="Reversing..." onClick={handleReverse}>
+          Reverse Settlement
+        </PendingButton>
+      </div>
+    </div>
+  )
+}
+
+function SettlementHistory({
+  history,
+  canSettle,
+  onChanged,
+}: {
+  history: SettlementHistoryEntry[]
+  canSettle: boolean
+  onChanged: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (history.length === 0) return null
+
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      <Button variant="ghost" size="sm" className="w-fit text-xs" onClick={() => setExpanded((value) => !value)}>
+        {expanded ? "Hide" : "Show"} settlement history ({history.length})
+      </Button>
+      {expanded ? (
+        <div className="flex flex-col gap-2 rounded-md border p-2">
+          {history.map(({ record, adjustments }) => {
+            const totalReversed = adjustments.reduce((sum, adjustment) => sum + adjustment.reversedQuantity, 0)
+            const reversibleRemaining = record.settledQuantity - totalReversed
+            return (
+              <div key={record.id} className="flex flex-col gap-1 border-b pb-2 text-xs last:border-b-0 last:pb-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    {record.settlementReference}: settled {record.settledQuantity} on {formatBusinessDate(record.settlementDate)}
+                  </span>
+                  {canSettle && reversibleRemaining > 0 ? (
+                    <ReverseSettlementForm settlement={record} reversibleRemaining={reversibleRemaining} onReversed={onChanged} />
+                  ) : null}
+                </div>
+                {adjustments.map((adjustment) => (
+                  <p key={adjustment.id} className="pl-3 text-muted-foreground">
+                    Reversed {adjustment.reversedQuantity} ({adjustment.reversalReference}): {adjustment.reason}
+                  </p>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function EntitlementDetailPage({
   customerKey,
   lineItem,
@@ -464,6 +579,8 @@ function EntitlementDetailPage({
   ledgerRows,
   unbilledEntries,
   unearnedEntries,
+  unbilledSettlementHistory,
+  unearnedSettlementHistory,
   canViewEntitlement,
   canViewUsage,
   canViewSettlement,
@@ -480,6 +597,9 @@ function EntitlementDetailPage({
   ledgerRows: MonthlyEntitlementLedgerRow[]
   unbilledEntries: UnbilledLedgerEntry[]
   unearnedEntries: UnearnedLedgerEntry[]
+  /** Product Decision Closure (Batch 17 I-024, 2026-09-22): settlement history (original + any reversal/adjustment) per ledger entry id. */
+  unbilledSettlementHistory: Record<string, SettlementHistoryEntry[]>
+  unearnedSettlementHistory: Record<string, SettlementHistoryEntry[]>
   /** Entitlement Sources / Monthly Schedule / Ledger sections (entitlement.read; the umbrella permission, unchanged from before this permission split). */
   canViewEntitlement: boolean
   /** Monthly Usage section (entitlement.read OR usage.read; usage.read alone now genuinely grants this, not just entitlement.read as before). */
@@ -502,7 +622,7 @@ function EntitlementDetailPage({
   }
 
   function handleCancelSource(id: string) {
-    const reason = window.prompt("Reason for cancelling this Entitlement Source?")
+    const reason = window.prompt("Reason for cancelling this Entitlement Source? This stops future monthly allocation only, it does not reverse or reduce entitlement already reflected in the Monthly Entitlement Ledger.")
     if (!reason || !reason.trim()) return
     cancelEntitlementSourceAction(id, reason.trim()).then((result) => {
       if (!result.ok) {
@@ -777,6 +897,7 @@ function EntitlementDetailPage({
                           {entry.status !== "SETTLED" && canSettle ? (
                             <SettleEntryForm ledgerEntryType="unbilled" entryId={entry.id} onSettled={refresh} />
                           ) : null}
+                          <SettlementHistory history={unbilledSettlementHistory[entry.id] ?? []} canSettle={canSettle} onChanged={refresh} />
                         </TableCell>
                       </TableRow>
                     ))
@@ -819,6 +940,7 @@ function EntitlementDetailPage({
                           {entry.status !== "SETTLED" && canSettle ? (
                             <SettleEntryForm ledgerEntryType="unearned" entryId={entry.id} onSettled={refresh} />
                           ) : null}
+                          <SettlementHistory history={unearnedSettlementHistory[entry.id] ?? []} canSettle={canSettle} onChanged={refresh} />
                         </TableCell>
                       </TableRow>
                     ))

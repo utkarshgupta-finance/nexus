@@ -42,6 +42,16 @@ describe("parseEntitlementError", () => {
     expect(error.entitlementError.kind).toBe("settlement_exceeds_outstanding")
   })
 
+  it("maps SETTLEMENT_REVERSAL_EXCEEDS_SETTLED to its own kind (Product Decision Closure, I-024 settlement reversal)", () => {
+    const parsed = parseEntitlementError({
+      message: "SETTLEMENT_REVERSAL_EXCEEDS_SETTLED: reversing 60 would exceed the 50 still reversible on this settlement (already reversed 0)",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("settlement_reversal_exceeds_settled")
+    expect(parsed.message).toBe("reversing 60 would exceed the 50 still reversible on this settlement (already reversed 0)")
+  })
+
   it("still falls back to unknown for a genuinely unrecognized token", () => {
     const parsed = parseEntitlementError({ message: "SOME_FUTURE_TOKEN_NOT_YET_MAPPED: detail" })
     expect(parsed.kind).toBe("unknown")
