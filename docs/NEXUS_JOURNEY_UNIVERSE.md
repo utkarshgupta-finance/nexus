@@ -9870,7 +9870,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: N/A
 - Notes: N/A
 
-### M-018: Operational Queue Send-Back Counts Increment Correctly Across Multiple Cycles
+### M-018: Operational Queue Send-Back Counts Increment Correctly Across Multiple Cycles (PREMISE CORRECTED, Batch 21, 2026-09-22)
 - Pack: M - My Work / Approvals / Waiting on Others
 - Business Objective: Confirm the send-back counter shown per item in the Operational Queue accurately reflects the true number of send-back events for that resource, cross-checked against workflow_cycle_number/workflow_node_transitions.
 - Domain: go_live
@@ -9878,12 +9878,18 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: 3 send-back events have occurred; item currently back in needs_action for its 4th cycle.
 - Personas: Ops Lead
 - Preconditions: N/A
-- Regular Path: The Operational Queue shows a send-back count of 3 for this item, matching the actual count of action=send_back rows in workflow_node_transitions for this resource_id.
+- Regular Path: [CORRECTED, Batch 21, 2026-09-22] The count is NOT derived from `workflow_node_transitions`; each
+  domain has its own dedicated append-only send-back-history table (`customer_onboarding_send_backs`,
+  `customer_change_send_backs`; Commercial Version has no such table/feature). The Operational Queue shows a
+  live `SELECT ... WHERE request_id IN (...)` count against that domain's own table, tallied at read time, not a
+  separately-maintained counter column.
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Count is derived from (or kept consistent with) the audit trail, not a separately-maintained counter that could drift.
+- Audit/Data Integrity Checks: [CORRECTED, Batch 21, 2026-09-22] Count is derived live from each domain's own
+  append-only send-back table, confirmed to structurally prevent drift (there is no separate counter to fall out of
+  sync); confirmed not sourced from `workflow_node_transitions`.
 - Recovery/Resilience Variant: N/A
 - UX Checks: This count helps ops identify high-friction requests; verify it is visually prominent for high counts.
 - Historical Variant: N/A
@@ -9895,7 +9901,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: J-018
 - Notes: N/A
 
-### M-019: Operational Queue Broad-Read Permission Is Distinct From the Narrow Per-Domain Approve Permission
+### M-019: Operational Queue Broad-Read Permission Is Distinct From the Narrow Per-Domain Approve Permission (PREMISE CORRECTED, Batch 21, 2026-09-22)
 - Pack: M - My Work / Approvals / Waiting on Others
 - Business Objective: Confirm a user holding only a narrow domain approve permission (no broad-read/operational permission) cannot see the Operational Queue's cross-user view at all.
 - Domain: customer_onboarding
@@ -9903,7 +9909,11 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: User holds onboarding approve permission only, no broad-read permission.
 - Personas: Regular Approver (narrow permission)
 - Preconditions: N/A
-- Regular Path: This user cannot access the Operational Queue view (or an API attempt is rejected server-side); their own My Work view continues to function normally and independently.
+- Regular Path: [CORRECTED, Batch 21, 2026-09-22] There is no separate "broad-read" permission today; `/operations/queue`
+  is gated by exactly `customer.read`, the identical permission Approvals/My Work use (`AuthGate`, no additional
+  check). The journey's own outcome still holds under the real mechanism: a user without `customer.read` cannot
+  reach the queue regardless of any approve permission held; a user with `customer.read` but no approve permission
+  can view it read-only. My Work continues to function independently of this gate either way.
 - Stress Variant: N/A
 - Authorization Variant: This journey is itself the authorization variant.
 - Concurrency Variant: N/A
@@ -9945,29 +9955,53 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: M-021
 - Notes: N/A
 
-### M-021: CanApprove OR-Imprecision Combined With a Coincidental Team Match Does Leak an Item Into Pending-My-Approval
+### M-021: CanApprove OR-Imprecision Combined With a Coincidental Team Match Does Leak an Item Into Pending-My-Approval (EMPIRICALLY DETERMINED, Batch 21, 2026-09-22)
 - Pack: M - My Work / Approvals / Waiting on Others
 - Business Objective: Isolate and confirm the actual risk scenario implied by the documented imprecision, a viewer who holds only ONE domain's approve permission but happens to ALSO be a genuine member of the responsible team for a DIFFERENT domain's item, sees that other-domain item as pending-my-approval even though their permission is not truly scoped to that domain's request type.
-- Domain: customer_onboarding (viewer's actual permission) and customer_change (the leaking item)
-- Object / Record Type: A customer_change_requests item at a node whose responsible_team_id is a team the viewer happens to genuinely belong to (e.g. a cross-functional Finance team used as the responsible team in both domains' graphs)
-- Starting State: Viewer holds onboarding approve permission only, NOT change approve permission, but IS a real member of the team assigned to this change-request node.
-- Personas: Viewer with onboarding-only formal permission, incidentally on the right team for a change-domain node
+- Domain: [CORRECTED, Batch 21, 2026-09-22] The originally-named pair (customer_onboarding vs customer_change) does
+  not actually exercise this scenario: both domains' approve actions gate on the identical permission resource name
+  (`"customer"`), confirmed via code read, so a viewer cannot hold one without the other; they are not separately
+  permissioned today. The real, live-demonstrated leak pair is `customer` (the viewer's actual permission,
+  covering onboarding + change) vs `go_live` (the leaking item's domain, a genuinely distinct permission resource).
+- Object / Record Type: A go_live_requests item at a node whose responsible_team_id is a team the viewer happens to genuinely belong to
+- Starting State: [CORRECTED, Batch 21, 2026-09-22] Viewer holds only `customer.approve` (via the real
+  `Customer Lifecycle Admin` role), zero `go_live` or `commercial_configuration` permission of any kind, but IS a
+  real member of the team assigned to a real go_live request's current node.
+- Personas: Viewer with `customer`-only formal permission, incidentally on the right team for a go_live-domain node
 - Preconditions: canApprove's OR-based computation is confirmed to make no per-domain distinction once ANY qualifying permission is held.
-- Regular Path: canApprove evaluates true (OR-imprecision); isResponsibleTeam ALSO evaluates true (genuine team match); the item incorrectly appears as pending my approval for a domain the viewer does not actually hold approve rights in.
-- Stress Variant: The viewer actually attempts to approve; determine whether the RPC-level permission check (which is presumably scoped correctly per domain, unlike the list computation) catches and rejects this at the point of action, meaning the leak is a list-display-only issue, not an actual authorization bypass; this distinction is the crux of the finding and should be explicitly confirmed either way.
+- Regular Path: [CONFIRMED LIVE, Batch 21, 2026-09-22] Live-demonstrated with a real test persona
+  (`wf-test.lifecycle-admin@example.test`, real permission set confirmed via direct query) added to `WF-TEST
+  Finance` (a team genuinely responsible for a real go_live node) via the real `assign_user_to_team` RPC:
+  `canApprove` evaluates true (OR-imprecision, via the `customer.approve` branch); `isResponsibleTeam` ALSO
+  evaluates true (genuine team match); computing the exact classifier confirms the item would be classified
+  `pending_my_approval` for this viewer, even though they hold zero `go_live` permission.
+- Stress Variant: [CONFIRMED LIVE, Batch 21, 2026-09-22] **Ruled out as an authorization bypass, conclusively.** The
+  real approve action's own Server Action calls `requirePermission("go_live", "approve")`, which performs an exact
+  `(resource, action)` match against this same viewer's real, queried permission set (confirmed to contain no
+  `go_live` entries). This check is completely independent of and uninfluenced by `canApprove`'s own OR-imprecision;
+  it would deterministically reject this viewer's actual approve attempt.
 - Authorization Variant: This journey is itself the authorization variant, and the key risk journey for the documented imprecision.
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
 - Audit/Data Integrity Checks: N/A
 - Recovery/Resilience Variant: N/A
-- UX Checks: If the RPC does reject the actual approve action, the UX experience (list says actionable, action fails) mirrors M-011's finding and should be reported the same way.
+- UX Checks: [CONFIRMED, Batch 21, 2026-09-22] The RPC does reject the actual approve action; the UX experience
+  (list says actionable, action fails) does mirror M-011's finding, reported the same way: classified PRODUCT GAP.
 - Historical Variant: N/A
-- Expected Business Result: At minimum this causes a confusing/misleading list entry; at worst (if the RPC-level check is ALSO imprecise) it could be a genuine cross-domain authorization leak, which must be explicitly ruled out, not assumed.
-- Expected Technical Invariants: N/A
+- Expected Business Result: [DETERMINED, Batch 21, 2026-09-22] Confirmed: at minimum, a confusing/misleading list
+  entry (real). At worst: explicitly ruled out; the RPC-level check is NOT imprecise, so this is not a genuine
+  cross-domain authorization leak.
+- Expected Technical Invariants: [DETERMINED, Batch 21, 2026-09-22] `sessionHasPermission` performs an exact
+  `(resource, action)` match, fully decoupled from `canApprove`'s own OR-based imprecision; this is the invariant
+  that keeps the list-layer imprecision from ever becoming an actual bypass.
 - Priority: P0
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: M-020, M-011
+- Notes: [Batch 21, 2026-09-22] Classified **PRODUCT GAP**, not fixed: computing `canApprove` correctly
+  per-domain/per-item would require threading each item's own domain through `buildMyWorkItems`'s permission check
+  (today a single caller-supplied boolean for the whole list), a real design decision with cost/complexity
+  tradeoffs, not invented here. Full evidence in `docs/journey-runs/BATCH_21_RESULTS.md`.
 - Notes: This is the single most important journey in Pack M given the grounding brief's explicit callout of this imprecision; the outcome (list-only cosmetic issue vs actual RPC-level bypass) must be empirically determined and reported either way.
 
 ### M-022: My Work Refreshes Immediately After the Viewer's Own Action
@@ -10170,7 +10204,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: M-013, M-027
 - Notes: N/A
 
-### M-030: Waiting-On-Others Classification Is Independent of the Creator's Own Current Team Memberships
+### M-030: Waiting-On-Others Classification Is Independent of the Creator's Own Current Team Memberships (STRESS VARIANT SUPERSEDED BY M-011, Batch 21, 2026-09-22)
 - Pack: M - My Work / Approvals / Waiting on Others
 - Business Objective: Confirm the "waiting on others" branch depends only on createdBy matching and bucket=needs_action, never on the creator's own team memberships, since a creator whose team memberships change later should still correctly see their own submitted item as waiting.
 - Domain: customer_onboarding
@@ -10179,7 +10213,12 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Personas: User A (creator)
 - Preconditions: N/A
 - Regular Path: Regardless of any team membership churn for User A after creation, the item continues to correctly show as "waiting on others" in their My Work for as long as it remains in needs_action and they remain unable to approve it themselves.
-- Stress Variant: User A is later (coincidentally) added to the exact team responsible for this item's current node; per the classification order (branch 1 checked first), the item would then flip to "pending my approval" instead, since canApprove and isResponsibleTeam would now both be true, confirming the classification is live-evaluated on every load, not fixed at creation time.
+- Stress Variant: [SUPERSEDED, Batch 21, 2026-09-22] Original expectation: User A later added to the exact
+  responsible team would flip to "pending my approval". **No longer true after M-011's closure** (pre-Batch-21):
+  `pending_my_approval` now also requires `!isSelfCreated`, so a creator added to their own item's team still
+  cannot self-approve it and the item correctly STAYS "waiting on others" even after the team addition. This is the
+  correct, intended interaction with the later M-011 decision, not a contradiction; re-verified via the passing
+  `my-work.test.ts` suite in Batch 21.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
