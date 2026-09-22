@@ -912,10 +912,10 @@ repeated in a future pass.
 headers now show a `currentResponsibilityLabel` badge
 (`platform/approvals/domain/inbox.ts`) alongside the status badge:
 "Waiting on Requester" (draft/sent back), "Needs Your Attention" (a
-reviewer viewing a decidable request), "Pending Finance Approval"
-(anyone else viewing the same request), or the terminal status label
-once decided. Role-based, never a fabricated named owner, since Nexus's
-approval model has no per-person routing.
+reviewer viewing a decidable request), "Pending Approval" (anyone else
+viewing the same request), or the terminal status label once decided.
+Role-based, never a fabricated named owner or a specific team it cannot
+verify, since Nexus's approval model has no per-person routing.
 
 **Fixed: the Commercial Version review title never named the customer.**
 It read the generic "Commercial Configuration Version Review" for every

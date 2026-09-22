@@ -9847,9 +9847,9 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: M-012
 - Notes: N/A
 
-### M-017: Operational Queue Shows a Role/Stage Label, Never a Named Individual, Across All Four Domains
+### M-017: Operational Queue Shows a Role/Stage Label, Never a Named Individual, Across All Four Domains [DEFECT FOUND AND FIXED, 2026-09-22]
 - Pack: M - My Work / Approvals / Waiting on Others
-- Business Objective: Confirm currentResponsibilityLabel is consistently role-based (e.g. "Pending Finance Approval") in every domain, reflecting Nexus's deliberate no-named-assignee model.
+- Business Objective: Confirm currentResponsibilityLabel is consistently role-based (e.g. "Pending Approval") in every domain, reflecting Nexus's deliberate no-named-assignee model.
 - Domain: All four domains
 - Object / Record Type: One needs_action item per domain, each at a different node/team
 - Starting State: As described.
@@ -9870,7 +9870,16 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: N/A
-- Notes: N/A
+- Notes: [DEFECT FOUND AND FIXED, 2026-09-22] Live-executing this journey with real fixtures across all four
+  domains surfaced a real defect: `currentResponsibilityLabel`'s non-decidable-viewer branch hardcoded the
+  literal string "Pending Finance Approval" for every domain and every actual responsible team, not just
+  Finance-owned items. The Operational Queue renders this directly next to a separate, correct `Team` column, so
+  a real Legal- or Ops-owned item showed the plainly wrong "Pending Finance Approval" text right next to a
+  correct "Team: Legal"/"Team: Ops" badge. Never a named individual (this journey's own core claim) still held,
+  but the label named the wrong team's function, not no team. Fixed: the string is now the domain-neutral
+  "Pending Approval", matching the function's own stated design intent (role-based, not per-team, since the
+  function has no access to real team resolution). See `docs/journey-runs/BATCH_21_EVIDENCE_AUDIT.md` M-017 for
+  the full live evidence and regression test.
 
 ### M-018: Operational Queue Send-Back Counts Increment Correctly Across Multiple Cycles (PREMISE CORRECTED, Batch 21, 2026-09-22)
 - Pack: M - My Work / Approvals / Waiting on Others

@@ -276,8 +276,9 @@ they now share one mental model a user can carry between them:
 - **Header**: reference id, the entity/customer name, a status badge,
   and a `currentResponsibilityLabel` badge (`platform/approvals/domain/inbox.ts`)
   naming who needs to act next: "Waiting on Requester", "Needs Your
-  Attention", "Pending Finance Approval" (role-based, never a fabricated
-  named owner), or the terminal status once decided.
+  Attention", "Pending Approval" (role-based, never a fabricated named
+  owner or a specific team it cannot verify), or the terminal status once
+  decided.
 - **Review summary**: what changed and why approval is needed, in
   whatever shape the domain actually has (a diff table, a proposed-rate
   table, a plain reason field). Not forced into one identical layout.
