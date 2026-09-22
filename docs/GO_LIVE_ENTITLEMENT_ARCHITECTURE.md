@@ -390,6 +390,29 @@ the component's own billed metric.** Both enforced server-side inside
   'volume', 'graduated')`; `flat` and `dimension` components legitimately
   have no unit.
 
+**PRODUCT DECISION CLOSED (Pre-Batch-21, 2026-09-22): `pricingUnit` is the
+current canonical billed-metric source of truth; `measurement_definitions`
+is a future capability only, not adopted now.** The Batch 19 Journey
+Discovery Check left open whether Nexus should redesign the current
+metric-consistency check to use `measurement_definitions` instead of
+`pricingUnit`. Decided: no. `commercial_components.pricing_rule_parameters
+->> 'pricingUnit'` (resolved via `reference_options`, `list_key =
+'pricing_unit'`) remains the metric source of truth I-035's check uses,
+and continues to be so unless a future, explicit migration/design project
+decides otherwise. `measurement_definitions` (the table, the
+`MeasurementDefinition` type, `measurement_definition_id`, and every
+read-model call site that resolves it) stays exactly as designed today,
+unpopulated and unused by any current product flow: this decision does
+not delete, hide, or deprecate that code, since it is legitimate
+forward-looking design, not dead weight to clean up. It simply confirms
+no current feature depends on it and none should be built against it
+without first re-confirming it is populated. Adopting
+`measurement_definitions` as the real source of truth in the future
+(migrating `pricingUnit` values across, wiring `add_commercial_component`
+callers to populate `measurement_definition_id`, and re-pointing I-035's
+check) is its own explicit migration/design project, not silently begun
+here or implied by this decision.
+
 ### 7.3 Additional-invoice handling: same mechanism, different anchor
 
 There is no separate "period" table. `entitlement_schedule_months` is one

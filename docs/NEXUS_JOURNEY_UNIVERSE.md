@@ -9675,7 +9675,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: M-003, M-009
 - Notes: N/A
 
-### M-011: Self-Created and Self-Approvable Item Shows as Pending My Approval, Not Waiting on Others
+### M-011: Self-Created and Self-Approvable Item Shows as Pending My Approval, Not Waiting on Others (PRODUCT DECISION CLOSED, IMPLEMENTED)
 - Pack: M - My Work / Approvals / Waiting on Others
 - Business Objective: Confirm the exact order-dependent branch called out in the grounding brief, a viewer who both created the request AND can approve it is classified as pending-my-approval since that check runs first, even though the request-level RPC separately blocks actual self-approval.
 - Domain: commercial_configuration
@@ -9683,22 +9683,42 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: Item as described.
 - Personas: The viewer, acting as both requestor and would-be approver
 - Preconditions: N/A
-- Regular Path: buildMyWorkItems classifies this item as "pending my approval" (branch 1 matches before branch 2 is ever evaluated), even though createdBy also matches the viewer.
-- Stress Variant: The viewer then actually attempts to approve it; confirm the RPC-level self-approval block (a separate control from this list-classification logic) correctly rejects the actual approve action, creating a UX moment where the item is listed as "pending my approval" but the action itself fails.
+- Regular Path: [CLOSED, Pre-Batch-21, 2026-09-22] Original finding: `buildMyWorkItems` classified this item as
+  "pending my approval" (branch 1 matched before branch 2 was ever evaluated), even though `createdBy` also matched
+  the viewer. **Decided and implemented**: Pending My Approval must contain only requests the viewer can actually
+  approve now. `buildMyWorkItems`'s `pending_my_approval` branch now also requires `!isSelfCreated`; a self-created,
+  otherwise-eligible item falls through to the `waiting_on_others` branch instead. Live-confirmed: a real request
+  created by a real WF-TEST Finance member, routed to WF-TEST Finance's own node, now resolves to
+  `waiting_on_others` for its own creator (confirmed via the exact classifier logic against this real item's data,
+  corroborated by automated test coverage of the identical shape), while a different, non-creator WF-TEST Finance
+  member still sees `pending_my_approval` and approved it successfully.
+- Stress Variant: [CLOSED, Pre-Batch-21, 2026-09-22] Confirmed live: the viewer (the item's own creator) attempting
+  to approve it directly is still correctly rejected by the unchanged server-side guard:
+  `SELF_APPROVAL_NOT_ALLOWED: you cannot approve your own request. Another authorized checker must review it.` The
+  list-classification fix and the RPC-level guard are independent, consistent controls; the UX moment this
+  journey originally flagged (list says actionable, action then fails) no longer occurs, since the list no longer
+  says actionable for the creator.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
 - Audit/Data Integrity Checks: N/A
 - Recovery/Resilience Variant: N/A
-- UX Checks: Confirm what the viewer actually sees when they click Approve on an item the list told them was actionable but which the RPC then rejects for self-approval, this is a real, confirmed-possible confusing UX gap worth explicit coverage.
+- UX Checks: [CLOSED, Pre-Batch-21, 2026-09-22] The viewer no longer sees this item as actionable at all; it now
+  correctly appears under Waiting on Others, consistent with the fact that clicking Approve would always fail.
 - Historical Variant: N/A
-- Expected Business Result: N/A
-- Expected Technical Invariants: Classification order is exactly as documented: branch 1 checked before branch 2.
+- Expected Business Result: [CLOSED, Pre-Batch-21, 2026-09-22] A user never sees their own request listed as
+  something they can act on when the server would always refuse the action.
+- Expected Technical Invariants: [CLOSED, Pre-Batch-21, 2026-09-22] `pending_my_approval` requires `bucket ===
+  "needs_action" && canApprove && isResponsibleTeam && !isSelfCreated`, all four conditions simultaneously; failing
+  any one, including the new self-created condition, excludes the item from this classification.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: M-005
-- Notes: This is a genuine, confirmed current-behavior UX rough edge (list says actionable, action itself is blocked) worth flagging as a product gap for a better inline message.
+- Notes: [CLOSED, Pre-Batch-21, 2026-09-22] Implemented in `src/platform/approvals/domain/my-work.ts`
+  (`buildMyWorkItems`), the single shared, cross-domain classifier, so the fix applies uniformly to all four
+  governed domains with no per-domain duplication. Full evidence in `docs/journey-runs/BATCH_20_RESULTS.md` under
+  M-011's Product Decision closure entry.
 
 ### M-012: Sent-Back Item Where Viewer Is Neither Creator Nor Approver Appears in Neither My Work Bucket
 - Pack: M - My Work / Approvals / Waiting on Others

@@ -317,6 +317,25 @@ into a second backlog.
 
 ## Later (explicit trigger points, do not build early)
 
+- **`measurement_definitions` is a fully-designed, currently-unused future
+  capability (Product Decision, Pre-Batch-21, 2026-09-22, see
+  `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2).** The table, the
+  `MeasurementDefinition` type, `commercial_components.measurement_definition_id`,
+  and several read-model call sites all exist, but the table has zero rows
+  and the column is null on every one of the 72 live commercial components
+  in the shared database; nothing writes to it today.
+  `commercial_components.pricing_rule_parameters ->> 'pricingUnit'` is the
+  real, current, canonical billed-metric source of truth, and I-035's
+  metric-consistency check (Batch 19 Product Gap Closure) is built against
+  it, not `measurement_definitions`. Build the migration to
+  `measurement_definitions` (backfilling values, wiring
+  `add_commercial_component` callers to populate
+  `measurement_definition_id`, re-pointing I-035's check and any other
+  metric-label rendering) only if a real product need for
+  `measurement_definitions`'s richer shape (unit, counting rule, period
+  basis, dimension keys, expected source, active/deprecated status) beyond
+  a plain code + label actually appears; until then, `pricingUnit` remains
+  sufficient and this stays parked.
 - **No dedicated Maker/Checker screen exists** (NEXUS FULL PRODUCT
   READINESS product surface audit). Who is a Maker versus a Checker is
   only visible by cross-referencing role names inside the generic User

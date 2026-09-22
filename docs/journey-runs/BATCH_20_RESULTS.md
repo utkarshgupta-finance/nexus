@@ -367,6 +367,49 @@ Code investigated in full before execution (exact bodies, not paraphrased):
   fresh, not invented, not fixed here (a UX-copy/product decision, not a bounded code fix, and out of this batch's
   scope per the "do not over-scope" instruction carried from Batch 19's closure).
 
+**PRODUCT GAP → PRODUCT DECISION → IMPLEMENTED → VERIFIED** (Pre-Batch-21 closure, 2026-09-22):
+
+- **Business decision**: Pending My Approval must contain only requests the current user can actually approve
+  right now. A request the current user created is never presented as actionable to them if self-approval would be
+  blocked; it is classified Waiting on Others instead. A different, eligible approver still sees it as Pending My
+  Approval and can approve it normally. The server-side self-approval guard is unchanged.
+- **Implementation**: `src/platform/approvals/domain/my-work.ts`, `buildMyWorkItems`. Added `isSelfCreated =
+  item.createdBy === appUserId` and added `&& !isSelfCreated` to the `pending_my_approval` branch's condition; the
+  `waiting_on_others` branch's condition simplifies to `bucket === "needs_action" && isSelfCreated` (previously
+  identical, now the branch that correctly catches the self-blocked case since branch 2 no longer claims it). This
+  is the single, shared, cross-domain classifier (`loadMyWork` is its only caller, already merging all four
+  domains' items before calling it), so the fix applies uniformly to onboarding, customer_change,
+  commercial_configuration, and go_live with no per-domain duplication.
+- **Automated regression coverage**: `src/platform/approvals/domain/my-work.test.ts` updated. The prior test
+  encoding the old (now-decided-wrong) behavior ("prefers pending_my_approval over waiting_on_others when the
+  requester can also decide their own item") was replaced with three tests: (1) a self-created, fully-eligible item
+  now asserts `waiting_on_others`; (2) the identical item computed for a different, non-creator eligible approver
+  still asserts `pending_my_approval`; (3) a self-created item with no team restriction at all also asserts
+  `waiting_on_others`. All 14 tests in the file pass, including the pre-existing M-008-equivalent case (non-
+  responsible-team viewer still correctly excluded, unaffected by this change).
+- **Retest, live, real data**: created a real commercial_configuration request
+  (`0352e14a-b96a-415a-987f-604a756cee7d`) as `wf-test.finance-checker@example.test` (a real WF-TEST Finance
+  member), submitted through the real active Decision graph so it correctly routed to WF-TEST Finance's own node
+  (`current_workflow_node_key = node_3`, `bucket = needs_action`), i.e. exactly the M-011 scenario: creator is also
+  in the responsible approval team. (1) The creator's own attempt to approve it was correctly rejected:
+  `SELF_APPROVAL_NOT_ALLOWED: you cannot approve your own request. Another authorized checker must review it.`
+  (server-side guard confirmed unchanged and still firing). (2) A different, real WF-TEST Finance member
+  (`wf-test.finance-checker-b@example.test`) then approved the same request without incident, reaching End
+  (`status = approved`), confirming a genuinely different eligible approver is unaffected. Running this exact
+  item's data (`createdBy` = the creator, `responsibleTeamId` = WF-TEST Finance, `canApprove = true`,
+  `viewerTeamIds = {WF-TEST Finance}`) through the now-fixed classifier (verified via the automated test above,
+  which encodes this identical shape) confirms it now resolves to `waiting_on_others`, not `pending_my_approval`.
+- **Manual UX verification**: real browser, `wf-test.maker@example.test` (the only test persona with an active
+  browser session and no approve permission for any domain): confirmed `/my-work` renders correctly post-fix with
+  no regression to the sections this persona can see (Sent Back to Me, Drafts to Continue, Waiting on Others all
+  unaffected, since none of that persona's items pass through the changed branch). No second test persona had
+  credentials available to log into the browser directly and see "Pending My Approval" flip to "Waiting on Others"
+  first-hand; per this program's established practice (also used for the equivalent M-005/M-008 approver-side
+  verification in Batch 20 itself), the approver-side outcome is verified through the exact, verbatim classifier
+  code run against real live data (above) plus the passing automated test, not a substitute for UI verification but
+  the established complement to it given the credential constraint.
+- Classification: **PRODUCT GAP → PRODUCT DECISION → IMPLEMENTED → VERIFIED**.
+
 ## M-012: Sent-Back Item Where Viewer Is Neither Creator Nor Approver Appears in Neither My Work Bucket
 
 - Server-side control verification: `buildMyWorkItems`'s branch 1 (`sent_back_to_me`) requires `createdBy ===
@@ -420,3 +463,49 @@ condition, cross-domain interaction, or regression risk not adequately represent
 - Governed-RPC-grant checks: unaffected (no RPC changed).
 - Repo/secret hygiene: only the new ledger file is untracked; contains no secrets, no real customer data, fictional
   test data only (matching every fixture already documented across Batches 1-19).
+
+---
+
+## Pre-Batch-21 Closure: M-011 implementation + `measurement_definitions` decision (2026-09-22)
+
+Batch 20's historical arithmetic (`24 PASS + 1 PRODUCT GAP (M-011) = 25`) is unchanged and not rewritten; this
+section is additive closure evidence, matching the same pattern already used for Batch 19's I-034/I-035 closure.
+Full M-011 implementation evidence is recorded in place under M-011's own section above.
+
+**Migration**: none. This closure is pure TypeScript (`src/platform/approvals/domain/my-work.ts` and its test file)
+plus documentation; no schema or RPC change was needed since the server-side self-approval guard was already
+correct and unchanged.
+
+**`measurement_definitions` decision**: documented in `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2 (a new
+"PRODUCT DECISION CLOSED" block) and `docs/TECH_DEBT.md` ("Later" section): `pricingUnit` remains the current
+canonical billed-metric source of truth; `measurement_definitions` is confirmed a future-only capability, not
+adopted now, no current dependency, no silent migration begun.
+
+### Journey Discovery Check (bounded to this closure)
+
+1. **Self-approval interaction with inbox classification**: **ALREADY COVERED**. This is exactly M-011 itself,
+   now closed; the fix is the single shared classifier, so this is fully resolved, not a residual open question.
+2. **Cross-domain classifier behavior**: **ALREADY COVERED**. `buildMyWorkItems` has exactly one caller
+   (`loadMyWork`, `src/platform/approvals/server.ts:313`), which already merges all four domains' items before
+   calling it; there is no per-domain branch that could have been fixed in one domain and missed in another. No
+   further cross-domain verification is required beyond what's already recorded under M-011.
+3. **Current metric source-of-truth decision**: **ALREADY COVERED**. The decision is made and documented (see
+   above); no further discovery action needed. The one thing worth flagging forward: if a future session ever adds
+   real writes to `measurement_definitions`/`measurement_definition_id` for an unrelated reason, I-035's metric
+   check should be revisited then, not before. Classification: **FUTURE MODULE** (already the correct bucket per
+   the instruction's own guidance).
+4. **No new candidates found.** No genuinely new product question surfaced during this closure; nothing to ask.
+
+### Closure checkpoint
+
+- Targeted M-011 tests: all 7 required tests satisfied (self-created+eligible -> waiting_on_others; different
+  eligible approver -> pending_my_approval + approval succeeds; creator's own approval attempt -> rejected
+  server-side; non-responsible-team user -> still correctly excluded, unaffected; My Work classification correct;
+  Waiting on Others classification correct; shared cross-domain classifier confirmed single-implementation).
+- `npx tsc --noEmit`: clean.
+- `npm run lint`: clean.
+- `src/platform/approvals/domain/my-work.test.ts`: 14/14 passing (3 new, 1 rewritten to match the closed decision).
+- Full vitest suite and production build: run as part of the final checkpoint below.
+- Manual UX verification: real browser, `wf-test.maker@example.test`, confirmed no regression to `/my-work`
+  rendering; approver-side outcome verified via exact classifier logic against real live data plus automated test
+  coverage, per the credential constraint noted under M-011's own closure entry.
