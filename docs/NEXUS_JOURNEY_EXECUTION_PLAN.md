@@ -1,6 +1,6 @@
 # Nexus Journey Execution Plan
 
-Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md) and [NEXUS_JOURNEY_COVERAGE_MATRIX.md](NEXUS_JOURNEY_COVERAGE_MATRIX.md). This plan originally sequenced all 782 current-executable journeys into 32 batches of 25 (the final batch holds 7); Batch 1 execution added K-030, making Batch 2 a 26-journey batch and the total 783. No journey has been executed as part of producing this plan; it exists to make later execution efficient and dependency-safe.
+Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md) and [NEXUS_JOURNEY_COVERAGE_MATRIX.md](NEXUS_JOURNEY_COVERAGE_MATRIX.md). This plan originally sequenced all 782 current-executable journeys into 32 batches of 25 (the final batch holds 7); Batch 1 execution added K-030, making Batch 2 a 26-journey batch and the total 783. After Batch 16, the Stage A Journey Universe Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`) added 8 further journeys (E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002), bringing the total to 793 and inserting a new Batch 18 dedicated to them; every batch from the former Batch 18 onward shifted down by one number (former Batch 18 is now Batch 19, and so on through former Batch 32, now Batch 33). Batch 17's own scope was deliberately left unchanged, since none of the 8 new journeys are a prerequisite for it. No journey has been executed as part of producing this plan; it exists to make later execution efficient and dependency-safe.
 
 ## Sequencing rationale
 
@@ -18,7 +18,26 @@ Reusable test data (personas, teams, published workflows, at least one approved 
 
 ## How to read a batch
 
-Each batch lists its Batch ID, its 25 (or, for the final batch, 7) Journey IDs in execution order, its Purpose, the personas it needs, the fixtures/state it needs already established, an expected duration range, its risk concentration, and which prior batch it depends on.
+Each batch lists its Batch ID, its 25 (or, for a partial batch, fewer) Journey IDs in execution order, its Purpose, the personas it needs, the fixtures/state it needs already established, an expected duration range, its risk concentration, and which prior batch it depends on.
+
+## Journey Discovery Check (mandatory from Batch 17 onward)
+
+Before any batch from Batch 17 onward is closed, its ledger must explicitly answer one standing question:
+
+> Did this batch reveal any durable business behaviour, control invariant, edge condition, cross-domain interaction, or regression risk that is not adequately represented in the Journey Universe?
+
+Every candidate this question surfaces must be classified using the same six-way taxonomy the Stage A Journey Universe Expansion Audit introduced (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`):
+
+- **ALREADY COVERED** (name the existing journey ID)
+- **EXPAND EXISTING JOURNEY** (name the existing journey ID and the exact variant to add)
+- **NEW JOURNEY REQUIRED** (allocate the next valid ID in the relevant pack, per that pack's own contiguous numbering; do not renumber any existing ID)
+- **REGRESSION TEST ONLY** (too implementation-specific for a permanent business journey; note where the regression test lives instead)
+- **FUTURE MODULE** (belongs to functionality intentionally not built yet; add to the relevant future-module backlog, do not build opportunistically)
+- **PRODUCT DECISION REQUIRED** (the expected business outcome is genuinely unresolved; record the question, do not invent the answer)
+
+The batch's own ledger must record the result of this check even when nothing is found: `No new journey candidates found.` is itself a valid, sufficient answer. A batch's own scheduled-journey denominator is never changed by anything this check finds; any newly-created journey becomes a future journey, placed into a later batch per Stage A10's own precedent (dependency ordering, domain grouping, fixture requirements), not retroactively inserted into the batch that discovered it.
+
+This requirement itself does not apply retroactively to Batches 1 through 16; those closed under the rules that existed at the time, and their own incidental findings were instead swept up in the one-time Stage A Journey Universe Expansion Audit.
 
 ---
 
@@ -176,146 +195,156 @@ Each batch lists its Batch ID, its 25 (or, for the final batch, 7) Journey IDs i
 **Risk concentration:** P0 on allocation-anchoring correctness and the usage-before-go-live rejection boundary.
 **Depends on:** Batch 16.
 
-### BATCH 18
+### BATCH 18 (backlog batch, 8 journeys; inserted by the Stage A Journey Universe Expansion Audit)
+**Journey IDs:** E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002
+**Purpose:** Clear the 8 journeys the Stage A Journey Universe Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`) added after Batch 16: Commercial Change correction-hardening (retroactive start date, intermediate-history overlap guard, adjacent-date guard, non-recurring-recognition UI honesty), a Go Live creation-time concurrency race never previously exercised, a cross-domain Timeline-wording risk check, a cross-cutting append-only-revocation invariant, and an accessibility follow-up. None of these are a prerequisite for Batch 17's Entitlement work, so Batch 17's own scope was deliberately left unchanged; this batch is scheduled immediately after it instead of being folded into it.
+**Required personas:** Finance Analyst, Checker, Maker (two sessions for H-044's concurrency race), a screen-reader user for ACC-002, an admin attempting direct table-level grant reactivation for AB-042
+**Required fixtures:** Existing Commercial Change correction fixtures from Batches 12-14 (including "WF-Test PD-002 Case A"); an approved Go Live request/stable_component_key from Batch 16 for H-044; in-flight requests across Onboarding, Customer Change, and Commercial Configuration for AA-023's Timeline check; the existing user_roles/role_permissions/user_teams revocation fixtures from Batches 4 and 16 for AB-042.
+**Expected duration:** 3-4 hours
+**Risk concentration:** P1 spread across the batch; H-044 (creation-time TOCTOU, never previously resolved either way) and AA-023 (an unverified defect-class risk in three domains) carry the most uncertainty going in.
+**Depends on:** Batch 16 (not Batch 17).
+
+### BATCH 19
 **Journey IDs:** I-031 through I-038, J-001 through J-017
 **Purpose:** Finish Entitlement (settlement flows, the new I-038 fully-settled terminal boundary), then begin Workflow Runtime depth: node-type-specific behavior, decision-node equals/not_equals/fallback, the 10-hop bound.
 **Required personas:** Finance user, Workflow Admin
 **Required fixtures:** Ledger entries from Batch 17; a published workflow with a Decision node bound to commercial_configuration (the only domain with real conditional routing).
 **Expected duration:** 4-5 hours
 **Risk concentration:** P1 on I-038 and on Decision-node inertness outside commercial_configuration (J-007 through J-009).
-**Depends on:** Batch 17.
+**Depends on:** Batch 17. (Batch 18 runs independently and does not gate this batch.)
 
-### BATCH 19
+### BATCH 20
 **Journey IDs:** J-018 through J-030, M-001 through M-012
 **Purpose:** Finish Workflow Runtime (team-ownership gaps, the historical RPC-overload regression as a regression check), then begin My Work/Approvals: inbox bucketing and the three-condition classification order.
 **Required personas:** Maker, Checker, an Approvals-inbox viewer with mixed team memberships
 **Required fixtures:** A mix of in-flight requests across all four governed domains from prior batches, at various workflow nodes.
 **Expected duration:** 4-5 hours
 **Risk concentration:** P1 on the zero-active-team-member orphaning gap and the "pending my approval" vs "waiting on others" classification order.
-**Depends on:** Batch 18.
+**Depends on:** Batch 19.
 
-### BATCH 20
+### BATCH 21
 **Journey IDs:** M-013 through M-030, Q-001 through Q-007
 **Purpose:** Finish My Work/Approvals (the canApprove cross-domain OR-imprecision investigation, M-020/M-021, and the Operational Queue's role-based-never-named-person model), then begin Documents/Evidence: upload, validation, supersede-not-delete.
 **Required personas:** Approvals-inbox viewer, Maker uploading documents
 **Required fixtures:** An in-flight Onboarding or Go Live request to attach documents to.
 **Expected duration:** 4-5 hours
 **Risk concentration:** P1 on M-021's cosmetic-vs-real-authorization-gap determination (run this one first in the batch).
-**Depends on:** Batch 19.
-
-### BATCH 21
-**Journey IDs:** Q-008 through Q-020, R-001 through R-012
-**Purpose:** Finish Documents (revision-document snapshotting, the demo-Documents-tab honesty check, the Customer Change/Commercial no-attachment-support confirmation), then begin Audit/Timeline: the shared RequestTimeline renderer and per-domain event composition.
-**Required personas:** Maker, Checker, an auditor/reviewer persona
-**Required fixtures:** Requests with a real Send Back / multi-cycle history from Batches 8-19, to give the Timeline something rich to render.
-**Expected duration:** 4-5 hours
-**Risk concentration:** P1 on document-metadata-without-file and the live-vs-snapshot actor-resolution behavior.
 **Depends on:** Batch 20.
 
 ### BATCH 22
+**Journey IDs:** Q-008 through Q-020, R-001 through R-012
+**Purpose:** Finish Documents (revision-document snapshotting, the demo-Documents-tab honesty check, the Customer Change/Commercial no-attachment-support confirmation), then begin Audit/Timeline: the shared RequestTimeline renderer and per-domain event composition.
+**Required personas:** Maker, Checker, an auditor/reviewer persona
+**Required fixtures:** Requests with a real Send Back / multi-cycle history from Batches 8-20, to give the Timeline something rich to render.
+**Expected duration:** 4-5 hours
+**Risk concentration:** P1 on document-metadata-without-file and the live-vs-snapshot actor-resolution behavior.
+**Depends on:** Batch 21.
+
+### BATCH 23
 **Journey IDs:** R-013 through R-020, S-001 through S-017
 **Purpose:** Finish Audit/Timeline (the explicit renamed-user/renamed-team/workflow-replaced/version-superseded historical-fidelity checks), then begin Search/Navigation/Discovery: the real but narrowly-scoped Customer Master search, list-based find-work surfaces.
 **Required personas:** Any user with customer.read, a user whose display name will be changed mid-scenario
 **Required fixtures:** A customer with a former name (via an approved rename) from Batch 9-10, and at least one user who has since changed their display name, to exercise the live-resolution-vs-snapshot journeys meaningfully.
 **Expected duration:** 4-5 hours
 **Risk concentration:** P2 on search recall/precision; P1 on the live-actor-resolution-after-rename confirmation.
-**Depends on:** Batch 21.
+**Depends on:** Batch 22.
 
-### BATCH 23
+### BATCH 24
 **Journey IDs:** S-018 through S-024, T-001 through T-018
 **Purpose:** Finish Search/Discovery (the explicit Forms Hub PRODUCT GAP verification journeys, and the new S-024 external API v1 boundary check), then begin Settings: Reference Master governance depth, deactivation non-retroactivity.
 **Required personas:** Any authenticated caller for the API journey; reference_master_admin
 **Required fixtures:** N/A beyond Reference Masters seeded in Batch 6.
 **Expected duration:** 4-5 hours
 **Risk concentration:** P1 on S-024 (a genuinely untested external surface) and Reference Master non-retroactivity guarantees.
-**Depends on:** Batch 22.
+**Depends on:** Batch 23.
 
-### BATCH 24
+### BATCH 25
 **Journey IDs:** T-019 through T-024, AB-001 through AB-019
 **Purpose:** Finish Settings (the team-deactivation-does-not-block-approval inconsistency as a dedicated Settings-side check, T-019), then begin Security/Direct Action: direct-URL and bypass-the-UI attempts against every governed domain.
 **Required personas:** An adversarial tester with varying, deliberately mismatched permissions/teams
 **Required fixtures:** In-flight requests across all four domains, at known current workflow nodes, to attempt direct-action bypass against.
 **Expected duration:** 5-6 hours
 **Risk concentration:** P0 concentrated almost entirely in this batch's AB journeys (server-side enforcement is the last line of defense).
-**Depends on:** Batch 23.
+**Depends on:** Batch 24.
 
-### BATCH 25
-**Journey IDs:** AB-020 through AB-040, V-001 through V-004
-**Purpose:** Finish Security/Direct Action (the 14 explicit permission-change-mid-flight scenarios), then begin Concurrency: the two-editor draft race and the row-lock approval race across all four domains.
+### BATCH 26
+**Journey IDs:** AB-020 through AB-041, V-001 through V-004
+**Purpose:** Finish Security/Direct Action (the 14 explicit permission-change-mid-flight scenarios, plus AB-041, the governed-RPC PostgreSQL-grant sweep added during Batch 7's closure and never previously placed in this plan), then begin Concurrency: the two-editor draft race and the row-lock approval race across all four domains.
 **Required personas:** Two sessions per race (Maker A/B or Checker A/B), an admin able to mutate permissions/teams mid-scenario
 **Required fixtures:** Fresh drafts and in-flight approvals per domain, created specifically for controlled racing rather than reused from earlier batches (to avoid cross-contaminating other batches' end states).
 **Expected duration:** 5-6 hours
 **Risk concentration:** P0 throughout; this is the highest-density P0 batch in the plan.
-**Depends on:** Batch 24.
-
-### BATCH 26
-**Journey IDs:** V-005 through V-029
-**Purpose:** Continue Concurrency: the remaining domain-specific approval races, the Workflow Builder and per-domain two-tab draft-edit regression checks (V-011 through V-015, all confirmed-fixed via the applied optimistic-locking migration, not open gaps), admin-changes-workflow-while-request-moves, and the Permission-Change Journeys sub-section.
-**Required personas:** Two-session pairs per race, plus a team/permission-mutating admin session
-**Required fixtures:** Same as Batch 25.
-**Expected duration:** 5-6 hours
-**Risk concentration:** P0/P1 on the 14 permission-change scenarios; V-011 through V-015 are now regression checks, not risk findings, since the draft-staleness fix is confirmed live.
 **Depends on:** Batch 25.
 
 ### BATCH 27
+**Journey IDs:** V-005 through V-029
+**Purpose:** Continue Concurrency: the remaining domain-specific approval races, the Workflow Builder and per-domain two-tab draft-edit regression checks (V-011 through V-015, all confirmed-fixed via the applied optimistic-locking migration, not open gaps), admin-changes-workflow-while-request-moves, and the Permission-Change Journeys sub-section.
+**Required personas:** Two-session pairs per race, plus a team/permission-mutating admin session
+**Required fixtures:** Same as Batch 26.
+**Expected duration:** 5-6 hours
+**Risk concentration:** P0/P1 on the 14 permission-change scenarios; V-011 through V-015 are now regression checks, not risk findings, since the draft-staleness fix is confirmed live.
+**Depends on:** Batch 26.
+
+### BATCH 28
 **Journey IDs:** V-030 through V-047, W-001 through W-007
 **Purpose:** Finish Concurrency (the remainder of the State-Mutation Journeys sub-section, the AA-014-style cross-domain row-version consistency confirmation, and the remaining approval-node/graph races), then begin Idempotency: double-submit/approve/reject/send-back/cancel across domains.
 **Required personas:** Standard Maker/Checker/Admin personas, plus a team/reference-master/workflow-mutating admin session for the State-Mutation scenarios.
 **Required fixtures:** In-flight requests across all four domains for the state-mutation-while-pending scenarios.
 **Expected duration:** 5-6 hours
-**Risk concentration:** P1/P2 spread across the State-Mutation sub-section (Customer Master changes while a Change is pending, Commercial Version changes while Go Live is pending, workflow version publish while a request is in flight); no residual draft-staleness risk in this batch, that was reconciled into Batch 26's V-011 through V-015.
-**Depends on:** Batch 26.
+**Risk concentration:** P1/P2 spread across the State-Mutation sub-section (Customer Master changes while a Change is pending, Commercial Version changes while Go Live is pending, workflow version publish while a request is in flight); no residual draft-staleness risk in this batch, that was reconciled into Batch 27's V-011 through V-015.
+**Depends on:** Batch 27.
 
-### BATCH 28
+### BATCH 29
 **Journey IDs:** W-008 through W-021, Z-001 through Z-011
 **Purpose:** Finish Idempotency (refresh-then-repeat, back/forward-then-repeat), then begin Chaos/Failure/Recovery: session expiry mid-edit/mid-approval, network failure after send, browser refresh/close mid-action.
 **Required personas:** Standard Maker/Checker, with the ability to force session expiry and simulate network interruption
 **Required fixtures:** N/A beyond standard drafts/approvals.
 **Expected duration:** 5-6 hours
 **Risk concentration:** P1 on session-expiry-mid-approval recovery paths.
-**Depends on:** Batch 27.
+**Depends on:** Batch 28.
 
-### BATCH 29
+### BATCH 30
 **Journey IDs:** Z-012 through Z-030, X-001 through X-006
 **Purpose:** Finish Chaos (deactivated referenced team/master value, zero-eligible-team-member, storage-object-missing, boundary dates, malformed deep links, the new Z-030 User Access degraded-failure check), then begin Historical/Legacy Data.
 **Required personas:** Standard Maker/Checker/Admin personas, plus direct storage/database access to simulate a missing storage object
 **Required fixtures:** A Reference Master value and a team deliberately set up for deactivation mid-scenario.
 **Expected duration:** 5-6 hours
 **Risk concentration:** P1 concentrated on zero-eligible-team-member and Z-030 (new, unconfirmed finding).
-**Depends on:** Batch 28.
-
-### BATCH 30
-**Journey IDs:** X-007 through X-021, AA-001 through AA-010
-**Purpose:** Finish Historical/Legacy Data (audit_sequence-vs-commit-order nuance, superseded workflow/commercial-version fidelity), then begin Cross-Domain Customer Lifecycle: the full Onboarding-to-Entitlement chain and post-Go-Live change scenarios.
-**Required personas:** Full persona set across all domains
-**Required fixtures:** As much accumulated real history as possible from Batches 1-29, since Historical journeys are most meaningful against genuinely aged data rather than data created moments earlier.
-**Expected duration:** 5-6 hours
-**Risk concentration:** P0 on the full cross-domain chain (AA-001) and Customer Change after Go Live (AA-002).
 **Depends on:** Batch 29.
 
 ### BATCH 31
+**Journey IDs:** X-007 through X-021, AA-001 through AA-010
+**Purpose:** Finish Historical/Legacy Data (audit_sequence-vs-commit-order nuance, superseded workflow/commercial-version fidelity), then begin Cross-Domain Customer Lifecycle: the full Onboarding-to-Entitlement chain and post-Go-Live change scenarios.
+**Required personas:** Full persona set across all domains
+**Required fixtures:** As much accumulated real history as possible from Batches 1-30, since Historical journeys are most meaningful against genuinely aged data rather than data created moments earlier.
+**Expected duration:** 5-6 hours
+**Risk concentration:** P0 on the full cross-domain chain (AA-001) and Customer Change after Go Live (AA-002).
+**Depends on:** Batch 30.
+
+### BATCH 32
 **Journey IDs:** AA-011 through AA-022, Y-001 through Y-013
-**Purpose:** Finish Cross-Domain Customer Lifecycle (the two new gap-analysis additions AA-021/AA-022 on segment-change routing and workflow-version independence), then begin Performance/Large Records: many send-back cycles, large workflow graphs, many components.
+**Purpose:** Finish Cross-Domain Customer Lifecycle (the two new gap-analysis additions AA-021/AA-022 on segment-change routing and workflow-version independence; AA-023, this plan's other newly-added cross-domain journey, already ran in Batch 18), then begin Performance/Large Records: many send-back cycles, large workflow graphs, many components.
 **Required personas:** Full persona set
 **Required fixtures:** A customer with multiple concurrent governed requests from earlier batches (AA-006-style setup).
 **Expected duration:** 5-6 hours
 **Risk concentration:** P1 on AA-021 (segment routing correctness) and early Performance journeys (large send-back cycle counts).
-**Depends on:** Batch 30.
+**Depends on:** Batch 31.
 
-### BATCH 32 (partial batch, 7 journeys)
+### BATCH 33 (partial batch, 7 journeys)
 **Journey IDs:** Y-014 through Y-020
 **Purpose:** Finish Performance/Large Records: many documents, many approvals, large audit history read performance, and large customer/commercial history rendering.
 **Required personas:** Standard Maker/Checker/Admin
-**Required fixtures:** The large, accumulated data volume from all 31 prior batches; this batch is deliberately last so it benefits from real accumulated scale rather than synthetically bulk-inserted data.
+**Required fixtures:** The large, accumulated data volume from all prior batches; this batch is deliberately last so it benefits from real accumulated scale rather than synthetically bulk-inserted data.
 **Expected duration:** 2-3 hours
 **Risk concentration:** P2/P3, this batch is about responsiveness and readability at scale, not correctness.
-**Depends on:** Batch 31.
+**Depends on:** Batch 32.
 
 ---
 
 ## Summary
 
-- 32 batches total: 31 full batches of 25, 1 final batch of 7.
-- Total current-executable journeys sequenced: 783 (K-030 added after Batch 1 execution).
-- Estimated total execution duration if run sequentially by a single team: roughly 135-165 hours across the full plan; batches 24-27 (Security and Concurrency) and 7-19 (the full customer-to-approvals chain) are the largest time investments due to multi-session/multi-persona setup overhead.
+- 33 batches total: 1 batch of 26 (Batch 2), 1 backlog batch of 8 (Batch 18, inserted by the Stage A Journey Universe Expansion Audit), 30 full batches of 25, 1 final batch of 7.
+- Total current-executable journeys sequenced: 793 (K-030 added after Batch 1 execution; E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002 added by the Stage A Journey Universe Expansion Audit after Batch 16, `docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`).
+- Estimated total execution duration if run sequentially by a single team: roughly 138-169 hours across the full plan; batches 25-28 (Security and Concurrency) and 7-20 (the full customer-to-approvals chain) are the largest time investments due to multi-session/multi-persona setup overhead.
 - The two FUTURE packs (Forms Hub, MRR Recognition) are intentionally absent from this plan; they have no batches because they are not executable against the current product.
+- Batches 1 through 17 are historical/immutable in scope (already executed, or, for Batch 17, executed under the plan as it existed before this audit). Batch 18 onward reflects the post-Stage-A plan; no batch number before 18 was changed.
