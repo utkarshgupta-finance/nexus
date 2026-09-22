@@ -9955,7 +9955,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: M-021
 - Notes: N/A
 
-### M-021: CanApprove OR-Imprecision Combined With a Coincidental Team Match Does Leak an Item Into Pending-My-Approval (EMPIRICALLY DETERMINED, Batch 21, 2026-09-22)
+### M-021: CanApprove OR-Imprecision Combined With a Coincidental Team Match Does Leak an Item Into Pending-My-Approval (EMPIRICALLY DETERMINED, Batch 21; FIXED, pre-Batch-22, 2026-09-22)
 - Pack: M - My Work / Approvals / Waiting on Others
 - Business Objective: Isolate and confirm the actual risk scenario implied by the documented imprecision, a viewer who holds only ONE domain's approve permission but happens to ALSO be a genuine member of the responsible team for a DIFFERENT domain's item, sees that other-domain item as pending-my-approval even though their permission is not truly scoped to that domain's request type.
 - Domain: [CORRECTED, Batch 21, 2026-09-22] The originally-named pair (customer_onboarding vs customer_change) does
@@ -9998,10 +9998,18 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: M-020, M-011
-- Notes: [Batch 21, 2026-09-22] Classified **PRODUCT GAP**, not fixed: computing `canApprove` correctly
-  per-domain/per-item would require threading each item's own domain through `buildMyWorkItems`'s permission check
-  (today a single caller-supplied boolean for the whole list), a real design decision with cost/complexity
-  tradeoffs, not invented here. Full evidence in `docs/journey-runs/BATCH_21_RESULTS.md`.
+- Notes: [Batch 21, 2026-09-22] Originally classified **PRODUCT GAP**, not fixed at the time: computing
+  `canApprove` correctly per-domain/per-item would require threading each item's own domain through
+  `buildMyWorkItems`'s permission check (previously a single caller-supplied boolean for the whole list).
+  **[CLOSED, pre-Batch-22, 2026-09-22]**: this was reclassified as a bounded defect against the already-settled
+  "Pending My Approval means this user can actually approve this item now" invariant (not a new product
+  decision) during the pre-Batch-22 evidence-integrity audit, and fixed: `buildMyWorkItems` now takes a
+  `CanApproveByType` map (`src/platform/approvals/domain/my-work.ts`), and `/my-work` (`src/app/my-work/page.tsx`)
+  checks all three real permission resources (`customer`, `commercial_configuration`, `go_live`) independently
+  instead of OR-ing two of them into one flag. Verified against two new automated tests and against the exact
+  real fixture (`wf-test.lifecycle-admin@example.test`, go_live request `3fdd8578-...`) this journey's own
+  discovery used. Full evidence in `docs/journey-runs/BATCH_21_RESULTS.md` (original discovery) and
+  `docs/journey-runs/BATCH_21_EVIDENCE_AUDIT.md` (the fix).
 - Notes: This is the single most important journey in Pack M given the grounding brief's explicit callout of this imprecision; the outcome (list-only cosmetic issue vs actual RPC-level bypass) must be empirically determined and reported either way.
 
 ### M-022: My Work Refreshes Immediately After the Viewer's Own Action
