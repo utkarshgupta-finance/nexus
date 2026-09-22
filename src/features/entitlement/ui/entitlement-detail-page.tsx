@@ -74,9 +74,10 @@ function runAction(
 /**
  * Add Invoice Entitlement form (Phase G). Every quantity here is a
  * metric quantity from an actual invoice, never a monetary amount:
- * `metric` is Finance-entered free text (Users, Outlets, whatever this
- * line item's own unit is), matching that no resolvable Commercial unit
- * label exists yet (see docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md).
+ * `metric` remains Finance-entered free text (not a select bound to the
+ * component's own pricing unit), but create_entitlement_source now
+ * rejects it server-side if it does not match the component's billed
+ * metric (see docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md).
  */
 function AddEntitlementSourceForm({ lineItem, onCreated }: { lineItem: GoLiveLineItem; onCreated: () => void }) {
   const [open, setOpen] = useState(false)

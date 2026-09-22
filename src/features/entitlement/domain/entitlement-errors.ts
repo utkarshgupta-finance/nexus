@@ -11,6 +11,8 @@ import { defaultMessageForCode } from "@/platform/errors"
 type EntitlementErrorKind =
   | "entitlement_source_not_found"
   | "entitlement_source_not_active"
+  | "entitlement_source_duplicate_invoice_reference"
+  | "entitlement_source_metric_mismatch"
   | "monthly_usage_not_found"
   | "monthly_usage_not_current"
   | "monthly_usage_already_finalized"
@@ -36,6 +38,8 @@ type EntitlementError = {
 const NAMED_TOKEN_KINDS: Record<string, EntitlementErrorKind> = {
   ENTITLEMENT_SOURCE_NOT_FOUND: "entitlement_source_not_found",
   ENTITLEMENT_SOURCE_NOT_ACTIVE: "entitlement_source_not_active",
+  ENTITLEMENT_SOURCE_DUPLICATE_INVOICE_REFERENCE: "entitlement_source_duplicate_invoice_reference",
+  ENTITLEMENT_SOURCE_METRIC_MISMATCH: "entitlement_source_metric_mismatch",
   MONTHLY_USAGE_NOT_FOUND: "monthly_usage_not_found",
   MONTHLY_USAGE_NOT_CURRENT: "monthly_usage_not_current",
   MONTHLY_USAGE_ALREADY_FINALIZED: "monthly_usage_already_finalized",
