@@ -468,23 +468,536 @@ Yes.
 
 ## END M-005
 
+## Historical Evidence Closure (2026-09-22, second continuation run)
+
+Baseline for this segment: `b0a4a75ad7d61e635cecabc4d5045dfb2dcaa816`. Scope per this run's instruction: close
+every remaining non-tooling-blocked Batch 20 gap, starting with the P1 cluster (J-027, J-028, M-006, M-007,
+M-009), rather than leaving them at grade B by default. For J-022, J-027, J-028, and J-029 the original blocker
+was structural (no live fixture with the exact required node shape existed in the domain's currently-active
+graph), not a domain-mismatch of convenience. Per this run's no-domain-substitution rule, a structural gap that
+is genuinely executable must be executed, not narrated. Two new workflow graphs were authored live via the real
+Workflow Builder RPC chain (`create_workflow_definition` -> `create_workflow_definition_version` ->
+`save_workflow_version_graph` -> `publish_workflow_definition_version` -> `set_workflow_definition_active` swap
+-> execute -> swap back), the same sanctioned pattern already used for J-004/J-006/J-027 in earlier rounds:
+
+- `wf_test_j022_j027_golive_nullteam_chain` (go_live): Start -> A1 (WF-TEST Finance) -> A2 (WF-TEST Legal) -> A3
+  (no team) -> End. Swapped in for `wf_test_decision_finance_or_legal`, executed, swapped back; final state
+  verified as exactly the original definition active again.
+- `wf_test_j028_j029_change_4node_teamreuse` (customer_change): Start -> A1 (WF-TEST Finance) -> A2 (WF-TEST
+  Legal) -> A3 (no team) -> A4 (WF-TEST Finance again) -> End. Swapped in for `wf_test_finance_legal_sequential`,
+  executed, swapped back; final state verified as exactly the original definition active again.
+
+Both graphs published cleanly under the live dead-end/reachability publish-time validator confirmed during the
+J-015 work. All fixtures below reuse the existing `test-customer-1` (`ec93474a-...`) base record; each
+customer_change request was created fresh against its current `row_version` at creation time, so none is exposed
+to the `CUSTOMER_CHANGE_STALE_BASE` guard that blocked J-028's original fresh-reproduction attempt.
+
+## BEGIN J-022 (P2)
+
+### Existing evidence
+No live fixture with a null-`responsible_team_id` Approval node existed anywhere in the product (confirmed via a
+direct query across every `workflow_nodes` row, all four domains); evidence was function-call and code-reading
+only.
+
+### Missing evidence
+A real go_live request reaching a null-team node, approved by a permission-holder outside every named team
+(Regular Path), plus the Authorization Variant (rejection independent of team_id nullability).
+
+### Fixture
+New graph `wf_test_j022_j027_golive_nullteam_chain` (A3 = null team). Go-live request
+`8e70d118-ef85-4050-9d65-5575ab854227` against `test-customer-1` / commercial configuration `2ae7aae0-...`.
+
+### Execution
+Created, confirmed (`set_go_live_customer_confirmation`), submitted. Approved A1 by
+`wf-test.finance-checker` (WF-TEST Finance), A2 by `wf-test.legal-checker` (WF-TEST Legal), then A3 (null team)
+by `wf-test.finance-checker-b`, who holds `go_live.approve` but is not a member of WF-TEST Legal or WF-TEST
+Leadership. Live server result: `status = approved`, `current_workflow_node_key = node_5` (End),
+`approved_by = 3d039bf0-...` (finance-checker-b). This is the Regular Path, proven live, in the canonical go_live
+domain.
+
+### Manual UX
+Not available (browser session tooling-blocked, per I-037/standing restriction). My Work's `isResponsibleTeam`
+OR-condition null-branch is confirmed by direct code read (unchanged since Batch 19) and now has real go_live
+domain server-side backing for the state it evaluates against.
+
+### Server/RPC evidence
+An initial attempt at the Authorization Variant, made by calling `approve_go_live_request` directly (bypassing
+the application layer) with an actor holding zero `go_live` permissions, unexpectedly succeeded. Root-caused: the
+RPC is locked to `service_role` only (`revoke all ... from public, anon, authenticated`), reachable exclusively
+through `approveGoLiveRequestAction` in `src/features/go-live/actions.ts`, which calls
+`requirePermission("go_live", "approve")` (line 101) before ever invoking the RPC. Calling the RPC directly with
+a service-role connection, as this audit's tooling does, bypasses that permission gate the same way the trusted
+Server Action's own service-role credential does, so it does not reproduce what an unauthorized real user could
+do. This is not a product defect; it is confirmed as a test-methodology correction (see Journey Discovery Check
+below). The Authorization Variant is therefore evidenced by code citation, not a raw RPC negative call:
+`requirePermission` is called unconditionally before `approveGoLiveRequest`, and this is the same mechanism
+already verified extensively elsewhere in this program to correctly deny actors lacking the named permission.
+
+### Required variants
+Regular Path: real, live, in-domain. Authorization Variant: code-cited (correct methodology given the RPC's
+`service_role`-only execute grant), not raw-RPC-reproduced.
+
+### Current outcome
+PASS. Regular Path SERVER/DB VERIFIED fresh this run; Authorization Variant CODE-VERIFIED (the only valid way to
+test it without a real authenticated session, since the RPC itself carries no independent permission check by
+design, relying entirely on the Server Action per `fn_require_workflow_team_membership`'s own doc comment: "never
+used to grant a permission, only to narrow which already-permitted actor may act").
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END J-022
+
+## BEGIN J-027 (P1)
+
+### Existing evidence
+Live send-back-then-resubmit cycle with correct cycle-number increment and node reset, but on a 2-node
+(`batch15_go_live_two_step`) graph, not the canonical A1-A2-A3 3-node shape.
+
+### Missing evidence
+The exact canonical shape: a genuine 3-sequential-Approval-node go_live graph, sent back at the last node,
+resubmitted, restart confirmed at A1 (not A2/A3), both earlier approvers required to re-approve in full.
+
+### Fixture
+Same new graph as J-022. Go-live request `4acda8b1-4de5-4d59-946b-eed4e5f225dc`.
+
+### Execution
+Created, confirmed, submitted; approved A1 (finance-checker) and A2 (legal-checker), reaching A3. Sent back at A3
+by finance-checker-b (reason recorded). Server state: `status = sent_back`, `current_workflow_node_key = null`,
+`workflow_cycle_number = 2`. Resubmitted by the requestor: `status = resubmitted`,
+`current_workflow_node_key = node_2` (A1), confirming restart at the first Approval node, not A2 or A3. Re-approved
+A1 (finance-checker again) and A2 (legal-checker again), then A3 (finance-checker-b), reaching End. The full
+`workflow_node_transitions` history shows two clean, cycle-scoped chains: cycle 1 (`submit->node_2`,
+`node_2->node_3` approve, `node_3->node_4` approve, `node_4->null` send_back) and cycle 2 (`submit->node_2`,
+`node_2->node_3` approve, `node_3->node_4` approve, `node_4->node_5` approve), proving both original approvers'
+prior-cycle approvals did not carry forward.
+
+### Manual UX
+Not available (tooling-blocked). Timeline/My Work restart-visibility is a direct, already-verified consequence of
+`current_workflow_node_key` and `workflow_cycle_number`, both confirmed correct at the data layer above.
+
+### Server/RPC evidence
+Full transition log, real, fresh, in the canonical go_live domain, exactly matching the journey's own stated
+Audit/Data Integrity Check.
+
+### Required variants
+Regular Path and Stress Variant (full re-approval required, not skipped) both proven live in one continuous
+fixture.
+
+### Current outcome
+PASS, genuinely revalidated in-domain, canonical 3-node shape.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END J-027
+
+## BEGIN J-028 (P1)
+
+### Existing evidence
+Live walk-through of a real 3-node graph (the largest then-active), not the canonical 4-Approval-node shape;
+canonical shape confirmed to exist only on superseded, non-active `workflow_definition_versions`, and the two
+still-open historical requests on those versions were blocked from fresh re-approval by the unrelated, correctly-
+functioning `CUSTOMER_CHANGE_STALE_BASE` guard (their shared base customer's `row_version` has drifted from 5 to
+27 across this multi-session program). A genuine historical 3-hop (not 4-hop) walk was located on
+`a4a4d876-a8d3-4ec4-9f2a-c71c985a5045`, real but not fresh, and topping out at 3 approval hops, not 4, since even
+that graph's longest real path is 3 sequential nodes before its End (a legitimate, separate finding: no
+customer_change graph in this environment's history has ever had more than 3 approval hops on its actual longest
+path, until the graph built for this closure).
+
+### Missing evidence
+The canonical shape itself: Start -> A1(Team X) -> A2(Team Y) -> A3(Team Z, null-team case) -> A4(Team X reused)
+-> End, walked fresh, end to end, with the Stress Variant (different real individuals at the two Team X
+occurrences) and Authorization Variant (early jump-ahead rejected).
+
+### Fixture
+New graph `wf_test_j028_j029_change_4node_teamreuse`. Customer-change request
+`3e1fd2e6-a027-4904-89ee-e76ec87f04cd` against `test-customer-1`, created fresh (`base_customer_row_version = 26`,
+matching the customer's row_version at creation, so no staleness exposure).
+
+### Execution
+Submitted, landing at A1 (node_2). Authorization Variant first: `wf-test.legal-checker` (Team Y, holds
+`customer.approve`) attempted to jump ahead and approve at A4 (`node_5`) while the request was still at A1;
+rejected with `WORKFLOW_NODE_ALREADY_ADVANCED`, confirming the node/state recheck governs regardless of the
+actor's eligibility elsewhere in the graph. Then approved sequentially: A1 by `wf-test.finance-checker`
+(cbfb7860), A2 by `wf-test.legal-checker`, A3 (null team) by `wf-test.leadership-approver` (00d0779e, on neither
+Finance nor Legal), A4 by `wf-test.finance-checker-b` (3d039bf0), a different real individual from A1's
+finance-checker, satisfying the Stress Variant. Final state: `status = approved`,
+`current_workflow_node_key = node_6` (End). `workflow_node_transitions` shows exactly 5 rows (1 submit + 4
+approvals), chained `null->node_2->node_3->node_4->node_5->node_6` end to end.
+
+### Manual UX
+Not available (tooling-blocked). My Work's per-hop team resolution is confirmed by the live, per-node-recomputed
+transition chain above (see also J-029, same graph, for the explicit "does the SAME viewer see pending correctly
+at each of the two Team X occurrences" check).
+
+### Server/RPC evidence
+Full transition log, real, fresh, in the canonical customer_change domain, exactly matching the journey's own
+Audit/Data Integrity Check (5 rows, correct chain).
+
+### Required variants
+Regular Path, Stress Variant, and Authorization Variant all proven live in one continuous fixture.
+
+### Current outcome
+PASS, genuinely revalidated in-domain, canonical 4-node shape, all three variants.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END J-028
+
+## BEGIN J-029 (P2)
+
+### Existing evidence
+Zero live execution; a pure structural corollary of Batch 19's J-017, reasoned from code only.
+
+### Missing evidence
+A real fixture where the SAME team is assigned to two non-adjacent nodes, with the SAME individual approving
+both occurrences, confirming per-node (not team-level or cached) eligibility computation.
+
+### Fixture
+Same graph as J-028 (Team X = WF-TEST Finance at both A1 and A4). Customer-change request
+`a759f411-4d69-4178-ab4f-676b3973041a`, created fresh (`base_customer_row_version = 27`).
+
+### Execution
+Submitted, landing at A1. Approved A1 by `wf-test.finance-checker` (cbfb7860). Immediately confirmed this same
+actor is correctly ineligible at the next node: an attempt by cbfb7860 to approve A2 (Team Y, Legal) was rejected
+with `WORKFLOW_TEAM_REQUIRED`, proving no stale carry-over of "already acted, still eligible" state. Approved A2
+by `wf-test.legal-checker`, A3 (null team) by `wf-test.leadership-approver-b` (dc44cd80). Now at A4, the SAME
+actor who approved A1 (cbfb7860) approved again: accepted, `status = approved`, `current_workflow_node_key =
+node_6` (End), `approved_by = cbfb7860-...`. This proves the same individual is correctly recognized eligible at
+the early occurrence, correctly rejected at intervening unrelated nodes, and correctly recognized eligible again
+at the late occurrence of the same team, i.e. genuinely per-node-scoped, not team-scoped or memoized.
+
+### Manual UX
+Not available (tooling-blocked). The underlying `getResponsibleTeamIdsByNode`-equivalent computation (current
+node's team only) is now backed by a real, fresh, three-way live confirmation (eligible / rejected / eligible
+again) rather than argued by analogy to J-017.
+
+### Server/RPC evidence
+Real, fresh, in the canonical customer_change domain.
+
+### Required variants
+Regular Path proven live; the journey has no separately-named Stress/Authorization Variant beyond the Regular
+Path itself.
+
+### Current outcome
+PASS, genuinely revalidated in-domain.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END J-029
+
+## BEGIN M-007 (P1)
+
+### Existing evidence
+Canonical domain customer_change; evidence reused was the go_live fixture from M-005.
+
+### Missing evidence
+A real customer_change item at a node with a specific `responsible_team_id`, approved by a member of exactly
+that team.
+
+### Fixture
+J-028's own fixture, `3e1fd2e6-a027-4904-89ee-e76ec87f04cd` (or equivalently J-029's), customer_change domain, A1
+node owned by WF-TEST Finance.
+
+### Execution
+`wf-test.finance-checker` (a member of exactly WF-TEST Finance, the node's `responsible_team_id`, holding
+`customer.approve`) successfully approved A1. `isResponsibleTeam` evaluated true, matching the OR-condition's
+second branch exactly, in the canonical domain, live.
+
+### Manual UX
+Not available (tooling-blocked).
+
+### Server/RPC evidence
+Real, fresh, in the canonical customer_change domain (reused from J-028/J-029's own execution rather than a
+separate fixture, since the shape is identical and building a third fixture for the same underlying fact would
+be redundant, not stronger).
+
+### Required variants
+Regular Path only, per the journey's own definition (no other variants specified).
+
+### Current outcome
+PASS, in-domain.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END M-007
+
+## BEGIN M-009 (P1)
+
+### Existing evidence
+Canonical domain go_live; evidence cited was customer_change/customer_onboarding rows. The Stress Variant's
+second sub-case ("has permission but wrong team") was only argued by analogy to M-008.
+
+### Missing evidence
+A real go_live_requests row created by the viewer, in needs_action, where the viewer cannot approve; sub-case 1
+("lacks permission entirely").
+
+### Fixture
+J-022/J-027's own go-live requests (`8e70d118-...`, `4acda8b1-...`, `7b49968a-...`), all created by
+`wf-test.maker` (`ada9b48c-...`).
+
+### Execution
+Confirmed live (already established in this run's own permission dump): `wf-test.maker` holds `go_live.create`,
+`go_live.read`, `go_live.submit`, but explicitly no `go_live.approve` of any kind (Maker role has no approve
+grant in any domain). Each of these three requests, while in `needs_action`, has `created_by = ada9b48c` and
+`canApprove = false` for that same viewer. Since the pending-my-approval branch is checked and fails first (per
+the already-code-confirmed classification order), the item correctly falls through to waiting-on-others for its
+own creator. This is sub-case 1, real, fresh, in the canonical go_live domain.
+
+### Manual UX
+Not available (tooling-blocked).
+
+### Server/RPC evidence
+Real, fresh, in-domain for sub-case 1. Sub-case 2 ("has permission but wrong team") remains backed by M-008's own
+fresh in-audit revalidation (a different domain, commercial_configuration, but the identical shape: permission
+held, team wrong), per this audit's already-established reasoning that the underlying boolean expression
+(`bucket === "needs_action" && canApprove && isResponsibleTeam`) has no per-domain branching.
+
+### Required variants
+Sub-case 1: real, fresh, in-domain. Sub-case 2: real, fresh, but in a different domain (M-008), not this run's
+own go_live domain specifically.
+
+### Current outcome
+PASS. Sub-case 1 fully in-domain; sub-case 2 backed by cross-domain real evidence of the identical code path,
+consistent with this audit's standing "domain-agnostic mitigates" finding, empirically re-confirmed rather than
+merely asserted.
+
+### Audit gap closed?
+Yes (sub-case 1 newly in-domain; sub-case 2's cross-domain backing was already established this run via M-008
+and is not re-litigated).
+
+### Ledger updated
+Yes.
+
+## END M-009
+
+## BEGIN M-006 (P1)
+
+### Existing evidence
+No live fixture exists (same structural gap as J-022/J-028 originally); pure expression evaluation from code.
+
+### Missing evidence
+A real customer_onboarding case at a node with `responsible_team_id` null, approved by a viewer on no special
+team, holding only the onboarding approve permission.
+
+### Fixture
+None constructed this run.
+
+### Execution
+Not attempted. `create_customer_onboarding_case` / `submit_customer_onboarding_case` /
+`approve_customer_onboarding_case` are a heavier RPC chain than the other three domains (the final approval
+bundles Customer Master field finalization, not a simple governed approve), and building a dedicated null-team
+onboarding graph plus a full case fixture was judged, within this run's remaining time budget after closing
+J-022/J-027/J-028/J-029/M-007/M-009, not achievable without further compressing evidence quality elsewhere.
+Confirmed (repeat query, this run): no `customer_onboarding` workflow version in this environment's full history
+has ever had a null-`responsible_team_id` Approval node.
+
+### Manual UX
+Not available (tooling-blocked).
+
+### Server/RPC evidence
+None new. The underlying `isResponsibleTeam` OR-condition null-branch is now empirically confirmed correct in
+two other domains this run (J-022 in go_live, J-028/J-029 in customer_change), and is the identical, already-
+directly-read expression in all four domains (confirmed by code read, unchanged since Batch 19). This
+materially reduces the risk this residual represents but does not substitute for customer_onboarding-domain
+evidence, which the journey's own canonical Domain field specifically names.
+
+### Required variants
+Not executed this run.
+
+### Current outcome
+Mechanism-level PASS (now backed by two, not zero, cross-domain live confirmations); customer_onboarding-domain
+evidence specifically remains outstanding.
+
+### Audit gap closed?
+No.
+
+### Ledger updated
+Yes (status honestly carried forward, not silently closed).
+
+## END M-006
+
+## BEGIN M-004 (P2)
+
+### Existing evidence
+The approved half (`f955d94d-...`/`a7644ec1-...`) was genuinely commercial_configuration, matching canonical; the
+rejected half (`426e02cf-...`) was customer_change.
+
+### Missing evidence
+A real, rejected commercial_configuration_version specifically, so both halves of the "Completed bucket includes
+Approved and Rejected" claim are evidenced in the canonical domain.
+
+### Fixture
+Existing, real, rejected commercial_configuration_versions rows, confirmed live this run:
+`f78c8ecd-33c6-47b3-9ab9-abc85cd4da25`, `2a0bbfdf-eaf9-492c-8aba-f1b79bb5ab36`,
+`bed16e3d-a988-4d3f-a961-2843864fd6d3` (any one suffices; all three confirmed `status = rejected`).
+
+### Execution
+Confirmed via direct query that real, historical, genuinely rejected commercial_configuration_versions rows
+exist in this environment. `bucketForStatus` maps `rejected` to `completed` identically regardless of domain
+(already code-confirmed, unchanged); the approved half was already in-domain from the original evidence, so both
+halves are now in-domain.
+
+### Manual UX
+Not available (tooling-blocked).
+
+### Server/RPC evidence
+Real, historical, in the canonical commercial_configuration domain for both approved and rejected halves.
+
+### Required variants
+Regular Path only, per the journey's own definition.
+
+### Current outcome
+PASS, both halves now in-domain.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END M-004
+
+## BEGIN M-012 (P2)
+
+### Existing evidence
+Canonical domain customer_change; evidence cited was customer_onboarding rows, and no actual third-party viewer
+computation was run (argued "by construction"). The Operational Queue cross-check was code-inspection only.
+
+### Missing evidence
+A real sent-back customer_change item, plus a real, concrete third-party viewer (neither creator nor ever
+eligible to approve at any node the item touches) confirmed to have no stake in it.
+
+### Fixture
+New customer_change request `c3b584d0-2b17-4415-8b94-1d163f0b07e2`, created against the currently-active
+`wf_test_finance_legal_sequential` v11 graph (no graph swap needed; this is the product's real, live default
+graph). Nodes: A1 = UX Verification Team, A2 = WF-TEST Legal, A3 = WF-TEST Leadership.
+
+### Execution
+Created (by `wf-test.maker`), submitted (landing at A1), sent back at A1 by `wf-test.leadership-approver`
+(currently the sole active UX Verification Team member). Server state: `status = sent_back`. Confirmed live that
+`wf-test.finance-checker-b` (`3d039bf0-...`) is active on WF-TEST Finance only, holds `customer.approve`, is not
+the creator, and has zero active membership on UX Verification Team, WF-TEST Legal, or WF-TEST Leadership, i.e.
+every team this item's graph ever names. For this viewer: bucket condition is irrelevant to
+`pending_my_approval`/`waiting_on_others` since `isResponsibleTeam` is false at every node this item touches or
+has touched; `sent_back_to_me` (which requires this viewer to be the one who received the send-back, or on the
+node's team) also does not apply, since this viewer was never on the sending node's team. This is a genuine,
+data-backed confirmation of the Regular Path claim, not an inference.
+
+### Manual UX
+Not available (tooling-blocked). The Operational Queue cross-check (broad-read visibility) remains code-
+inspection only this run; not re-verified live.
+
+### Server/RPC evidence
+Real, fresh, in the canonical customer_change domain, using the product's own currently-active graph (not a
+purpose-built test graph).
+
+### Required variants
+Regular Path proven live and data-concrete. UX Checks (Operational Queue broad-read visibility) remain code-
+inspection only, not newly verified.
+
+### Current outcome
+PASS for the Regular Path (now concretely computed, not merely argued); Operational Queue cross-check unchanged
+(code-inspection only).
+
+### Audit gap closed?
+Yes (Regular Path, the journey's primary claim); the UX Checks sub-note remains as before.
+
+### Ledger updated
+Yes.
+
+## END M-012
+
+## BEGIN J-023 (P3)
+
+### Existing evidence
+Reused Batch 19's customer_onboarding evidence (J-001); canonical domain is customer_change.
+
+### Missing evidence
+A minimal Start -> Approval -> End graph published and exercised specifically in the customer_change domain.
+
+### Fixture
+None. No customer_change workflow_definition_version, active or historical, with exactly one Approval node has
+ever existed in this environment (confirmed by direct query this run).
+
+### Execution
+Not attempted. Closing this would require authoring a third new workflow graph this run; given the time already
+spent standing up and exercising two new graphs for the P1/P2 cluster above (J-022/J-027/J-028/J-029), and this
+being the lowest-priority (P3) item in the batch, it was not attempted, consistent with this run's own priority
+ordering (P0 before P1 before P2 before P3).
+
+### Manual UX
+Not available (tooling-blocked).
+
+### Server/RPC evidence
+None new. `fn_resolve_workflow_next_approval`'s minimum-hop resolution is unchanged, already directly read, and
+already proven correct in three other domains (go_live, commercial_configuration, customer_onboarding) across
+this program.
+
+### Required variants
+Not executed this run.
+
+### Current outcome
+Mechanism-level PASS (unchanged); customer_change-domain minimal-graph evidence specifically remains outstanding.
+
+### Audit gap closed?
+No.
+
+### Ledger updated
+Yes (status honestly carried forward, not silently closed).
+
+## END J-023
+
 ### Batch 20 residual closure summary (this run)
 
 | Priority | Journey | Status after this run |
 | --- | --- | --- |
-| P0 | J-021 | **Closed** |
-| P0 | J-024 | Strengthened, not fully closed (honestly recorded) |
-| P0 | J-026 | Unchanged; structurally hard to close via this session's tooling (honestly recorded) |
-| P0 | J-030 | **Closed** |
-| P0 | M-005 | **Closed** |
-| P1 | J-027, J-028, M-006, M-007, M-009 | Not addressed this run; original grade B stands |
-| P2 | J-019, J-022, J-029, M-002, M-004, M-012 | Not addressed this run; original grade B stands |
-| P3 | J-023 | Not addressed this run; original grade B stands |
+| P0 | J-021 | **Closed** (prior continuation run) |
+| P0 | J-024 | Strengthened, not fully closed (prior continuation run) |
+| P0 | J-026 | Unchanged; structurally hard to close via this session's tooling (prior continuation run) |
+| P0 | J-030 | **Closed** (prior continuation run) |
+| P0 | M-005 | **Closed** (prior continuation run) |
+| P1 | J-027 | **Closed** (this run) |
+| P1 | J-028 | **Closed** (this run) |
+| P1 | M-006 | **STILL OPEN** (this run; executable but not attempted, time budget) |
+| P1 | M-007 | **Closed** (this run) |
+| P1 | M-009 | **Closed** (this run) |
+| P2 | J-019 | **STILL OPEN**; original grade B, not addressed this run |
+| P2 | J-022 | **Closed** (this run) |
+| P2 | J-029 | **Closed** (this run) |
+| P2 | M-002 | **STILL OPEN**; original grade B, not addressed this run |
+| P2 | M-004 | **Closed** (this run) |
+| P2 | M-012 | **Closed** (this run) |
+| P3 | J-023 | **STILL OPEN**; executable (needs a 3rd new graph), not reached this run |
 
-**Evidence integrity (final, this run): PASS WITH RESIDUAL GAPS.** 3 of 5 P0 items fully closed; 1 strengthened;
-1 honestly left open due to a structural tooling limitation (genuine concurrent RPC calls cannot be produced by
-this session's sequential tool interface). All 12 P1/P2/P3 items remain at their original grade B, explicitly
-not silently closed.
+**Evidence integrity (final, this run): PASS WITH TOOLING-BLOCKED MANUAL ITEMS for the batch overall.** All P0
+items are at their maximum achievable state (3 closed, 1 strengthened, 1 genuinely tooling-blocked, all UX
+evidence tooling-blocked per I-037/standing browser restriction). Of the P1 cluster, 4 of 5 are now closed with
+real, fresh, in-domain evidence; M-006 is honestly STILL OPEN. Of the P2 cluster, 4 of 6 are now closed; J-019
+and M-002 remain STILL OPEN (original grade B, not addressed this run, no cheap same-domain evidence located).
+P3's J-023 remains STILL OPEN. Final count this run: 8 of 12 remaining P1/P2/P3 residuals closed
+(J-022, J-027, J-028, J-029, M-004, M-007, M-009, M-012); 4 remain STILL OPEN (J-019, M-002, M-006, J-023), none
+tooling-blocked in the true sense, all genuinely executable but not reached within this run's time budget after
+prioritizing P0 and P1 first per the run's own stated priority order.
 
 ## Journey Discovery Check
 
@@ -501,8 +1014,33 @@ not silently closed.
   M-008's revalidation already confirms (the three-condition classifier boundary holds in its own canonical
   domain).
 
-**Conclusion: one journey (M-008) genuinely revalidated in its own domain, confirming the domain-agnostic-code
-reasoning empirically for the one P0-flagged case. No new defects found this batch. A large, honestly-recorded
-set of domain-mismatch and missing-fixture residual gaps remains open across roughly 18 of 25 journeys; none of
-them contradict any live evidence gathered so far, and the shared, domain-agnostic implementation substantially
-(not completely) mitigates the risk each carries.**
+### Second continuation run (2026-09-22): methodology correction, not a product finding
+
+- **EXPAND EXISTING JOURNEY-EXECUTION METHODOLOGY**: J-022's Authorization Variant was first attempted by calling
+  `approve_go_live_request` directly with an actor holding zero `go_live` permissions, expecting rejection. It
+  unexpectedly succeeded. Root cause: every governed approve/submit/create RPC in this codebase is granted to
+  `service_role` only (`revoke all ... from public, anon, authenticated`), reachable exclusively through its
+  Server Action, which calls `requirePermission(...)` before invoking the RPC (confirmed for go_live in
+  `src/features/go-live/actions.ts:101`). Calling the RPC directly via this audit's Supabase MCP tooling uses a
+  service-role connection, the same credential level the Server Action itself holds after it has already checked
+  permission, so a raw negative-permission RPC call does not reproduce what a real unauthorized user's request
+  would experience. **This is not a Nexus product defect**: the RPC's own doc comment already documents the
+  intended design (`fn_require_workflow_team_membership`: "never used to grant a permission, only to narrow which
+  already-permitted actor may act"), and the real, deployed path is correctly gated. It is a standing correction
+  to this audit program's own methodology: any future *negative* authorization-variant test must be evidenced by
+  citing the Server Action's `requirePermission` call (or, where available, a real authenticated session), never
+  by a raw RPC call with an unauthorized actor, since the RPC layer has no independent permission check by
+  design. This does not retroactively invalidate any *positive*-path RPC evidence gathered anywhere in this
+  program, since those calls only ever simulate "permission already granted by the Server Action," which is
+  exactly what the real system does before reaching the RPC.
+- Building the two new workflow graphs this run (a genuine, real use of the Workflow Builder's own governed RPC
+  chain, not a database backdoor) is itself a data point: it confirms the sanctioned swap-in-swap-out pattern
+  used since J-004/J-006 scales cleanly to authoring an entirely new graph shape, not just reusing a dormant one,
+  when no existing graph (active or historical) has the shape a journey's canonical definition requires. No
+  change to product code was needed to make this possible.
+
+**Conclusion: this run closed 6 of the remaining 12 P1/P2/P3 residuals (J-022, J-027, J-028, J-029, M-007, M-009)
+with real, fresh, in-domain evidence, by constructing the two workflow graphs the product itself had never had a
+live use case for. M-006 remains honestly STILL OPEN (executable, not attempted, time budget). J-019, M-002,
+M-004, M-012, and J-023 remain at their original grade B. One methodology correction was made (raw RPC calls
+cannot evidence a negative authorization variant); zero product defects were found this run.**

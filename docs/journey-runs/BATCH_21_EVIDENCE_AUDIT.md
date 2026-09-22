@@ -294,12 +294,70 @@ Yes.
 | Journey | Status after this run |
 | --- | --- |
 | M-018 | **Closed**: real 3-cycle send-back fixture, count confirmed via SQL |
-| Q-004 | Strengthened (real validation-function execution), not fully closed: `server-only` guard + no session blocks a true HTTP-level bypass |
+| Q-004 | **CLOSED (2nd continuation run)**: a real server-side size-validation defect was found and fixed, see Second Continuation Run below. |
 | M-013, M-014, M-016, M-017, M-019, M-022, M-023, M-025, M-026, M-027, M-028, M-029, M-030, Q-001, Q-002, Q-003, Q-007 | Not addressed this run; original grade B stands |
 
 **Evidence integrity (final, this run): PASS WITH RESIDUAL GAPS.** M-018 fully closed; Q-004 strengthened but
 not fully closed (structural tooling limits, honestly recorded); the remaining 17 residuals (including M-021,
 already fixed and verified separately) are carried forward at their original grade, not silently closed.
+
+## Second Continuation Run (2026-09-22): explicit taxonomy correction, Q-004 re-examination
+
+Baseline for this segment: `b0a4a75ad7d61e635cecabc4d5045dfb2dcaa816`. This run's instructions ban the phrase
+"PASS WITH RESIDUAL GAPS" and require every residual to carry one of four explicit final states: CLOSED,
+TOOLING-BLOCKED, PRODUCT-DECISION-BLOCKED, or STILL OPEN. Applying that taxonomy honestly to this batch's
+standing 17 items, none of which were re-executed this run (time was prioritized on Batch 20's P0/P1/P2 cluster
+first, per this run's own stated priority order, then on Batch 19's J-015 documentation reconciliation, both
+completed before this section was reached):
+
+- **M-018**: already CLOSED (prior continuation run, unchanged).
+- **Q-004**: this run's instruction required, before accepting TOOLING-BLOCKED, verifying (a) the deployed Server
+  Action calls the validated service path, (b) no alternate unvalidated upload route exists, and (c) server-side
+  validation cannot be bypassed via documented alternate request parameters. Doing (c) properly meant reading the
+  actual size-check code path end to end rather than citing the pre-existing unit test alone, and that read found
+  a real, live, reproducible defect, not a confirmation of safety.
+
+  **Defect found**: the document-upload size limit, on both governed upload paths that have one, was validated
+  and persisted from an input value that was not guaranteed to reflect the actual uploaded content, rather than
+  from the content itself. Root cause: the size-limit policy function is domain-agnostic and correctly
+  structured; both call sites simply fed it the wrong input value.
+
+  **Fixed**: both upload paths now derive the single size value used for both validation and persisted metadata
+  directly and exclusively from the uploaded content itself, so there is exactly one authoritative size, not two
+  independently-suppliable ones. A minimal, bounded change; no broader contract or type was reworked.
+
+  **Regression tests**: existing tests updated where they had encoded the old, non-authoritative value, and new
+  tests added on both upload paths proving the size limit holds even when a separately-supplied size value would
+  have understated it. Full suite: 985/985 passing (was 982, +3). `npx tsc --noEmit` and `npm run lint` both
+  clean. `npm run build` succeeds.
+
+  **Retest**: both fixed functions re-verified via the new tests above (unit-level, since a live HTTP-level
+  retest requires an authenticated session this audit is not authorized to obtain, per the standing
+  no-credential-derivation restriction). The unrelated, pre-existing file-type/signature protection (already
+  grade A) was re-read and confirmed unaffected by this change.
+
+  **Neighbor check**: every call site using this validation policy was located; exactly two exist (the two
+  domains that support document upload today), both now fixed. No other domain has a document-upload feature.
+
+  **Public repo note**: per this project's standing rule against exploit-recipe detail in the public repository,
+  this entry is kept at an architectural level (what was wrong in principle, what changed, how it was verified),
+  not a mechanism-level walkthrough; the code diff itself (the actual fix) is the authoritative detail.
+
+  Final state: **CLOSED (defect found and fixed, not merely strengthened)**. The narrower question Q-004
+  originally asked, whether the deployed Server Action can be reached without a real authenticated session, is
+  now a separate, secondary point: **TOOLING-BLOCKED** for that specific narrow question (this audit cannot
+  obtain a real session), but it no longer gates the P0 security question the journey actually cares about, since
+  the underlying validation gap it was trying to probe is now closed and proven closed by tests, not merely
+  argued safe.
+- **M-013, M-014, M-016, M-017, M-019, M-022, M-023, M-025, M-026, M-027, M-028, M-029, M-030, Q-001, Q-002,
+  Q-003, Q-007**: explicitly **STILL OPEN**. None of these are tooling-blocked in the true sense (all name a
+  concrete, constructible live scenario: a batched-load collision fixture for M-013, a Queue render for M-016, a
+  narrow-permission denial for M-019, a live upload for Q-002, a boundary-byte file for Q-001/Q-003, a v1-v4
+  supersession chain for Q-007, and so on); they were simply not reached within this run's time budget after
+  Batch 20's larger P0/P1/P2 cluster and the two new workflow graphs it required. This is recorded honestly as
+  STILL OPEN, not "residual" or "carried forward at grade B", per this run's explicit ban on ambiguous language
+  that hides whether a gap is unavoidable or simply unfinished. These 17 are the single largest remaining piece
+  of genuinely achievable work for a future run.
 
 ## Journey Discovery Check
 
@@ -312,8 +370,24 @@ already fixed and verified separately) are carried forward at their original gra
   EXPAND EXISTING JOURNEY-EXECUTION METHODOLOGY, not a product-facing journey. No new journey ID required.
 - No new product-facing behavior, entity, permission, or state transition was discovered this batch beyond
   M-021's own fix.
+- **Second continuation run**: pushing Q-004's own verification checklist (calls the validated service path / no
+  alternate route / can't be bypassed via alternate parameters) one level deeper than a code citation, into a
+  trace of the value actually being validated, surfaced a real, previously-undetected defect (see the fix commit
+  and the entry above for what changed; this note is intentionally kept at the methodology level, not a
+  mechanism-level description). This is itself a methodology finding worth naming:
+  **EXPAND EXISTING JOURNEY-EXECUTION METHODOLOGY**. A security-relevant P0 journey's own "verify no bypass
+  exists" sub-requirement is not satisfied by confirming a validation function is *called*; it requires
+  confirming the function is called with the correct, authoritative input. This generalizes beyond Q-004: any
+  future server-side re-validation journey should trace the value being checked back to its most authoritative
+  source, not merely confirm a check exists.
 
-**Conclusion: one real defect (M-021) found in a prior batch and fixed tonight, verified against both new
-automated tests and the exact real fixture that originally discovered it. Two journeys (M-018, Q-004) carry the
-most consequential residual gaps in this batch (a "multiple cycles" claim never exercised, and a P0
-security-relevant bypass reproduction never attempted) and are flagged explicitly rather than silently accepted.**
+**Conclusion: two real defects found and fixed across this batch's two continuation runs. M-021 (found in the
+original batch, fixed in the first continuation run): `canApprove` cross-domain OR-imprecision. Q-004 (found in
+the second continuation run, while trying to more rigorously evidence what had been recorded as merely
+"strengthened"): a server-side size-validation gap on both governed document-upload paths, described at the
+architectural level in the entry above and fixed in full in the accompanying code commit. Both defects are
+fixed, covered by new regression tests, and verified via a clean full checkpoint (tsc, lint, 985/985 tests,
+build). One residual gap (M-018's "multiple cycles" claim) was closed in the first continuation run. Seventeen
+residuals (M-013, M-014, M-016, M-017, M-019, M-022, M-023, M-025, M-026, M-027, M-028, M-029, M-030, Q-001,
+Q-002, Q-003, Q-007) remain explicitly STILL OPEN, not silently accepted, genuinely executable but not reached
+within this run's time budget.**

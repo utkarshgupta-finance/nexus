@@ -7568,30 +7568,32 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
   in its broken state); the fix was verified against a separate fresh request, per this program's
   never-rewrite-history rule.
 
-### J-015: WORKFLOW_GRAPH_DEAD_END When Current Node Has No Outgoing Path
+### J-015: WORKFLOW_GRAPH_DEAD_END When Current Node Has No Outgoing Path (PREMISE CORRECTED, pre-Batch-22, 2026-09-22)
 - Pack: J - Workflow Runtime
 - Business Objective: Confirm the distinct dead-end failure mode that fires when current_workflow_node_key is non-null but the graph has a validation gap (e.g. an Approval node with no outgoing edge to anything, not even End).
 - Domain: go_live
-- Object / Record Type: workflow_definition_versions graph with an Approval node missing any outgoing edge (a gap that current publish-time validation does not catch since it is not decision-specific)
+- Object / Record Type: workflow_definition_versions graph with an Approval node missing any outgoing edge (a gap that current publish-time validation does not catch since it is not decision-specific) **[CORRECTED, pre-Batch-22, 2026-09-22]: this premise is stale. Live-confirmed this run: `publish_workflow_definition_version` now rejects exactly this shape at publish time (`WORKFLOW_INVALID_GRAPH: Node "..." is a dead end: it has no outgoing transition and is not an End node`), reproduced by directly attempting to publish the batch's own dormant `wf_test_j015_deadend` probe graph. The validation gap this journey's own Domain/Notes fields originally described no longer exists; the check is now decision-agnostic (it fires for a plain Approval node with a missing edge, not only around a Decision node).**
 - Starting State: Request currently sitting at that Approval node, about to be approved.
 - Personas: Approver
-- Preconditions: Graph published in this structurally incomplete state.
-- Regular Path: Approver approves; the engine attempts to resolve the next node from this current node and finds none; WORKFLOW_GRAPH_DEAD_END is raised; the approval is not recorded and current_workflow_node_key is not advanced.
+- Preconditions: Graph published in this structurally incomplete state. **[CORRECTED, pre-Batch-22, 2026-09-22]: this precondition can no longer be satisfied through the real governed publish path — a graph in this shape cannot be published at all today, confirmed live.**
+- Regular Path: Approver approves; the engine attempts to resolve the next node from this current node and finds none; WORKFLOW_GRAPH_DEAD_END is raised; the approval is not recorded and current_workflow_node_key is not advanced. **[CORRECTED, pre-Batch-22, 2026-09-22]: this approve-time path is now unreachable in practice, since the precondition (a published dead-end graph) cannot be constructed. The underlying `fn_resolve_workflow_next_approval` resolver behavior (returns zero rows for a node with no outgoing edge) remains correct and was independently, freshly confirmed live this run via a direct function call, and via a real, full-RPC-chain equivalent of the identical failure mode in the commercial_configuration domain (see J-006, Batch 19), so the failure-handling code itself is not in doubt; only the ability to reach it via a real published graph is now closed off, one layer earlier than this journey originally assumed.**
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
 - Audit/Data Integrity Checks: No transition row for the failed advancement; the request remains parked exactly where it was, re-attemptable once the graph is fixed.
-- Recovery/Resilience Variant: A Builder admin must add the missing outgoing edge in a new draft and publish; but per L's binding rules, this ALREADY-IN-FLIGHT request never re-resolves to the new version, so this specific stuck request can never actually recover through a graph fix alone.
+- Recovery/Resilience Variant: A Builder admin must add the missing outgoing edge in a new draft and publish; but per L's binding rules, this ALREADY-IN-FLIGHT request never re-resolves to the new version, so this specific stuck request can never actually recover through a graph fix alone. **[CORRECTED, pre-Batch-22, 2026-09-22]: this variant's own premise (a request could reach this state in the first place) no longer holds either, for the same reason.**
 - UX Checks: Approver sees an unexpected failure on an action that looked otherwise valid (they held permission and were on the right team).
 - Historical Variant: N/A
-- Expected Business Result: Confirms a genuine "orphaned forever" class of request distinct from J-011's team-emptiness gap: this one is unrecoverable even with a graph fix once the request already exists, since workflow_version_id is bound at creation.
-- Expected Technical Invariants: WORKFLOW_GRAPH_DEAD_END raised deterministically; current_workflow_node_key unchanged after the failed attempt.
+- Expected Business Result: Confirms a genuine "orphaned forever" class of request distinct from J-011's team-emptiness gap: this one is unrecoverable even with a graph fix once the request already exists, since workflow_version_id is bound at creation. **[CORRECTED, pre-Batch-22, 2026-09-22]: this class of request can no longer be created at all, so the "orphaned forever" outcome is now prevented structurally rather than merely handled gracefully after the fact.**
+- Expected Technical Invariants: WORKFLOW_GRAPH_DEAD_END raised deterministically; current_workflow_node_key unchanged after the failed attempt. This remains the correct fallback invariant for any dead-end reachable through some other path not yet identified; not verified moot, only unreachable via the standard publish flow.
 - Priority: P0
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: J-011, J-014, L-011
 - Notes: This combination (validation gap in a published graph plus permanent version-binding) makes an existing in-flight request genuinely unrecoverable; worth flagging as a product gap needing either stronger publish-time validation or an admin override path to rebind an in-flight request to a corrected version.
+  **[CLOSED, pre-Batch-22, 2026-09-22]: the stronger publish-time validation this Notes field asked for already exists** (`supabase/migrations/20260927000000_publish_validation_end_edge_and_reachability.sql`,
+  `20260929000000_publish_validation_start_incoming_edge.sql`), confirmed live this run by a direct publish attempt against the exact probe graph this journey uses. This was not a fix made in response to this journey; it was independently discovered to already be in place. The admin-override/rebind half of the original ask (for an already-in-flight request bound to a since-corrected graph) remains a distinct, still-open question, but it can now only ever apply to requests that predate this validation, not to any newly-created one, since the dead-end shape can no longer be published going forward.
 
 ### J-016: fn_resolve_workflow_next_approval Correctly Resolves First Approval Regardless of Intervening Node Types
 - Pack: J - Workflow Runtime
