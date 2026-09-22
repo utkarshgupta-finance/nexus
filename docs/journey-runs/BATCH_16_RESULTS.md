@@ -426,9 +426,11 @@ journey below.
 - **Files changed**: `supabase/migrations/20260930200000_go_live_draft_save_submit_creator_only.sql` (new),
   `src/app/customers/[customerKey]/go-live/[requestId]/page.tsx`,
   `src/features/go-live/ui/go-live-detail-page.tsx`.
-- **Verification status**: server-side fix verified live (both new NOT_OWNER rejections observed against the
-  deployed migration; legitimate creator path re-verified unaffected). UI-side control-visibility
-  reverification deferred to this batch's final deploy-verify checkpoint.
+- **Verification status**: fully verified live, including the UI-side reverification deferred at write time.
+  Server-side: both new NOT_OWNER rejections observed against the deployed migration; legitimate creator path
+  re-verified unaffected. UI-side, against the deployed commit (`c904435`): a fresh draft (`GLR-000028`,
+  created by `wf-test.maker`) viewed as `wf-test.finance-checker` (a non-creator holding full `go_live.*`)
+  shows no Save Draft, Submit, or Cancel Draft control anywhere on the page, exactly the intended fix.
 
 ### DEFECT: go_live_requests had no defense-in-depth protect trigger (H-043)
 
