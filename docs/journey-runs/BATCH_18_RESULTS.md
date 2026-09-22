@@ -147,8 +147,18 @@ Grounding research completed before live execution:
   Name/Email/Country code/Phone/Designation): all correctly expose `aria-required="true"`. The one field with no
   visible asterisk (Website) correctly exposes `aria-required="false"`, confirming the check is not merely
   over-marking everything.
-- Classification: **FAILED THEN FIXED + PASS** for the Country field itself (the confirmed regression target);
-  **PASS** for every other field checked on this page (already correct, not previously flagged).
+- Classification: **PASS**. `aria-required="true"` was already present on the Country field at the moment this
+  journey executed; no failure occurred during Batch 18 itself, so `FAILED THEN FIXED + PASS` does not apply here
+  (that label belongs to a journey whose own scheduled assertion failed and was then fixed/retested within this
+  batch). The Country field's `aria-required="false"` gap was ACC-001's own historical finding (Batch 8); ACC-001's
+  own entry explicitly left it unfixed at the time ("noted here for a future accessibility-focused pass rather than
+  fixed now"), so its correction is not attributable to any journey-program batch and must have happened in an
+  unrelated commit sometime before Batch 18 ran. Batch 18's role for ACC-002 was to formally schedule and confirm
+  this already-fixed state for the first time, not to find or fix a new failure.
+  **Pre-Batch-19 Reconciliation (2026-09-22): CORRECTED.** This entry originally misclassified ACC-002 as
+  `FAILED THEN FIXED + PASS`, incorrectly transferring ACC-001's own historical, explicitly-deferred finding onto
+  ACC-002 as if it had failed and been fixed within Batch 18. Corrected to `PASS`. ACC-001's own finding remains
+  recorded, unedited, in `docs/journey-runs/BATCH_08_RESULTS.md`, unaffected by this correction.
 
 ## Summary reconciliation
 
@@ -156,19 +166,24 @@ Grounding research completed before live execution:
 
 | Classification | Count |
 | --- | --- |
-| PASS | 6 (E-029, E-030, E-031, E-032, AA-023, AB-042) |
-| FAILED THEN FIXED + PASS | 2 (H-044, ACC-002) |
+| PASS | 7 (E-029, E-030, E-031, E-032, AA-023, AB-042, ACC-002) |
+| FAILED THEN FIXED + PASS | 1 (H-044) |
 | EXPECTED BEHAVIOUR | 0 |
 | PRODUCT GAP | 0 |
 | PRODUCT DECISION | 0 |
 | DEFERRED | 0 |
 | **Total** | **8** |
 
+**Pre-Batch-19 Reconciliation (2026-09-22): CORRECTED.** This table originally read 6 PASS + 2 FAILED THEN
+FIXED + PASS (H-044, ACC-002). ACC-002 never failed during Batch 18's own execution (`aria-required="true"` was
+already present when this batch checked it); the original entry incorrectly transferred ACC-001's own historical,
+already-deferred finding onto ACC-002. Corrected to 7 PASS + 1 FAILED THEN FIXED + PASS = 8. No other journey's
+classification changed.
+
 One genuine new defect was found and fixed this batch: H-044 (Go Live request creation had no database-level
-protection against a concurrent-creation race for the same commercial line item). ACC-002 confirms a defect
-(the Country combobox's `aria-required` gap) that was already fixed in an earlier, unrelated session and is now
-being formally closed as a scheduled journey for the first time; no new code change was required for it in this
-batch, only live confirmation.
+protection against a concurrent-creation race for the same commercial line item). ACC-002 formally confirms, for
+the first time as a scheduled journey, a fix that was already made in an earlier, unrelated session; no new code
+change was required for it in this batch, and no failure of its own occurred within it.
 
 ## Journey Discovery Check (mandatory from Batch 17 onward, per Stage A11)
 
@@ -179,8 +194,8 @@ REQUIRED / REGRESSION TEST ONLY / FUTURE MODULE / PRODUCT DECISION REQUIRED.
 - H-044's defect and fix are exactly what the journey's own premise anticipated ("if both succeed today, this
   journey's finding becomes the basis for adding a database-level uniqueness constraint"); fixing and
   regression-testing it does not surface any distinct untested behavior. ALREADY COVERED.
-- ACC-002 confirms an already-fixed defect; no new accessibility surface was discovered beyond the one field this
-  journey's own scope names. ALREADY COVERED.
+- ACC-002 confirms an already-fixed condition, not a Batch 18 defect; no new accessibility surface was discovered
+  beyond the one field this journey's own scope names. ALREADY COVERED.
 - AA-023's finding, that the terminal-wording mechanism is structurally absent (not just correctly gated) in three
   of four domains, does not describe a new user-facing path; it is a stronger form of the same PASS the journey
   already tests for. ALREADY COVERED.
@@ -189,3 +204,22 @@ REQUIRED / REGRESSION TEST ONLY / FUTURE MODULE / PRODUCT DECISION REQUIRED.
   Cross-Domain, Security, and Accessibility packs.
 
 **Conclusion: No new journey candidates found.**
+
+## Pre-Batch-19 Reconciliation (2026-09-22)
+
+Two issues were raised before Batch 19: whether I-015's implementation actually complied with the strict "no CN =
+entitlement remains" decision, and whether ACC-002's Batch 18 classification correctly attributed a failure to
+this batch. Both were investigated and corrected; see the I-015 closure note above (Batch 17 entry) and the
+ACC-002 entry and Summary reconciliation table above (this file) for the full detail.
+
+### Reconciliation Journey Discovery Check
+
+- I-015's correction (cancellation now touches no schedule data at all, not even not-yet-recognized months) is a
+  stricter enforcement of the exact same permanent journey invariant I-015 already states; it does not describe a
+  new user-facing path. EXPAND EXISTING JOURNEY (I-015 itself already rewritten in `NEXUS_JOURNEY_UNIVERSE.md`).
+- ACC-002's classification correction is a documentation/bookkeeping fix, not a new finding about the product.
+  ALREADY COVERED.
+- No new entity, permission, state transition, or cross-module interaction was discovered during this
+  reconciliation.
+
+**Conclusion: No new journey candidates found. Zero product decisions remain open.**

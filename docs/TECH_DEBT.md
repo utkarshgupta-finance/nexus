@@ -348,9 +348,9 @@ into a second backlog.
   structural link to Entitlement. Build a real CN-driven entitlement
   reduction/reversal mechanism once Nexus has an actual Credit Note
   document concept for Entitlement to reference; until then, the only
-  bounded correction made was ensuring `cancel_entitlement_source` can
-  never itself erase already-recognized entitlement (see
-  `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2).
+  bounded correction made was ensuring `cancel_entitlement_source` has
+  zero effect on any Invoice entitlement, past or future, recognized or
+  not (see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2).
 - **Invoice Frequency cadence has no freeze mechanism, unlike Currency's
   `fx_snapshot_rate`.** `commercial_components.billing_cadence` stores
   only an opaque code string; the one function that would resolve a live

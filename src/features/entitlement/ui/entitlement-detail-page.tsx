@@ -622,7 +622,7 @@ function EntitlementDetailPage({
   }
 
   function handleCancelSource(id: string) {
-    const reason = window.prompt("Reason for cancelling this Entitlement Source? This stops future monthly allocation only, it does not reverse or reduce entitlement already reflected in the Monthly Entitlement Ledger.")
+    const reason = window.prompt("Reason for cancelling this Entitlement Source? This is an administrative record only, it has no effect on any past or future entitlement quantity. Entitlement from this source can only be reduced through a Credit Note.")
     if (!reason || !reason.trim()) return
     cancelEntitlementSourceAction(id, reason.trim()).then((result) => {
       if (!result.ok) {

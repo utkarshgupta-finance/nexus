@@ -334,21 +334,28 @@ per the interface-independence principle in
 `docs/API_INTEGRATION_ARCHITECTURE.md` §1: no business logic is
 duplicated, only a new caller and a new parameter are added.
 
-**LOCKED RULE (Product Decision Closure, 2026-09-22): invoice-created
-entitlement persists unless reduced or reversed by the source financial
-document's own lifecycle (a Credit Note); no independent entitlement-
-source cancellation may erase it.** Cancelling a source
-(`cancel_entitlement_source`) stops future, not-yet-recognized monthly
-allocation only: it deletes `entitlement_schedule_months` rows for
-months that have no `monthly_entitlement_ledger` row yet, but preserves
-schedule data for any month already recognized in the ledger, so a
-later recompute of an already-recognized month can never silently lose
-that source's historical contribution (fixed in migration
-`20261002000000_fix_cancel_entitlement_source_preserves_ledgered_months.sql`,
-after Batch 17's I-015 found the prior unconditional-delete behavior
-created exactly this risk). Nexus has no Credit Note document lifecycle
-wired to Entitlement today; the `invoice_evidence`/`credit_note` concept
-in `docs/COMMERCIAL_MIGRATION_10_BILLING_INVOICE_RECONCILIATION_DESIGN.md`
+**LOCKED RULE (Product Decision Closure, 2026-09-22; corrected
+Pre-Batch-19 Reconciliation, 2026-09-22): invoice-created entitlement
+persists in full, past and future, unless reduced or reversed by the
+source financial document's own lifecycle (a Credit Note); no
+independent entitlement-source cancellation may erase, shorten, or
+reduce it in any way.** Cancelling a source (`cancel_entitlement_source`)
+never touches `entitlement_schedule_months`, for any month, recognized
+or not: it is a pure administrative/status marker on the
+`entitlement_sources` row itself (`status`, `cancelled_reason`,
+`cancelled_by`, `cancelled_at`), with zero effect on any generated
+schedule, monthly entitlement, or ledger figure (migration
+`20261004000000_fix_cancel_entitlement_source_zero_entitlement_effect.sql`).
+An earlier fix pass (migration
+`20261002000000_fix_cancel_entitlement_source_preserves_ledgered_months.sql`)
+preserved only already-recognized months' schedule data while still
+deleting not-yet-recognized months' rows; on a strict reading of the
+business decision ("past AND future Invoice entitlement remains until a
+CN or equivalent financial-document reversal exists"), that still
+constituted an unauthorized reduction, and was corrected to touch no
+schedule data at all. Nexus has no Credit Note document lifecycle wired
+to Entitlement today; the `invoice_evidence`/`credit_note` concept in
+`docs/COMMERCIAL_MIGRATION_10_BILLING_INVOICE_RECONCILIATION_DESIGN.md`
 is a separate billing-reconciliation bounded context, structurally
 unconnected to `entitlement_sources`. A real CN-driven entitlement
 reduction/reversal mechanism is a future-module dependency (§8,
