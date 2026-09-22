@@ -168,3 +168,102 @@ describe("buildDraftWorkItems (Platform Scale Closure, Phase K)", () => {
     expect(result.map((r) => r.requestId)).toEqual(["v-b", "v-a"])
   })
 })
+
+describe("M-027: multi-domain aggregation, exact seeded counts, no cross-domain contamination", () => {
+  it("merges a precisely-seeded portfolio (2 onboarding pending, 1 change sent-back, 3 commercial-version pending, 1 go-live waiting-on-others) into exactly the right buckets with no loss or duplication", () => {
+    const VIEWER = "power-approver"
+    const seeded: ApprovalInboxItem[] = [
+      // 2 onboarding items pending my approval
+      item({ type: "onboarding", requestId: "onb-1", displayId: "CO-000001", status: "submitted", bucket: "needs_action", createdBy: "other-requester", responsibleTeamId: "team-onb" }),
+      item({ type: "onboarding", requestId: "onb-2", displayId: "CO-000002", status: "resubmitted", bucket: "needs_action", createdBy: "other-requester", responsibleTeamId: "team-onb" }),
+      // 1 change request sent back to the viewer (viewer is the creator)
+      item({ type: "change_request", requestId: "cr-1", displayId: "CCR-000001", status: "sent_back", bucket: "sent_back", createdBy: VIEWER }),
+      // 3 commercial-version items pending my approval
+      item({ type: "commercial_version", requestId: "cv-1", displayId: "CC-000001", status: "submitted", bucket: "needs_action", createdBy: "other-requester", responsibleTeamId: "team-cc" }),
+      item({ type: "commercial_version", requestId: "cv-2", displayId: "CC-000002", status: "submitted", bucket: "needs_action", createdBy: "other-requester", responsibleTeamId: "team-cc" }),
+      item({ type: "commercial_version", requestId: "cv-3", displayId: "CC-000003", status: "submitted", bucket: "needs_action", createdBy: "other-requester", responsibleTeamId: "team-cc" }),
+      // 1 go-live item the viewer created but cannot decide (waiting on others)
+      item({ type: "go_live", requestId: "gl-1", displayId: "GLR-000001", status: "submitted", bucket: "needs_action", createdBy: VIEWER, responsibleTeamId: "team-gl" }),
+    ]
+    const canApprove: CanApproveByType = { onboarding: true, change_request: true, commercial_version: true, go_live: false }
+    const viewerTeams = new Set(["team-onb", "team-cc"])
+
+    const result = buildMyWorkItems(seeded, VIEWER, canApprove, viewerTeams, NOW)
+
+    const pending = result.filter((r) => r.reason === "pending_my_approval")
+    const sentBack = result.filter((r) => r.reason === "sent_back_to_me")
+    const waiting = result.filter((r) => r.reason === "waiting_on_others")
+
+    expect(pending).toHaveLength(5)
+    expect(sentBack).toHaveLength(1)
+    expect(waiting).toHaveLength(1)
+    expect(result).toHaveLength(7) // no loss, no duplication: exactly the 7 seeded items, each classified once
+
+    expect(pending.map((r) => r.type).sort()).toEqual(["commercial_version", "commercial_version", "commercial_version", "onboarding", "onboarding"])
+    expect(sentBack[0].requestId).toBe("cr-1")
+    expect(waiting[0].requestId).toBe("gl-1")
+  })
+})
+
+describe("M-028: empty-state data (rendering itself is a UI concern, tooling-blocked without a browser)", () => {
+  it("returns a clean empty array, not an error or undefined, for a viewer with genuinely zero eligible items in every bucket", () => {
+    const items = [
+      item({ type: "onboarding", requestId: "o-1", bucket: "needs_action", status: "submitted", createdBy: "someone-else", responsibleTeamId: "team-x" }),
+      item({ type: "go_live", requestId: "g-1", bucket: "completed", status: "approved", createdBy: "someone-else" }),
+    ]
+    const result = buildMyWorkItems(items, "brand-new-viewer", approveNone(), NO_TEAMS, NOW)
+    expect(result).toEqual([])
+    expect(Array.isArray(result)).toBe(true)
+  })
+})
+
+describe("M-029: correctness holds at volume (PARTIAL automation feasibility per the journey's own definition)", () => {
+  it("classifies 500 mixed-domain items with no drops, no duplicates, and the exact expected split", () => {
+    const VOLUME = 500
+    const viewerTeams = new Set(["team-broad"])
+    const seeded: ApprovalInboxItem[] = Array.from({ length: VOLUME }, (_, i) => {
+      const isEligible = i % 2 === 0
+      return item({
+        type: "onboarding",
+        requestId: `vol-${i}`,
+        displayId: `CO-${String(i).padStart(6, "0")}`,
+        status: "submitted",
+        bucket: "needs_action",
+        createdBy: "someone-else",
+        responsibleTeamId: isEligible ? "team-broad" : "team-other",
+        updatedAt: new Date(NOW.getTime() - i * 1000).toISOString(),
+      })
+    })
+    const result = buildMyWorkItems(seeded, "high-volume-approver", approveAll(), viewerTeams, NOW)
+    expect(result).toHaveLength(VOLUME / 2)
+    expect(new Set(result.map((r) => r.requestId)).size).toBe(VOLUME / 2) // no duplicates
+    const ageDaysDescending = result.every((r, i) => i === 0 || result[i - 1].ageDays >= r.ageDays)
+    expect(ageDaysDescending).toBe(true)
+  })
+})
+
+describe("M-030: waiting-on-others survives a real before/after team-membership change (not just static code structure)", () => {
+  it("stays waiting-on-others for the creator even after they gain the item's own responsible team (M-011 interaction, exercised not just cited)", () => {
+    const CREATOR = "requestor-who-later-joins-the-team"
+    const selfCreatedItem = item({
+      type: "onboarding",
+      requestId: "self-1",
+      bucket: "needs_action",
+      status: "submitted",
+      createdBy: CREATOR,
+      responsibleTeamId: "team-that-creator-later-joins",
+    })
+    const canApprove: CanApproveByType = { onboarding: true, change_request: true, commercial_version: true, go_live: true }
+
+    // Before: creator has no team membership at all.
+    const before = buildMyWorkItems([selfCreatedItem], CREATOR, canApprove, new Set(), NOW)
+    expect(before).toHaveLength(1)
+    expect(before[0].reason).toBe("waiting_on_others")
+
+    // After: creator is added to the item's own responsible team (a real
+    // mid-lifecycle team-membership change, not a hypothetical).
+    const after = buildMyWorkItems([selfCreatedItem], CREATOR, canApprove, new Set(["team-that-creator-later-joins"]), NOW)
+    expect(after).toHaveLength(1)
+    expect(after[0].reason).toBe("waiting_on_others") // still not pending_my_approval: self-approval stays blocked (M-011)
+  })
+})

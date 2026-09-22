@@ -40,16 +40,21 @@ function labelForCaseStatus(status: string): string {
  * who needs to act next, without ever fabricating an individual owner.
  * Nexus's approval model is role-based, not per-person (no routing to a
  * named reviewer exists), so this names a role/state
- * ("Pending Finance Approval"), never a person ("Pending with John").
+ * ("Pending Approval"), never a person ("Pending with John") and never a
+ * specific team it cannot actually verify.
  * `canDecide` is whichever permission check the caller already made
  * (`commercial_configuration.approve`, `customer.approve`, etc.), so the
  * same submitted/resubmitted state reads as "Needs Your Attention" for a
- * reviewer and "Pending Finance Approval" for anyone else, including the
- * requester checking on their own request.
+ * reviewer and "Pending Approval" for anyone else, including the
+ * requester checking on their own request. This label never names a
+ * specific team (Finance, Legal, Ops, ...): the item's real current node
+ * may be owned by any team or none, and this function has no access to
+ * that resolution, so it must stay domain-neutral rather than naming one
+ * team as if every request always routes there.
  */
 function currentResponsibilityLabel(status: string, canDecide: boolean): string {
   if (status === "draft" || status === "sent_back") return "Waiting on Requester"
-  if (status === "submitted" || status === "resubmitted") return canDecide ? "Needs Your Attention" : "Pending Finance Approval"
+  if (status === "submitted" || status === "resubmitted") return canDecide ? "Needs Your Attention" : "Pending Approval"
   return labelForCaseStatus(status)
 }
 

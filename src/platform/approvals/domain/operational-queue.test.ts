@@ -32,7 +32,36 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
 
   it("names a role, never a fabricated person, for current responsibility", () => {
     const entries = buildOperationalQueue([item({ status: "submitted" })], new Map(), new Map(), new Map(), NOW)
-    expect(entries[0].currentResponsibility).toBe("Pending Finance Approval")
+    expect(entries[0].currentResponsibility).toBe("Pending Approval")
+  })
+
+  it("never names a specific team in currentResponsibility, across all four domains, even though the Team column is separately real (M-017)", () => {
+    // Regression for a real bug found live: currentResponsibility used to
+    // hardcode "Pending Finance Approval" regardless of the item's actual
+    // domain or team, so a real Legal- or Ops-owned item would show
+    // "Pending Finance Approval" right next to a correct "Team: Legal"
+    // badge. The label must stay domain-neutral instead.
+    const types: ApprovalInboxItem["type"][] = ["onboarding", "change_request", "commercial_version", "go_live"]
+    const entries = buildOperationalQueue(
+      types.map((type, i) => item({ type, requestId: `req-${i}`, status: "submitted", responsibleTeamId: `team-${i}` })),
+      new Map(),
+      new Map(),
+      new Map([
+        ["team-0", "WF-TEST Legal"],
+        ["team-1", "WF-TEST Ops"],
+        ["team-2", "WF-TEST Leadership"],
+        ["team-3", "WF-TEST Finance"],
+      ]),
+      NOW
+    )
+    for (const entry of entries) {
+      expect(entry.currentResponsibility).toBe("Pending Approval")
+      expect(entry.currentResponsibility).not.toMatch(/Finance|Legal|Ops|Leadership|@|actor-/i)
+    }
+    // The real team name is carried separately and correctly, confirming
+    // the two fields are genuinely independent, not silently duplicating
+    // the (buggy) hardcoded string.
+    expect(entries.map((e) => e.responsibleTeamName)).toEqual(["WF-TEST Legal", "WF-TEST Ops", "WF-TEST Leadership", "WF-TEST Finance"])
   })
 
   it("falls back to zero sent-back count when the request has no entry in the lookup, rather than throwing", () => {

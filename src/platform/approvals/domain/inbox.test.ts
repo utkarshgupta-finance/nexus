@@ -63,10 +63,11 @@ describe("currentResponsibilityLabel (Platform Scale Closure, Phase J)", () => {
     expect(currentResponsibilityLabel("sent_back", true)).toBe("Waiting on Requester")
   })
 
-  it("tells a reviewer it needs their attention, and anyone else that it is pending role-based approval", () => {
+  it("tells a reviewer it needs their attention, and anyone else that it is pending approval, never naming a specific team", () => {
     expect(currentResponsibilityLabel("submitted", true)).toBe("Needs Your Attention")
     expect(currentResponsibilityLabel("resubmitted", true)).toBe("Needs Your Attention")
-    expect(currentResponsibilityLabel("submitted", false)).toBe("Pending Finance Approval")
+    expect(currentResponsibilityLabel("submitted", false)).toBe("Pending Approval")
+    expect(currentResponsibilityLabel("resubmitted", false)).toBe("Pending Approval")
   })
 
   it("falls back to the plain status label once a decision is final", () => {

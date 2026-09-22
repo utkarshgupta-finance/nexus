@@ -63,4 +63,22 @@ describe("sessionHasPermission: deny-by-default over every session state", () =>
     expect(sessionHasPermission(session, "reference_master", "read")).toBe(true)
     expect(sessionHasPermission(session, "reference_master", "write")).toBe(true)
   })
+
+  it("denies the Operational Queue's customer.read gate for a real narrow-permission holder (M-019): go_live approve access does not imply queue access", () => {
+    // Real permission set confirmed live against a real WF-TEST user
+    // holding the real "Go Live Admin" role: go_live.approve/create/read/
+    // submit plus workflow_definition.publish/read/write, and genuinely
+    // zero customer.* permissions of any kind.
+    const goLiveAdminOnly = activeSession([
+      { resource: "go_live", action: "approve" },
+      { resource: "go_live", action: "create" },
+      { resource: "go_live", action: "read" },
+      { resource: "go_live", action: "submit" },
+      { resource: "workflow_definition", action: "publish" },
+      { resource: "workflow_definition", action: "read" },
+      { resource: "workflow_definition", action: "write" },
+    ])
+    expect(sessionHasPermission(goLiveAdminOnly, "go_live", "approve")).toBe(true)
+    expect(sessionHasPermission(goLiveAdminOnly, "customer", "read")).toBe(false)
+  })
 })
