@@ -66,7 +66,7 @@ describe("uploadOnboardingDocument (Platform Scale Closure, Phase R/U)", () => {
     expect(uploadDocumentBytes).not.toHaveBeenCalled()
   })
 
-  it("passes the exact mimeType/name/size through to storage and metadata, not File-specific fields", async () => {
+  it("passes the exact mimeType/name through to storage and metadata, not File-specific fields", async () => {
     uploadDocumentBytes.mockResolvedValue(undefined)
     insertDocumentMetadata.mockResolvedValue({
       document_id: "doc-1",
@@ -75,7 +75,7 @@ describe("uploadOnboardingDocument (Platform Scale Closure, Phase R/U)", () => {
       document_type: "gst_certificate",
       original_file_name: "gst.pdf",
       mime_type: "application/pdf",
-      size_bytes: 12345,
+      size_bytes: validPdfBlob.size,
       storage_bucket: "customer-onboarding-documents",
       storage_path: "r1/tax/gst_certificate/doc-1.pdf",
       uploaded_by: "actor-1",
@@ -88,14 +88,35 @@ describe("uploadOnboardingDocument (Platform Scale Closure, Phase R/U)", () => {
       requestId: "r1",
       category: "tax",
       documentType: "gst_certificate",
-      file: { name: "gst.pdf", mimeType: "application/pdf", size: 12345, bytes: validPdfBlob },
+      file: { name: "gst.pdf", mimeType: "application/pdf", size: validPdfBlob.size, bytes: validPdfBlob },
       actorUserId: "actor-1",
     })
 
     expect(uploadDocumentBytes).toHaveBeenCalledWith(expect.any(String), validPdfBlob, "application/pdf")
     expect(insertDocumentMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({ originalFileName: "gst.pdf", mimeType: "application/pdf", sizeBytes: 12345 })
+      expect.objectContaining({ originalFileName: "gst.pdf", mimeType: "application/pdf", sizeBytes: validPdfBlob.size })
     )
+  })
+
+  it("validates and persists the Blob's own size, ignoring a caller-supplied `size` field that understates it (Q-004)", async () => {
+    // A direct Server Action call (bypassing the browser's own upload UI)
+    // could pass a `bytes` Blob and a `size` number that disagree. The
+    // actual stored bytes always come from `bytes`, so the size limit
+    // must be measured from `bytes`, never trusted from the separate field.
+    const oversizedBlob = new Blob([new Uint8Array(2 * 1024 * 1024)], { type: "application/pdf" }) // 2MB, over the 1MB limit
+    const { uploadOnboardingDocument, InvalidDocumentError } = await import("./documents.service")
+
+    await expect(
+      uploadOnboardingDocument({
+        requestId: "r1",
+        category: "tax",
+        documentType: "gst_certificate",
+        file: { name: "gst.pdf", mimeType: "application/pdf", size: 100, bytes: oversizedBlob },
+        actorUserId: "actor-1",
+      })
+    ).rejects.toBeInstanceOf(InvalidDocumentError)
+
+    expect(uploadDocumentBytes).not.toHaveBeenCalled()
   })
 
   it("supersedes prior documents before inserting new metadata, never the reverse order", async () => {

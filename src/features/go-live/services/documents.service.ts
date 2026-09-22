@@ -50,7 +50,12 @@ function buildGoLiveDocumentStoragePath(goLiveRequestId: string, documentType: s
 }
 
 async function uploadGoLiveDocument(input: UploadGoLiveDocumentInput): Promise<PersistedGoLiveDocumentMetadata> {
-  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: input.file.size }, "This document")
+  // Validate against the Blob's own size, never the caller-supplied `size`
+  // field: a direct Server Action call can pass a `bytes` Blob and a
+  // `size` number that disagree, and the actual stored bytes always come
+  // from `bytes`, so that is the only size a size limit can honestly gate.
+  const actualSizeBytes = input.file.bytes.size
+  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: actualSizeBytes }, "This document")
   if (!validation.valid) {
     throw new InvalidGoLiveDocumentError(validation.reason)
   }
@@ -66,7 +71,7 @@ async function uploadGoLiveDocument(input: UploadGoLiveDocumentInput): Promise<P
     documentType: input.documentType,
     originalFileName: input.file.name,
     mimeType: input.file.mimeType,
-    sizeBytes: input.file.size,
+    sizeBytes: actualSizeBytes,
     storagePath,
     uploadedBy: input.actorUserId,
   })

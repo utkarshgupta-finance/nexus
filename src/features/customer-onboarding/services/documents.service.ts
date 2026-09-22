@@ -60,7 +60,12 @@ type UploadOnboardingDocumentInput = {
  * check only the server can perform, since it needs the actual bytes.
  */
 async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): Promise<PersistedOnboardingDocumentMetadata> {
-  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: input.file.size }, "This document")
+  // Validate against the Blob's own size, never the caller-supplied `size`
+  // field: a direct Server Action call can pass a `bytes` Blob and a
+  // `size` number that disagree, and the actual stored bytes always come
+  // from `bytes`, so that is the only size a size limit can honestly gate.
+  const actualSizeBytes = input.file.bytes.size
+  const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: actualSizeBytes }, "This document")
   if (!validation.valid) {
     throw new InvalidDocumentError(validation.reason)
   }
@@ -82,7 +87,7 @@ async function uploadOnboardingDocument(input: UploadOnboardingDocumentInput): P
     documentType: input.documentType,
     originalFileName: input.file.name,
     mimeType: input.file.mimeType,
-    sizeBytes: input.file.size,
+    sizeBytes: actualSizeBytes,
     storagePath,
     uploadedBy: input.actorUserId,
   })
