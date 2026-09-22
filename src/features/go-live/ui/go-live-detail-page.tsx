@@ -47,6 +47,7 @@ function GoLiveDetailPage({
   timelineEvents,
   canSubmit,
   canApprove,
+  isCreator,
 }: {
   customerKey: string
   request: GoLiveRequest
@@ -55,6 +56,7 @@ function GoLiveDetailPage({
   timelineEvents: RequestTimelineEvent[]
   canSubmit: boolean
   canApprove: boolean
+  isCreator: boolean
 }) {
   const router = useRouter()
   const [goLiveDate, setGoLiveDate] = useState(request.goLiveDate)
@@ -71,6 +73,8 @@ function GoLiveDetailPage({
 
   const isEditable = request.status === "draft" || request.status === "sent_back"
   const isDecidable = request.status === "submitted" || request.status === "resubmitted"
+  /** Save/Submit/Cancel are creator-only mutations (cancel_go_live_request already enforces this server-side; save_go_live_request_draft and submit_go_live_request now do too). Gated here as well so a non-creator viewer, who may still hold the blanket go_live.create/go_live.submit permission, never sees enabled controls for a draft that is not theirs. */
+  const canManageDraft = isEditable && isCreator
 
   function run(action: () => Promise<{ ok: boolean; error?: string; stale?: boolean }>) {
     setError(null)
@@ -205,7 +209,7 @@ function GoLiveDetailPage({
               type="date"
               className="w-48"
               value={goLiveDate}
-              disabled={!isEditable}
+              disabled={!canManageDraft}
               onChange={(event) => setGoLiveDate(event.target.value)}
             />
           </div>
@@ -215,13 +219,13 @@ function GoLiveDetailPage({
               type="checkbox"
               className="size-3.5 accent-foreground"
               checked={prorateFirstMonth}
-              disabled={!isEditable}
+              disabled={!canManageDraft}
               onChange={(event) => setProrateFirstMonth(event.target.checked)}
             />
             Prorate first month?
           </label>
 
-          {isEditable ? (
+          {canManageDraft ? (
             <div className="flex gap-2">
               <PendingButton size="sm" variant="outline" pending={isPending} pendingLabel="Saving..." onClick={handleSaveDraft}>
                 Save Draft
@@ -344,7 +348,7 @@ function GoLiveDetailPage({
           </section>
         ) : null}
 
-        {isEditable ? (
+        {canManageDraft ? (
           <section className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm">
             <PendingButton size="sm" variant="outline" className="w-fit text-destructive" pending={isPending} pendingLabel="Cancelling..." onClick={handleCancel}>
               Cancel Draft

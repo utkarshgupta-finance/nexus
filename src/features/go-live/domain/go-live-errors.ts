@@ -19,6 +19,8 @@ type GoLiveErrorKind =
   | "go_live_request_not_approvable"
   | "go_live_request_not_cancellable"
   | "go_live_request_cancel_not_owner"
+  | "go_live_draft_save_not_owner"
+  | "go_live_request_submit_not_owner"
   | "go_live_send_back_reason_required"
   | "go_live_confirmation_required"
   | "go_live_self_approval_not_allowed"
@@ -49,6 +51,8 @@ const NAMED_TOKEN_KINDS: Record<string, GoLiveErrorKind> = {
   GO_LIVE_REQUEST_NOT_APPROVABLE: "go_live_request_not_approvable",
   GO_LIVE_REQUEST_NOT_CANCELLABLE: "go_live_request_not_cancellable",
   GO_LIVE_REQUEST_CANCEL_NOT_OWNER: "go_live_request_cancel_not_owner",
+  GO_LIVE_DRAFT_SAVE_NOT_OWNER: "go_live_draft_save_not_owner",
+  GO_LIVE_REQUEST_SUBMIT_NOT_OWNER: "go_live_request_submit_not_owner",
   GO_LIVE_SEND_BACK_REASON_REQUIRED: "go_live_send_back_reason_required",
   GO_LIVE_CONFIRMATION_REQUIRED: "go_live_confirmation_required",
   SELF_APPROVAL_NOT_ALLOWED: "go_live_self_approval_not_allowed",

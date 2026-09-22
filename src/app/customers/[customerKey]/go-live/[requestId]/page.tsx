@@ -54,6 +54,7 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
   )
   const timelineEvents = buildGoLiveTimeline(request, sendBacks, actorLabels, workflowTransitionEvents)
   const lineItem = lineItems.find((item) => item.stableComponentKey === request.stableComponentKey) ?? null
+  const isCreator = session.status === "active" && session.appUserId === request.createdBy
 
   return (
     <AuthGate session={session} requiredPermission={GO_LIVE_READ} loginRedirectTo={`/customers/${customerKey}/go-live/${requestId}`}>
@@ -65,6 +66,7 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
         timelineEvents={timelineEvents}
         canSubmit={canSubmit}
         canApprove={canApprove}
+        isCreator={isCreator}
       />
     </AuthGate>
   )
