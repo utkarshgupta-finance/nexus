@@ -7302,55 +7302,67 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: J-005, J-025
 - Notes: This is a real, currently-possible admin misconfiguration trap worth explicit regression coverage since publish-time validation does not require a fallback to exist.
 
-### J-007: Decision Node in Onboarding Domain Always Takes Default/Fallback (Empty Context)
+### J-007: Decision Node in Onboarding Domain Always Takes Default/Fallback (Empty Context) [PREMISE CORRECTED, Batch 19, 2026-09-22]
 - Pack: J - Workflow Runtime
 - Business Objective: Confirm that placing a Decision node in a domain that never populates a decision context (onboarding) means it behaves as an unconditional pass-through to whichever edge is unconditioned.
 - Domain: customer_onboarding
 - Object / Record Type: Decision node with a segment-based conditioned edge plus one fallback edge, in an onboarding graph
-- Starting State: Onboarding case submitted; decision context passed by the onboarding domain is always empty (no segment key populated).
+- Starting State: [CORRECTED, Batch 19, 2026-09-22] Onboarding case submitted; decision context passed by the onboarding domain is `jsonb_build_object('segment', v_revision.raw_data ->> 'segment')` (`submit_customer_onboarding_case`), real and non-empty whenever the submitted form data includes a `segment` value. This was added by a later migration after this journey was originally drafted; the original premise ("always empty") is preserved below for history but no longer reflects current behavior.
 - Personas: Requestor
 - Preconditions: Onboarding graph published with a Decision node present (an unusual but not-forbidden authoring choice).
-- Regular Path: Engine evaluates the segment-conditioned edge against an empty context; it never matches (field absent); engine takes the fallback edge every single time regardless of the actual customer's real segment.
-- Stress Variant: Repeat across multiple onboarding cases with different real-world segments to confirm the fallback is taken 100% of the time, proving the conditioned edge is dead code in this domain today.
+- Regular Path: [CORRECTED, Batch 19, 2026-09-22] Live-confirmed: engine evaluates the segment-conditioned edge against the REAL submitted segment value. A case submitted with `segment: "enterprise"` correctly routed to the equals-enterprise edge's target; a case submitted with `segment: "smb"` correctly routed to the fallback instead. The conditioned edge is live, data-driven routing, not dead code, in this domain today.
+- Stress Variant: [ORIGINAL PREMISE, historical] Repeat across multiple onboarding cases with different real-world segments to confirm the fallback is taken 100% of the time, proving the conditioned edge is dead code in this domain today. [CORRECTED, Batch 19, 2026-09-22]: this no longer holds; see Regular Path above. The correct stress variant going forward is to confirm routing tracks the submitted segment value correctly across a range of segments, not that it is always fallback.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: to_node_key always equals the fallback target across all sampled cases.
+- Audit/Data Integrity Checks: [CORRECTED, Batch 19, 2026-09-22] to_node_key correctly tracks the submitted segment value (confirmed for both an equals-match and a fallback case), not always the fallback target.
 - Recovery/Resilience Variant: N/A
 - UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: Any admin who authors a segment-conditioned Decision node in Onboarding today gets a silently-dead branch; only the fallback is ever reachable.
-- Expected Technical Invariants: Decision context for customer_onboarding is confirmed empty at every evaluation; conditioned edges targeting "segment" never fire in this domain.
+- Expected Business Result: [CORRECTED, Batch 19, 2026-09-22] A segment-conditioned Decision node in Onboarding today is live, correctly-routing logic, not a silently-dead branch.
+- Expected Technical Invariants: [CORRECTED, Batch 19, 2026-09-22] Decision context for customer_onboarding is populated from the submitted revision's own `segment` field at every evaluation; conditioned edges targeting "segment" correctly fire when the submitted data matches.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: J-008, J-009, J-006
-- Notes: Worth flagging to product as a builder-authoring footgun: nothing in the UI warns an admin that Decision nodes are effectively inert outside commercial_configuration.
+- Notes: [CORRECTED, Batch 19, 2026-09-22] The original footgun premise (Decision nodes silently inert outside commercial_configuration) is stale for onboarding and customer_change; only go_live (J-009) still always passes an empty context today. See `docs/journey-runs/BATCH_19_RESULTS.md` J-007 for full live evidence.
 
-### J-008: Decision Node in Customer Change Domain Always Takes Default/Fallback (Empty Context)
+### J-008: Decision Node in Customer Change Domain Always Takes Default/Fallback (Empty Context) [PREMISE CORRECTED, Batch 19, 2026-09-22]
 - Pack: J - Workflow Runtime
 - Business Objective: Same empty-context fallback confirmation as J-007, exercised in the customer_change domain for domain-specific regression coverage.
 - Domain: customer_change
 - Object / Record Type: Decision node in a customer_change graph
-- Starting State: Change request submitted; decision context empty.
+- Starting State: [CORRECTED, Batch 19, 2026-09-22] Change request submitted; decision context is
+  `jsonb_build_object('segment', coalesce(v_revision.raw_data ->> 'segment', v_customer.segment))`
+  (`submit_customer_change_request`), real and non-empty whenever the customer has any segment set or the change
+  itself proposes one.
 - Personas: Requestor
 - Preconditions: Change graph published with a Decision node present.
-- Regular Path: Engine takes the fallback edge unconditionally since segment is never populated for this domain.
+- Regular Path: [CORRECTED, Batch 19, 2026-09-22] Live-confirmed, dual-mode: (1) with no proposed segment override, the
+  engine correctly evaluates against the customer's own stored segment (a customer with `segment = "smb"` correctly
+  fell to the fallback edge); (2) with a proposed segment override in the change payload, the engine correctly prefers
+  the proposed value (a change proposing `segment: "enterprise"` against that same `smb` customer correctly routed to
+  the equals-enterprise edge), exactly matching the `coalesce(proposed, current)` precedence in the code.
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: to_node_key always the fallback target.
+- Audit/Data Integrity Checks: [CORRECTED, Batch 19, 2026-09-22] to_node_key correctly tracks the resolved segment
+  value (proposed override if present, else the customer's current segment), not always the fallback target.
 - Recovery/Resilience Variant: N/A
 - UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: Consistent, predictable (if unconditional) routing; no crash, no WORKFLOW_DECISION_NO_MATCH as long as a fallback exists.
-- Expected Technical Invariants: Same as J-007, domain-specific instance.
+- Expected Business Result: Consistent, predictable, and now confirmed data-driven routing; no crash, no
+  WORKFLOW_DECISION_NO_MATCH as long as a fallback exists.
+- Expected Technical Invariants: [CORRECTED, Batch 19, 2026-09-22] Decision context for customer_change is populated
+  from `coalesce(proposed segment, customer's current segment)`; a segment-conditioned edge correctly fires whenever
+  either resolves to a match. See J-007's own correction for the parallel onboarding-domain finding.
 - Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: J-007, J-009
-- Notes: N/A
+- Notes: [CORRECTED, Batch 19, 2026-09-22] See `docs/journey-runs/BATCH_19_RESULTS.md` J-008 for full live evidence
+  of both the base-customer-segment path and the proposed-override path.
 
 ### J-009: Decision Node in Go Live Domain Always Takes Default/Fallback (Empty Context)
 - Pack: J - Workflow Runtime
@@ -7375,9 +7387,13 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: J-007, J-008
-- Notes: N/A
+- Notes: [CONFIRMED CURRENT, Batch 19, 2026-09-22] Unlike J-007 (onboarding) and J-008 (customer_change), whose
+  premise was corrected this batch, go_live is the one domain where "always empty context" remains accurate today:
+  `submit_go_live_request` and `approve_go_live_request` both still pass `'{}'::jsonb` literally. Confirmed by direct
+  code read and by every historical `submit` transition row against the active go_live Decision graph (Batches
+  15-16 and Batch 19) consistently resolving to the fallback edge.
 
-### J-010: End Node Reached Marks Request Terminal With No Further Actions Possible
+### J-010: End Node Reached Marks Request Terminal With No Further Actions Possible [MECHANISM CLARIFIED, Batch 19, 2026-09-22]
 - Pack: J - Workflow Runtime
 - Business Objective: Confirm reaching an End node is a true terminal state, closing off any further approve/send-back/reject attempts.
 - Domain: Any governed domain (representative: go_live)
@@ -7390,12 +7406,19 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Final workflow_node_transitions row has to_node_key = End's key; no further rows are ever appended for this resource_id and cycle_number afterward.
+- Audit/Data Integrity Checks: Final workflow_node_transitions row has to_node_key = End's key; no further rows are ever appended for this resource_id and cycle_number afterward. [CONFIRMED, Batch 19, 2026-09-22] Live-confirmed: neither a repeat approve nor a send-back attempt against a terminal request writes any transition row.
 - Recovery/Resilience Variant: N/A
 - UX Checks: Timeline visibly shows the End stage reached; My Work no longer lists it as actionable for anyone.
 - Historical Variant: N/A
 - Expected Business Result: Completed requests are immutable from a routing perspective; only new resubmission-triggering events (which do not apply post-completion) could ever reopen them.
-- Expected Technical Invariants: Any post-terminal action attempt is rejected (current-node/team recheck fails since there is no valid "current approval node" anymore).
+- Expected Technical Invariants: [MECHANISM CLARIFIED, Batch 19, 2026-09-22] Live-confirmed the two post-terminal
+  actions use two DIFFERENT mechanisms, both correctly preventing any further mutation: `approve_go_live_request`
+  against an already-`approved` request is a silent, idempotent no-op (`if v_row.status = 'approved' then return
+  v_row; end if;`, no error, row returned unchanged); `send_back_go_live_request` against the same row explicitly
+  raises `GO_LIVE_REQUEST_NOT_SENDBACKABLE`. The original text's implication that every post-terminal action "is
+  rejected" via an error is only true for send-back; approve's terminal handling is a safe silent no-op instead. Not
+  a defect, just a documentation correction: both mechanisms achieve the same business invariant (no further
+  mutation ever happens to a terminal request).
 - Priority: P0
 - Automation Feasibility: FULL
 - Dependencies: N/A
@@ -7477,20 +7500,24 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: J-011, J-012
 - Notes: N/A
 
-### J-014: Bounded 10-Hop Walk Raises WORKFLOW_GRAPH_DEAD_END on a Long Decision Chain
+### J-014: Bounded 10-Hop Walk Raises WORKFLOW_GRAPH_DEAD_END on a Long Decision Chain [EXPANDED + DEFECT FIXED, Batch 19, 2026-09-22]
 - Pack: J - Workflow Runtime
 - Business Objective: Confirm the documented 10-hop bound on fn_resolve_workflow_next_approval is enforced and fails safe rather than looping or timing out silently.
-- Domain: commercial_configuration
+- Domain: [EXPANDED, Batch 19, 2026-09-22] All four governed domains (customer_onboarding, customer_change,
+  commercial_configuration, go_live). Originally scoped to commercial_configuration alone; Batch 19's Journey
+  Discovery Check found the underlying guard is domain-generic infrastructure shared by all four `submit_*` RPCs
+  (see the defect below), so this journey's scope is widened to match, mirroring how J-001 already covers all four
+  domains for the same reason.
 - Object / Record Type: workflow_definition_versions graph engineered with more than 10 chained Decision-to-Decision hops before reaching any Approval node
 - Starting State: Published graph: Start -> Decision -> Decision -> ... (11+ decision hops, each unconditionally routing via its fallback) -> Approval -> End.
 - Personas: Requestor
 - Preconditions: Graph structurally valid at publish time per current validation (which does not bound total path length).
-- Regular Path: Requestor submits; fn_resolve_workflow_next_approval walks hop by hop and hits its 10-hop bound before reaching the first Approval node; WORKFLOW_GRAPH_DEAD_END is raised.
-- Stress Variant: Repeat with exactly 10 hops (should just barely succeed) versus 11 hops (should fail), to pin down the exact boundary.
+- Regular Path: Requestor submits; fn_resolve_workflow_next_approval walks hop by hop and hits its 10-hop bound before reaching the first Approval node; WORKFLOW_GRAPH_DEAD_END is raised. [DEFECT FOUND + FIXED, Batch 19, 2026-09-22] Live-tested against commercial_configuration: this did NOT hold before Batch 19 — `submit_commercial_configuration_version` (and, by the same code pattern, all three sibling submit RPCs) had no dead-end guard at all and silently persisted `status = submitted` with `current_workflow_node_key = null` instead of raising. Root cause: the four `approve_*` RPCs already had this guard; it was never mirrored onto their `submit_*` siblings. Fixed by migration `20261005000000_fix_submit_rpcs_missing_dead_end_guard.sql` (applied to the shared database with explicit user authorization); retested live post-fix and now raises correctly, with a non-dead-end submit re-confirmed unaffected. See `docs/journey-runs/BATCH_19_RESULTS.md` J-014 for full evidence.
+- Stress Variant: Repeat with exactly 10 hops (should just barely succeed) versus 11 hops (should fail), to pin down the exact boundary. [CONFIRMED, Batch 19, 2026-09-22] Live-confirmed via direct `fn_resolve_workflow_next_approval` calls at the exact boundary (a from_node_key-shifted call against the same 11-node probe graph simulates the 10-hop case): 10 total nodes to Approval succeeds, 11 fails. The hop bound is exactly 10, deterministic.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: No transition row written on failure.
+- Audit/Data Integrity Checks: No transition row written on failure. [CORRECTED pre-fix, CONFIRMED post-fix, Batch 19, 2026-09-22] Before the fix, a transition row WAS written recording `to_node_key = null` on the silently-accepted dead-end submit; after the fix, the submit raises before any row is written, matching this original assertion.
 - Recovery/Resilience Variant: Only recovery is a Builder admin restructuring the graph to shorten the path and republishing.
 - UX Checks: Error surfaced to requestor is generic relative to the true root cause (graph too deep), a support burden similar to J-011.
 - Historical Variant: N/A
@@ -7500,7 +7527,10 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: J-015, J-006
-- Notes: N/A
+- Notes: [Batch 19, 2026-09-22] The pre-fix silent-acceptance behavior is preserved as historical evidence in
+  `docs/journey-runs/BATCH_19_RESULTS.md` (original failure `request_id f3e7747d-1b69-41a6-a053-e473b7dc3bbf`, left
+  in its broken state); the fix was verified against a separate fresh request, per this program's
+  never-rewrite-history rule.
 
 ### J-015: WORKFLOW_GRAPH_DEAD_END When Current Node Has No Outgoing Path
 - Pack: J - Workflow Runtime
