@@ -2539,55 +2539,55 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: D-001
 - Notes: Defensive edge case; this state should be transient in practice but the UI must tolerate it.
 
-### D-003: Deactivate a Commercial Configuration (is_active true to false)
+### D-003: Commercial Configuration has no independent deactivate/reactivate lifecycle (PRODUCT DECISION CLOSED)
 - Pack: D - Commercial Configuration
-- Business Objective: Confirm the one-way deactivation of a commercial relationship is correctly applied and irreversible through the UI.
+- Business Objective: Confirm Commercial Configuration correctly has no independent deactivate/reactivate action, and that a commercial relationship's operational status is governed entirely through the customer lifecycle, never through this table's own `is_active` column.
 - Domain: Commercial Configuration
 - Object / Record Type: commercial_configurations
 - Starting State: Active configuration with multiple historical versions of components.
 - Personas: Finance Manager
-- Preconditions: Manager has permission to deactivate.
-- Regular Path: Manager deactivates the configuration; is_active flips true to false; existing components and their effective dating are untouched.
-- Stress Variant: Deactivating a configuration that has an in-flight (draft/submitted) commercial_configuration_versions row.
-- Authorization Variant: A user without deactivation permission attempts the action and is blocked.
-- Concurrency Variant: Two managers attempt to deactivate the same configuration at the same moment; second call must be a safe no-op, not an error that implies a second deactivation event.
-- Idempotency Variant: Retry deactivation call after apparent timeout does not produce a duplicate audit entry.
-- Audit/Data Integrity Checks: Confirm there is no code path to flip is_active back to true (product deliberately has none); audit log records who/when deactivated.
-- Recovery/Resilience Variant: N/A
-- UX Checks: UI clearly warns this is one-way before confirming; deactivated configuration is visually distinct (e.g. greyed out) in lists.
-- Historical Variant: Historical components and past versions remain fully visible and unedited after deactivation.
-- Expected Business Result: Configuration is marked inactive without altering its committed financial history.
-- Expected Technical Invariants: is_active is monotonic true-to-false only; no lifecycle status field is invented on this table.
-- Priority: P1
-- Automation Feasibility: FULL
-- Dependencies: N/A
-- Related Journeys: D-004
-- Notes: N/A
-
-### D-004: Attempt to create a new Commercial Change on a deactivated Commercial Configuration
-- Pack: D - Commercial Configuration
-- Business Objective: Verify a deactivated configuration cannot silently accept new commercial terms.
-- Domain: Commercial Configuration, Commercial Change
-- Object / Record Type: commercial_configurations, commercial_configuration_versions
-- Starting State: Configuration with is_active = false (from D-003).
-- Personas: Finance Analyst
-- Preconditions: Analyst attempts create_commercial_configuration_version against the inactive configuration id.
-- Regular Path: RPC call is rejected with a clear business-rule error; UI hides or disables the "create change" action for inactive configurations.
-- Stress Variant: Direct RPC call bypassing UI (API-level test) still enforces the same rule.
+- Preconditions: N/A
+- Regular Path: No "Deactivate" action exists anywhere in the UI or as a governed RPC/Server Action; `commercial_configurations.is_active` remains `true` for the life of the row. If the commercial relationship needs to stop, or the customer should no longer operate under the commercial setup, the correct mechanism is the customer lifecycle / customer change path (`customers.is_active`), not an independent Commercial Configuration action.
+- Stress Variant: N/A (no such action exists to stress).
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: No commercial_configuration_versions row is created; no orphaned draft appears in any queue.
+- Audit/Data Integrity Checks: Confirm no RPC, Server Action, or trigger anywhere ever sets `commercial_configurations.is_active` to `false`; the column exists in schema but is permanently unused by design, not an unbuilt feature.
 - Recovery/Resilience Variant: N/A
-- UX Checks: Action control is disabled/hidden with a tooltip explaining why, rather than a dead click.
+- UX Checks: No deactivate control exists to check.
 - Historical Variant: N/A
-- Expected Business Result: Inactive relationships cannot accumulate new pricing terms.
-- Expected Technical Invariants: Server-side guard exists independent of UI hiding (defense in depth).
+- Expected Business Result: Commercial Configuration has no independent deactivate/reactivate lifecycle; customer lifecycle governs whether the relationship remains operational. This is the permanent journey invariant for this pack.
+- Expected Technical Invariants: `commercial_configurations.is_active` is never set to `false` by any code path; this is intentional, not an oversight.
+- Priority: P1
+- Automation Feasibility: FULL
+- Dependencies: N/A
+- Related Journeys: D-004, D-015, D-021
+- Notes: **Product Decision Closure (2026-09-22):** originally written (pre-execution) as a journey testing a deactivate action assumed to exist; Batch 11 (2026-09-21) found no governed deactivate path exists anywhere in the codebase and recorded this as PRODUCT GAP CONFIRMED / PRODUCT DECISION REQUIRED (see `docs/journey-runs/BATCH_11_RESULTS.md`, D-003/D-004/D-015/D-021 finding). Business decision, made 2026-09-22: Commercial Configuration will NOT gain an independent deactivate/reactivate lifecycle. This entry is rewritten to test the decided permanent absence going forward, per the standing rule that Journey Universe canonical definitions describe intended future behavior; the original historical finding remains preserved, unedited, in `BATCH_11_RESULTS.md` with its own closure note appended there.
+
+### D-004: New Commercial Change is never blocked by a Commercial Configuration deactivation state (PRODUCT DECISION CLOSED)
+- Pack: D - Commercial Configuration
+- Business Objective: Confirm that, since Commercial Configuration has no independent deactivate state (D-003), a new Commercial Change is never blocked on that basis; only the existing customer-inactive guard (PD-003, `commercial_version_customer_inactive`) can block new commercial terms.
+- Domain: Commercial Configuration, Commercial Change
+- Object / Record Type: commercial_configurations, commercial_configuration_versions
+- Starting State: An ordinary active configuration; no `is_active = false` state is reachable (per D-003).
+- Personas: Finance Analyst
+- Preconditions: N/A
+- Regular Path: `create_commercial_configuration_version` has no `commercial_configurations.is_active` check of any kind (there is nothing to check, since the column is permanently `true`); the only real-world guard blocking new commercial terms is the customer-level inactive guard already implemented for PD-003.
+- Stress Variant: N/A
+- Authorization Variant: N/A
+- Concurrency Variant: N/A
+- Idempotency Variant: N/A
+- Audit/Data Integrity Checks: No `commercial_configuration_versions` row is ever rejected on the basis of this table's own `is_active`.
+- Recovery/Resilience Variant: N/A
+- UX Checks: N/A
+- Historical Variant: N/A
+- Expected Business Result: Inactive relationships cannot accumulate new pricing terms; this is achieved entirely through the customer lifecycle guard (PD-003), never through a Commercial Configuration-level state.
+- Expected Technical Invariants: N/A
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: D-003
 - Related Journeys: E-003
-- Notes: Confirm whether this guard truly exists server-side; if only UI-side, this journey should surface that as a real gap in the notes at execution time.
+- Notes: **Product Decision Closure (2026-09-22):** see D-003. This entry originally assumed a deactivation-blocks-new-changes guard would exist once D-003 was built; since D-003 is now permanently decided never to exist, this entry is rewritten to confirm the negative (no such guard is needed or present) rather than left describing an unreachable starting state.
 
 ### D-005: Configuration key uniqueness enforcement
 - Pack: D - Commercial Configuration
@@ -2839,30 +2839,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: N/A
 - Notes: N/A
 
-### D-015: Search/list Commercial Configurations by customer with mixed active/inactive results
+### D-015: Search/list Commercial Configurations by customer, all rows always active (PRODUCT DECISION CLOSED)
 - Pack: D - Commercial Configuration
-- Business Objective: Confirm the configuration list/search view correctly surfaces both active and deactivated configurations for a customer with multiple relationships.
+- Business Objective: Confirm the configuration list/search view for a customer never needs to reconcile mixed active/inactive rows, since D-003 permanently closes off any deactivated state.
 - Domain: Commercial Configuration
 - Object / Record Type: commercial_configurations
-- Starting State: A customer has two configurations: one active ("MAIN"), one deactivated ("LEGACY").
+- Starting State: A customer has two or more configurations (e.g. multiple relationship identities for the same customer), all with `is_active = true`.
 - Personas: Finance Analyst
 - Preconditions: N/A
-- Regular Path: Analyst searches by customer; both configurations appear, with is_active clearly indicated; default filter may hide inactive ones but a toggle reveals them.
+- Regular Path: Analyst searches by customer; all configurations appear as active; no inactive-filter toggle is needed since no configuration can ever become inactive independently.
 - Stress Variant: Customer with a large number (dozens) of historical configurations to confirm pagination/performance.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
 - Audit/Data Integrity Checks: Search never conflates two configurations sharing the same customer_id but different keys.
 - Recovery/Resilience Variant: N/A
-- UX Checks: Clear visual distinction between active/inactive rows in the list.
+- UX Checks: N/A (no active/inactive visual distinction is needed at the Commercial Configuration level; a customer's own `is_active` state, shown at the Customer Master level, is the only relevant lifecycle signal).
 - Historical Variant: N/A
-- Expected Business Result: Analysts can find the right relationship without ambiguity, including old ones.
+- Expected Business Result: Analysts can find the right relationship without ambiguity, including old ones; configuration-level active/inactive filtering is permanently out of scope.
 - Expected Technical Invariants: N/A
 - Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: D-003
 - Related Journeys: N/A
-- Notes: N/A
+- Notes: **Product Decision Closure (2026-09-22):** see D-003. Originally written assuming D-003's deactivate action would exist and produce mixed-status search results to test; since D-003 is now permanently decided never to exist, this entry is rewritten to confirm the all-active baseline instead.
 
 ### D-016: Commercial Configuration linked commercial_change_id chain integrity across the full lifecycle
 - Pack: D - Commercial Configuration
@@ -2989,30 +2989,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: D-007
 - Notes: N/A
 
-### D-021: Commercial Configuration for a customer with is_active flipped mid-active-version-review
+### D-021: Customer deactivation mid-review of a pending Commercial Change (PRODUCT DECISION CLOSED, re-scoped to Customer lifecycle)
 - Pack: D - Commercial Configuration
-- Business Objective: Confirm deactivating a configuration while a Commercial Change version is in submitted (pending approval) status does not silently orphan or corrupt the pending review.
-- Domain: Commercial Configuration, Commercial Change
-- Object / Record Type: commercial_configurations, commercial_configuration_versions
-- Starting State: Configuration active; a version is in submitted status awaiting approval.
-- Personas: Finance Manager (deactivates), Approver (holds the pending version)
+- Business Objective: Since Commercial Configuration itself has no deactivate state (D-003), the real version of this scenario is: confirm the Customer becoming inactive while a Commercial Change version is in submitted (pending approval) status does not silently orphan or corrupt the pending review, consistent with PD-004's already-decided behavior for Customer Change requests.
+- Domain: Commercial Configuration, Commercial Change, Customer Master
+- Object / Record Type: customers, commercial_configuration_versions
+- Starting State: Customer active; a Commercial Change version is in submitted status awaiting approval.
+- Personas: Customer Master admin (deactivates the customer), Approver (holds the pending version)
 - Preconditions: N/A
-- Regular Path: Manager deactivates the parent configuration; the system either blocks deactivation while a pending version exists, or allows it and the pending version becomes explicitly uncancellable/unapprovable with a clear message, whichever the real behavior is.
-- Stress Variant: Attempt to approve the now-orphaned pending version after deactivation.
+- Regular Path: Admin deactivates the customer; per PD-004 (`docs/journey-runs/BATCH_10_RESULTS.md`, C-030), a validly created pending request continues through its normal approval workflow even if the underlying customer subsequently becomes inactive; no code path blocks `approve_commercial_configuration_version` on customer status.
+- Stress Variant: Attempt to approve the pending version after the customer is deactivated; expected to succeed per PD-004's decided behavior.
 - Authorization Variant: N/A
 - Concurrency Variant: Deactivation and approval submitted at nearly the same instant.
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: No approved change is ever applied on top of a deactivated configuration without explicit, visible business sign-off.
-- Recovery/Resilience Variant: If blocked, the pending version remains cleanly cancellable so the workflow doesn't get stuck.
-- UX Checks: Clear error/warning message explaining the conflict.
+- Audit/Data Integrity Checks: This is the same invariant PD-004 already regression-tests for Customer Change requests; confirm it holds identically for Commercial Configuration Version approval.
+- Recovery/Resilience Variant: N/A
+- UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: No commercial terms get silently activated on a relationship the business has already declared inactive.
-- Expected Technical Invariants: N/A
+- Expected Business Result: A valid, in-flight approval is not retroactively invalidated by a later customer-lifecycle change; this matches the intentional, already-decided behavior in PD-004.
+- Expected Technical Invariants: `approve_commercial_configuration_version` has no customer-status check, mirroring the confirmed absence in `approve_customer_change_request`.
 - Priority: P1
-- Automation Feasibility: PARTIAL
-- Dependencies: D-003, E-006
-- Related Journeys: D-004
-- Notes: This journey's actual expected behavior should be confirmed against real code during execution since the grounding brief does not explicitly state which of the two outcomes is implemented.
+- Automation Feasibility: FULL
+- Dependencies: E-006
+- Related Journeys: D-004, PD-004 (C-030)
+- Notes: **Product Decision Closure (2026-09-22):** originally written around a Commercial-Configuration-level deactivation, which D-003 now permanently closes off. Re-scoped to the customer-lifecycle version of the same underlying concern, which is a near-duplicate of PD-004's already-decided and regression-tested scenario; classified as REGRESSION TEST ONLY in the Batch 18 Journey Discovery Check rather than a genuinely new journey, since PD-004's existing regression coverage (`change-request.data.test.ts`) already guards the identical invariant pattern.
 
 ### D-022: Cross-customer isolation of Commercial Configuration data
 - Pack: D - Commercial Configuration
@@ -6550,30 +6550,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: I-015, I-016
 - Notes: N/A
 
-### I-015: Cancel Entitlement Source With Already-Consumed Usage
+### I-015: Cancel Entitlement Source Never Erases Already-Recognized Entitlement (PRODUCT DECISION CLOSED, IMPLEMENTED)
 - Pack: I - Entitlement
-- Business Objective: Confirm cancelling a source that has already been partially consumed by recorded usage produces a correct, non-corrupting ledger reconciliation rather than silently erasing consumption history.
+- Business Objective: Confirm cancelling a source that has already contributed to a recognized (ledgered) month never erases or reduces that month's entitlement, since an invoice-created entitlement persists unless reduced/reversed by a real Credit Note, never by a standalone administrative cancellation.
 - Domain: Entitlement
-- Object / Record Type: entitlement_sources, monthly_entitlement_ledger
-- Starting State: entitlement_sources with schedule months generated; some months already have monthly_usage recorded against the entitlement pool it feeds.
+- Object / Record Type: entitlement_sources, entitlement_schedule_months, monthly_entitlement_ledger
+- Starting State: entitlement_sources with schedule months generated across several months; at least one month already has a monthly_entitlement_ledger row (recognized), and at least one does not yet (not yet recognized).
 - Personas: Finance Ops Analyst
 - Preconditions: N/A
-- Regular Path: Analyst cancels the source; monthly_entitlement_ledger for already-processed months is recomputed to correctly reflect entitlement withdrawal (e.g. surfacing an overage/unbilled situation where usage now exceeds the remaining entitlement), rather than silently deleting the historical usage or ledger rows.
-- Stress Variant: Cancel a source that is the only one covering a given month, versus one of several overlapping sources for that month, confirming the recompute logic handles both correctly.
+- Regular Path: Analyst cancels the source. `entitlement_schedule_months` rows for months that already have a `monthly_entitlement_ledger` row are preserved untouched; rows for months with no ledger row yet are deleted, stopping only future, not-yet-recognized allocation. The already-recognized month's ledger figure (`monthly_entitlement_quantity`) remains stable even if that month is later recomputed (e.g. a correction resubmission), since the schedule data backing it still exists.
+- Stress Variant: Cancel a source that is the only one covering a given month, versus one of several overlapping sources for that month; confirm the preserved-vs-deleted split is per source, not per component.
 - Authorization Variant: N/A
 - Concurrency Variant: Cancellation occurs concurrently with a new usage submission for the same month; confirm the resulting ledger state is coherent regardless of ordering.
-- Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Historical monthly_usage rows are never deleted or altered by the source cancellation; only entitlement/ledger figures change.
+- Idempotency Variant: Cancelling an already-cancelled source is a safe no-op (unchanged from the original mechanism).
+- Audit/Data Integrity Checks: Historical monthly_usage rows are never deleted or altered by source cancellation. entitlement_schedule_months rows for already-ledgered months are never deleted by cancellation, only by direct future intervention (e.g. a future Credit Note mechanism, not yet built).
 - Recovery/Resilience Variant: N/A
-- UX Checks: UI surfaces the resulting overage/unbilled implication clearly to the analyst before or immediately after cancellation, not silently.
+- UX Checks: The Cancel confirmation prompt states plainly that cancellation stops future allocation only and does not reverse already-recognized entitlement.
 - Historical Variant: N/A
-- Expected Business Result: Cancelling a source never destroys the historical record of actual usage, only the forward entitlement it would have granted.
-- Expected Technical Invariants: monthly_usage rows are immutable with respect to entitlement_sources cancellation; only monthly_entitlement_ledger and unbilled/unearned entries are recomputed.
+- Expected Business Result: **Permanent journey invariant: invoice-created entitlement persists unless reduced/reversed by the source financial document's own lifecycle (a Credit Note); no independent entitlement-source cancellation may erase it.**
+- Expected Technical Invariants: monthly_usage rows are immutable with respect to entitlement_sources cancellation; entitlement_schedule_months rows for months already reflected in monthly_entitlement_ledger are immutable with respect to cancellation; only not-yet-recognized future schedule rows are removed.
 - Priority: P0
-- Automation Feasibility: PARTIAL
+- Automation Feasibility: FULL
 - Dependencies: I-014
 - Related Journeys: I-020, I-022
-- Notes: N/A
+- Notes: **Product Decision Closure (2026-09-22): DECIDED and IMPLEMENTED.** Batch 17 found `cancel_entitlement_source` never recomputed the ledger at all after cancellation, framed at the time as a gap (PRODUCT GAP CONFIRMED). Business decision: that non-recompute was actually closer to correct than the journey's original assumption. Reframed the real invariant as "cancellation must never retroactively erase already-recognized entitlement," and fixed the actual structural risk this exposed: `cancel_entitlement_source` previously deleted ALL schedule rows for the source (including already-ledgered months), which could have silently lost historical entitlement on a future recompute. Fixed via migration `20261002000000_fix_cancel_entitlement_source_preserves_ledgered_months.sql` to preserve ledgered months' schedule data. Live-verified: cancelling ES-000004 (one ledgered month, five not-yet-ledgered months) correctly preserved the ledgered month's schedule row and deleted only the five future rows. A real Credit Note document lifecycle wired to Entitlement does not exist in Nexus today (the `invoice_evidence`/reconciliation `credit_note` concept in `docs/COMMERCIAL_MIGRATION_10_BILLING_INVOICE_RECONCILIATION_DESIGN.md` is a separate billing-reconciliation bounded context, structurally unconnected to `entitlement_sources`); CN-driven entitlement reversal is recorded as a FUTURE MODULE dependency in `docs/TECH_DEBT.md`, not invented here.
 
 ### I-016: Cancel Entitlement Source Authorization Boundary
 - Pack: I - Entitlement
@@ -6775,30 +6775,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: I-022
 - Notes: N/A
 
-### I-024: Settlement Reversal or Adjustment of a Prior Settlement
+### I-024: Settlement Reversal or Adjustment of a Prior Settlement (PRODUCT DECISION CLOSED, IMPLEMENTED)
 - Pack: I - Entitlement
-- Business Objective: Confirm an incorrect settlement can be corrected through an auditable reversal/adjustment rather than deletion.
+- Business Objective: Confirm an incorrect settlement can be corrected through an auditable, immutable reversal/adjustment rather than deletion or mutation of the original.
 - Domain: Entitlement
-- Object / Record Type: settlement_records (reversal/adjustment)
+- Object / Record Type: settlement_records (original, immutable), settlement_adjustments (reversal, additive)
 - Starting State: An existing settlement_records row, later discovered to be incorrect (e.g. wrong amount).
-- Personas: Finance Ops Analyst / Billing Team Lead
+- Personas: Finance Ops Analyst / Billing Team Lead (entitlement_settlement.write, same permission as recording a settlement)
 - Preconditions: N/A
-- Regular Path: Analyst records a reversal or adjustment settlement referencing the original; both the original and the reversal remain visible in history, with the net effect correctly reflected in current outstanding unbilled/unearned totals.
-- Stress Variant: Multiple sequential adjustments to the same original settlement.
-- Authorization Variant: Reversal/adjustment may require a distinct, more restrictive permission than the original settlement action; confirm actual behavior.
+- Regular Path: Analyst reverses (fully or partially) the original settlement via `reverse_settlement`, supplying a reversal reference and reason; a new `settlement_adjustments` row is created, linked to the original by `original_settlement_id`. The original `settlement_records` row is never mutated. The ledger entry's derived status (OPEN/PARTIALLY_SETTLED/SETTLED) is recomputed from net-settled (settled minus reversed).
+- Stress Variant: Multiple sequential partial reversals against the same original settlement, up to and including a final reversal that brings net-settled to exactly zero.
+- Authorization Variant: Gated on `entitlement_settlement.write`, the same permission as recording a settlement; no separate approval hierarchy was invented.
 - Concurrency Variant: N/A
-- Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Original settlement row is never deleted or mutated; the reversal is a distinct, separately timestamped row.
+- Idempotency Variant: A retried reversal call with the same `reversal_reference` is a safe no-op (mirrors `record_settlement`'s own established idempotency pattern).
+- Audit/Data Integrity Checks: Original settlement row is never deleted or mutated; the reversal is a distinct, separately timestamped, append-only row. A reversal attempt exceeding the settlement's own remaining reversible quantity is rejected (`SETTLEMENT_REVERSAL_EXCEEDS_SETTLED`), so cumulative reversed quantity can never exceed what was originally settled.
 - Recovery/Resilience Variant: This journey is itself the recovery path for settlement errors.
-- UX Checks: History view clearly shows the original settlement and its subsequent reversal linked together.
+- UX Checks: The Unbilled/Unearned Ledger's settlement history view shows the original settlement and every subsequent reversal together, with a "Reverse" control offered only while reversible quantity remains; the UI never implies the original settlement never happened.
 - Historical Variant: N/A
-- Expected Business Result: Settlement mistakes are correctable without destroying the historical record of what was originally recorded.
-- Expected Technical Invariants: No hard-delete path exists for settlement_records; corrections are always additive.
+- Expected Business Result: **Permanent journey invariant: settlement corrections occur through immutable linked reversal/adjustment transactions rather than mutation or deletion of the original settlement.**
+- Expected Technical Invariants: No hard-delete or update path exists for settlement_records; `settlement_adjustments.reversed_quantity` is check-constrained positive; cumulative reversed quantity per settlement is enforced server-side (RPC), never client-side only.
 - Priority: P1
-- Automation Feasibility: PARTIAL
+- Automation Feasibility: FULL
 - Dependencies: I-022
 - Related Journeys: N/A
-- Notes: Confirm whether a dedicated reversal RPC exists distinct from record_settlement, or whether reversal is simply a negative-amount settlement call; document actual mechanism found.
+- Notes: **Product Decision Closure (2026-09-22): DECIDED and IMPLEMENTED.** A dedicated `reverse_settlement` RPC was built (migration `20261002010000_add_settlement_reversal.sql`), distinct from `record_settlement`; reversal is never a negative-amount settlement call (blocked at the database level by `settled_quantity > 0`). Live-verified end-to-end: a 50-unit settlement partially reversed by 20 (status correctly stayed PARTIALLY_SETTLED), a further over-reversal attempt of 40 against the 30 remaining correctly rejected with the safe `SETTLEMENT_REVERSAL_EXCEEDS_SETTLED` message, and a final full reversal of the remaining 30 correctly flipped the ledger entry's status back to OPEN. The original settlement_records row's `settled_quantity` was confirmed unchanged (50) throughout via direct SQL. Unauthorized-actor rejection verified by code inspection, reusing the same `entitlement_settlement.write` gate already live-verified for `recordSettlementAction` in I-026.
 
 ### I-025: Entitlement Permission Boundary, Read vs Write
 - Pack: I - Entitlement

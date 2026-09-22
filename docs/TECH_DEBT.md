@@ -338,6 +338,19 @@ into a second backlog.
   volume of "why can't I do X" support requests appears that an admin
   currently has to manually look up each time (N-026, Product Gap
   Triage, Batches 3-6).
+- **No Credit Note document lifecycle wired to Entitlement (Product
+  Decision Closure, 2026-09-22, Batch 17 I-015).** The decided business
+  rule is that invoice-created entitlement persists unless reduced or
+  reversed by a real Credit Note. Nexus has no such document lifecycle
+  connected to `entitlement_sources` today; the `invoice_evidence`/
+  `credit_note` concept in `docs/COMMERCIAL_MIGRATION_10_BILLING_INVOICE_RECONCILIATION_DESIGN.md`
+  is a separate billing-reconciliation bounded context with no
+  structural link to Entitlement. Build a real CN-driven entitlement
+  reduction/reversal mechanism once Nexus has an actual Credit Note
+  document concept for Entitlement to reference; until then, the only
+  bounded correction made was ensuring `cancel_entitlement_source` can
+  never itself erase already-recognized entitlement (see
+  `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2).
 - **Invoice Frequency cadence has no freeze mechanism, unlike Currency's
   `fx_snapshot_rate`.** `commercial_components.billing_cadence` stores
   only an opaque code string; the one function that would resolve a live

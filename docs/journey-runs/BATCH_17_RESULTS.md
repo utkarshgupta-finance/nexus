@@ -102,6 +102,7 @@ These are treated as findings to verify live, not assumed defects; each is confi
 - Regular Path: cancelled the source the same way as I-014. SQL confirmed: source `status = 'cancelled'`; its schedule months cascade-deleted; **all 4 historical `monthly_usage` rows remained completely untouched** (same count before and after), confirming usage history is never destroyed by source cancellation.
 - **PRODUCT GAP (Batch 17, I-015)**: the `monthly_entitlement_ledger` row for the affected month was **not recomputed at all** after cancellation. SQL confirmed it still reads `monthly_entitlement_quantity = 50` (the pre-cancellation figure) even though the source that produced that 50 was just cancelled and its schedule deleted; the true current entitlement for that month is now 0. `cancel_entitlement_source` has no ledger-recompute side effect of any kind, unlike `submit_monthly_usage` (which always triggers `recomputeMonthlyLedger` for the one month it touches). Recomputing correctly after a cancellation is a materially larger undertaking than a single bounded fix: it would need to identify and recompute every month the cancelled source ever contributed a schedule row for (potentially many months), not just one, which is a genuine scope decision rather than a narrow bug. Classification: **PRODUCT GAP CONFIRMED**, not fixed in this batch (distinguished from I-012/I-021's narrower, single-call-site defects, which were fixed).
 - Classification: **PASS** for usage-preservation (the journey's primary invariant); **PRODUCT GAP CONFIRMED** for the ledger-recompute-on-cancellation gap, recorded as an incidental finding.
+- **Product Decision Closure (2026-09-22): DECIDED and IMPLEMENTED.** Business decision: an invoice-created entitlement persists unless reduced/reversed by a real Credit Note; it was never correct for a standalone `cancel_entitlement_source` action to make a month's recognized entitlement silently disappear on its own. The framing above (that non-recompute was a gap needing a fix that makes entitlement drop to 0 on cancel) is superseded by this decision, not confirmed by it. Invariant under this decision: cancellation must never retroactively erase entitlement already reflected in the ledger. Root cause of the actual data-integrity risk this exposed: `cancel_entitlement_source` deleted all of a source's schedule allocation rows unconditionally, including months already recognized in the ledger, which could have let a later recompute of an already-recognized month silently lose that source's historical contribution. Fixed via migration `20261002000000_fix_cancel_entitlement_source_preserves_ledgered_months.sql`: cancellation now preserves schedule data for any month already reflected in the ledger, only stopping allocation for months not yet recognized. Live re-verified against a real multi-month source with a mix of recognized and not-yet-recognized months: cancellation correctly preserved the recognized month's schedule data and its ledger figure, while removing only the not-yet-recognized months' future allocation. See `docs/NEXUS_JOURNEY_UNIVERSE.md` I-015 for the rewritten canonical journey definition and the full decision rationale. A real Credit Note-driven entitlement reversal mechanism does not exist in Nexus today and is recorded as a FUTURE MODULE dependency in `docs/TECH_DEBT.md`, not built here.
 
 ### I-016: Cancel Entitlement Source Authorization Boundary
 - Regular Path: logged in as `wf-test.finance-checker@example.test` (confirmed zero `entitlement`/`usage`/`entitlement_settlement` permissions of any kind, per the Batch 17 pre-execution persona audit). Attempting to reach any Entitlement page is blocked outright by the page-level `AuthGate` (same "Access restricted" behavior independently confirmed live during I-013's setup for a different under-permissioned persona), so the cancel action itself is unreachable through the UI for this persona; confirmed via code inspection that `cancelEntitlementSourceAction` gates on `requirePermission("entitlement","write")`, the same permission as source creation, not a distinct "cancel" permission.
@@ -146,6 +147,7 @@ These are treated as findings to verify live, not assumed defects; each is confi
 ### I-024: Settlement Reversal or Adjustment of a Prior Settlement
 - Regular Path: confirmed via code inspection (the authoritative `record_settlement` body, re-read after applying the I-022 fix) that **no dedicated reversal/adjustment RPC exists** for `settlement_records`, and a negative-amount settlement call is independently impossible at the database level (`settled_quantity numeric check (settled_quantity > 0)`). There is currently no mechanism of any kind, correction-specific or otherwise, to reverse or adjust an already-recorded settlement.
 - Classification: **PRODUCT GAP CONFIRMED**. This is a genuine, currently-real absence, not a broken implementation of an existing feature, and designing a reversal/adjustment mechanism (what it should look like, what permission gates it, how it interacts with the entry's derived status) is a product-scope decision, not a bounded bug fix. Not fixed in this batch.
+- **Product Decision Closure (2026-09-22): DECIDED and IMPLEMENTED.** Business decision: Nexus should support controlled correction of an incorrect settlement through an immutable, additive reversal, never by editing or deleting the original. Built: `settlement_adjustments` table (append-only, `original_settlement_id` references `settlement_records`, `reversed_quantity` check-constrained positive) and a dedicated `reverse_settlement` RPC (migration `20261002010000_add_settlement_reversal.sql`), idempotent on `(original_settlement_id, reversal_reference)` mirroring `record_settlement`'s own pattern, gated on the existing `entitlement_settlement.write` permission (no new approval hierarchy invented). Live re-verified end-to-end against the 100-unit unbilled entry from this same batch's I-022 re-verification fixture (`INV-B17-I022-REVERIFY-A`, 50 settled): a partial reversal of 20 correctly kept the entry `PARTIALLY_SETTLED`; a further attempt to reverse 40 against the 30 still reversible was correctly rejected (`SETTLEMENT_REVERSAL_EXCEEDS_SETTLED`, no new row created); a final reversal of the remaining 30 correctly flipped the entry back to `OPEN`. SQL confirmed the original `settlement_records` row's `settled_quantity` stayed exactly 50 throughout. The Entitlement UI now shows a "Show settlement history" control per ledger entry with a "Reverse" action per settlement while reversible quantity remains. See `docs/NEXUS_JOURNEY_UNIVERSE.md` I-024 for the rewritten canonical journey definition.
 
 ### I-025: Entitlement Permission Boundary, Read vs Write
 - Regular Path: logged in as `wf-test.entitlement-reader@example.test` (`entitlement.read` only, from the Batch 17 boundary-persona setup). Confirmed live: the Entitlement page loaded (read access works), the Entitlement Sources section was visible, but no "Add Invoice Entitlement", "Generate Schedule", or "Cancel" controls were rendered anywhere on the page for this persona.
@@ -174,6 +176,28 @@ These are treated as findings to verify live, not assumed defects; each is confi
 - Regular Path: not independently re-created as a fresh scenario in this batch; instead reasoned directly from two already-confirmed facts from this same batch: (1) I-014/I-015 confirmed cancelling an *entitlement source* never touches `go_live_requests`, and (2) the reverse direction (cancelling a *Go Live request* never touching `entitlement_sources`) was confirmed by code inspection during pre-execution research: no trigger, FK constraint, or RPC anywhere references `entitlement_sources` from any Go Live RPC, and `cancel_go_live_request`'s full body (both the original and the post-H-043-fix rebuilt version) only ever updates the `go_live_requests` row itself.
 - Classification: **PASS** (by code inspection; not independently re-verified live with a fresh cancelled-Go-Live fixture in this batch, since no code path exists that could plausibly connect the two in either direction, and the specific claim under test, "entitlement_sources rows remain queryable and unmodified," is the same invariant I-014/I-015 already live-verified from the other direction).
 
+## Summary reconciliation
+
+25 journeys scheduled (I-006 through I-030). 25 executed, 25 classified.
+
+| Classification | Count |
+| --- | --- |
+| PASS | 20 |
+| FAILED THEN FIXED + PASS | 3 (I-012, I-021, I-022) |
+| EXPECTED BEHAVIOUR | 0 |
+| PRODUCT GAP | 2 (I-015, I-024) |
+| PRODUCT DECISION | 0 |
+| DEFERRED | 0 |
+| **Total** | **25** |
+
+I-015 and I-024 are each counted once under PRODUCT GAP even though I-015's own write-up also confirms a PASS
+result for its primary usage-preservation invariant; the incidental gap finding is the more significant outcome
+for tallying purposes, consistent with how I-003/I-004 were counted in Batch 16's own reconciliation. This
+corrects an arithmetic error in this batch's original closure report to the user, which stated "19 PASS + 3
+FAILED THEN FIXED + PASS + 1 EXPECTED BEHAVIOUR + 2 PRODUCT GAP = 25"; no journey in this ledger was ever actually
+classified as EXPECTED BEHAVIOUR, and the correct PASS count is 20, not 19. No individual journey's classification
+changed; only the summary tally is corrected.
+
 ## Journey Discovery Check (mandatory from Batch 17 onward, per Stage A11)
 
 Reviewed every finding this batch surfaced (I-012, I-021, I-022 defects; I-015 and I-024 PRODUCT GAP CONFIRMED
@@ -194,3 +218,26 @@ EXISTING JOURNEY / NEW JOURNEY REQUIRED / REGRESSION TEST ONLY / FUTURE MODULE /
   `docs/NEXUS_JOURNEY_UNIVERSE.md`'s E-series and cross-referenced I-series journeys.
 
 **Conclusion: No new journey candidates found.**
+
+## Product Decision Closure Journey Discovery Check (2026-09-22)
+
+Before Batch 18, three product decisions were closed: Commercial Configuration deactivate/reactivate (no
+independent lifecycle), I-015 (invoice entitlement persists unless a real CN reduces it), and I-024 (settlement
+reversal is now built). Checked whether resolving them revealed any additional durable journey not already
+represented, against the same taxonomy above.
+
+- Commercial Configuration deactivate/reactivate: D-003/D-004/D-015 rewritten in place to test the decided
+  permanent absence; D-021 re-scoped to the customer-lifecycle version of its concern, a near-duplicate of the
+  already-decided PD-004/C-030. EXPAND EXISTING JOURNEY, no new IDs.
+- I-015: rewritten in place to test the decided invariant (cancellation never erases already-recognized
+  entitlement) and the bounded fix that enforces it. The unbuilt CN-driven reversal itself is FUTURE MODULE,
+  recorded in `docs/TECH_DEBT.md`; no new journey ID is allocated for a capability that does not exist yet, per
+  the same principle already applied to I-003/I-004's manual-only decision.
+- I-024: rewritten in place to test the now-built reversal mechanism, including the full/partial/over-reversal
+  variants live-verified during closure, folded into the existing journey's own Stress/Idempotency Variant
+  fields rather than new IDs, consistent with how every other journey in this Universe already carries multiple
+  variants inline.
+- No new entity, permission, state transition, or cross-module interaction was discovered during closure work
+  that falls outside what D-003/D-004/D-015/D-021, I-015, and I-024 already enumerate.
+
+**Conclusion: No new journey candidates found. Zero product decisions remain open.**

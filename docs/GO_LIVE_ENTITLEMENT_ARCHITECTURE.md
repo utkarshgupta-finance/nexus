@@ -334,9 +334,25 @@ per the interface-independence principle in
 `docs/API_INTEGRATION_ARCHITECTURE.md` §1: no business logic is
 duplicated, only a new caller and a new parameter are added.
 
-Cancelling a source (`cancel_entitlement_source`) also deletes its own
-schedule rows, since a cancelled invoice's allocation is void, not merely
-hidden.
+**LOCKED RULE (Product Decision Closure, 2026-09-22): invoice-created
+entitlement persists unless reduced or reversed by the source financial
+document's own lifecycle (a Credit Note); no independent entitlement-
+source cancellation may erase it.** Cancelling a source
+(`cancel_entitlement_source`) stops future, not-yet-recognized monthly
+allocation only: it deletes `entitlement_schedule_months` rows for
+months that have no `monthly_entitlement_ledger` row yet, but preserves
+schedule data for any month already recognized in the ledger, so a
+later recompute of an already-recognized month can never silently lose
+that source's historical contribution (fixed in migration
+`20261002000000_fix_cancel_entitlement_source_preserves_ledgered_months.sql`,
+after Batch 17's I-015 found the prior unconditional-delete behavior
+created exactly this risk). Nexus has no Credit Note document lifecycle
+wired to Entitlement today; the `invoice_evidence`/`credit_note` concept
+in `docs/COMMERCIAL_MIGRATION_10_BILLING_INVOICE_RECONCILIATION_DESIGN.md`
+is a separate billing-reconciliation bounded context, structurally
+unconnected to `entitlement_sources`. A real CN-driven entitlement
+reduction/reversal mechanism is a future-module dependency (§8,
+`docs/TECH_DEBT.md`), not built here.
 
 ### 7.3 Additional-invoice handling: same mechanism, different anchor
 
@@ -388,6 +404,25 @@ Unearned, supporting partial settlement (`record_settlement` recomputes
 versus the entry's own total). No monetary amount is ever stored; this is
 explicitly not an Accounts Receivable or invoicing engine (§8).
 
+**LOCKED RULE (Product Decision Closure, 2026-09-22): settlement
+corrections occur through immutable linked reversal/adjustment
+transactions rather than mutation or deletion of the original
+settlement.** `settlement_adjustments` is a separate, append-only table
+(never updated, never deleted): each row reverses a specific quantity
+against one `settlement_records` row via `reverse_settlement`, cannot
+exceed that settlement's own remaining reversible quantity
+(`SETTLEMENT_REVERSAL_EXCEEDS_SETTLED` otherwise), is idempotent on
+`(original_settlement_id, reversal_reference)` mirroring
+`record_settlement`'s own pattern, and is gated on the same
+`entitlement_settlement.write` permission (no new approval hierarchy).
+A ledger entry's true net-settled total is `sum(settlement_records.
+settled_quantity)` minus `sum(settlement_adjustments.reversed_quantity)`
+for that entry; `reverse_settlement` recomputes the entry's derived
+`OPEN`/`PARTIALLY_SETTLED`/`SETTLED` status from that net figure using
+the same thresholds `record_settlement` itself uses. Built in migration
+`20261002010000_add_settlement_reversal.sql`, closing Batch 17's I-024
+finding.
+
 For an On-Demand line item, there is no entitlement pool at all, so
 `monthlyEntitlementQuantity` is always 0 for it: the same math in §3 then
 naturally yields `unbilled = actualUsage`, `unearned = 0`. This is not a
@@ -433,6 +468,12 @@ nothing above should be read as simulating them:
 - A Suspended/Stopped/Churned line-item lifecycle. Only `NO_GO_LIVE` /
   `GO_LIVE_PENDING` / `LIVE` / `CANCELLED` exist (§6.1), matching what Go
   Live actually needs today.
+- A Credit Note document lifecycle wired to Entitlement (§7.2). Invoice
+  entitlement reduction/reversal driven by a real CN is a future-module
+  dependency, recorded in `docs/TECH_DEBT.md`, not invented here.
+  Settlement reversal itself (§7.6) is built; what is absent is a real
+  financial CN document that could drive an entitlement-source-level
+  reduction.
 
 ## 9. Authorization
 

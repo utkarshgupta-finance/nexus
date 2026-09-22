@@ -154,7 +154,7 @@ fictional examples only; no em dashes.
 
 | Table | Purpose | Resource-backed | Mutable | Lifecycle |
 |---|---|---|---|---|
-| `commercial_configurations` | Stable anchor for one coherent commercial relationship | Yes | Metadata, row-version-protected; `is_active` one-way | Active, then inactive |
+| `commercial_configurations` | Stable anchor for one coherent commercial relationship | Yes | Metadata, row-version-protected; `is_active` one-way | Active, then inactive (column present; **Product Decision Closure, 2026-09-22: no governed path ever sets it `false`; Commercial Configuration has no independent deactivate/reactivate lifecycle by permanent decision, not by omission. See `docs/journey-runs/BATCH_11_RESULTS.md` D-003 and `docs/NEXUS_JOURNEY_UNIVERSE.md` D-003.**) |
 | `commercial_components` | The effective-dated unit carrying commercial terms | No (revised) | No (one controlled closure transition) | Effective, then superseded/ended |
 | `commercial_component_capabilities` | Many-to-many: component to canonical capability | No | Insert-only, with intrinsic provenance | Permanent once created |
 | `measurement_definitions` | Canonical business meaning of a countable quantity | No | Cosmetic metadata, row-version-protected; semantic fields immutable | Active, then deprecated |
