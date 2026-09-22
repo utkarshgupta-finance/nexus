@@ -247,6 +247,15 @@ into a second backlog.
   scoped out of this program; revisit once MRR Recognition itself is
   designed.
 
+- **`go_live_requests.request_number` has no explicit unique index (found live during Batch 16's H-039), unlike
+  the sibling `customer_change_requests.request_number` (`create unique index
+  idx_customer_change_requests_request_number`).** Not an open defect: the backing sequence
+  (`go_live_request_number_seq`) is itself race-safe (`nextval()` is atomic; confirmed empirically with 8
+  concurrent creations, all unique, no gaps), and no code path anywhere ever sets `request_number` outside the
+  column's own default. A pure defense-in-depth consistency gap versus the sibling domain, worth closing the
+  next time this table's own migration file is touched for an unrelated reason, not urgent enough for a
+  dedicated migration on its own.
+
 - **Required fields do not consistently expose `aria-required` to assistive technology (found live during Batch 8's ACC-001).** The Country field on Customer Onboarding is visually marked required (a red asterisk) but its underlying Base UI combobox renders `aria-required="false"`, so a screen-reader user is not told the field is mandatory purely from focusing it. Not fixed in that pass, since a proper fix means auditing every required field across both SurveyJS-rendered stages and Base UI form controls app-wide for consistency, broader than the one keyboard-navigation-order finding ACC-001 was scoped to that round (which did get a real fix: a "Skip to main content" link, since the app had none anywhere and every page's tab order forced 7 stops through the sidebar and Log out button first). Revisit as part of a dedicated accessibility pass.
 
 ## Soon (real, but not urgent; revisit within the next few feature rounds)
@@ -416,18 +425,42 @@ into a second backlog.
   limited to one customer/business unit/legal entity; the extension path
   (`user_roles.scope_resource_id` already exists, unpopulated) is
   preserved, per `docs/AUTHORIZATION_MODEL.md` §5.
-- **Go Live domain, Entitlement Ledger, Agreement lifecycle, and Legal-
-  Commercial coverage** (Platform Operating Expansion, Phases Q-T) were
-  deliberately not built in that program. `docs/MASTER_DATA_FOUNDATION_DESIGN.md`
-  §21 already locks Go Live and Entitlement as domains whose boundary is
-  preserved (they anchor to `customers.id` like Commercial Configuration
-  does) but explicitly marks them "[NOT DESIGNED, correctly out of
-  scope]" pending real Finance/business input; `docs/COMMERCIAL_DOMAIN_ARCHITECTURE.md`
-  §14 lists "a go-live condition pending" only as an illustrative,
-  undesigned example of an Invoice Eligibility gate. Building any of the
-  four for real means inventing what triggers them, who approves them,
-  and what they gate, exactly the kind of business rule this project does
-  not fabricate without a product brief (this is also why a placeholder
-  Go-Live sidebar item was removed rather than left pointing at a fake
-  route, Platform Scale Program Phase M, above). Build each only once a
-  real product brief defines its business meaning.
+- ~~Go Live domain and Entitlement Ledger coverage~~ — **superseded (Go Live +
+  Entitlement Ledger program, Phases F-N; live-tested end to end in Batches
+  15-16).** The note this replaced said these two domains were "[NOT
+  DESIGNED, correctly out of scope]"; that is no longer accurate. Both are
+  now real, built, and exercised through the real UI and RPC layer across
+  Batch 15 (H-001 through H-023, G-025/G-026) and Batch 16 (H-024 through
+  H-043, I-001 through I-005): request lifecycle, workflow approval,
+  optimistic locking, attachment upload, direct-mutation defense-in-depth,
+  and manual Entitlement Source creation with Go-Live-anchored allocation
+  scheduling are all real and tested. `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md`
+  is the current, accurate design record. Agreement lifecycle and
+  Legal-Commercial coverage remain genuinely not built; see the two
+  separate entries below for their own status.
+- **Agreement lifecycle and Legal-Commercial coverage** (Platform
+  Operating Expansion, Phases Q-T) were deliberately not built in that
+  program and remain not built as of Batch 16. Building either means
+  inventing what triggers them, who approves them, and what they gate,
+  exactly the kind of business rule this project does not fabricate
+  without a product brief. Build each only once a real product brief
+  defines its business meaning.
+- **API-sourced and Import/Bulk-sourced Entitlement Source creation**
+  (confirmed live during Batch 16's I-003/I-004; product decision made in
+  the Stage A closure that followed). `entitlement_sources.source_type`
+  already allows `'API'`/`'IMPORT'` at the schema level, and both
+  `docs/API_INTEGRATION_ARCHITECTURE.md` §1 and
+  `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2 already named this as
+  future scope, but `create_entitlement_source`'s own RPC parameter list
+  has no `p_source_type` at all, so every call today unconditionally
+  produces `MANUAL`. **Decided (Stage A, post-Batch 16): Entitlement
+  Source creation stays manual-only for now; this is an intentional
+  product-scope decision, not an oversight.** Build real API/Import
+  support only once both of these are true: (1) a real, scoped external
+  integration or bulk-import requirement actually exists (not built
+  speculatively ahead of one), and (2) the non-interactive caller
+  authentication model this would need
+  (`docs/API_INTEGRATION_ARCHITECTURE.md` §7, "Service principal / machine
+  identity", DESIGNED / IMPLEMENTATION DEFERRED) has itself been designed
+  first. Do not add a `p_source_type` parameter or any import-file
+  handling opportunistically ahead of that trigger.

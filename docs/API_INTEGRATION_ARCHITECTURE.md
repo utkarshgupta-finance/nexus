@@ -40,7 +40,14 @@ domain/*.ts`), called by `entitlement.service.ts` before any RPC runs.
 The RPCs only ever persist already-computed values. Manual Finance entry
 today and a future API/import integration (`source_type`/`source` already
 reserve `API`/`IMPORT` alongside `MANUAL`) call the exact same service
-functions; see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.1.
+functions; see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.1. **Confirmed
+live in Batch 16 (I-003/I-004):** the schema-level reservation is real,
+but `create_entitlement_source`'s own RPC parameter list does not yet
+accept a caller-supplied `source_type` at all, so today every call
+produces `MANUAL` regardless of caller. This is now a decided product
+scope boundary (manual-only for now, see `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md`
+§7.2 and `docs/TECH_DEBT.md`), not an oversight; the interface-independence
+property described here still holds for the day this is actually built.
 
 **One gap found and not yet closed**: `case.service.ts`'s
 `checkForDuplicateCustomersAction` and `customer-change/actions.ts`'s

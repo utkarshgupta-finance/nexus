@@ -379,27 +379,47 @@ journey below.
   `created_by` correctly attributing the real actor.
 - Classification: **PASS**.
 
-### I-003: Create Entitlement Source, API Source Type — PRODUCT GAP
-
-### I-004: Create Entitlement Source, Import Source Type — PRODUCT GAP
+### I-003: Create Entitlement Source, API Source Type — PRODUCT GAP → PRODUCT DECISION MADE → FUTURE MODULE
 
 - Investigation: `create_entitlement_source`'s full parameter list
   (`entitlement_ledger_foundation.sql:361-373`) has no `p_source_type` parameter at all; its `INSERT` never
   sets `source_type`, so every call unconditionally defaults to `'MANUAL'` per the column's own default. There
-  is currently no code path, RPC parameter, UI control, or integration surface through which an `API` or
-  `IMPORT` sourced row could ever be created, even though the table's own `check` constraint already allows
-  those two values and the RPC's own comment explicitly anticipates them: "Manual Finance entry today
-  (`source_type = MANUAL`); the same `create_entitlement_source` RPC is the one path a future API/import
-  integration calls too, never a parallel write path."
-- Reconciliation: this is a genuine, precisely-documented missing capability, not previously recorded in
-  `docs/TECH_DEBT.md`. It is not classified as a bounded defect to fix in this batch: building real API/IMPORT
-  support means designing how a non-interactive integration caller authenticates (Nexus currently has no
-  public API surface at all, only session-based Server Actions) and what an "Integration Service Account"
-  concretely is, which are real product/architecture decisions this batch should not invent unilaterally, not
-  a mechanical gap-fill. The RPC's own comment already correctly anticipates this as future scope, consistent
-  with this codebase's "Build order: do not build ahead of the current step" principle.
-- Classification: **PRODUCT GAP** (both I-003 and I-004, same root cause). Does not block I-001, I-002, or
-  I-005, all of which use the one currently-real (MANUAL) path.
+  is currently no code path, RPC parameter, UI control, or integration surface through which an `API`-sourced
+  row could ever be created, even though the table's own `check` constraint already allows the value and both
+  `docs/API_INTEGRATION_ARCHITECTURE.md` §1 and `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2 already
+  anticipate it explicitly ("Manual Finance entry today; the same `create_entitlement_source` RPC is the one
+  path a future API/import integration calls too, never a parallel write path").
+- Reconciliation: originally classified **PRODUCT GAP** at Batch 16 execution time. Not a bounded defect:
+  building real API support means designing how a non-interactive integration caller authenticates (Nexus
+  currently has no public API surface at all, only session-based Server Actions) and what an "Integration
+  Service Account" concretely is (`docs/API_INTEGRATION_ARCHITECTURE.md` §7, DESIGNED / IMPLEMENTATION
+  DEFERRED), real product/architecture decisions this batch correctly did not invent unilaterally.
+- **Stage A closure (this pass): PRODUCT DECISION MADE.** Utkarsh decided: Nexus Entitlement Source creation
+  remains **manual only** for now. API-created Entitlement Sources are explicitly out of current product
+  scope, not merely undecided. See `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2 and `docs/TECH_DEBT.md`
+  ("Later" section) for the recorded trigger point at which this should actually be built (a real API/import
+  integration requirement, at which point the non-interactive authentication model from
+  `docs/API_INTEGRATION_ARCHITECTURE.md` §7 must be designed first).
+- Classification: **PRODUCT GAP → PRODUCT DECISION MADE → FUTURE MODULE**. The original PRODUCT GAP finding
+  and its evidence are preserved unchanged above; this note only appends the later decision, it does not
+  rewrite the finding as PASS. Does not block Batch 17 or any later batch: no scheduled journey depends on
+  API-sourced entitlement creation existing.
+
+### I-004: Create Entitlement Source, Import Source Type — PRODUCT GAP → PRODUCT DECISION MADE → FUTURE MODULE
+
+- Investigation: identical root cause to I-003 (same RPC, same missing `p_source_type` parameter); the table's
+  `check` constraint also already allows `IMPORT`, with the same "future integration" comment covering both
+  values together.
+- Reconciliation: originally classified **PRODUCT GAP** at Batch 16 execution time, same reasoning as I-003:
+  building real bulk-import support requires the same non-interactive-caller authentication design, plus a
+  real import-file format/validation decision, neither of which this batch should invent unilaterally.
+- **Stage A closure (this pass): PRODUCT DECISION MADE.** Utkarsh decided: Import/Bulk-created Entitlement
+  Sources remain out of current product scope, for the same reason and at the same future trigger point as
+  I-003 (a real bulk-import requirement, decided together with the API path since both share the one blocked
+  RPC parameter and the one authentication design question).
+- Classification: **PRODUCT GAP → PRODUCT DECISION MADE → FUTURE MODULE**. The original PRODUCT GAP finding
+  and its evidence are preserved unchanged above; this note only appends the later decision. Does not block
+  Batch 17 or any later batch.
 
 ### I-005: Generate Allocation Schedule Anchored at Go Live Month — PASS
 
@@ -449,10 +469,18 @@ journey below.
   `customer_change_requests.request_number`. Not exploitable through any current code path (the backing
   sequence is itself race-safe, confirmed empirically); a minor structural inconsistency, not fixed in this
   batch. See H-039's own entry above.
+  - **Stage A1 reconciliation (this pass): ARCHITECTURE / CONTROL HARDENING DEBT**, not an open defect.
+    "Defects remaining = 0" in the original closure report was accurate: nothing is currently broken or
+    exploitable through any reachable code path. Recorded permanently in `docs/TECH_DEBT.md` ("Now" section)
+    as a defense-in-depth consistency item, not left only in this batch's own ledger.
 - **H-040**: `user_teams` is an append-only historical grant record; a revoked membership cannot be
   reactivated via `UPDATE`, only replaced with a fresh `INSERT`. This is correct, intentional design
   (consistent with this platform's established append-only-history convention elsewhere), not a defect.
   Recorded here only because it was an unexpected discovery mid-journey, not because anything needs fixing.
+  - **Stage A1 reconciliation (this pass): EXPECTED BEHAVIOUR / INTENTIONAL ARCHITECTURE.** Already correctly
+    described as "not a defect" above; this line only formalizes the classification label per the Stage A1
+    taxonomy. No documentation or code change needed beyond this note. Considered as a Journey Universe
+    candidate in the Stage A Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`).
 
 ## Product decisions required
 
@@ -461,8 +489,14 @@ None block this batch's closure. I-003 and I-004 surfaced a genuine, precisely-d
 entries above), but building real support requires product/architecture decisions about how a non-interactive
 integration caller would authenticate against a platform that currently has no public API surface at all, only
 session-based Server Actions. This is not something to invent unilaterally, and it does not block any other
-Batch 16 journey, so it is disclosed here as a gap rather than raised as an urgent decision. No question is
-asked at closure; the user may raise it at their own initiative in a future batch.
+Batch 16 journey, so it was disclosed here as a gap rather than raised as an urgent decision at original
+closure time.
+
+**Stage A closure (subsequent pass, before Batch 17): RESOLVED.** Utkarsh made the decision directly: Nexus
+Entitlement Source creation remains manual-only for now; API-created and Import/Bulk-created sources are
+intentionally out of current product scope, not merely undecided. See I-003 and I-004's own entries above for
+the full `PRODUCT GAP → PRODUCT DECISION MADE → FUTURE MODULE` notation, and `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md`
+§7.2 / `docs/TECH_DEBT.md` for the recorded future trigger point. No open product decision remains from Batch 16.
 
 ## Summary reconciliation
 

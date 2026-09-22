@@ -315,8 +315,25 @@ a second real domain.
 `entitlement_sources` records one invoice's worth of entitlement
 (reference, date, quantity, metric, duration, optional supporting
 document reference). Creating a source never requires Go Live (§2);
-`source_type` is `MANUAL` today, with `API`/`IMPORT` reserved for a future
-integration using the same `createEntitlementSource` service function.
+confirmed live in Batch 16 (I-001).
+
+**Product decision (Stage A, post-Batch 16): manual only, for now.**
+`source_type` is `MANUAL` today; the column's own `check` constraint
+already allows `API`/`IMPORT`, but `create_entitlement_source` has no
+`p_source_type` parameter at all today, so every call unconditionally
+produces `MANUAL` (confirmed live, Batch 16 I-003/I-004). This is now a
+deliberate, decided product-scope boundary, not an open question:
+API-created and Import/Bulk-created Entitlement Sources are intentionally
+out of current scope. Building either requires designing the
+non-interactive caller authentication model first
+(`docs/API_INTEGRATION_ARCHITECTURE.md` §7, "Service principal / machine
+identity"), plus, for Import, a real file-format/validation decision;
+see `docs/TECH_DEBT.md` for the exact trigger point. When that work happens, it calls the same
+`createEntitlementSource` service function Manual entry already uses,
+per the interface-independence principle in
+`docs/API_INTEGRATION_ARCHITECTURE.md` §1: no business logic is
+duplicated, only a new caller and a new parameter are added.
+
 Cancelling a source (`cancel_entitlement_source`) also deletes its own
 schedule rows, since a cancelled invoice's allocation is void, not merely
 hidden.
