@@ -361,6 +361,35 @@ unconnected to `entitlement_sources`. A real CN-driven entitlement
 reduction/reversal mechanism is a future-module dependency (§8,
 `docs/TECH_DEBT.md`), not built here.
 
+**LOCKED RULE (Product Gap Closure, 2026-09-22): one Invoice reference
+creates entitlement at most once per customer, and its metric must match
+the component's own billed metric.** Both enforced server-side inside
+`create_entitlement_source`
+(migration `20261006000000_entitlement_source_duplicate_invoice_and_metric_checks.sql`):
+
+- **Duplicate invoice reference**: scoped to `customer_id` (Nexus has no
+  separate legal-entity concept, `docs/MASTER_DATA_FOUNDATION_DESIGN.md`),
+  normalized (`lower(btrim(...))`, matching the GST/PAN duplicate-detection
+  convention in `src/features/customer-onboarding/domain/
+  duplicate-detection.ts`), enforced by a real unique index
+  (`uq_entitlement_sources_customer_invoice_reference`) covering every
+  status including `cancelled`, since cancellation has zero effect on
+  already-derived entitlement (see the LOCKED RULE above). A concurrent
+  race is caught at the database level, not just the application layer.
+- **Metric mismatch**: the billed-metric source of truth is
+  `commercial_components.pricing_rule_parameters ->> 'pricingUnit'`
+  (a Reference Master code, `list_key = 'pricing_unit'`), resolved to its
+  label via `reference_options`, **not**
+  `measurement_definition_id`/`measurement_definitions`. That column and
+  table are fully designed (`MeasurementDefinition` type, mappers, a read
+  query in `configuration.data.ts`) but confirmed entirely unpopulated in
+  this database (0 of 72 live `commercial_components` rows, 0 rows in
+  `measurement_definitions`) as of this closure; do not build a future
+  metric-related check against it without first confirming it is actually
+  populated by then. Applicable only to `pricing_rule_kind in ('linear',
+  'volume', 'graduated')`; `flat` and `dimension` components legitimately
+  have no unit.
+
 ### 7.3 Additional-invoice handling: same mechanism, different anchor
 
 There is no separate "period" table. `entitlement_schedule_months` is one

@@ -94,6 +94,43 @@ Two parallel research passes completed before live execution (see conversation g
   correct fix. Not invented here. Checked against prior Product Gap/Decision records and TECH_DEBT: no prior
   finding on this specific question exists; this is a new, real finding, not a rediscovery.
 
+**PRODUCT GAP → PRODUCT DECISION → IMPLEMENTED → VERIFIED** (Product Gap Closure, post-Batch-19, 2026-09-22):
+
+- **Business decision**: one Invoice reference must create entitlement at most once, scoped to the customer (Nexus
+  has no separate legal-entity concept; `docs/MASTER_DATA_FOUNDATION_DESIGN.md` explicitly rejects one), not scoped
+  globally. The same reference remains valid for two different customers.
+- **Implementation**: migration `20261006000000_entitlement_source_duplicate_invoice_and_metric_checks.sql`.
+  `create_entitlement_source` now does a normalized (`lower(btrim(...))`, matching the existing GST/PAN
+  duplicate-detection convention in `src/features/customer-onboarding/domain/duplicate-detection.ts`) lookup against
+  `entitlement_sources.customer_id` before inserting, raising `ENTITLEMENT_SOURCE_DUPLICATE_INVOICE_REFERENCE` with
+  the exact conflicting source number named in the message.
+- **Server-side, race-proof enforcement**: a real unique index,
+  `uq_entitlement_sources_customer_invoice_reference on entitlement_sources (customer_id,
+  lower(btrim(invoice_reference)))`, covers every status (not just `active`), because the already-closed decision
+  that cancellation has zero effect on already-derived entitlement means a cancelled duplicate would still represent
+  double-counted entitlement. The RPC's own select-based check is wrapped around the insert inside a `begin ...
+  exception when unique_violation` block, so a genuine concurrent race (two requests both past the select) still
+  cannot both commit: the loser hits the index, not a raw duplicate row, and receives the same named,
+  human-readable error, not a generic constraint violation.
+- **Historical data**: live inspection before adding the index found exactly one pre-existing duplicate pair,
+  `ES-000006`/`ES-000007` on `test-sql-smoke-co` (`INV-B17-I023`), both self-created during this same batch's
+  original I-034 probe. `ES-000007`'s `invoice_reference` was renamed (not deleted) to
+  `INV-B17-I023-BATCH19-I034-DUPLICATE-TEST-FIXTURE` (via the migration itself, idempotent), preserving both rows
+  and their schedule data as historical evidence while unblocking the constraint. No real/sensitive data existed or
+  was touched.
+- **Retest, live RPC**: (1) first reference (`INV-I034-TEST-001`) on `test-sql-smoke-co` succeeded, creating
+  `ES-000008`; (2) the exact same reference again, same customer, rejected with the named error citing `ES-000008`;
+  (2b) a case/whitespace variant (`"  inv-i034-test-001  "`) of the same reference, same customer, also correctly
+  rejected, confirming normalization; (5) the same reference against a different customer
+  (`wf-test-j-decision-probe`) succeeded, creating `ES-000009`, confirming the per-customer scope; (8) `ES-000006`
+  (the original valid source) confirmed unchanged throughout.
+- **Manual UX verification, real browser, logged in as `wf-test.maker@example.test`**: navigated to
+  `test-sql-smoke-co`'s Linear component Entitlement page, opened the real "Add Invoice Entitlement" form, submitted
+  `INV-B17-I023` (exact duplicate of `ES-000006`): the form surfaced the exact server error inline (`"this customer
+  already has an Entitlement Source (ES-000006) using invoice reference \"INV-B17-I023\". One invoice can only
+  create entitlement once."`), no server-side bypass, no silent success.
+- Classification: **PRODUCT GAP → PRODUCT DECISION → IMPLEMENTED → VERIFIED**.
+
 ## I-035: Metric Mismatch Between Entitlement Source and Commercial Component's Billed Metric
 
 - Regular Path: in the same live creation as I-034, set `metric = "Outlets"` against a component actually billed on
@@ -106,6 +143,47 @@ Two parallel research passes completed before live execution (see conversation g
 - Classification: **PRODUCT GAP CONFIRMED**. Same reasoning as I-034: whether/how strictly to validate metric
   consistency is a business-policy question requiring product input on the correct UX (hard block vs. warn vs.
   constrain the field to the component's known metric), not invented here.
+
+**PRODUCT GAP → PRODUCT DECISION → IMPLEMENTED → VERIFIED** (Product Gap Closure, post-Batch-19, 2026-09-22):
+
+- **Business decision**: an Entitlement Source's metric must match the commercial component's own billed metric;
+  a mismatch is rejected.
+- **Source-of-truth correction found during implementation**: the obvious candidate,
+  `commercial_components.measurement_definition_id -> measurement_definitions.name`, is confirmed **never
+  populated** anywhere in this database: `measurement_definitions` has zero rows and 0 of 72 live
+  `commercial_components` rows have a `measurement_definition_id` set (confirmed by live query before writing any
+  code). Building the check against that column would have silently never fired. The real, populated source of
+  truth is `commercial_components.pricing_rule_parameters ->> 'pricingUnit'` (a Reference Master code, `list_key =
+  'pricing_unit'`, e.g. `USER`), resolved to its human label (`"User"`) via `reference_options`. This is only ever
+  populated for `pricing_rule_kind in ('linear', 'volume', 'graduated')`
+  (`src/features/customer-onboarding/domain/commercial-rate.ts`); `flat` and `dimension` components legitimately
+  have no unit, so the check is skipped for those rather than inventing a rule those types were never meant to
+  carry.
+- **Implementation**: same migration as I-034. `create_entitlement_source` resolves the current (`effective_to is
+  null`) `commercial_components` row for `p_stable_component_key`, and when its `pricing_rule_kind` is
+  linear/volume/graduated with a `pricingUnit` set, compares the resolved label against `p_metric` (both sides
+  normalized: lowercased, trimmed, and a single trailing "s" stripped, since Finance's existing free-text values are
+  plural, "Users", while the Reference Master label is singular, "User"; this is plain text-matching, not a new
+  business rule). Mismatch raises `ENTITLEMENT_SOURCE_METRIC_MISMATCH` naming both the given and expected metric.
+- **Server-side enforcement**: entirely inside the RPC; the UI's free-text `Metric` field is unchanged (still plain
+  text, per this batch's explicit "do not over-scope" instruction), so there is no client-side gate to rely on.
+- **Retest, live RPC**: matching metric (`"Users"` against a `pricingUnit = USER` component, resolved label
+  `"User"`) succeeded (`ES-000008`, also reused for the I-034 tests above); mismatched metric (`"Transactions"`)
+  correctly rejected with `ENTITLEMENT_SOURCE_METRIC_MISMATCH: metric "Transactions" does not match this
+  component's billed metric "User". Use the component's own billed metric.`; the rejected attempt created no row at
+  all (confirmed by a direct count query), so no schedule could ever be generated from it.
+- **Manual UX verification, real browser**: submitted `metric = "Transactions"` through the real "Add Invoice
+  Entitlement" form: the exact server message was shown inline, no silent acceptance. A follow-up submission with
+  `metric = "Users"` (matching) and a fresh invoice reference succeeded, and the new source (`ES-000010`) appeared
+  immediately in the Entitlement Sources table (screenshot evidence captured).
+- **Existing valid sources unchanged**: `ES-000001` through `ES-000006`, `ES-000008`, `ES-000009` untouched; this
+  check only ever applies at creation, never retroactively. `ES-000007` (pre-fix, genuinely metric-mismatched:
+  `"Outlets"` against a `USER`-priced component) is left exactly as it was, as historical evidence of the original
+  gap, consistent with never rewriting a preserved historical fixture.
+- **Neighbouring paths unaffected**: `generate_allocation_schedule`, `submit_monthly_usage`,
+  `record_settlement`/`reverse_settlement` were not touched by this migration; the full vitest suite (978 tests)
+  passes after this change (see Product Gap Closure checkpoint).
+- Classification: **PRODUCT GAP → PRODUCT DECISION → IMPLEMENTED → VERIFIED**.
 
 ## I-036: No Attachment Support Exists for Entitlement
 
@@ -461,3 +539,66 @@ condition, cross-domain interaction, or regression risk not adequately represent
    previously-settled decision.
 
 Applying discovery item 1 to `docs/NEXUS_JOURNEY_UNIVERSE.md`:
+
+---
+
+## Batch 19 Product Gap Closure (post-Batch-19, 2026-09-22)
+
+I-034 and I-035, historically classified PRODUCT GAP at Batch 19 closure, were decided and implemented after Batch
+19 closed. Both are documented in full under their own I-034/I-035 sections above (Regular Path / Stress Variant /
+Concurrency Variant / retest evidence / manual UX evidence), each closing with **PRODUCT GAP → PRODUCT DECISION →
+IMPLEMENTED → VERIFIED**. Batch 19's original historical arithmetic (`22 PASS + 1 FAILED THEN FIXED + PASS + 2
+PRODUCT GAP = 25`) is unchanged and not rewritten; this section is additive closure evidence, not a
+reclassification.
+
+**Migration**: `20261006000000_entitlement_source_duplicate_invoice_and_metric_checks.sql`, applied to the shared
+database via the Supabase CLI (not the MCP `apply_migration` tool).
+
+**Data mutation**: one historical test-fixture row renamed (not deleted): `entitlement_sources.id =
+7e99fb24-8852-48b3-94b5-99467c4b95b9` (`ES-000007`), `invoice_reference` changed from `INV-B17-I023` to
+`INV-B17-I023-BATCH19-I034-DUPLICATE-TEST-FIXTURE`. This row was itself a Batch 19 test fixture (self-created to
+prove the I-034 gap existed), not real or sensitive data. No other row was mutated.
+
+### Journey Discovery Check (I-034/I-035 implementation)
+
+1. **Concurrent duplicate Invoice Source creation**: **ALREADY COVERED** by the implementation itself, not a new
+   finding. The unique index (`uq_entitlement_sources_customer_invoice_reference`) plus the RPC's
+   `exception when unique_violation` handler make this structurally impossible to lose silently; this is the
+   mechanism, not a residual gap.
+2. **Normalization/case/whitespace behavior of Invoice references**: **REGRESSION TEST ONLY**. Live-confirmed
+   correct (trim + lowercase, matching the existing GST/PAN convention); worth a permanent automated regression
+   test if/when this domain gets vitest-level RPC coverage (it does not today; this program's methodology for SQL
+   RPC behavior has consistently been live execution + this ledger, matching every other batch), but not a new
+   product question.
+3. **Customer/legal-entity uniqueness boundary**: **ALREADY COVERED**. Confirmed and documented: Nexus has no
+   separate legal-entity concept (`docs/MASTER_DATA_FOUNDATION_DESIGN.md` explicitly rejects one); `customer_id` is
+   the correct and only boundary. Not an open question.
+4. **Metric lookup across component types**: **EXPAND EXISTING JOURNEY**, applied directly to I-035's own entry in
+   `docs/NEXUS_JOURNEY_UNIVERSE.md` rather than a new journey ID (matching the user's own stated expectation): the
+   real, populated source of truth (`pricing_rule_parameters ->> 'pricingUnit'`, not
+   `measurement_definition_id`) and its scope (`linear`/`volume`/`graduated` only; `flat`/`dimension` skipped) are
+   now recorded in both the Journey Universe entry and `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2, so a future
+   batch does not have to rediscover this from scratch or assume `measurement_definitions` is live data.
+5. **A genuinely new structural finding surfaced during implementation, not asked for by name**:
+   `measurement_definitions`/`measurement_definition_id` is fully designed in code (types, mappers, a read query)
+   but has zero live data and zero live writes anywhere in this database. **PRODUCT DECISION REQUIRED, but not
+   urgent**: is `measurement_definitions` an intentionally deferred future capability (in which case its dead
+   read-path code should stay as-is, documented as such), or should `commercial_components.measurement_definition_id`
+   actually be populated going forward as the long-term canonical source of truth (in which case `pricingUnit`
+   free-text-in-jsonb is the interim/legacy mechanism this fix correctly builds against today, and a future
+   migration would need to backfill/switch over)? Not invented here; both `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md`
+   and `docs/TECH_DEBT.md`-adjacent context now record the finding precisely so the question can be posed rather
+   than silently assumed either way.
+6. No candidate required a new journey ID; no candidate was classified FUTURE MODULE beyond what was already
+   settled (manual-only source creation, API/Import deferral).
+
+### Closure checkpoint
+
+- Targeted I-034/I-035 tests: all required tests executed and passed (see I-034/I-035 sections above).
+- Neighbouring Entitlement tests: `generate_allocation_schedule`, `submit_monthly_usage`, `record_settlement` paths
+  unmodified by this migration; full vitest suite green (978/978) after the change.
+- `npx tsc --noEmit`: clean.
+- `npm run lint`: clean.
+- Production build: succeeds.
+- Manual UX verification: real browser, `wf-test.maker@example.test`, real "Add Invoice Entitlement" form, both
+  error paths (duplicate reference, metric mismatch) and the valid-creation path all confirmed live.

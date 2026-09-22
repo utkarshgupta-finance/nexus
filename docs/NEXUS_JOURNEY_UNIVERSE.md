@@ -7025,7 +7025,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: I-007
 - Notes: N/A
 
-### I-034: Duplicate Invoice Reference Handling on Source Creation
+### I-034: Duplicate Invoice Reference Handling on Source Creation (PRODUCT DECISION CLOSED, IMPLEMENTED)
 - Pack: I - Entitlement
 - Business Objective: Confirm the system's behavior when a second entitlement source is created referencing an invoiceReference that already exists, guarding against accidental double-entry of the same invoice.
 - Domain: Entitlement
@@ -7033,24 +7033,43 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: An entitlement_sources row already exists with invoiceReference = "INV-1001".
 - Personas: Finance Ops Analyst
 - Preconditions: N/A
-- Regular Path: Analyst attempts to create a second entitlement_sources row with the same invoiceReference "INV-1001" (e.g. accidental double data entry); document actual behavior, rejection with a duplicate warning, or silent acceptance as two independent rows, and confirm whether the second is intended or a genuine data-integrity gap.
-- Stress Variant: Same invoiceReference used across two different customers (should likely be allowed, since invoice numbers are not guaranteed globally unique across customers) versus the same customer (higher risk of true duplication).
+- Regular Path: [CLOSED, Product Gap Closure, 2026-09-22] Decided: one Invoice reference creates entitlement at most
+  once, scoped to the customer (Nexus has no separate legal-entity concept). A second `create_entitlement_source`
+  call with a case/whitespace-normalized-matching `invoice_reference` for the same `customer_id` is rejected with
+  `ENTITLEMENT_SOURCE_DUPLICATE_INVOICE_REFERENCE`, naming the conflicting source number. Live-verified, both via
+  direct RPC and through the real "Add Invoice Entitlement" UI form.
+- Stress Variant: [CLOSED, Product Gap Closure, 2026-09-22] Confirmed live: the same reference across two different
+  customers succeeds (per the decided per-customer scope); the same reference for the same customer is always
+  rejected, including a cancelled prior source (cancellation has zero entitlement effect, so its reference remains
+  blocked, per the already-closed I-015 decision).
 - Authorization Variant: N/A
-- Concurrency Variant: Two near-simultaneous creations with the same invoiceReference for the same customer; confirm whether a race allows both to slip through if a uniqueness check exists only at the application layer.
+- Concurrency Variant: [CLOSED, Product Gap Closure, 2026-09-22] Enforced at the database level: a real unique index
+  (`uq_entitlement_sources_customer_invoice_reference`) makes the race structurally impossible to lose silently; the
+  RPC catches the resulting `unique_violation` and converts it to the same named, human-readable error, so even the
+  losing side of a genuine race gets a clear message, not a raw constraint error.
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: If duplicates are allowed, confirm double-entry does not silently double the customer's entitlement pool without at least a visible warning.
+- Audit/Data Integrity Checks: [CLOSED, Product Gap Closure, 2026-09-22] Confirmed: a rejected duplicate creates no
+  row at all (the whole insert is rejected before any row exists), so it cannot inflate the customer's entitlement
+  pool even momentarily.
 - Recovery/Resilience Variant: N/A
-- UX Checks: UI warns the analyst before submission if a matching invoiceReference already exists for the customer.
+- UX Checks: [CLOSED, Product Gap Closure, 2026-09-22] Live-confirmed: the real "Add Invoice Entitlement" form
+  surfaces the exact server-side error inline before any row is created.
 - Historical Variant: N/A
-- Expected Business Result: Accidental duplicate invoice entry does not silently inflate a customer's entitlement.
-- Expected Technical Invariants: To be confirmed: no uniqueness constraint is documented in the grounding brief for invoiceReference, so treat the actual enforcement level as unverified rather than assuming a constraint exists.
+- Expected Business Result: [CLOSED, Product Gap Closure, 2026-09-22] Accidental duplicate invoice entry cannot
+  create entitlement more than once for the same customer, confirmed live.
+- Expected Technical Invariants: [CLOSED, Product Gap Closure, 2026-09-22]
+  `uq_entitlement_sources_customer_invoice_reference on entitlement_sources (customer_id,
+  lower(btrim(invoice_reference)))` covers every status, not only `active`.
 - Priority: P2
 - Automation Feasibility: PARTIAL
 - Dependencies: N/A
 - Related Journeys: N/A
-- Notes: Grounding brief does not confirm a uniqueness constraint on invoiceReference; this journey is explicitly written to discover and document actual behavior rather than assert a specific expected outcome.
+- Notes: [CLOSED, Product Gap Closure, 2026-09-22] Originally a discovery journey (Batch 19 classified it PRODUCT
+  GAP CONFIRMED); the business decision was made after Batch 19 closed and implemented via migration
+  `20261006000000_entitlement_source_duplicate_invoice_and_metric_checks.sql`. Full evidence in
+  `docs/journey-runs/BATCH_19_RESULTS.md` under I-034's Product Gap Closure entry.
 
-### I-035: Metric Mismatch Between Entitlement Source and Commercial Component's Billed Metric
+### I-035: Metric Mismatch Between Entitlement Source and Commercial Component's Billed Metric (PRODUCT DECISION CLOSED, IMPLEMENTED)
 - Pack: I - Entitlement
 - Business Objective: Confirm the system prevents (or at least clearly flags) an entitlement source recorded against a metric that does not match the commercial component's actual billed metric, which would silently produce a meaningless ledger.
 - Domain: Entitlement, Commercial
@@ -7058,22 +7077,39 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Starting State: A commercial component billed on metric "API_CALLS"; an analyst attempts to create an entitlement_sources row with metric = "STORAGE_GB" for that same component.
 - Personas: Finance Ops Analyst
 - Preconditions: N/A
-- Regular Path: Attempt to create the mismatched source; document actual behavior, validation rejection versus silent acceptance of a meaningless combination, since a mismatch would make the entitlement ledger's usage-vs-entitlement comparison for that component nonsensical.
-- Stress Variant: A metric string with a typo/case difference (e.g. "api_calls" vs "API_CALLS") that a naive string comparison would treat as a mismatch even though it is meant to be the same metric.
+- Regular Path: [CLOSED, Product Gap Closure, 2026-09-22] Decided: the metric must match the component's own billed
+  metric. The real, populated source of truth is `commercial_components.pricing_rule_parameters ->>
+  'pricingUnit'` (a Reference Master code, resolved to its label via `reference_options`), NOT
+  `measurement_definition_id`/`measurement_definitions`, which is confirmed empty/unpopulated everywhere in this
+  database (0 of 72 live components have it set). Mismatch is rejected with `ENTITLEMENT_SOURCE_METRIC_MISMATCH`,
+  naming both the given and expected metric. Live-verified via direct RPC and the real UI form.
+- Stress Variant: [CLOSED, Product Gap Closure, 2026-09-22] Comparison normalizes case, whitespace, and a trailing
+  "s" (Finance's free-text values are plural, "Users"; the Reference Master label is singular, "User") before
+  comparing, so this class of superficial mismatch does not falsely reject a genuine match.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: If mismatches are allowed, confirm the resulting ledger clearly surfaces the mismatch rather than silently comparing incompatible quantities.
+- Audit/Data Integrity Checks: [CLOSED, Product Gap Closure, 2026-09-22] Confirmed: a rejected mismatch creates no
+  row and so can never enter the ledger; the check only applies to `pricing_rule_kind in ('linear', 'volume',
+  'graduated')`, since `flat` and `dimension` components legitimately have no unit to compare against.
 - Recovery/Resilience Variant: N/A
-- UX Checks: Source creation form ideally pre-fills or constrains the metric field to the component's actual billed metric to prevent this class of error at entry time.
+- UX Checks: [CLOSED, Product Gap Closure, 2026-09-22] The metric field remains free text (not converted to a
+  select in this pass, per explicit scope); the real-time server error is the enforcement mechanism, confirmed live
+  through the actual "Add Invoice Entitlement" form.
 - Historical Variant: N/A
-- Expected Business Result: Entitlement figures are never silently computed against a mismatched metric, which would produce meaningless overage/underuse figures.
-- Expected Technical Invariants: To be confirmed against actual validation logic; not explicitly guaranteed in the grounding brief, treat as a discovery journey.
+- Expected Business Result: [CLOSED, Product Gap Closure, 2026-09-22] Entitlement figures can no longer be created
+  against a metric mismatched from the component's own billed unit, confirmed live.
+- Expected Technical Invariants: [CLOSED, Product Gap Closure, 2026-09-22] Enforced entirely server-side inside
+  `create_entitlement_source`; applicable only when the resolved component has a populated `pricingUnit`.
 - Priority: P1
 - Automation Feasibility: PARTIAL
 - Dependencies: N/A
 - Related Journeys: N/A
-- Notes: Grounding brief does not confirm whether metric validation against the component's billed metric exists; written to discover actual behavior.
+- Notes: [CLOSED, Product Gap Closure, 2026-09-22] Originally a discovery journey (Batch 19 classified it PRODUCT
+  GAP CONFIRMED); implemented via the same migration as I-034,
+  `20261006000000_entitlement_source_duplicate_invoice_and_metric_checks.sql`. Full evidence, including the
+  discovery that `measurement_definitions` is entirely vestigial in this database, in
+  `docs/journey-runs/BATCH_19_RESULTS.md` under I-035's Product Gap Closure entry.
 
 ### I-036: No Attachment Support Exists for Entitlement
 - Pack: I - Entitlement

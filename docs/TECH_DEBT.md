@@ -28,6 +28,16 @@ into a second backlog.
   entry applies today (creation happens via a single navigation, not a
   repeatable button) and the same deferral reasoning holds; listed here
   so a future idempotency-key pass covers five RPCs, not three.
+  **Partially mitigated for `create_entitlement_source` (Product Gap
+  Closure, 2026-09-22):** the unique constraint added for I-034
+  (`uq_entitlement_sources_customer_invoice_reference`) incidentally
+  catches a same-invoice-reference retry too, since that is exactly the
+  duplicate-key case it was built to reject. It is not a purpose-built
+  idempotency key (a retry with a client-minted UUID but a mistyped or
+  differently-formatted reference would still slip through), so this
+  entry stays open for `create_go_live_request` and as a reminder that a
+  real idempotency-key pass is still the correct eventual fix, not this
+  side effect.
   `record_settlement`, the one RPC in this family with no natural
   create-then-retry shape at all (no client id, and its own derived
   status directly sums every row), was fixed this round with a real
