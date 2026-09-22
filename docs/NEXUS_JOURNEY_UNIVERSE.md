@@ -7795,30 +7795,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: J-001, J-016
 - Notes: N/A
 
-### J-024: Decision Node With No Fallback in a Domain That Never Matches Always Dead-Ends
+### J-024: Decision Node With No Fallback in a Domain That Never Matches Always Dead-Ends [PREMISE PARTIALLY CORRECTED, 2026-09-22]
 - Pack: J - Workflow Runtime
 - Business Objective: Combine J-007's empty-context finding with J-006's no-fallback finding to confirm the worst-case authoring mistake: any Decision node with only conditioned (segment) edges and no fallback, placed in onboarding, change, or go_live, is a guaranteed WORKFLOW_DECISION_NO_MATCH for every single request in that domain, with no exceptions.
-- Domain: customer_onboarding, customer_change, go_live (all three, since all pass empty decision context)
+- Domain: customer_onboarding, customer_change, go_live [CORRECTED, 2026-09-22] Only go_live still genuinely passes an empty decision context unconditionally, confirmed live this run: a no-fallback decision graph submitted against a real `segment = "enterprise"` customer still dead-ended with `WORKFLOW_DECISION_NO_MATCH`, because `submit_go_live_request` calls the resolver with a hardcoded `'{}'::jsonb}` literal, independent of any real data. customer_onboarding (J-007) and customer_change (J-008) were already corrected in Batch 19: both now derive a real, non-empty `segment` from the submission/customer, so a no-fallback decision node in those two domains dead-ends only when the resolved segment matches no conditioned edge, not unconditionally for every request. This journey's own grouping predates that Batch 19 correction and was never updated to match; it is updated now.
 - Object / Record Type: Decision node with only conditioned edges, no fallback, published into a non-commercial-configuration domain
 - Starting State: Published graph as described.
 - Personas: Requestor
 - Preconditions: N/A
-- Regular Path: Every submission attempt in this domain fails identically with WORKFLOW_DECISION_NO_MATCH, with no successful path ever existing until an admin edits the graph.
-- Stress Variant: Confirm across multiple distinct requestors and multiple distinct underlying customer segments, all producing the same universal failure.
+- Regular Path: [CORRECTED, 2026-09-22] In go_live: every submission attempt fails identically with WORKFLOW_DECISION_NO_MATCH, with no successful path ever existing until an admin edits the graph (original claim holds exactly as written). In customer_onboarding and customer_change: a submission fails with WORKFLOW_DECISION_NO_MATCH only when the resolved real segment matches none of the conditioned edges (live-confirmed this run for customer_change: a change proposing an unrecognized segment value dead-ended; a change proposing `segment: "enterprise"` against the same no-fallback graph correctly routed through instead of dead-ending). The "100% domain-wide outage regardless of data" framing is accurate for go_live only.
+- Stress Variant: [CORRECTED, 2026-09-22] In go_live, confirm across multiple distinct requestors/customers, all producing the same universal failure (the original Stress Variant, still valid there). In onboarding/customer_change, the correct stress variant is confirming the dead-end tracks the resolved segment (matches an edge -> succeeds; matches none -> dead-ends), not that it is universal.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Zero successful submits ever recorded against this workflow_version_id for this domain.
+- Audit/Data Integrity Checks: Zero successful submits ever recorded against this workflow_version_id, for go_live specifically; for onboarding/customer_change, zero successful submits only among the requests whose resolved segment matched no edge.
 - Recovery/Resilience Variant: Builder admin must add a fallback edge (or remove the Decision node) in a new draft and republish; per L's binding rules this fixes only NEWLY created requests, any already-failed submit attempt simply gets retried fresh (submissions that failed never got a workflow_version_id-consuming row created, so this is recoverable, unlike J-015).
 - UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: A total, domain-wide outage for this workflow (100% submit failure rate) is possible from a single bad Decision node authoring choice; this is a maximal-severity instance of J-006/J-007.
+- Expected Business Result: [CORRECTED, 2026-09-22] A total, domain-wide outage for this workflow (100% submit failure rate) from a single bad Decision node authoring choice is a real risk specifically in go_live; in onboarding/customer_change the same authoring mistake is a data-dependent partial-failure risk, not a guaranteed total outage, since real segment data can legitimately route around it.
 - Expected Technical Invariants: N/A
 - Priority: P0
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: J-006, J-007, J-008, J-009
-- Notes: Recommend this be flagged as a product gap: the Builder should warn (or the publish-time validator should require) a fallback edge on any Decision node in a domain that provides no decision context.
+- Notes: [CORRECTED, 2026-09-22] The publish-time validator does require a Decision node to have at least two outgoing branches to publish at all (confirmed live this run), but does not require a fallback specifically; a genuinely no-fallback, multi-conditioned-branch Decision node remains publishable and is exactly what this journey exercises. The original Notes field's recommendation (warn or require a fallback edge in a domain with no decision context) is now only well-founded for go_live, since onboarding and customer_change do have real decision context today.
 
 ### J-025: Decision Node Fallback Reached Consistently Regardless of Which Conditioned Edges Exist
 - Pack: J - Workflow Runtime

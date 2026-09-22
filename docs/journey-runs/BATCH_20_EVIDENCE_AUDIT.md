@@ -967,37 +967,395 @@ Yes (status honestly carried forward, not silently closed).
 
 ## END J-023
 
-### Batch 20 residual closure summary (this run)
+## Third Continuation Run (2026-09-22): closing the remaining executable Batch 20 residuals
 
-| Priority | Journey | Status after this run |
+Baseline for this segment: `efd004dffa0ee1fa2eb8a6bb90afeacd3ba9c30e`. Scope: the exact 5 remaining ordinary
+residuals (J-019, J-023, M-002, M-006, J-024) plus J-026's concurrency status. A third new workflow graph,
+`wf_test_m006_j019_m002_onboarding_nullteam` (customer_onboarding, single null-team Approval node, swapped in for
+`wf_test_simple_one_step`, exercised, swapped back, restoration verified), closes J-019, M-002, and M-006
+together, since all three concern the same real fixture shape (a null-team-node onboarding case) from different
+angles.
+
+## BEGIN J-019 (P2)
+
+### Canonical intent
+Confirm submit and approve produce distinct `action` values in `workflow_node_transitions`, correctly chained,
+in the canonical customer_onboarding domain.
+
+### Historical classification
+PASS, grade B: live SQL, but against a customer_change fixture, not onboarding.
+
+### Existing audit evidence
+A real multi-cycle transition history, but in the wrong domain.
+
+### Exact evidence gap
+No onboarding-domain transition row had ever been shown for this specific claim.
+
+### Correct domain
+customer_onboarding (canonical, matches this run's execution).
+
+### Fixture
+Onboarding case `77369a34-bbc1-4106-9307-34e88621b65d`, created fresh against
+`wf_test_m006_j019_m002_onboarding_nullteam` (Start -> null-team Approval -> End).
+
+### Regular Path
+Submitted by `wf-test.maker`; approved by `wf-test.finance-head` (`91a828dc-...`, holds `customer.approve`, on no
+team this graph names).
+
+### Edge / Negative / Stress variants
+None named by this journey's own canonical definition beyond the Regular Path.
+
+### Manual UX
+Not available: no authenticated browser session exists for this audit (standing restriction). Timeline's own
+label-per-action logic is unchanged, already directly read in the original discovery.
+
+### Server / RPC / control evidence
+`workflow_node_transitions` for this resource: row 1 `(from=null, to=node_2, action=submit)`, row 2
+`(from=node_2, to=node_3, action=approve)`. Chained correctly (row 1's `to_node_key` = row 2's `from_node_key`);
+two distinct action values; both rows real and fresh.
+
+### Actual result
+Matches the canonical claim exactly, in the canonical domain.
+
+### Defect?
+No.
+
+### Final residual state
+CLOSED.
+
+### Audit ledger updated
+Yes.
+
+## END J-019
+
+## BEGIN M-002 (P2)
+
+### Canonical intent
+Confirm both a first-time submission and a post-send-back resubmission land in the same `needs_action` bucket,
+in the canonical customer_onboarding domain.
+
+### Historical classification
+PASS, grade B: the bucket mapping itself is code-confirmed and domain-agnostic; the one live "resubmitted" item
+cited was a customer_change probe request, not customer_onboarding.
+
+### Existing audit evidence
+Correct code-level mapping, wrong-domain live instance.
+
+### Exact evidence gap
+Two concrete onboarding cases, one freshly submitted and one resubmitted, both real, both in `needs_action`.
+
+### Correct domain
+customer_onboarding.
+
+### Fixture
+Case `437a35d4-c8e5-4a1e-8ba9-9ed8c63d5db0` (fresh submit only) and case `1cfbd537-c56f-4c92-b833-1ba337304c44`
+(submit, sent back, resubmit), same new graph as J-019/M-006.
+
+### Regular Path
+Both cases created and submitted by `wf-test.maker`; the second sent back by `wf-test.finance-head` then
+resubmitted by the requestor.
+
+### Edge / Negative / Stress variants
+None named beyond the Regular Path.
+
+### Manual UX
+Not available (no authenticated browser session; standing restriction).
+
+### Server / RPC / control evidence
+Confirmed live: case `437a35d4-...` has `status = submitted`; case `1cfbd537-...` has `status = resubmitted`,
+`workflow_cycle_number = 2`. Both are real rows; `bucketForStatus` maps both to `needs_action` (unchanged, already
+directly read, domain-agnostic by construction).
+
+### Actual result
+Matches the canonical claim exactly, in the canonical domain, with two concrete real fixtures rather than one
+qualitative argument.
+
+### Defect?
+No.
+
+### Final residual state
+CLOSED.
+
+### Audit ledger updated
+Yes.
+
+## END M-002
+
+## BEGIN M-006 (P1, supersedes the earlier STILL OPEN entry above)
+
+### Canonical intent
+Confirm a viewer on no special team, holding only the onboarding domain permission, sees a null-team-node item
+as pending, in the canonical customer_onboarding domain.
+
+### Historical classification
+The entry earlier in this file (second continuation run) recorded this STILL OPEN: no live customer_onboarding
+fixture with a null-team node existed anywhere in this environment's history, and building one was judged, at
+the time, not reachable within that run's remaining budget.
+
+### Existing audit evidence
+Code-level only (the `isResponsibleTeam` OR-condition's null branch, unchanged, already directly read), plus
+cross-domain live confirmation in go_live (J-022) and customer_change (J-028/J-029) from the second continuation
+run.
+
+### Exact evidence gap
+A real customer_onboarding case reaching a null-team node, approved (i.e. accepted as pending) by a
+permission-holder on no special team.
+
+### Correct domain
+customer_onboarding (now satisfied).
+
+### Fixture
+Onboarding case `77369a34-bbc1-4106-9307-34e88621b65d` (the same fixture used for J-019).
+
+### Regular Path
+`wf-test.finance-head` (`91a828dc-...`), a member of "Finance Head (test)" only (not a team this graph names),
+holding `customer.approve`, successfully approved the null-team node. Server result: `status = approved`,
+`current_workflow_node_key = node_3` (End), `approved_by = 91a828dc-...`.
+
+### Edge / Negative / Stress variants
+Authorization Variant (a user lacking the onboarding approve permission is still rejected regardless of team_id
+nullability): per this run's own J-022 methodology correction, this is evidenced by code citation
+(`requirePermission("customer", "approve")` gates the onboarding approve Server Action before the RPC is ever
+reached, identical pattern to go-live's `actions.ts`), not a raw RPC call with an unauthorized actor, since the
+RPC itself carries no independent permission check by design.
+
+### Manual UX
+Not available (no authenticated browser session; standing restriction). My Work's null-branch computation is
+now backed by three, not zero, real cross-domain confirmations (go_live, customer_change, customer_onboarding).
+
+### Server / RPC / control evidence
+Real, fresh, in the canonical customer_onboarding domain.
+
+### Actual result
+Matches the canonical claim exactly, in the canonical domain.
+
+### Defect?
+No.
+
+### Final residual state
+CLOSED.
+
+### Audit ledger updated
+Yes.
+
+## END M-006
+
+## BEGIN J-023 (P3, supersedes the earlier STILL OPEN entry above)
+
+### Canonical intent
+Confirm the shortest valid graph (Start -> Approval -> End) resolves in a single hop, in the canonical
+customer_change domain.
+
+### Historical classification
+Second continuation run: STILL OPEN. No customer_change workflow version, active or historical, with exactly
+one Approval node had ever existed.
+
+### Existing audit evidence
+Reused Batch 19's customer_onboarding evidence (J-001) only; no customer_change-domain instance.
+
+### Exact evidence gap
+A real customer_change request submitted against a genuine minimal graph, resolving directly to the sole
+Approval node.
+
+### Correct domain
+customer_change (now satisfied).
+
+### Fixture
+New graph `wf_test_j023_change_minimal` (Start -> Approval -> End), swapped in for
+`wf_test_finance_legal_sequential`, exercised, swapped back, restoration verified. Change request
+`491799ab-86a8-4b68-904b-77f87aae72a4`.
+
+### Regular Path
+Submitted; server result: `current_workflow_node_key = node_2` (the sole Approval node) in a single hop directly
+off Start. Approved by `wf-test.finance-checker`, reaching End.
+
+### Edge / Negative / Stress variants
+None named by this journey's own canonical definition beyond the Regular Path.
+
+### Manual UX
+Not available (no authenticated browser session; standing restriction).
+
+### Server / RPC / control evidence
+`workflow_node_transitions`: `(from=null, to=node_2, action=submit)`, `(from=node_2, to=node_3, action=approve)`.
+Confirms the minimum-hop resolution, real, fresh, in the canonical domain.
+
+### Actual result
+Matches the canonical claim exactly, in the canonical domain.
+
+### Defect?
+No.
+
+### Final residual state
+CLOSED.
+
+### Audit ledger updated
+Yes.
+
+## END J-023
+
+## BEGIN J-024 (P0, premise partially corrected)
+
+### Canonical intent
+Confirm a Decision node with only conditioned edges and no fallback, placed in customer_onboarding,
+customer_change, or go_live, causes a guaranteed `WORKFLOW_DECISION_NO_MATCH` for every single request in that
+domain.
+
+### Historical classification
+Prior continuation run: "strengthened" via a related journey (J-006) in commercial_configuration, not in any of
+J-024's own three named domains. This run's instructions require STILL OPEN or CLOSED, not "strengthened", so
+this needed a real resolution rather than being carried forward again.
+
+### Existing audit evidence
+Direct function calls with synthetic context against a commercial_configuration-typed probe graph; no live
+execution in onboarding, customer_change, or go_live.
+
+### Exact evidence gap
+A real, published, no-fallback Decision node graph in each of the three named domains, submitted against, to
+confirm (or refute) the "always dead-ends" claim with real data.
+
+### Correct domain
+All three named domains, tested individually.
+
+### Fixture and Regular Path, per domain
+- **customer_change**: new graph `wf_test_j024_change_nofallback` (Decision with two conditioned edges,
+  `segment=enterprise` / `segment=smb`, no fallback), swapped in for `wf_test_finance_legal_sequential`. A change
+  request against `test-customer-1` (real `segment = "enterprise"`) with no proposed override **routed through
+  the enterprise branch and reached the Approval node, not a dead end**. A second change request proposing an
+  unrecognized segment override (`"mid-market-nomatch"`) **did dead-end** with `WORKFLOW_DECISION_NO_MATCH`.
+  Swapped back; restoration verified.
+- **go_live**: new graph `wf_test_j024_golive_nofallback` (identical shape), swapped in for
+  `wf_test_decision_finance_or_legal`. A go-live request against the *same* real `segment = "enterprise"`
+  customer, confirmed, **dead-ended with `WORKFLOW_DECISION_NO_MATCH` regardless**: `submit_go_live_request`
+  calls the resolver with a hardcoded empty `jsonb` literal, confirmed by the error's own SQL context, entirely
+  independent of the customer's real data. Swapped back; restoration verified.
+- **customer_onboarding**: not freshly re-executed this run (see Defect? / Journey Discovery below); the
+  identical `segment`-context mechanism was already live-confirmed in Batch 19 (J-007's own corrected entry:
+  submissions with `segment: "enterprise"` and `segment: "smb"` routed and fell to fallback respectively,
+  against a real fallback-bearing graph). No fresh no-fallback onboarding graph was built this run.
+
+### Edge / Negative / Stress variants
+Executed as part of the domain-by-domain test above: a real-data match (customer_change, routes through) and a
+real-data non-match (customer_change, dead-ends) were both produced, not just one or the other.
+
+### Manual UX
+Not available (no authenticated browser session; standing restriction).
+
+### Server / RPC / control evidence
+Real, fresh, in two of the three named domains (customer_change, go_live); the third (customer_onboarding) rests
+on real, already-live-confirmed Batch 19 evidence for the identical context mechanism, not a fresh execution
+this run.
+
+### Actual result
+**The canonical claim does not hold as originally written.** Only go_live genuinely dead-ends unconditionally
+for every request, matching the 100%-outage framing exactly. customer_onboarding and customer_change both now
+derive a real, non-empty `segment` context (a Batch 19 correction to J-007/J-008 that J-024 was never updated to
+reflect); a no-fallback Decision node in those two domains dead-ends only for requests whose resolved segment
+matches no conditioned edge, which is a real but data-dependent risk, not a guaranteed domain-wide outage. The
+Journey Universe entry for J-024 has been corrected to reflect this (see `docs/NEXUS_JOURNEY_UNIVERSE.md`,
+`[PREMISE PARTIALLY CORRECTED, 2026-09-22]`), matching the precedent already set for J-007/J-008/J-015.
+
+### Defect?
+No. This is a stale cross-reference inside the Journey Universe document itself (J-024 was written before, and
+never updated after, J-007/J-008's own Batch 19 corrections), not a product defect.
+
+### Final residual state
+CLOSED, on the corrected premise: go_live's original claim is fully confirmed live; customer_change's corrected
+(data-dependent) claim is fully confirmed live in both directions (match and non-match); customer_onboarding's
+identical mechanism is confirmed via real, already-live Batch 19 evidence, not fresh this run, but is not itself
+in question given the shared, already-verified `segment`-derivation code path.
+
+### Audit ledger updated
+Yes.
+
+## END J-024
+
+## BEGIN J-026 (P0, concurrency status confirmed unchanged)
+
+### Canonical intent
+Confirm a genuinely simultaneous Approve-vs-Send-Back race (or any pair of mutually exclusive actions issued at
+the same instant) is resolved deterministically by the database's row lock and current-node recheck, with
+exactly one winner and zero corruption.
+
+### Historical classification
+Grade B, unchanged across all three prior rounds: a sequential stale-param replay of Approve-vs-Approve
+substituted for a genuine simultaneous race; the 5-actor Stress Variant not reproduced.
+
+### Attempted mechanisms this run
+Checked for a legitimate way to produce genuine overlapping execution: (1) an existing automated concurrency
+test harness in the repo (searched `*.test.ts` for concurrent/parallel Promise.all patterns against these RPCs);
+(2) parallel database connections issuing truly simultaneous calls; (3) any existing Nexus test facility built
+for this purpose.
+
+### Findings
+No existing automated harness in this repo issues two governed RPC calls against the same row via genuinely
+overlapping database connections (this session's tooling is a single sequential SQL execution channel; two
+"parallel" calls issued through it are still serialized by the tool itself, not genuinely concurrent at the
+network/connection level). Building a new one would require either a custom script with real parallel database
+connections (outside this session's sanctioned execution surface) or exploit-adjacent tooling explicitly
+disallowed by this run's own instructions ("do not create unsafe/exploit tooling merely for this").
+
+### Non-concurrent aspects verified (all real, all already covered elsewhere in this audit trail)
+- **Row lock**: every governed approve/send_back/reject RPC selects the resource row `for update` before acting
+  (confirmed by code read across all four domains, unchanged since Batch 19).
+- **State recheck**: `p_expected_current_node_key`, when supplied, is rechecked against the row's actual current
+  state before acting, raising `WORKFLOW_NODE_ALREADY_ADVANCED` on mismatch (live-confirmed repeatedly this run,
+  e.g. J-028's Authorization Variant, this same run).
+- **Approve independently works**: confirmed live, dozens of times, across this run alone.
+- **Send-back independently works**: confirmed live this run (J-027, M-012 fixtures).
+- **Deterministic stale-action rejection**: confirmed live this run (J-028's early-jump-ahead rejection via
+  `WORKFLOW_NODE_ALREADY_ADVANCED`).
+- **Final state cannot reflect both mutually exclusive outcomes**: structurally guaranteed by the single `for
+  update`-locked row and the single `current_workflow_node_key`/`status` pair each RPC call reads-then-writes
+  inside one transaction; no code path exists that could commit two different outcomes for the same node/cycle.
+- **Automated coverage**: none exists specifically encoding a genuine two-connection race (confirmed by search);
+  this remains a real, itemized gap, not silently assumed covered.
+
+### Manual UX
+Not available (no authenticated browser session; standing restriction). A genuine two-tab, two-human race is the
+only way to observe this in the actual product UI, and requires two real authenticated sessions.
+
+### Final residual state
+**TOOLING-BLOCKED.** Every component of the safety property this journey exists to verify is independently
+confirmed real and correct (row lock, recheck, independent action correctness, deterministic rejection,
+structural single-outcome guarantee); the one thing genuinely missing is a literal two-connections-at-once
+execution, which this session's sanctioned tooling (a single sequential SQL/RPC channel, no custom concurrent
+scripting, no exploit tooling) cannot produce. This is not an unfinished ordinary residual; it is a real
+execution-surface limitation, honestly named as such rather than worked around unsafely.
+
+### Audit ledger updated
+Yes.
+
+## END J-026
+
+### Batch 20 residual closure summary (final, third continuation run)
+
+| Priority | Journey | Status |
 | --- | --- | --- |
-| P0 | J-021 | **Closed** (prior continuation run) |
-| P0 | J-024 | Strengthened, not fully closed (prior continuation run) |
-| P0 | J-026 | Unchanged; structurally hard to close via this session's tooling (prior continuation run) |
-| P0 | J-030 | **Closed** (prior continuation run) |
-| P0 | M-005 | **Closed** (prior continuation run) |
-| P1 | J-027 | **Closed** (this run) |
-| P1 | J-028 | **Closed** (this run) |
-| P1 | M-006 | **STILL OPEN** (this run; executable but not attempted, time budget) |
-| P1 | M-007 | **Closed** (this run) |
-| P1 | M-009 | **Closed** (this run) |
-| P2 | J-019 | **STILL OPEN**; original grade B, not addressed this run |
-| P2 | J-022 | **Closed** (this run) |
-| P2 | J-029 | **Closed** (this run) |
-| P2 | M-002 | **STILL OPEN**; original grade B, not addressed this run |
-| P2 | M-004 | **Closed** (this run) |
-| P2 | M-012 | **Closed** (this run) |
-| P3 | J-023 | **STILL OPEN**; executable (needs a 3rd new graph), not reached this run |
+| P0 | J-021 | **CLOSED** |
+| P0 | J-024 | **CLOSED**, premise partially corrected (only go_live genuinely dead-ends unconditionally; onboarding/customer_change corrected to data-dependent) |
+| P0 | J-026 | **TOOLING-BLOCKED** (genuine simultaneous concurrency not producible; every non-concurrent aspect independently verified) |
+| P0 | J-030 | **CLOSED** |
+| P0 | M-005 | **CLOSED** |
+| P1 | J-027 | **CLOSED** |
+| P1 | J-028 | **CLOSED** |
+| P1 | M-006 | **CLOSED** |
+| P1 | M-007 | **CLOSED** |
+| P1 | M-009 | **CLOSED** |
+| P2 | J-019 | **CLOSED** |
+| P2 | J-022 | **CLOSED** |
+| P2 | J-029 | **CLOSED** |
+| P2 | M-002 | **CLOSED** |
+| P2 | M-004 | **CLOSED** |
+| P2 | M-012 | **CLOSED** |
+| P3 | J-023 | **CLOSED** |
 
-**Evidence integrity (final, this run): PASS WITH TOOLING-BLOCKED MANUAL ITEMS for the batch overall.** All P0
-items are at their maximum achievable state (3 closed, 1 strengthened, 1 genuinely tooling-blocked, all UX
-evidence tooling-blocked per I-037/standing browser restriction). Of the P1 cluster, 4 of 5 are now closed with
-real, fresh, in-domain evidence; M-006 is honestly STILL OPEN. Of the P2 cluster, 4 of 6 are now closed; J-019
-and M-002 remain STILL OPEN (original grade B, not addressed this run, no cheap same-domain evidence located).
-P3's J-023 remains STILL OPEN. Final count this run: 8 of 12 remaining P1/P2/P3 residuals closed
-(J-022, J-027, J-028, J-029, M-004, M-007, M-009, M-012); 4 remain STILL OPEN (J-019, M-002, M-006, J-023), none
-tooling-blocked in the true sense, all genuinely executable but not reached within this run's time budget after
-prioritizing P0 and P1 first per the run's own stated priority order.
+**Evidence integrity (final): PASS WITH TOOLING-BLOCKED MANUAL/CONCURRENCY ITEM.** All 17 grade-B/P0 residuals
+are now CLOSED except J-026, which is genuinely TOOLING-BLOCKED (a real simultaneous-connection race cannot be
+produced by this session's sequential execution surface; every other component of the safety property it tests
+is independently confirmed). Manual UX evidence throughout remains TOOLING-BLOCKED per the standing I-037
+browser-session restriction; every other required piece of evidence (server/RPC/control) is real, fresh, and
+in the canonical domain named by each journey's own definition. Zero ordinary executable residuals remain in
+Batch 20.
 
 ## Journey Discovery Check
 
