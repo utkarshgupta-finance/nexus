@@ -75,10 +75,24 @@ describe("buildMyWorkItems", () => {
     expect(result[0].reason).toBe("waiting_on_others")
   })
 
-  it("prefers pending_my_approval over waiting_on_others when the requester can also decide their own item", () => {
+  it("M-011 (Pre-Batch-21 closure): never classifies a self-created item as pending_my_approval, even when the requester otherwise holds the permission and covers the responsible team, since self-approval is blocked server-side", () => {
+    const items = [item({ bucket: "needs_action", status: "submitted", createdBy: "actor-requester", responsibleTeamId: "team-finance" })]
+    const result = buildMyWorkItems(items, "actor-requester", true, new Set(["team-finance"]), NOW)
+    expect(result).toHaveLength(1)
+    expect(result[0].reason).toBe("waiting_on_others")
+  })
+
+  it("M-011: the same item shows as pending_my_approval for a different, non-creator eligible approver", () => {
+    const items = [item({ bucket: "needs_action", status: "submitted", createdBy: "actor-requester", responsibleTeamId: "team-finance" })]
+    const result = buildMyWorkItems(items, "actor-finance-approver", true, new Set(["team-finance"]), NOW)
+    expect(result).toHaveLength(1)
+    expect(result[0].reason).toBe("pending_my_approval")
+  })
+
+  it("M-011: a self-created item with no responsible team restriction also falls to waiting_on_others, not pending_my_approval", () => {
     const items = [item({ bucket: "needs_action", status: "submitted", createdBy: "actor-requester" })]
     const result = buildMyWorkItems(items, "actor-requester", true, NO_TEAMS, NOW)
-    expect(result[0].reason).toBe("pending_my_approval")
+    expect(result[0].reason).toBe("waiting_on_others")
   })
 
   it("computes age in whole days from updatedAt", () => {

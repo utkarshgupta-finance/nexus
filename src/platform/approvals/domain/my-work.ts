@@ -43,27 +43,34 @@ function whatINeedToDo(reason: MyWorkReason, type: ApprovalInboxItemType): strin
  * (docs/CUSTOMER_LIFECYCLE.md). A `needs_action` item qualifies only if
  * this user holds the domain's fixed approve permission AND either the
  * item names no responsible team (no workflow bound, or a graph with no
- * Approval node routing) or this user is an active member of that team.
- * This is what makes Finance's task disappear and Legal's appear the
- * moment a sequential Approval node advances, instead of every
- * approve-permission holder seeing every submitted item forever.
+ * Approval node routing) or this user is an active member of that team
+ * AND this user did not create the item themselves (self-approval is
+ * blocked server-side on every approve_* RPC via SELF_APPROVAL_NOT_ALLOWED;
+ * Batch 20's M-011 found the inbox listed a self-created, otherwise-eligible
+ * item as actionable here even though clicking Approve would always fail,
+ * so the self-created case is excluded from this reason and falls through
+ * to "waiting on others" instead, decided and closed pre-Batch-21). This is
+ * what makes Finance's task disappear and Legal's appear the moment a
+ * sequential Approval node advances, instead of every approve-permission
+ * holder seeing every submitted item forever.
  *
- * "Waiting on others" (Platform Scale Closure, Phase K): the flip side
- * of "sent back to me", for a requester checking on their own submitted
- * work: an item they created that is `needs_action` but they cannot
- * decide themselves, whether for lacking the permission entirely or for
- * not covering the item's current node's team. Checked only after
- * "pending my approval" so a request its own creator can also approve
- * shows as actionable to them, not merely as "waiting."
+ * "Waiting on others" (Platform Scale Closure, Phase K; extended pre-Batch-21
+ * per M-011): the flip side of "sent back to me", for a requester checking
+ * on their own submitted work: an item they created that is `needs_action`
+ * but they cannot decide themselves, whether for lacking the permission
+ * entirely, not covering the item's current node's team, or (as of the
+ * M-011 closure) being blocked from approving their own request by the
+ * self-approval rule even though they would otherwise be eligible.
  */
 function buildMyWorkItems(items: ApprovalInboxItem[], appUserId: string, canApprove: boolean, viewerTeamIds: Set<string>, now: Date): MyWorkItem[] {
   const result: MyWorkItem[] = []
   for (const item of items) {
     const isResponsibleTeam = item.responsibleTeamId === null || viewerTeamIds.has(item.responsibleTeamId)
+    const isSelfCreated = item.createdBy === appUserId
     let reason: MyWorkReason | null = null
-    if (item.bucket === "sent_back" && item.createdBy === appUserId) reason = "sent_back_to_me"
-    else if (item.bucket === "needs_action" && canApprove && isResponsibleTeam) reason = "pending_my_approval"
-    else if (item.bucket === "needs_action" && item.createdBy === appUserId) reason = "waiting_on_others"
+    if (item.bucket === "sent_back" && isSelfCreated) reason = "sent_back_to_me"
+    else if (item.bucket === "needs_action" && canApprove && isResponsibleTeam && !isSelfCreated) reason = "pending_my_approval"
+    else if (item.bucket === "needs_action" && isSelfCreated) reason = "waiting_on_others"
     if (!reason) continue
     result.push({
       type: item.type,
