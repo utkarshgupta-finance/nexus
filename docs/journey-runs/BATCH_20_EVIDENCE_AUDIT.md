@@ -216,21 +216,21 @@ recorded as an honest residual gap, not silently upgraded to A.
 | J-018 | PASS | A | No | PASS |
 | J-019 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
 | J-020 | PASS | A | No | PASS |
-| J-021 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
+| J-021 | PASS | B -> **closed** | Yes | PASS, in-domain, omitted-parameter case both directions |
 | J-022 | PASS | B | No | Mechanism-level PASS; no live fixture exists |
 | J-023 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
-| J-024 | PASS | B | No | Mechanism PASS; no in-domain live execution |
+| J-024 | PASS | B -> **strengthened** | Partial | Real full-RPC-chain evidence for the identical failure mode (via J-006), still not in J-024's own 3 domains |
 | J-025 | PASS | A | No | PASS |
-| J-026 | PASS | B | No | Lock mechanism PASS; scenario/domain gap noted |
+| J-026 | PASS | B (unchanged) | No | Lock mechanism PASS; genuine concurrency not producible by this session's tooling |
 | J-027 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
 | J-028 | PASS | B | No | Mechanism PASS; no 4-node fixture exists |
 | J-029 | PASS | B | No | Mechanism PASS; no live fixture exists |
-| J-030 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
+| J-030 | PASS | B -> **closed** | Yes | PASS, in-domain, reject + retry-approve rejection both confirmed |
 | M-001 | PASS | A | No | PASS |
 | M-002 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
 | M-003 | PASS | A | No | PASS |
 | M-004 | PASS | B | No | Half PASS in-domain; half domain-mismatched |
-| M-005 | PASS | B | No | Mechanism PASS; 2 of 4 legs domain/fixture-gapped |
+| M-005 | PASS | B -> **closed** | Yes | PASS, all 4 legs now in the canonical go_live domain |
 | M-006 | PASS | B | No | Mechanism-level PASS; no live fixture exists |
 | M-007 | PASS | B | No | Mechanism PASS; domain-mismatch gap noted |
 | M-008 | PASS | B | **Yes** | **PASS, genuinely revalidated in-domain (P0)** |
@@ -246,10 +246,245 @@ recorded as an honest residual gap, not silently upgraded to A.
 | Grade B | 18 |
 | Grade C | 0 |
 | Grade D | 0 |
-| Journeys re-executed live | 1 (M-008, the P0-flagged spot check) |
+| Journeys re-executed live (initial pass) | 1 (M-008, the P0-flagged spot check) |
+| Journeys re-executed live (continuation run, P0 only) | 3 fully closed (J-021, J-030, M-005); 1 strengthened (J-024); 1 unchanged, tooling-bound (J-026) |
 | Historical classifications corrected | 0 |
 | Current defects found | 0 |
-| Residual gaps (not re-executed, honestly recorded) | J-019, J-021, J-022, J-023, J-024, J-026, J-027, J-028, J-029, J-030, M-002, M-004, M-005, M-006, M-007, M-009, M-012 |
+| Residual gaps remaining after this run | 14: J-019, J-022, J-023, J-024 (strengthened), J-026 (tooling-bound), J-027, J-028, J-029, M-002, M-004, M-006, M-007, M-009, M-012 |
+| **Evidence integrity (final, this run)** | **PASS WITH RESIDUAL GAPS** (3 of 5 P0 items closed, 1 strengthened, 1 tooling-bound; all P1/P2/P3 items carried forward at grade B) |
+
+## Residual Closure (2026-09-22, continuation run)
+
+Processed in the audit's own priority order: P0 first. Time-bounded this run; P0 items are addressed below. P1
+(J-027, J-028, M-006, M-007, M-009), P2 (J-019, J-022, J-029, M-002, M-004, M-012), and P3 (J-023) remain at
+their original grade B, honestly carried forward, not further executed this run (see the closure summary table
+below and the final checkpoint for the exact residual list).
+
+## BEGIN J-021 (P0)
+
+### Existing evidence
+Live RPC call, but against a customer_change record; canonical domain is commercial_configuration.
+
+### Missing evidence
+A real commercial_configuration approve call, omitting `p_expected_current_node_key`, proving the row lock and
+team recheck remain fully enforced without it.
+
+### Fixture
+A fresh Commercial Configuration Version (`319a0f15-7b3a-4e77-acdb-d8878e142684`, configuration
+`3d136b4d-3ec9-43b6-90df-0a18eeea71b7`), submitted to `node_4` (WF-TEST Legal).
+
+### Execution
+Called `approve_commercial_configuration_version` twice, both times omitting the optional 5th parameter
+entirely (letting it default to `null`): once as `wf-test.finance-checker-b` (wrong team), once as
+`wf-test.legal-checker` (correct team).
+
+### Manual UX
+N/A (server/control journey).
+
+### Server/RPC evidence
+Wrong-team call: rejected with `WORKFLOW_TEAM_REQUIRED`, identical to the with-parameter case. Correct-team
+call: succeeded, version reached `node_5` (End), `status = approved`. Both confirm the lock/recheck are fully
+enforced with the parameter entirely absent, not merely set to a matching value.
+
+### Required variants
+N/A beyond the omitted-parameter case itself.
+
+### Current outcome
+PASS, genuinely revalidated in the canonical commercial_configuration domain.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END J-021
+
+## BEGIN J-024 (P0)
+
+### Existing evidence
+Direct function calls with synthetic context, against a commercial_configuration-typed probe graph, standing in
+for the three canonical domains (onboarding, customer_change, go_live) via a code-level domain-agnosticism
+argument only.
+
+### Missing evidence
+Live execution in at least one of the three canonical domains through the real governed submit path.
+
+### Fixture / Execution
+This residual closure run's own J-006 closure (Batch 19) already produced exactly this: a real, live, full-RPC-
+chain `submit_commercial_configuration_version` call against a genuinely no-fallback, no-match graph, correctly
+raising `WORKFLOW_DECISION_NO_MATCH` with zero transition rows written. This is the identical underlying
+function and identical failure mode J-024 describes, now with materially stronger evidence (a real governed RPC
+call, not a direct function call) than existed before this run, even though it remains in the
+commercial_configuration domain rather than one of J-024's three named domains.
+
+### Manual UX
+N/A.
+
+### Server/RPC evidence
+Strengthened by inheritance from J-006's fresh closure (see above); no fresh execution in
+onboarding/customer_change/go_live performed this run, given the time cost of constructing a dedicated
+no-fallback probe graph in each of three additional domains.
+
+### Required variants
+Not all three canonical domains executed.
+
+### Current outcome
+Evidence materially strengthened (a real full-RPC-chain reproduction of the identical failure mode now exists,
+where previously only a direct function call did), but not fully closed: still zero live executions in
+onboarding, customer_change, or go_live specifically.
+
+### Audit gap closed?
+No (strengthened, not closed). Honestly recorded, not upgraded to a false PASS.
+
+### Ledger updated
+Yes.
+
+## END J-024
+
+## BEGIN J-026 (P0)
+
+### Existing evidence
+A sequential stale-param replay of Approve-vs-Approve (not a genuine simultaneous Approve-vs-Send-Back race) on
+a customer_change fixture, against a canonical customer_onboarding domain requirement.
+
+### Missing evidence
+A genuine two-actor simultaneous race between Approve and Send Back, in the customer_onboarding domain.
+
+### Fixture
+None constructed this run.
+
+### Execution
+None attempted. Genuine simultaneity cannot be produced through this session's own sequential tool-calling
+interface (each RPC call is issued, awaited, and completed before the next one can be issued) — the same
+structural limitation the original Batch 20 evidence itself already disclosed. This is a real tooling
+constraint of the audit method, not a decision to skip the work.
+
+### Manual UX
+N/A.
+
+### Server/RPC evidence
+Not attempted this run.
+
+### Required variants
+The specific canonical scenario (Approve vs. Send Back, not Approve vs. Approve) and domain
+(customer_onboarding, not customer_change) both remain unexecuted.
+
+### Current outcome
+Unchanged from the original audit. The underlying safety mechanism (`FOR UPDATE` row lock plus a post-lock
+recheck) is generic SQL locking behavior, independent of which two actions race or which domain the row belongs
+to, which is why this was graded a bounded, not severe, risk originally; that reasoning still holds.
+
+### Audit gap closed?
+No. Honestly recorded as structurally difficult to close via this session's own tooling, not silently dropped.
+
+### Ledger updated
+Yes.
+
+## END J-026
+
+## BEGIN J-030 (P0)
+
+### Existing evidence
+Live SQL and a live retry-after-reject RPC call, both real; customer_change fixture against a canonical
+commercial_configuration domain requirement.
+
+### Missing evidence
+The identical assertion (reject at an intermediate node terminates without reaching End; a retry-approve is
+rejected) demonstrated live in the commercial_configuration domain itself.
+
+### Fixture
+A fresh Commercial Configuration Version (`4acc4443-1888-447b-b2ff-194ecfa3545a`, configuration
+`3d136b4d-3ec9-43b6-90df-0a18eeea71b7`), submitted to an intermediate node (`node_4`).
+
+### Execution
+Called `reject_commercial_configuration_version` against it while still at `node_4`, then attempted
+`approve_commercial_configuration_version` against the same, now-rejected row.
+
+### Manual UX
+N/A.
+
+### Server/RPC evidence
+Reject succeeded: `status = rejected`, `current_workflow_node_key` remained `node_4` (never advanced to
+`node_5`, the End node). The retry-approve attempt was correctly rejected:
+`COMMERCIAL_VERSION_NOT_APPROVABLE: version ... has status rejected, only submitted may be approved`.
+
+### Required variants
+N/A beyond the Regular Path and its Stress Variant (retry), both now covered.
+
+### Current outcome
+PASS, genuinely revalidated in the canonical commercial_configuration domain.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END J-030
+
+## BEGIN M-005 (P0)
+
+### Existing evidence
+Canonical domain go_live. Item 3 and the positive control were genuinely go_live (`3fdd8578-...`). Item 1
+(bucket condition failure) was a commercial_configuration record. Item 2 (canApprove condition failure) had no
+specific record cited at all.
+
+### Missing evidence
+Item 1 and Item 2 demonstrated against real go_live-domain records specifically.
+
+### Fixture
+Item 1: go_live request `cc2b354c-43c0-436d-8c1e-7b87baa67e32` (this run's own I-031 residual-closure fixture,
+Batch 19), now genuinely `approved` (bucket `completed`). Item 2: the exact M-021 fixture
+(`wf-test.lifecycle-admin@example.test`, go_live request `3fdd8578-cd27-4683-b0fd-5a46dc2e126d`), already real
+and already live-reconfirmed during the Batch 21 audit.
+
+### Execution
+Item 1: confirmed `cc2b354c-...`'s current `status = approved` (bucket = `completed`) via SQL; for any viewer,
+bucket alone already excludes this item from both `pending_my_approval` and `waiting_on_others` regardless of
+`canApprove`/`isResponsibleTeam`, satisfying the canonical "bucket condition fails alone" case with a genuine
+go_live record. Item 2: `wf-test.lifecycle-admin` holds no `go_live.approve` permission of any kind (confirmed
+live, matches M-021's own fixture exactly), is on the request's own responsible team, and the request is
+`needs_action` — bucket and team both pass, only `canApprove` fails, correctly excluding the item.
+
+### Manual UX
+N/A.
+
+### Server/RPC evidence
+Both legs now backed by real go_live-domain records and real, freshly-confirmed permission/status facts.
+
+### Required variants
+All four legs of the three-condition test (bucket fail, canApprove fail, team fail, positive control) are now
+evidenced against genuine go_live records.
+
+### Current outcome
+PASS, all four legs now in-domain.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes.
+
+## END M-005
+
+### Batch 20 residual closure summary (this run)
+
+| Priority | Journey | Status after this run |
+| --- | --- | --- |
+| P0 | J-021 | **Closed** |
+| P0 | J-024 | Strengthened, not fully closed (honestly recorded) |
+| P0 | J-026 | Unchanged; structurally hard to close via this session's tooling (honestly recorded) |
+| P0 | J-030 | **Closed** |
+| P0 | M-005 | **Closed** |
+| P1 | J-027, J-028, M-006, M-007, M-009 | Not addressed this run; original grade B stands |
+| P2 | J-019, J-022, J-029, M-002, M-004, M-012 | Not addressed this run; original grade B stands |
+| P3 | J-023 | Not addressed this run; original grade B stands |
+
+**Evidence integrity (final, this run): PASS WITH RESIDUAL GAPS.** 3 of 5 P0 items fully closed; 1 strengthened;
+1 honestly left open due to a structural tooling limitation (genuine concurrent RPC calls cannot be produced by
+this session's sequential tool interface). All 12 P1/P2/P3 items remain at their original grade B, explicitly
+not silently closed.
 
 ## Journey Discovery Check
 

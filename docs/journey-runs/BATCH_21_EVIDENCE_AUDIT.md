@@ -151,7 +151,7 @@ closes the exact leak Batch 21 found, not just a synthetic unit-test scenario.
 | M-015 | PASS | A | No | PASS |
 | M-016 | PASS | B | No | Code-level PASS; no live Queue render |
 | M-017 | PASS | B | No | Code-level PASS; no live cross-domain render |
-| M-018 | PASS | B | No | Single-cycle only; "multiple cycles" unexercised |
+| M-018 | PASS | B -> **closed** | Yes | PASS, real 3-cycle send-back fixture, count confirmed |
 | M-019 | PASS | B | No | Code-level PASS; no live denial reproduction |
 | M-020 | PASS | A | No (strengthened by M-008 + M-021 work) | PASS |
 | M-021 | PRODUCT GAP | A (discovery) | **Fixed tonight** | **FIXED, verified against real fixture** |
@@ -167,7 +167,7 @@ closes the exact leak Batch 21 found, not just a synthetic unit-test scenario.
 | Q-001 | PASS | B | No | Regular Path PASS; boundary variant missing |
 | Q-002 | PASS | B | No | Zero live execution this batch |
 | Q-003 | PASS | B | No | Regular Path PASS; boundary variant missing |
-| Q-004 | PASS | B | No | **P0 security journey; no bypass reproduction** |
+| Q-004 | PASS | B -> **strengthened** | Partial | Real validation-function execution; full HTTP-bypass still blocked by tooling |
 | Q-005 | PASS | A | No | PASS |
 | Q-006 | PASS | A | No | PASS |
 | Q-007 | PASS | B | No | Core mechanism PASS; multi-cycle variant missing |
@@ -179,13 +179,127 @@ closes the exact leak Batch 21 found, not just a synthetic unit-test scenario.
 | Grade B | 18 |
 | Grade C | 0 |
 | Grade D | 0 |
-| Journeys re-executed | 0 additional live browser/RPC reproductions this batch (time-bounded prioritization; M-020/M-021 strengthened by cross-batch work already performed) |
+| Journeys re-executed (initial pass) | 0 additional live browser/RPC reproductions this batch (time-bounded prioritization; M-020/M-021 strengthened by cross-batch work already performed) |
+| Journeys re-executed (continuation run) | 1 closed (M-018); 1 strengthened (Q-004) |
 | Historical classifications corrected | 0 |
 | Current defects found | 1 (M-021, already known and now fixed) |
 | Current defects fixed | 1 |
 | Code changed | `my-work.ts`, `server.ts`, `my-work/page.tsx`, `my-work.test.ts` |
 | Migrations applied | 0 |
-| Residual gaps (not re-executed, honestly recorded) | M-013, M-014, M-016, M-017, M-018, M-019, M-022, M-023, M-025, M-026, M-027, M-028, M-029, M-030, Q-001, Q-002, Q-003, Q-004, Q-007 |
+| Residual gaps remaining after this run | 17: M-013, M-014, M-016, M-017, M-019, M-022, M-023, M-025, M-026, M-027, M-028, M-029, M-030, Q-001, Q-002, Q-003, Q-007 (Q-004 strengthened, listed separately) |
+| **Evidence integrity (final, this run)** | **PASS WITH RESIDUAL GAPS** (M-018 closed, Q-004 strengthened, M-021 fixed; 17 items carried forward at grade B) |
+
+## Residual Closure (2026-09-22, continuation run)
+
+Per explicit priority, the two journeys specifically flagged (M-018 and Q-004) were addressed first, live. The
+other 16 Batch 21 residuals were not addressed this run given time constraints; they remain at their original
+grade B (see the closure summary table below).
+
+## BEGIN M-018
+
+### Existing evidence
+The real counting mechanism (`SELECT COUNT` on `customer_onboarding_send_backs`) was correctly identified, but
+every cited fixture showed exactly one send-back, and even that single count was not freshly re-queried.
+
+### Missing evidence
+A request genuinely sent back 3 separate times, with the counter confirmed to read 3 afterward.
+
+### Fixture
+A fresh Customer Onboarding case (`8657a96f-18ec-4fbf-a2e1-76da24502a3e`), created via the real
+`create_customer_onboarding_case` RPC.
+
+### Execution
+Submitted, sent back, resubmitted, sent back again, resubmitted, and sent back a third time, each through the
+real `submit_customer_onboarding_case` / `send_back_customer_onboarding_case` RPCs (a real Leadership-team
+approver, `00d0779e-9304-40c0-8dd3-a187f9edf25a`, performed each send-back).
+
+### Manual UX
+N/A (server/control journey; the count itself is what's asserted, not a specific UI render).
+
+### Server/RPC evidence
+`select count(*) from customer_onboarding_send_backs where request_id = '8657a96f-...'` returns exactly `3`,
+directly confirming the counter increments correctly across genuine multiple cycles, not merely a single one.
+
+### Required variants
+The canonical "multiple cycles" scenario (3+) is now genuinely exercised, closing the exact gap identified.
+
+### Current outcome
+PASS, genuinely revalidated with a real multi-cycle fixture.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes. The case was left in its real `sent_back` state as historical evidence, not deleted or force-completed.
+
+## END M-018
+
+## BEGIN Q-004
+
+### Existing evidence
+Pure code inspection and a pre-existing unit test; the canonical Starting State specifically calls for a direct
+API call bypassing the browser UI entirely, which had never been attempted.
+
+### Missing evidence
+An actual execution (not merely a reading) of the server-side size re-validation, independent of anything a
+client claims.
+
+### Fixture
+None needed beyond a genuine 2MB byte length.
+
+### Execution
+Attempted a direct call to the real orchestrating service function, `uploadOnboardingDocument`
+(`src/features/customer-onboarding/services/documents.service.ts`), from a standalone script. This failed
+immediately: the file is guarded by Next.js's own `server-only` import restriction, which throws before any of
+this session's code runs, when imported outside the Next.js server runtime. A true raw-HTTP bypass of the actual
+deployed Server Action would additionally require a valid authenticated session (to resolve the actor identity
+server-side), which is the same credential restriction blocking every browser-dependent item tonight. Given both
+constraints, executed the next-most-direct thing available: the exact real validation function
+`uploadOnboardingDocument` itself calls first, before any Supabase orchestration begins
+(`validateAttachmentFile`, `src/features/customer-onboarding/domain/documents.ts`), called directly with a
+genuine 2MB size (a real byte count, not a claimed one, and not going through any client-side check of any
+kind).
+
+### Manual UX
+N/A (this journey's canonical shape is explicitly a direct API-level test, not a UI journey).
+
+### Server/RPC evidence
+`validateAttachmentFile({ name: "...", type: "application/pdf", size: 2097152 }, "This document")` returned
+`{"valid":false,"reason":"This document is 2.0 MB. Maximum allowed size is 1 MB..."}`, a real, live execution of
+the actual rejection logic. Combined with the already-verified code read (this exact function is called as the
+very first line of `uploadOnboardingDocument`, before the Supabase upload/metadata calls), this demonstrates the
+real re-validation logic itself functions correctly against a genuine oversized input, independent of any
+client-supplied claim.
+
+### Required variants
+N/A beyond the core size-boundary case.
+
+### Current outcome
+**Strengthened, not fully closed.** This is real execution of the real validation logic (not inspection), a
+step beyond the original evidence, but it stops short of a genuine end-to-end bypass of the deployed Server
+Action itself, which remains blocked by the `server-only` import guard and the absence of an authenticated
+session, both structural to this audit session rather than open questions about the product's own correctness.
+
+### Audit gap closed?
+No (strengthened, honestly recorded as not fully closed, matching the same standard applied to J-024 in Batch
+20).
+
+### Ledger updated
+Yes.
+
+## END Q-004
+
+### Batch 21 residual closure summary (this run)
+
+| Journey | Status after this run |
+| --- | --- |
+| M-018 | **Closed**: real 3-cycle send-back fixture, count confirmed via SQL |
+| Q-004 | Strengthened (real validation-function execution), not fully closed: `server-only` guard + no session blocks a true HTTP-level bypass |
+| M-013, M-014, M-016, M-017, M-019, M-022, M-023, M-025, M-026, M-027, M-028, M-029, M-030, Q-001, Q-002, Q-003, Q-007 | Not addressed this run; original grade B stands |
+
+**Evidence integrity (final, this run): PASS WITH RESIDUAL GAPS.** M-018 fully closed; Q-004 strengthened but
+not fully closed (structural tooling limits, honestly recorded); the remaining 17 residuals (including M-021,
+already fixed and verified separately) are carried forward at their original grade, not silently closed.
 
 ## Journey Discovery Check
 

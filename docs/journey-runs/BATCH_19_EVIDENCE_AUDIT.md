@@ -277,14 +277,14 @@ M-011 fixture) and were not touched by either the regressing or the fixing migra
 | I-034 | PRODUCT GAP -> closed | A | No | PASS (discovery evidence) |
 | I-035 | PRODUCT GAP -> closed | A | No | PASS (discovery evidence) |
 | I-036 | PASS | A | No | PASS |
-| I-037 | PASS | B | Attempted, blocked | Server/code evidence complete; browser check parked |
+| I-037 | PASS | B | Attempted, blocked | **TOOLING-BLOCKED MANUAL UX** (server/code evidence complete) |
 | I-038 | PASS | A | No | PASS |
 | J-001 | PASS | A | No | PASS |
 | J-002 | PASS | A | No | PASS |
 | J-003 | PASS | A | No | PASS |
-| J-004 | PASS | B | No | Routing-logic PASS; full-RPC-chain evidence gap noted |
-| J-005 | PASS | B | No | Routing-logic PASS; full-RPC-chain evidence gap noted |
-| J-006 | PASS | B | No | Routing-logic PASS; full-RPC-chain evidence gap noted |
+| J-004 | PASS | B -> **closed** | Yes | PASS, full-RPC-chain evidence, both branches |
+| J-005 | PASS | B -> **closed** | Yes | PASS, full-RPC-chain evidence |
+| J-006 | PASS | B -> **closed** | Yes | PASS, full-RPC-chain evidence incl. Audit/Data Integrity Check |
 | J-007 | PASS (corrected) | A | No | PASS |
 | J-008 | PASS (corrected) | A | No | PASS |
 | J-009 | PASS | A | No | PASS |
@@ -293,23 +293,270 @@ M-011 fixture) and were not touched by either the regressing or the fixing migra
 | J-012 | PASS | A | No | PASS |
 | J-013 | PASS | A | No | PASS |
 | J-014 | FAILED THEN FIXED + PASS | A | No | PASS |
-| J-015 | PASS | B | No | Resolver-level PASS; RPC-level evidence gap noted |
+| J-015 | PASS | B -> **closed (stronger grounds)** | Yes | PASS, publish-time validation now prevents the scenario entirely |
 | J-016 | PASS | A | No | PASS |
 | J-017 | PASS | A | No | PASS |
 
 | Item | Result |
 | --- | --- |
 | Journeys audited | 25 |
-| Grade A | 18 |
-| Grade B | 7 (I-031, I-033, I-037, J-004, J-005, J-006, J-015) |
+| Grade A (initial) | 18 |
+| Grade B (initial) | 7 (I-031, I-033, I-037, J-004, J-005, J-006, J-015) |
 | Grade C | 0 |
 | Grade D | 0 |
-| Journeys re-executed | 2 fully (I-031, I-033); 1 attempted and blocked (I-037) |
+| Journeys re-executed (initial pass) | 2 fully (I-031, I-033); 1 attempted and blocked (I-037) |
+| Residuals identified after initial audit | 5 (I-037, J-004, J-005, J-006, J-015) |
+| Residuals closed this continuation run | 4 (J-004, J-005, J-006, J-015) |
+| Tooling-blocked (not closeable) | 1 (I-037) |
 | Historical classifications corrected | 0 |
 | Current defects found | 1 (submit_go_live_request regression) |
 | Current defects fixed | 1 |
-| Residual gaps (not re-executed, honestly recorded) | I-037 (browser check blocked), J-004/J-005/J-006 (full-RPC-chain audit trail), J-015 (RPC-level Regular Path) |
 | Migrations applied | 1 (`20261007000000`) |
+| **Evidence integrity (final)** | **PASS WITH TOOLING-BLOCKED MANUAL ITEMS** (only I-037's browser render remains open, explicitly parked) |
+
+## Residual Closure (2026-09-22, continuation run)
+
+All five Batch 19 residuals identified above were processed sequentially, live, this run. The other 20 journeys
+were not touched.
+
+## BEGIN I-037
+
+### Existing evidence
+Server/code-level: `deriveLineItemGoLiveStatus` returns the literal string `"CANCELLED"` for a line item whose
+only `go_live_requests` row is cancelled; the Entitlement page's own ternary renders that string directly.
+Confirmed unchanged since Batch 19. A fresh, genuine CANCELLED-only fixture exists (component
+`5332909c-8419-410d-aad5-55a2906bad17`, customer `fictional-nexus-test-co`).
+
+### Missing evidence
+Live browser render confirming "Go Live Status: CANCELLED" actually appears.
+
+### Fixture
+Component `5332909c-8419-410d-aad5-55a2906bad17`, already prepared, unchanged.
+
+### Execution
+Navigated to `http://localhost:3000/my-work` to check for an already-authenticated session before attempting
+anything else. Redirected to the sign-in form.
+
+### Manual UX
+BLOCKED. No authenticated session exists for any persona. Per explicit standing instruction, this session will
+not search for, derive, reset, or use credentials to create one solely to obtain this evidence.
+
+### Server/RPC evidence
+Complete and current (see Existing evidence).
+
+### Required variants
+N/A beyond the CANCELLED case itself.
+
+### Current outcome
+Server/code-path evidence complete. Manual browser confirmation remains genuinely blocked by tooling, not by an
+outstanding technical question.
+
+### Audit gap closed?
+Tooling blocked (not closeable without violating the credential restriction).
+
+### Ledger updated
+Yes.
+
+## END I-037
+
+## BEGIN J-004
+
+### Existing evidence
+A direct `fn_resolve_workflow_next_approval` call (not the full `submit_commercial_configuration_version` RPC)
+against the dormant `wf_test_j004_notequals` probe graph, correctly evaluating `not_equals("enterprise")` both
+true and false.
+
+### Missing evidence
+A real `workflow_node_transitions` row produced by an actual governed submit, in both directions of the
+`not_equals` condition.
+
+### Fixture
+`wf_test_j004_notequals` (definition `55775bf8-5171-4ce5-8edd-49319c182921`, version `589ab609-...`), published
+and temporarily activated as the live commercial_configuration workflow (the previously-active
+`wf_test_commercial_segment` was deactivated for the duration, then restored). Two real customers: `sme` segment
+(`demo-northstar-consumer-products`) and `enterprise` segment (`wf-test-j003-enterprise-probe`).
+
+### Execution
+Published `589ab609-...`; deactivated `wf_test_commercial_segment`; activated `wf_test_j004_notequals`. Created
+and submitted a real Commercial Configuration Version for the `sme`-segment customer
+(`bb78cf40-3f75-46d9-b39e-5099ed449dc5`) and, separately, for the `enterprise`-segment customer
+(`3b592a21-c5ca-418d-9d84-a4bbaefd9d85`), both through the real `create_commercial_configuration_version` /
+`submit_commercial_configuration_version` RPCs.
+
+### Manual UX
+N/A (server/control journey, no canonical UX check beyond inbox visibility, not separately re-verified here).
+
+### Server/RPC evidence
+`sme` case: resolved to `node_3` (the `not_equals` edge's target), `workflow_node_transitions` row confirmed
+(`to_node_key = node_3`, `action = submit`). `enterprise` case: resolved to `node_4` (the fallback edge, since
+`not_equals("enterprise")` is false for an enterprise customer). Both real, both live, both through the actual
+governed RPC chain.
+
+### Required variants
+Both branches of the `not_equals` condition now covered (true and false), closing the canonical Stress Variant
+alongside the Regular Path.
+
+### Current outcome
+PASS, genuinely revalidated with full-RPC-chain evidence in both directions.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes. Both fixtures closed out through governed rejection; `wf_test_commercial_segment` restored as the active
+definition (confirmed via a fresh query: exactly one active `commercial_configuration` definition, the original
+one).
+
+## END J-004
+
+## BEGIN J-005
+
+### Existing evidence
+A direct `fn_resolve_workflow_next_approval` call against the dormant `wf_test_j005_fallback` probe graph.
+
+### Missing evidence
+A real `workflow_node_transitions` row produced by an actual governed submit.
+
+### Fixture
+Discovered during this closure that the ALREADY-ACTIVE `wf_test_commercial_segment` graph (the same one J-003
+uses) itself already contains an unconditioned fallback edge (`node_2 -> node_4`, label "Default", `condition =
+null`) alongside its `equals "enterprise"` edge. No swap needed.
+
+### Execution
+Created and submitted a real Commercial Configuration Version (`28f04ff0-a34a-4bef-a308-7060a655e571`) for a
+real `sme`-segment customer (`demo-northstar-consumer-products`) through the real, currently-active governed RPC
+chain.
+
+### Manual UX
+N/A.
+
+### Server/RPC evidence
+Resolved to `node_4` (the fallback edge). `workflow_node_transitions` row confirmed (`to_node_key = node_4`,
+`action = submit`).
+
+### Required variants
+N/A beyond the Regular Path itself.
+
+### Current outcome
+PASS, genuinely revalidated with full-RPC-chain evidence, via the real production graph, no environment swap
+required at all.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes. Fixture closed out through governed rejection.
+
+## END J-005
+
+## BEGIN J-006
+
+### Existing evidence
+A direct `fn_resolve_workflow_next_approval` call against the dormant `wf_test_j006_nofallback` probe graph.
+
+### Missing evidence
+Confirmation that a real governed submit attempt against a no-fallback, no-match graph both raises
+`WORKFLOW_DECISION_NO_MATCH` and writes zero `workflow_node_transitions` rows (the canonical Audit/Data
+Integrity Check).
+
+### Fixture
+`wf_test_j006_nofallback` (definition `3bc9eb6f-5035-4fb3-8d34-5ec57f9dd638`, version `946df2db-...`), published
+and temporarily activated (with `wf_test_commercial_segment` deactivated for the duration, then restored). A
+real `sme`-segment customer (`demo-northstar-consumer-products`), matching neither of the graph's two
+conditioned edges (`equals "enterprise"`, `equals "smb"`).
+
+### Execution
+Created a real Commercial Configuration Version (`ce3503eb-ddbe-4fab-b938-5514ca8aa54a`) and called the real
+`submit_commercial_configuration_version` RPC.
+
+### Manual UX
+N/A.
+
+### Server/RPC evidence
+Correctly raised `WORKFLOW_DECISION_NO_MATCH` (live, through the real submit RPC, not a direct resolver call).
+Confirmed the version's own `status` remained `draft` (the exception rolled back the whole transaction) and
+exactly zero `workflow_node_transitions` rows exist for this resource, matching the canonical Audit/Data
+Integrity Check precisely.
+
+### Required variants
+N/A beyond the Regular Path itself.
+
+### Current outcome
+PASS, genuinely revalidated with full-RPC-chain evidence, including the previously-unverified Audit/Data
+Integrity Check.
+
+### Audit gap closed?
+Yes.
+
+### Ledger updated
+Yes. Fixture cancelled through the governed `cancel_commercial_configuration_version` path.
+`wf_test_commercial_segment` restored as the active definition (confirmed: exactly one active
+`commercial_configuration` definition afterward, the original one).
+
+## END J-006
+
+## BEGIN J-015
+
+### Existing evidence
+A direct `fn_resolve_workflow_next_approval` call against the dead-end node of the dormant `wf_test_j015_deadend`
+probe graph (zero rows, live), combined with a code read of `approve_go_live_request`'s own guard, concluding a
+real request parked there "would deterministically raise" `WORKFLOW_GRAPH_DEAD_END`. No real
+`approve_go_live_request` call was ever made against an actual request sitting at this node.
+
+### Missing evidence
+A real `approve_go_live_request` call against a genuine request parked at a dead-end Approval node.
+
+### Fixture
+Attempted to publish `wf_test_j015_deadend`'s version (`9007ab80-a1a9-4ce9-b2d7-b4eb41cd6288`, an Approval node
+with no outgoing edge) via the real `publish_workflow_definition_version` RPC, as a precondition to activating
+it and constructing a real go_live request parked there.
+
+### Execution
+`publish_workflow_definition_version('9007ab80-...')` was called live.
+
+### Manual UX
+N/A (blocked before reaching this step; see below).
+
+### Server/RPC evidence
+**Real, significant finding**: the publish attempt was rejected outright: `WORKFLOW_INVALID_GRAPH: Node
+"Approval (no outgoing edge)" is a dead end: it has no outgoing transition and is not an End node.` This graph
+was never actually published in Batch 19 either (confirmed: its version status was still `draft`). The current,
+live `publish_workflow_definition_version` RPC now validates against exactly this shape and refuses to publish
+it at all (confirmed present in `supabase/migrations/20260927000000_publish_validation_end_edge_and_reachability.sql`
+and `20260929000000_publish_validation_start_incoming_edge.sql`). This means the scenario J-015's Regular Path
+describes (a request parked at a published, reachable, dead-end Approval node) is not constructible through the
+real governed publish path today: the protection now exists one layer earlier than the journey's own canonical
+definition anticipated, catching the malformed graph before it can ever be published, rather than requiring the
+approve-time guard to catch it after the fact.
+
+### Required variants
+N/A; the finding above supersedes the need for the originally-planned reproduction.
+
+### Current outcome
+**PASS, on stronger grounds than originally required.** The underlying business concern J-015 protects against
+(a request permanently stuck, unreachable, with no way to ever progress) cannot occur via the standard
+create-version-and-publish flow at all, confirmed live. The specific canonical Regular Path (approve raises
+`WORKFLOW_GRAPH_DEAD_END`) remains unexercised because the precondition to construct it (a published dead-end
+graph) is now impossible to create, not because of any remaining tooling limitation.
+
+### Audit gap closed?
+Yes, via a premise correction: the real protection is stronger and earlier than the journey originally assumed.
+
+### Ledger updated
+Yes. This should be reflected as a premise correction in `NEXUS_JOURNEY_UNIVERSE.md`'s J-015 entry the next time
+the Universe doc is reconciled (see Journey Discovery Check below); not rewritten mid-audit here.
+
+## END J-015
+
+### Batch 19 residual closure summary
+
+| Item | Status before this run | Status after this run |
+| --- | --- | --- |
+| I-037 | Server/code evidence complete; browser check blocked | Unchanged: still tooling-blocked, re-confirmed, not fabricated |
+| J-004 | Routing-logic proof only (direct resolver call) | **Closed**: full-RPC-chain evidence, both branches |
+| J-005 | Routing-logic proof only (direct resolver call) | **Closed**: full-RPC-chain evidence, via the real active graph |
+| J-006 | Routing-logic proof only (direct resolver call) | **Closed**: full-RPC-chain evidence, including the Audit/Data Integrity Check |
+| J-015 | Resolver-level proof + code read only | **Closed on stronger grounds**: publish-time validation now prevents the scenario entirely, confirmed live |
 
 ## Journey Discovery Check
 
