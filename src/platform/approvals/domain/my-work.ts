@@ -1,6 +1,28 @@
 import type { ApprovalInboxItem, ApprovalInboxItemType } from "./types"
 import { labelForItemType } from "./inbox"
 
+/**
+ * M-021 fix (Batch 21 finding, closed as a bounded defect against the
+ * already-settled "Pending My Approval means this user can actually
+ * approve this item now" invariant, pre-Batch-22): the domain's real
+ * approve permission resource per item type. `onboarding` and
+ * `change_request` legitimately share the same `customer` resource (they
+ * are not separately permissioned in this product); `commercial_version`
+ * and `go_live` each have their own. A single OR'd boolean across
+ * `customer`/`go_live` (with `commercial_configuration` never even
+ * included) let a user who held only one domain's approve permission and
+ * coincidentally shared a team with a DIFFERENT domain's node see that
+ * item as actionable, even though the real approve RPC would reject them.
+ */
+const APPROVE_PERMISSION_RESOURCE_BY_TYPE: Record<ApprovalInboxItemType, string> = {
+  onboarding: "customer",
+  change_request: "customer",
+  commercial_version: "commercial_configuration",
+  go_live: "go_live",
+}
+
+type CanApproveByType = Record<ApprovalInboxItemType, boolean>
+
 type MyWorkReason = "sent_back_to_me" | "pending_my_approval" | "draft_to_continue" | "waiting_on_others"
 
 type MyWorkItem = {
@@ -41,7 +63,11 @@ function whatINeedToDo(reason: MyWorkReason, type: ApprovalInboxItemType): strin
  * real per-node team routing, replacing Customer Lifecycle V1's older
  * "any customer.approve holder may decide any of them"
  * (docs/CUSTOMER_LIFECYCLE.md). A `needs_action` item qualifies only if
- * this user holds the domain's fixed approve permission AND either the
+ * this user holds THIS ITEM'S OWN DOMAIN's approve permission (M-021 fix,
+ * pre-Batch-22: previously a single OR'd boolean across only
+ * customer/go_live, which could cosmetically list an item as actionable
+ * for a user who held a different domain's approve permission and merely
+ * happened to share a team with the item's node) AND either the
  * item names no responsible team (no workflow bound, or a graph with no
  * Approval node routing) or this user is an active member of that team
  * AND this user did not create the item themselves (self-approval is
@@ -62,14 +88,15 @@ function whatINeedToDo(reason: MyWorkReason, type: ApprovalInboxItemType): strin
  * M-011 closure) being blocked from approving their own request by the
  * self-approval rule even though they would otherwise be eligible.
  */
-function buildMyWorkItems(items: ApprovalInboxItem[], appUserId: string, canApprove: boolean, viewerTeamIds: Set<string>, now: Date): MyWorkItem[] {
+function buildMyWorkItems(items: ApprovalInboxItem[], appUserId: string, canApproveByType: CanApproveByType, viewerTeamIds: Set<string>, now: Date): MyWorkItem[] {
   const result: MyWorkItem[] = []
   for (const item of items) {
     const isResponsibleTeam = item.responsibleTeamId === null || viewerTeamIds.has(item.responsibleTeamId)
     const isSelfCreated = item.createdBy === appUserId
+    const canApproveThisItem = canApproveByType[item.type]
     let reason: MyWorkReason | null = null
     if (item.bucket === "sent_back" && isSelfCreated) reason = "sent_back_to_me"
-    else if (item.bucket === "needs_action" && canApprove && isResponsibleTeam && !isSelfCreated) reason = "pending_my_approval"
+    else if (item.bucket === "needs_action" && canApproveThisItem && isResponsibleTeam && !isSelfCreated) reason = "pending_my_approval"
     else if (item.bucket === "needs_action" && isSelfCreated) reason = "waiting_on_others"
     if (!reason) continue
     result.push({
@@ -114,5 +141,5 @@ function buildDraftWorkItems(draftEntries: DraftWorkSource[], now: Date): MyWork
     .sort((a, b) => b.ageDays - a.ageDays)
 }
 
-export { buildMyWorkItems, buildDraftWorkItems, ageInDays }
-export type { MyWorkItem, MyWorkReason }
+export { buildMyWorkItems, buildDraftWorkItems, ageInDays, APPROVE_PERMISSION_RESOURCE_BY_TYPE }
+export type { MyWorkItem, MyWorkReason, CanApproveByType }

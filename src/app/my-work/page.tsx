@@ -3,7 +3,7 @@ import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
 import { loadMyWork } from "@/platform/approvals/server"
 import { MyWorkPage } from "@/features/my-work/ui/my-work-page"
-import type { MyWorkItem } from "@/platform/approvals/domain/my-work"
+import type { MyWorkItem, CanApproveByType } from "@/platform/approvals/domain/my-work"
 
 /**
  * My Work (task spec): real, server-scoped aggregation, replacing the
@@ -22,12 +22,23 @@ export default async function MyWorkRoute() {
   let unavailable = false
   if (appUserId) {
     try {
-      // Same imprecision already accepted for commercial_configuration.approve
-      // (Commercial Version's own approval permission, folded in here rather
-      // than given its own flag): "pending my approval" is an approximation
-      // across every request type until per-type routing exists.
-      const [canApproveCustomer, canApproveGoLive] = await Promise.all([hasPermission("customer", "approve"), hasPermission("go_live", "approve")])
-      items = await loadMyWork(appUserId, canApproveCustomer || canApproveGoLive)
+      // M-021 fix (pre-Batch-22): each item type is gated on its own real
+      // approve permission resource, never a single OR'd boolean. Onboarding
+      // and change_request legitimately share the "customer" resource (see
+      // APPROVE_PERMISSION_RESOURCE_BY_TYPE's own doc); commercial_version and
+      // go_live each have their own, checked independently.
+      const [canApproveCustomer, canApproveCommercialConfiguration, canApproveGoLive] = await Promise.all([
+        hasPermission("customer", "approve"),
+        hasPermission("commercial_configuration", "approve"),
+        hasPermission("go_live", "approve"),
+      ])
+      const canApproveByType: CanApproveByType = {
+        onboarding: canApproveCustomer,
+        change_request: canApproveCustomer,
+        commercial_version: canApproveCommercialConfiguration,
+        go_live: canApproveGoLive,
+      }
+      items = await loadMyWork(appUserId, canApproveByType)
     } catch {
       unavailable = true
     }

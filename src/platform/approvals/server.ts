@@ -20,7 +20,7 @@ import { bucketForStatus, sortByUpdatedAtDesc } from "./domain/inbox"
 import { buildMyWorkItems, buildDraftWorkItems } from "./domain/my-work"
 import { buildOperationalQueue } from "./domain/operational-queue"
 import type { ApprovalInboxItem } from "./domain/types"
-import type { MyWorkItem } from "./domain/my-work"
+import type { MyWorkItem, CanApproveByType } from "./domain/my-work"
 import type { OperationalQueueEntry } from "./domain/operational-queue"
 
 /**
@@ -308,9 +308,9 @@ async function loadMyDraftsToContinue(appUserId: string): Promise<MyWorkItem[]> 
  * second read of the underlying tables (see ./domain/my-work.ts's own
  * header for the exact scoping rules).
  */
-async function loadMyWork(appUserId: string, canApprove: boolean): Promise<MyWorkItem[]> {
+async function loadMyWork(appUserId: string, canApproveByType: CanApproveByType): Promise<MyWorkItem[]> {
   const [items, drafts, viewerTeamIds] = await Promise.all([loadApprovalInbox(), loadMyDraftsToContinue(appUserId), getActiveTeamIdsForUser(appUserId)])
-  return [...buildMyWorkItems(items, appUserId, canApprove, viewerTeamIds, new Date()), ...drafts]
+  return [...buildMyWorkItems(items, appUserId, canApproveByType, viewerTeamIds, new Date()), ...drafts]
 }
 
 /**
