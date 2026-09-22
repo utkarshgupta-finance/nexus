@@ -13,9 +13,11 @@ type EntitlementErrorKind =
   | "entitlement_source_not_active"
   | "monthly_usage_not_found"
   | "monthly_usage_not_current"
+  | "monthly_usage_already_finalized"
   | "usage_before_go_live"
   | "settlement_invalid_ledger_entry_type"
   | "settlement_ledger_entry_not_found"
+  | "settlement_exceeds_outstanding"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -34,9 +36,11 @@ const NAMED_TOKEN_KINDS: Record<string, EntitlementErrorKind> = {
   ENTITLEMENT_SOURCE_NOT_ACTIVE: "entitlement_source_not_active",
   MONTHLY_USAGE_NOT_FOUND: "monthly_usage_not_found",
   MONTHLY_USAGE_NOT_CURRENT: "monthly_usage_not_current",
+  MONTHLY_USAGE_ALREADY_FINALIZED: "monthly_usage_already_finalized",
   USAGE_BEFORE_GO_LIVE: "usage_before_go_live",
   SETTLEMENT_INVALID_LEDGER_ENTRY_TYPE: "settlement_invalid_ledger_entry_type",
   SETTLEMENT_LEDGER_ENTRY_NOT_FOUND: "settlement_ledger_entry_not_found",
+  SETTLEMENT_EXCEEDS_OUTSTANDING: "settlement_exceeds_outstanding",
 }
 
 const SQLSTATE_KINDS: Record<string, EntitlementErrorKind> = {
