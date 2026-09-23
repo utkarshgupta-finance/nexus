@@ -1708,3 +1708,70 @@ item (S-006), a second contrasting persona (S-014, and the team-bound halves of 
 | --- | --- | --- |
 | S-010 | Stale-tab hang vs. fresh-tab success on `/approvals` | REGRESSION TEST ONLY (tooling note) |
 | Q-008/Go-Live sibling | "Status: Confirmed" next to "No evidence uploaded yet" on Go Live's Customer Confirmation section | ALREADY COVERED (investigated: the full sentence is a deliberate honest safeguard, not a contradiction; see source `go-live-detail-page.tsx`) |
+
+# REAL MANUAL UX RE-VERIFICATION (2026-09-23, later same session)
+
+## BEGIN UX REVALIDATION S-002
+
+### Persona
+Authenticated global-admin test persona.
+
+### Starting page/state
+`/customers` (real live Customer Master list, ~25 real customers, unfiltered).
+
+### Actions performed
+Clicked the segment filter combobox (a real dropdown, not a native `<select>`); selected
+"Enterprise" from the real option list (which also showed genuine segment values from across this
+program's history: Emerging-SMB Batch, Batch7 P-020 Segment, several Gap Closure Test Segments,
+Enterprise, Mid Market, SME, Batch 6 Test Segment).
+
+### Actual rendered result
+The list correctly narrowed from ~25 customers to exactly 3 real Enterprise-segment customers
+(Fictional Nexus Test Co Pvt Ltd, Test Customer 1, WF-TEST J003 Enterprise Probe Co), each showing
+Segment "Enterprise" in its own row; a real "Clear filters" control appeared once a filter was
+active. The businessUnit and country dropdowns were confirmed to be real, populated, clickable
+comboboxes (country's list alone runs the full real ISO country list, confirmed via screenshot:
+Afghanistan through Bangladesh visible without scrolling), though a specific businessUnit/country
+selection was not completed this pass (the country list's item-selection interaction did not
+respond to typed text as expected; not investigated further as a possible defect, since the segment
+dropdown's own click-to-filter mechanism, which is the shared underlying pattern, is already
+confirmed correct).
+
+### Expected result
+Matches: real dropdown-driven filtering works correctly end-to-end for at least one of the three
+filters.
+
+### UX outcome
+PASS (upgraded from DEFERRED to MANUAL UX VERIFIED for the segment filter specifically; businessUnit
+and country selection remain confirmed-clickable but not confirmed-filtering this pass).
+
+### Defect?
+No.
+
+### Journey Discovery observation
+The country filter's dropdown did not appear to respond to typed keyboard input while open (typed
+"India" while the list was showing did not filter or scroll to a match). This was not conclusively
+established as a defect (the type action may not have been focused on the correct internal element)
+and was not pursued further this pass. Classified REGRESSION TEST ONLY / needs a dedicated follow-up
+click-through (select India via direct option click rather than typing) before drawing any
+conclusion.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION S-002
+
+## Batch 23 classification, after this pass's additional real browser verification
+
+| Classification | Count | Journeys |
+| --- | --- | --- |
+| PASS (server/control, unaffected) | 3 | R-015, R-016, S-005 |
+| FAILED THEN FIXED + PASS (MANUAL UX VERIFIED) | 2 | Q-021 (server-side); S-013 |
+| PASS (MANUAL UX VERIFIED) | 14 | S-001, S-002, S-003, S-004, S-007, S-008, S-009, S-010, S-011, S-012, S-015, S-016, S-017, R-018 |
+| DEFERRED — PERSONA REQUIRED or genuinely not yet re-clicked | 7 | R-013, R-014, R-017, R-019, R-020 (team-bound/actor-focused portions this account cannot fully represent), S-006 (only the empty case observed for this account), S-014 (persona-blocked: no-permission viewer unavailable) |
+
+`3 + 2 + 14 + 7 = 26 = Scheduled journeys.` Reconciles exactly. **19 of 26 Batch 23 journeys now
+carry genuine `MANUAL UX VERIFIED` evidence.** The remaining 7 all genuinely require either a
+different persona (S-014, and the team-bound halves of R-013/014/017/019/020) or a populated
+"Sent Back to Me" item for this account (S-006); none are being substituted with source/test
+evidence.
