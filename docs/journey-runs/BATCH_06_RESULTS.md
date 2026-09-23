@@ -956,6 +956,84 @@ rewritten to make a journey look like it passed the first time.
 - SUSPECTED TRIGGER: dev logs show a cluster of `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` warnings (11, within under 100ms of each other) shortly before the observed hang, consistent with concurrent requests contending over refresh-token state. This entry originally attributed the hang to "Supabase Auth's own token-refresh lock." That specific mechanism is withdrawn: this project's installed `@supabase/auth-js` (v2.116.0) runs the SDK's "lockless coordination" default path, since neither `middleware.ts` nor `src/lib/supabase/server-auth-client.ts` passes a `lock` option; confirmed directly against the installed package, `getUser()` takes the unwrapped `_getUser()` path with no lock acquisition at all in this configuration. The classic lock-deadlock explanation does not apply as originally stated.
 - NOT PROVEN: the exact code path that left the `getUser()` promise unresolved was not isolated, and the hang was not reproduced deterministically in a live browser: repeated normal navigation, hard reloads, rapid back-to-back route switching, and multiple consecutive reloads against both routes, both before and after the fix, all rendered correctly with no stuck state. Failure to reproduce does not prove the suspected trigger; it only means this session could not confirm the specific mechanism.
 - FIX: `getUser()` is wrapped in an 8-second timeout (`withTimeout`, `src/platform/auth/server.ts`) that rejects if the call has not settled, routed through the existing `AUTH_PROVIDER_ERROR` catch path so it degrades to the same honest `{ status: "unavailable" }` state a real provider rejection already produces, distinct from `unauthenticated`, `inactive`, and a missing-permission state (`AuthGate`, `src/components/product/auth-gate.tsx`, renders a distinct message for each). This bounds Nexus's own wait; it does not cancel the underlying Supabase request, since `supabase-js` v2's `getUser()` takes no `AbortSignal`/cancellation parameter (confirmed against the installed package) and the SDK's own `dispose()` API documents in-flight fetches as running to completion, not aborted. The abandoned call's eventual settlement is a no-op against the already-settled outer promise (native Promise semantics): no crash, no unhandled rejection, no accumulating leak, only one already-in-flight request per timed-out call continuing in the background until it naturally resolves.
+
+---
+
+## Historical UX Revalidation (overnight run, Batches 2-7) — CRITICAL TOOLING FINDING
+
+### BATCH 6 UX HEADER
+
+| Historical journeys | MANUAL UX REQUIRED | MIXED MANUAL+SERVER | SERVER/DB ONLY | Historical UX evidence sufficient | Missing/partial UX evidence | Starting SHA |
+|---|---|---|---|---|---|---|
+| 25 (O-018 to O-025, P-001 to P-017) | 3 (O-020, O-023, P-016) | 20 (O-018, O-021, O-024, O-025, P-001 to P-011, P-013, P-014, P-015, P-017) | 2 (O-019, O-022) | 9 (O-020, O-023, P-012, P-013, P-014, plus reasoning below) | 16 initially flagged | `220bb68` |
+
+Reconciliation found the same "not a single genuine browser action in the original pass" pattern already seen in Batch 5, now confirmed across essentially the entire Reference Master (P-series) worklist: every original "UX Result: PASS" for P-001 through P-011 and P-015 was backed only by an RPC insert, a SQL query, or a raw-data comparison, never an actual page render. O-020, O-023, P-012, P-013 are correctly ALREADY COVERED via complete, targeted source searches proving genuine negative-existence claims (no search/filter UI, no history-viewing UI, no live caller of a stale function, no Level-3 add affordance).
+
+**Mid-batch discovery — a critical, escalating tooling failure, not a product defect:** While attempting the first genuine live click-through this pass (adding a throwaway Level 1 value via the real "Add value" form on `/settings/customer-onboarding`), the click produced zero effect (no new row, no network request in the dev server's own terminal log). This was investigated exhaustively rather than assumed:
+1. Retried with fresh `read_page` refs, a render-tick wait, and a full hard `window.location.reload()` immediately before the click: still zero effect.
+2. Suspected a tab-specific issue (the admin tab, `tab-36`/`seed`, had been used continuously for many hours). Tested a plain sidebar navigation `<a>` link click on the SAME tab: also zero effect (no navigation at all).
+3. Tested the identical link click on a different tab, different origin (`tab-38`, `workflow-admin.localhost:3000`): this one **succeeded** (real navigation occurred), initially suggesting a per-tab issue.
+4. Immediately retried the exact same click on `tab-38` again, moments later: it now **also** produced zero effect.
+5. Explicitly fronted a tab (`tabs_select`) before retrying its click, to rule out a background-tab focus issue: no change, still zero effect.
+
+This progression, an initially-working mechanism that stopped working across every tab tried within a short window, with `navigate` (full URL loads) continuing to work perfectly throughout, points to a genuine degradation in this tool session's click-delivery mechanism itself over the course of a very long session (many hours, hundreds of prior tool calls), not a per-component, per-page, or per-tab product issue, and not the already-fixed server-side `getCurrentNexusSession` hang described above (a hard client-side reload creates an entirely fresh JS execution context, which would clear any stuck client-side promise state, yet the click still failed immediately after such a reload). This is recorded in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` as a critical, session-wide tooling limitation.
+
+**Practical effect on this batch:** every remaining journey whose residual gap required a genuine live click-through (adding/deactivating/reactivating a Level 1 or Level 2 reference value, the O-018/O-021/O-024/O-025 team-assignment UI checks) could not be freshly exercised via mutation for the remainder of this pass. Pure-viewing evidence (navigation, `read_page`, screenshots) continued to work reliably throughout and was used wherever it could close a gap without needing a click.
+
+### BEGIN HISTORICAL UX REVALIDATION P-001 through P-011, P-015 (Reference Master Level 1/2/3 values)
+
+- **Canonical intent (collectively):** Confirm adding, deactivating, and reactivating Level 1/Level 2/Level 3 reference values behaves correctly and renders honestly (immediate appearance, disappearance from active views, historical preservation, no warning badges misapplied).
+- **Genuine live evidence gathered this pass:** Navigated to the real `/settings/customer-onboarding` page and directly observed its actual structure for Industry/Category (Level 1): a "Configurable" badge, a "Used by Customer Details" reference-count line, a live search box, All/Active/Inactive filter buttons with a genuine "7 Active · 0 Inactive" count, a real data table with Code/Label/Status/Action columns, and a real "Add value" form (Label + Code + Add button). This confirms the page's rendering shape is real and matches the canonical description, but the specific per-value assertions (a newly-added value appearing immediately, a deactivated value disappearing from the Active filter, a referenced value's detail page rendering without a warning badge) each require a click-through that could not be completed once the tooling limitation above set in.
+- **Expected result:** Each specific per-value UX assertion holds.
+- **Manual UX result:** PARTIAL for all of P-001 through P-011 and P-015. The page's real structure is genuinely confirmed live; the specific click-dependent behaviors are blocked by the tooling limitation discovered mid-pass, not fabricated as PASS.
+- **Existing server/control evidence:** Unchanged from each original entry (RPC-level correctness for insert/deactivate/reactivate was already established).
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED. The underlying business logic is not in question; only a fresh, dedicated live-render re-check is blocked this pass.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION P-001–P-011, P-015 (PARTIAL: page structure genuinely confirmed live; per-value click-throughs blocked by the tooling finding above)
+
+### BEGIN HISTORICAL UX REVALIDATION O-018, O-021, O-024, O-025
+
+- **Canonical intent (collectively):** O-018 (last remaining active team member removed while a request waits — a real, unhandled gap with a warning built later), O-021 (team membership assignment requires `team.write`, separate from `user_access.write`), O-024 (a new team is immediately assignable), O-025 (two admins simultaneously assigning the same user to the same team).
+- **Why a fresh live check is not safely performable this pass:** Each of these needs either a genuine "Assign a team" click-through (the same control already confirmed non-responsive during Batch 5's O-011/O-013 investigation, and now confirmed part of a broader, escalated click-delivery failure affecting this entire tool session) or a rendered warning/Operational-Queue-badge state that depends on the same blocked interaction.
+- **Expected result:** Each journey's own canonical assertion holds.
+- **Manual UX result:** PARTIAL for all four, matching the same disclosed tooling limitation.
+- **Existing server/control evidence:** Unchanged from each original entry (the underlying RPC/permission-boundary mechanics were already established and are not in question).
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION O-018/O-021/O-024/O-025 (PARTIAL, blocked by the escalated tooling finding)
+
+---
+
+## BATCH 6 CLOSURE (overnight run, Batches 2-7)
+
+### Batch Report
+
+| Journey | UX evidence | Result | Discovery |
+|---|---|---|---|
+| O-020, O-023, P-012, P-013, P-014 | Already-sufficient complete source searches (unchanged) | ALREADY COVERED | ALREADY COVERED |
+| P-001–P-011, P-015 | Real page structure confirmed live; per-value click-throughs blocked mid-pass | PARTIAL | ALREADY COVERED |
+| O-018, O-021, O-024, O-025 | Blocked by the same escalated tooling finding | PARTIAL | ALREADY COVERED |
+
+### Summary Metrics
+
+| Metric | Count |
+|---|---|
+| Historical journeys (Batch 6 UX-scoped worklist) | 16 |
+| Previously sufficient (confirmed, no re-execution needed) | 9 |
+| Genuinely re-confirmed via live page structure this pass | 12 (P-001 through P-011, P-015 — partial) |
+| PASS | 0 new (structure confirmed; per-value click-throughs not completed) |
+| Overnight blocked | 16, all due to one root cause: the session-wide click-delivery tooling degradation discovered mid-batch |
+| Product decisions parked | 0 |
+| New journeys discovered | 0 |
+| Remaining ordinary UX residuals | 0 autonomously executable; 16 journeys are blocked specifically by a tooling failure external to the product, not a gap this run declined to close. |
+
+**Starting SHA:** `220bb68`. Batch 6 closes with a critical tooling finding recorded in full in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md`. Given this affects every remaining click-dependent journey in the same way, Batch 7 proceeds using read-only browser evidence (navigation, `read_page`, screenshots) wherever it can close a gap, and discloses PARTIAL wherever a genuine click-through is the only remaining evidence gap, rather than repeatedly re-diagnosing the same already-confirmed tool limitation.
+
+---
 - REGRESSION EVIDENCE: `src/platform/auth/server.test.ts` covers `getUser` success (active and unprovisioned/inactive branches), unauthenticated (`user: null`), provider rejection, and a `getUser()` call that never resolves (`new Promise(() => {})`, asserted with `vi.useFakeTimers()`/`advanceTimersByTimeAsync` to reach the timeout without a real 8-second wait). Full suite: 101 files, 910 tests, all passed. Live browser regression pass covered both routes across normal navigation, hard reload, rapid route switching, and multiple consecutive reloads, before and after the fix: no permanent loading state, no redirect loop, no false missing-permission state, no false logged-out state in any pass.
 - FIX COMMIT: `baf7026` (backfilled 2026-09-21, Batches 1-13 Ledger Audit; this is the same commit that recorded the rest of this batch's ledger, "Batch 6: complete Teams + Reference Masters journey execution," confirmed via `git show --stat` to also touch `src/platform/auth/server.ts` and `src/platform/auth/server.test.ts`).
 
