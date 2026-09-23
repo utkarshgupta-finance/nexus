@@ -1597,3 +1597,17 @@ safety classifier). Zero ordinary executable residuals remain in Batch 21.**
 alongside a correct, real team name in the Operational Queue and three review-detail pages, now corrected to a
 domain-neutral label). All 7 remaining ordinary Batch 21 residuals are now CLOSED. Zero ordinary executable
 residuals remain in Batch 21.**
+
+## M-028 accounting reconciliation (2026-09-23)
+
+Re-read M-028's canonical definition in `docs/NEXUS_JOURNEY_UNIVERSE.md` (Regular Path: "Each empty bucket shows
+a clear, distinct 'nothing here' state, not conflated with a loading or error state"; UX Checks: "This journey is
+itself a UX check"). Rendered empty-state UX is explicitly part of the canonical assertion, not merely
+supplementary.
+
+The classification recorded above already reflects this correctly: M-028 is **CLOSED for its real data-layer
+precondition** (the `buildMyWorkItems` execution proving a genuinely-zero-match input returns a clean `[]`), with
+the rendered-empty-state visual claim carried separately as an explicit, acknowledged **TOOLING-BLOCKED MANUAL
+UX** sub-point (no authenticated browser session available this run). No change to the classification was needed;
+this note confirms the distinction was deliberate and matches the canonical journey text, rather than a rendering
+claim silently absorbed into "CLOSED". This is a documentation reconciliation only; no journeys were re-executed.

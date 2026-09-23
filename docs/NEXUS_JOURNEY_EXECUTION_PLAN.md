@@ -243,10 +243,10 @@ This requirement itself does not apply retroactively to Batches 1 through 16; th
 **Depends on:** Batch 21.
 
 ### BATCH 23
-**Journey IDs:** R-013 through R-020, S-001 through S-017
-**Purpose:** Finish Audit/Timeline (the explicit renamed-user/renamed-team/workflow-replaced/version-superseded historical-fidelity checks), then begin Search/Navigation/Discovery: the real but narrowly-scoped Customer Master search, list-based find-work surfaces.
+**Journey IDs:** Q-021, R-013 through R-020, S-001 through S-017
+**Purpose:** Close Q-021 (discovered during Batch 22's Q-011: Go Live's upload service skips the real-byte-signature check Onboarding performs), finish Audit/Timeline (the explicit renamed-user/renamed-team/workflow-replaced/version-superseded historical-fidelity checks), then begin Search/Navigation/Discovery: the real but narrowly-scoped Customer Master search, list-based find-work surfaces.
 **Required personas:** Any user with customer.read, a user whose display name will be changed mid-scenario
-**Required fixtures:** A customer with a former name (via an approved rename) from Batch 9-10, and at least one user who has since changed their display name, to exercise the live-resolution-vs-snapshot journeys meaningfully.
+**Required fixtures:** A customer with a former name (via an approved rename) from Batch 9-10, and at least one user who has since changed their display name, to exercise the live-resolution-vs-snapshot journeys meaningfully; a spoofed-content file fixture (PNG bytes disguised as PDF, mirroring Q-006) for Q-021.
 **Expected duration:** 4-5 hours
 **Risk concentration:** P2 on search recall/precision; P1 on the live-actor-resolution-after-rename confirmation.
 **Depends on:** Batch 22.

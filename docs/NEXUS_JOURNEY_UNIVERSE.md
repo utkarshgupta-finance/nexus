@@ -12736,6 +12736,31 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: Q-001
 - Notes: N/A
 
+### Q-021: Go Live document upload rejects a spoofed-content file via real byte-signature verification, matching Onboarding's own defense-in-depth [DISCOVERED DURING BATCH 22, JOURNEY Q-011, 2026-09-23]
+- Pack: Q - Documents / Evidence
+- Business Objective: Confirm Go Live's document validation is not weaker than Onboarding's for the one dimension Onboarding additionally checks: the file's real bytes, not merely its claimed MIME type/extension/size.
+- Domain: Go Live
+- Object / Record Type: Document upload attempt, Go Live's own document_type
+- Starting State: An in-progress Go Live request with no evidence uploaded for a given Go Live document type.
+- Personas: Go Live preparer
+- Preconditions: N/A
+- Regular Path: Preparer attempts to upload a file with an allowed extension/MIME type/size whose real bytes are a different, disallowed format (mirroring Q-006's own Onboarding fixture: PNG bytes disguised as a `.pdf`/`application/pdf`).
+- Stress Variant: N/A
+- Authorization Variant: N/A
+- Concurrency Variant: N/A
+- Idempotency Variant: N/A
+- Audit/Data Integrity Checks: No document row or storage object is created for a rejected upload.
+- Recovery/Resilience Variant: N/A
+- UX Checks: N/A
+- Historical Variant: N/A
+- Expected Business Result: A spoofed-content file cannot pass Go Live's evidence validation merely by claiming an allowed extension/MIME type.
+- Expected Technical Invariants: Go Live's upload service calls the same `matchesAllowedAttachmentSignature` real-byte-signature check Onboarding's own service already performs, not only `validateAttachmentFile`.
+- Priority: P2
+- Automation Feasibility: FULL
+- Dependencies: N/A
+- Related Journeys: Q-006, Q-011
+- Notes: Discovered during Batch 22's execution of Q-011 (confirming Go Live reuses Onboarding's size/type policy, which it does): found Go Live's service imports `validateAttachmentFile` only, not the additional real-byte-signature check. Not fixed at discovery time (a real but non-trivial scope addition to Go Live's own validation depth, not a one-line completion of an already-stated Go Live requirement); scheduled here for dedicated execution. If found to still be missing when executed, this is a bounded PRODUCT GAP to close (extend Go Live's service to also call `matchesAllowedAttachmentSignature`), not a new Product Decision, since the business intent (real evidence, not spoofable by extension/MIME claim alone) is already settled by Q-006's own existence.
+
 ## Pack R: Audit / Timeline
 
 ### R-001: Onboarding Timeline full-tuple verification for an approval action
