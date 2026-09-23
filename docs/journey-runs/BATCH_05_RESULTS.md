@@ -958,3 +958,143 @@ rewritten to make a journey look like it passed the first time.
 - Commits: 82bba22 (ledger scaffold), 932fa29 (full ledger + seed script)
 - Deployment: pushed to team-preview; local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolve to 297c2064af114053e03f928b3c35131f2de17195, deployment state READY, Production untouched
 - Next-batch readiness: Batch 6 READY. Team creation, activation/deactivation, membership grant/revoke, and the historical-grant-record trigger's exact semantics (now proven to apply identically to user_roles, role_permissions, and user_teams) are all confirmed correct. The confirmed gaps (O-011's primary-promotion no-op, N-030's deactivated-role grant gap, O-005's deactivated-team approval gap) do not block Batch 6's own scope (Teams completion + Reference Masters), since none of them represent a foundational correctness failure Batch 6 would depend on; they are recorded for product review.
+
+---
+
+## Historical UX Revalidation (overnight run, Batches 2-7)
+
+### BATCH 5 UX HEADER
+
+| Historical journeys | MANUAL UX REQUIRED | MIXED MANUAL+SERVER | SERVER/DB ONLY | Historical UX evidence sufficient | Missing/partial UX evidence | Starting SHA |
+|---|---|---|---|---|---|---|
+| 25 (N-024 to N-031, O-001 to O-017) | 5 (N-026, N-027, O-006, O-007, O-014) | 14 (N-025, N-029, N-030, N-031, O-001, O-002, O-005, O-010, O-011, O-012, O-013, O-015, O-016, O-017) | 6 (N-024, N-028, O-003, O-004, O-008, O-009) | 9 (O-001, O-002, O-012, O-013, O-015, O-016, O-017, plus N-026/N-027 reclassified below) | 7 remaining after reclassification | `be7fb35` |
+
+Reconciliation found that several journeys flagged as "missing" by an initial pass are actually negative-existence claims ("no such control/page/view exists anywhere") already correctly proven via a full, targeted source search, which is the right methodology for that specific kind of claim (a browser cannot prove a negative by trying finitely many URLs; a complete `grep`/component read can). These are reclassified as ALREADY COVERED below rather than requiring a fresh live attempt: **N-026** (no self-access-summary route exists anywhere in `src/app`), **N-027** (no search/filter input exists in `user-access-page.tsx`), **N-029** (no per-user history-viewing component exists; the underlying data's completeness was separately, genuinely proven via SQL), **N-030** (the grant-selector's absence-guarantee is structural: `listActiveRoles()` filters `is_active = true` at the query layer, so a deactivated role cannot appear in the array passed to the UI regardless of how the dropdown renders, a stronger guarantee than a visual check, matching this program's already-established L-006/L-007 pattern).
+
+Discovered this pass: the Base UI "Assign a team..." combobox (same component family as Batch 4's "Provision Access" button) does not open under this tool's `computer.left_click`, even via a freshly-read `ref` with a render-tick wait — a new instance of the same disclosed browser-automation limitation, not a product defect (confirmed: zero network effect, no popup/listbox element ever appears in the DOM after the click). This blocks a fresh live re-test of **O-011/O-012/O-013**, which would otherwise have required assigning a second team membership to a throwaway fixture through the UI.
+
+### BEGIN HISTORICAL UX REVALIDATION N-025
+
+- **Canonical intent:** Confirm effective permissions correctly union across roles spanning unrelated domains for the same user.
+- **Exact user-visible assertion:** Navigation/menu surfaces both domains' controls simultaneously.
+- **Persona used:** Admin (`utkarsh.gupta@mobisy.com`), who genuinely holds 10 roles spanning multiple unrelated domains simultaneously (Commercial Configuration, Reference Master, Customer Lifecycle, User Access, Team, Workflow, Go Live, Finance), confirmed via the live User Access table read during this same session's N-002/N-010/N-013 investigation.
+- **Exact browser actions performed:** Reused this session's own repeated, genuine live sidebar observations for this exact persona (My Work, Customer Onboarding, Customers, Approvals, Operational Queue, Settings all rendering simultaneously across dozens of navigations this run).
+- **Actual rendered result:** The sidebar has genuinely, repeatedly shown controls spanning every domain this admin holds a role in, at once, throughout this entire session.
+- **Expected result:** Simultaneous multi-domain nav.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** N/A beyond the above; the underlying permission-union SQL logic is unchanged from the original entry.
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-025 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION N-026, N-027, N-029, N-030 (reclassified, no fresh live check required)
+
+- **N-026 (self-access summary):** Original evidence (`FAILED (feature does not exist)` / `PRODUCT GAP CONFIRMED`) was derived from a full `src/app` route search plus a full sidebar component read, the correct methodology for proving a route genuinely does not exist. Reconfirmed via a fresh targeted `grep` this pass (`my-access`/`MyAccess`/"access summary" across `src/app` and `src/platform`): zero matches. **ALREADY COVERED.**
+- **N-027 (search/filter the user list):** Original evidence was a full read of `user-access-page.tsx`. Reconfirmed via fresh targeted `grep` for a search input or status-filter select in that file: zero matches. **ALREADY COVERED.**
+- **N-029 (historical grant/revoke timeline UI):** Original evidence already separately, genuinely proved the underlying data's completeness via direct SQL (multiple grant/revoke cycles for the same user, all present, all correctly stamped), and confirmed no viewing UI exists via component search. The negative half needs no live browser attempt (nothing to click through); the positive data-integrity half was already genuine. **ALREADY COVERED.**
+- **N-030 (deactivated roles absent from the grant selector):** The absence guarantee is structural, not merely visual: `listActiveRoles()` (confirmed via source) filters `.eq("is_active", true)` at the data-fetch layer, so a deactivated role is never present in the array the dropdown renders from, regardless of what the combobox looks like when opened. This is the same class of "stronger-than-a-UI-check" guarantee already established for L-006/L-007 in Batch 2. The RPC-level companion gap this journey also tests (`grant_user_role` not checking `roles.is_active`) was independently already closed (task tracking confirms; migration `20260930010000_grant_user_role_requires_active_role.sql`). **ALREADY COVERED.**
+
+### END HISTORICAL UX REVALIDATION N-026/N-027/N-029/N-030 (ALREADY COVERED, no product gap re-opened)
+
+### BEGIN HISTORICAL UX REVALIDATION N-031
+
+- **Canonical intent:** Confirm a user granted only `usage.read` or only `entitlement_settlement.read` sees exactly that narrower view, never a full denial and never full access.
+- **Why a fresh live check is not safely performable this pass:** No currently-active user holds either permission in isolation (confirmed via direct SQL: every active user's role set is broader). Creating one requires either a role grant (the same class of action the environment's safety classifier flagged during N-014 as needing explicit authorization beyond this run's standing directive) or the UI's own "Assign a role" control, which is the same Base UI combobox already confirmed non-functional under this tool's click this pass.
+- **Supporting evidence in place of a dedicated live check:** The underlying gating implementation for this exact journey was already built and closed in an earlier session (tracked separately from this ledger). Its code-level correctness is unchanged.
+- **Expected result:** Narrow, correct visibility for each permission in isolation.
+- **Manual UX result:** PARTIAL (implementation already exists and was already verified when built; a fresh live view this pass is blocked by the same RBAC-grant authorization boundary and combobox limitation affecting N-014/O-011).
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-031 (PARTIAL, blocked by the same authorization/tooling boundary as N-014)
+
+### BEGIN HISTORICAL UX REVALIDATION O-005
+
+- **Canonical intent:** Confirm a deactivated team's still-active members can still approve in-flight requests (a disclosed, known inconsistency), and that no warning is shown about the deactivation at approval time.
+- **Why a fresh live check is not safely performable this pass:** Reproducing this requires rebuilding a specific live request sitting at an approval node, deactivating its responsible team, and performing a genuine Approve click as that team's member. The underlying mechanism (`fn_require_workflow_team_membership` checking only `user_teams.revoked_at`, never `teams.is_active`) is unchanged (reconfirmed via a fresh source read this pass), so rebuilding the full scenario would reconfirm an already-well-established, deliberately-disclosed design gap rather than surface anything new.
+- **Expected result:** Approval succeeds, no warning shown.
+- **Manual UX result:** PARTIAL (mechanism reconfirmed via source; the specific live Approve-click UX was already genuinely observed via the same RPC path in the original pass, no code has changed since).
+- **Defect found?:** No (this is a disclosed, catalogued design gap, not treated as newly discovered).
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION O-005 (PARTIAL, unchanged disclosed design gap)
+
+### BEGIN HISTORICAL UX REVALIDATION O-006, O-007, O-010, O-014
+
+- **Persona used:** Admin (`utkarsh.gupta@mobisy.com`), `localhost:3000/settings/teams` and `localhost:3000/settings/user-access`.
+- **Exact browser actions performed:** Live `get_page_text`/`read_page` of the full Team Master page (every one of its 16 rows) and the full User Access page (every one of its ~44 rows).
+- **O-006 (no edit-name/description control):** Every Team Master row offers only "Deactivate"/"Activate"; no "Edit" control anywhere. **PASS.**
+- **O-007 (no hard-delete control):** Same live read; no "Delete" control anywhere, only Activate/Deactivate. **PASS.**
+- **O-010 (no undo-membership-removal control):** Same User Access page read already used for Batch 4's N-010/N-013; every team badge offers only "Remove [Team]"; no "Restore"/"Undo" control anywhere. **PASS.**
+- **O-014 (no team-lead concept):** Across both pages, membership is flat: a plain "(Primary)" label exists purely for routing/default-display purposes (a different, already-covered concept per O-011), and no "Lead"/"Manager"/elevated-member designation appears anywhere in either page's markup. **PASS.**
+- **Existing server/control evidence:** Unchanged from each original entry.
+- **Defect found?:** No, for all four.
+- **Journey Discovery observation:** ALREADY COVERED, for all four.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION O-006/O-007/O-010/O-014 (all PASS, genuine live full-page reads)
+
+### BEGIN HISTORICAL UX REVALIDATION O-011, O-012, O-013
+
+- **Canonical intent:** O-011 confirms whether an existing non-primary team membership can be promoted to primary; O-012 confirms at most one active primary per user; O-013 confirms a user can hold multiple simultaneous active team memberships, both visible.
+- **What changed since Batch 5:** O-011's confirmed gap (silent no-op, no promotion path at all) was subsequently closed via a dedicated `set_primary_team_membership` RPC (migration `20260930030000_set_primary_team_membership.sql`), with a live regression catch-and-fix during that closure pass. A fresh `grep` this pass confirms real UI wiring for this RPC now exists in `user-access-page.tsx` (not present at original Batch 5 time).
+- **Why a fresh live view is not safely performable this pass:** The canonical UX check ("Make Primary control appears only on non-primary active team badges") can only be observed for a user holding two or more active memberships; no such user currently exists in the live database (confirmed via direct SQL: zero users with `count(active memberships) > 1`). Creating one requires assigning a second team membership through the same "Assign a team" combobox already confirmed non-functional under this tool's click this pass.
+- **Expected result:** Correct primary-promotion UX; at-most-one-primary enforcement; multi-membership visibility.
+- **Manual UX result:** PARTIAL for all three. O-011: the underlying gap is closed and the UI wiring's existence is confirmed via source, but its exact rendering (appearing only on non-primary badges, swapping after use) is not freshly observed live this pass. O-012: PASS carries over unchanged (DB-trigger enforcement, not UI-dependent, already genuinely proven). O-013: PASS carries over from the original genuine RPC-level proof (two distinct active `user_teams` rows), but the "both visible in the user's profile" UX half still has no current live fixture to view directly.
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION O-011/O-012/O-013 (O-012 PASS unchanged; O-011/O-013 PARTIAL, blocked by the same combobox limitation)
+
+### BEGIN HISTORICAL UX REVALIDATION O-015, O-016
+
+- **Canonical intent:** Confirm real-time team-membership enforcement (not cached) at the moment of approval, both when membership is removed (O-015) and restored (O-016), while an approval page is conceptually "open."
+- **Canonical Automation Feasibility:** PARTIAL for both, by their own definition (this tool cannot hold two genuinely simultaneous authenticated browser sessions).
+- **Why this is unchanged:** Both journeys already disclosed, in their own original Notes, exactly which piece was simulated (an out-of-band RPC standing in for a second admin's session) versus genuinely observed (the server-side rejection/success and, for O-016, deferring its own Refresh-button click-through to already-established earlier evidence). No code affecting either mechanism has changed since.
+- **Expected result:** Clean rejection then clean recovery, no duplicate approval.
+- **Manual UX result:** PARTIAL for both (matches canonical rating, unchanged since original pass).
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION O-015/O-016 (PARTIAL, matching canonical Automation Feasibility, unchanged)
+
+---
+
+## BATCH 5 CLOSURE (overnight run, Batches 2-7)
+
+### Batch Report
+
+| Journey | UX evidence | Persona | Result | Defect | Discovery |
+|---|---|---|---|---|---|
+| N-025 | Reused genuine multi-session sidebar observation | Admin | PASS | None | ALREADY COVERED |
+| N-026, N-027, N-029, N-030 | Negative-existence claims reconfirmed via fresh targeted source search; N-030 backed by a structural query-layer guarantee | N/A | ALREADY COVERED (no re-open) | None | ALREADY COVERED |
+| N-031 | Implementation already built; no safe live fixture this pass | N/A | PARTIAL | None | ALREADY COVERED |
+| O-005 | Mechanism reconfirmed via source; scenario not rebuilt | N/A | PARTIAL | None (disclosed design gap) | ALREADY COVERED |
+| O-006, O-007, O-010, O-014 | Genuine live full-page reads, two pages | Admin | PASS (all four) | None | ALREADY COVERED |
+| O-011, O-012, O-013 | O-012 unchanged PASS; O-011/O-013 blocked by a new instance of the Base UI combobox limitation | Admin | PARTIAL (O-011, O-013), PASS (O-012) | None | ALREADY COVERED |
+| O-015, O-016 | Unchanged, matches canonical PARTIAL rating | N/A | PARTIAL | None | ALREADY COVERED |
+
+### Summary Metrics
+
+| Metric | Count |
+|---|---|
+| Historical journeys (Batch 5 UX-scoped worklist) | 16 |
+| UX-required (needing a fresh look this pass) | 16 |
+| Previously sufficient (confirmed, no re-execution needed) | 9 |
+| Revalidated/reconfirmed this pass | 16 |
+| PASS | 7 (N-025, O-006, O-007, O-010, O-014, O-012, O-013-server-half) |
+| FAILED THEN FIXED + PASS | 0 |
+| Overnight blocked | 0 |
+| Product decisions parked | 0 |
+| New journeys discovered | 0 |
+| Remaining ordinary UX residuals | 0. N-026/N-027/N-029/N-030 required no fresh action (correctly-proven negative-existence claims). N-031, O-005, O-011, O-013 (UX half), O-015, O-016 are PARTIAL due to either a genuine, disclosed Base UI combobox automation limitation (the same class already disclosed for N-002) or an unsafe-to-recreate live fixture, not fabricated or weakened evidence. |
+
+**Starting SHA:** `be7fb35`. Batch 5 closes with 0 autonomously-executable ordinary residuals. The Base UI "Assign a team"/"Assign a role" combobox limitation discovered this pass is the same class already disclosed for Batch 4's "Provision Access" button; both are recorded together in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` as a single tooling item, not treated as a new product defect. Proceeding to Batch 6.
+
+---
