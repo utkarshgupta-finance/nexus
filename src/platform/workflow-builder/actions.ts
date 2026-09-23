@@ -4,6 +4,7 @@ import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
 import { createDefinition, setDefinitionActive, replaceActiveDefinition, createVersion, saveVersionGraph, publishVersion, discardVersion } from "./services/workflow-builder.service"
 import type { WorkflowAppliesTo, WorkflowNodeDraft, WorkflowEdgeDraft, WorkflowDefinition, WorkflowDefinitionVersion } from "./domain/types"
+import { friendlyMessageForKnownConstraint } from "./domain/known-errors"
 
 /**
  * Real, database-backed Workflow Builder mutations (task Phase N/O).
@@ -36,7 +37,10 @@ function hasStringMessage(error: unknown): error is { message: string } {
 
 function toError(error: unknown, fallback: string): { ok: false; error: string } {
   if (error instanceof AuthorizationError) return { ok: false, error: error.message }
-  if (hasStringMessage(error)) return { ok: false, error: stripErrorToken(error.message) }
+  if (hasStringMessage(error)) {
+    const friendly = friendlyMessageForKnownConstraint(error.message)
+    return { ok: false, error: friendly ?? stripErrorToken(error.message) }
+  }
   return { ok: false, error: fallback }
 }
 

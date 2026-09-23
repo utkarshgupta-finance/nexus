@@ -943,3 +943,65 @@ rewritten to make a journey look like it passed the first time.
 - DEFECTS FIXED: 4 of 4. Fix commits, backfilled in this audit pass from `git log` since the original entries recorded them as placeholders: K-026 = `fa061f2`, K-027 = `0491261`, K-029 = `925915e`, L-021 = `d0f58d8`.
 - Tests / deployment parity at Batch 2's original close: not separately captured in this ledger at the time (the gap this Final Report closes); the batch-completion commit is `d13b63d` ("Record K-029 and K-030 results, complete all 26 Batch 2 journeys"), immediately followed by Batch 3's own scaffold commit `e3e46ac`. Not reconstructed retroactively here since a historical test/deploy snapshot cannot be verified after the fact; current baseline deployment parity is confirmed as of this audit in the audit's own final report.
 - Next-batch readiness: Batch 3 proceeded from this state per its own ledger's "Required fixtures: Published workflow version(s) from Batch 2," confirmed satisfied.
+
+---
+
+## Historical UX Revalidation (overnight run, Batches 2-7)
+
+### BATCH 2 UX HEADER
+
+| Item | Result |
+|---|---|
+| Historical journeys | 26 (K-026 through K-030, L-001 through L-021) |
+| MANUAL UX REQUIRED | 11 (K-027, K-029, K-030, L-002, L-004, L-006, L-007, L-015, L-018, L-020, L-021) |
+| MIXED MANUAL + SERVER | 1 (L-019) |
+| SERVER/DB ONLY | 14 (K-026, K-028, L-001, L-003, L-005, L-008, L-009, L-010, L-011, L-012, L-013, L-014, L-016, L-017) |
+| Historical UX evidence sufficient | 4 (K-027, K-029, K-030, L-019) |
+| Missing/partial UX evidence | 8 (L-002, L-004, L-006, L-007, L-015, L-018, L-020, L-021) |
+| Starting SHA | 586c990 |
+
+Denominator fixed per the above; not changed during this pass. Reconciliation performed via a dedicated research pass over this file, `docs/NEXUS_JOURNEY_UNIVERSE.md`, and every later evidence-audit file (`BATCHES_01_13_LEDGER_AUDIT.md`, `BATCH_18/19/20/21_EVIDENCE_AUDIT.md`, `JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`) — none of the later audits touch Batch 2 journeys beyond the 3 documentation-integrity fixes already reflected above (final report backfill, 3 fix-commit hashes, L-019 correction). The evidence-genuineness bar introduced starting Batch 18 had never been applied retroactively to Batch 2 before this pass.
+
+### BEGIN HISTORICAL UX REVALIDATION L-002
+
+- **Canonical intent:** Confirm the partial unique index enforcing at most one draft per definition is actually enforced, not just documented.
+- **Exact user-visible assertion:** "Error message clearly explains a draft already exists rather than a generic constraint-violation dump."
+- **Persona required:** Workflow Admin.
+- **Persona used:** `nexus-test-workflow-admin@example.test` at `http://workflow-admin.localhost:3000`.
+- **Fixture used:** "K-017 Workflow Admin Lifecycle Test" (definition `e8a1dcc8-e056-4dbf-a0dc-5fdd8f4cdbd0`), a fictional test workflow with one published version and no draft — chosen because it starts from a clean, controllable no-draft state.
+- **Journey Discovery observation (before executing):** The original ledger's L-002 evidence was server-RPC-only; more importantly, the real Builder UI does not even render a "New Draft Version" button once a draft already exists for a definition (confirmed live: the definition list page shows only "Discard Draft" in that state). This means the canonical scenario ("Admin attempts to create a second draft") is not reachable through ordinary single-session UI use at all — only through a genuine race between two sessions that both loaded the page before either created a draft, exactly matching the journey's own Stress Variant. Executed as that race, not as the (unreachable) simple case.
+- **Exact browser actions performed:** Opened the same fixture definition's page in two separate tabs under the same workflow-admin session (both showing "New Draft Version," confirming no draft existed yet); clicked "New Draft Version" in Tab A first, then immediately clicked "New Draft Version" in Tab B (which had loaded before Tab A's action completed, so its UI still showed the create button) — a genuine race, not simulated.
+- **Actual rendered result (defect found):** Tab A succeeded and navigated into the new Draft Version 2 editor. Tab B's click failed as expected (server-side, the DB correctly allowed only one draft to be created) but rendered the raw exception text verbatim on screen: `duplicate key value violates unique constraint "uq_workflow_version_one_draft"` — exactly the generic constraint-violation dump the canonical UX Check says must not happen. This is a genuine, newly-confirmed defect, not previously caught because the original pass never drove this through the real UI.
+- **Root cause:** `src/platform/workflow-builder/actions.ts`'s `createWorkflowVersionAction` used the generic `toError()` helper, which has no translation for this specific known SQLSTATE 23505 constraint (unlike `toSaveError`, which already special-cases two other known tokens). The raw Postgres message passed straight through to the rendered error paragraph.
+- **Fix:** Added `friendlyMessageForKnownConstraint()` in a new `src/platform/workflow-builder/domain/known-errors.ts` (mirroring the established per-domain `parse*Error` pattern used elsewhere, e.g. `src/features/customer-onboarding/domain/commercial-version-errors.ts`), matching on `uq_workflow_version_one_draft` and returning "A draft already exists for this workflow. Publish or discard it before creating a new one." Wired into `toError()` in `actions.ts` ahead of the generic passthrough.
+- **Regression test:** `src/platform/workflow-builder/domain/known-errors.test.ts` — asserts the known constraint message translates correctly and that unrelated messages return null (fall through unchanged). `npx vitest run src/platform/workflow-builder/` — 54/54 passing (6 files). `npx tsc --noEmit -p tsconfig.json` — clean (after clearing a stale `.next/types/* 2.*` duplicate-build artifact, a known tooling artifact, not a real type error).
+- **Genuine retest after fix:** Discarded Tab A's draft to restore the clean starting state; reloaded both tabs fresh (both showing "New Draft Version" again); repeated the exact same live two-tab race. Tab A succeeded identically. Tab B now rendered: "A draft already exists for this workflow. Publish or discard it before creating a new one." — confirmed live, in the real UI, not inferred. Discarded the resulting draft afterward to leave the fixture clean.
+- **Expected result:** A clear, actionable message, not a raw database error.
+- **Manual UX result:** FAILED THEN FIXED + PASS.
+- **Existing server/control evidence:** N/A beyond the live retest above.
+- **Defect found?:** Yes (new, not previously documented in this file or any later audit).
+- **Fix/regression/browser retest:** Complete, as described above.
+- **Journey Discovery observation:** EXPAND EXISTING JOURNEY — L-002's canonical text describes the simple single-admin case, but the real UI only ever reaches this error message via the genuine two-session race (the Stress Variant), since the button itself disappears once a draft exists. Recorded here rather than as a separate new journey ID, since the Stress Variant already exists in the canonical text and this is exactly what was exercised.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-002 (FAILED THEN FIXED + PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-004
+
+- **Canonical intent:** Confirm that wanting to change a published graph always means authoring a new version, never resurrecting or reopening the old one.
+- **Exact user-visible assertion:** "UI clearly labels this as creating 'version 2,' not 'editing version 1.'"
+- **Persona required:** Workflow Admin.
+- **Persona used:** `nexus-test-workflow-admin@example.test`.
+- **Fixture used:** "K-017 Workflow Admin Lifecycle Test" (`e8a1dcc8-e056-4dbf-a0dc-5fdd8f4cdbd0`), one published version (Version 1), no draft. Domain executed: Customer Change (canonical Domain field says commercial_configuration; this mismatch is cosmetic to the mechanic under test, consistent with the same pattern noted throughout the rest of this batch's original evidence).
+- **Exact browser actions performed:** Confirmed starting state (Version 1, Published, no draft). Clicked "New Draft Version." Read the resulting page's own heading and the version history table.
+- **Actual rendered result:** The page heading reads "Workflow Version 2" with a "Draft" status badge directly beneath it — not "Editing Version 1" or any ambiguous label. The version history table simultaneously shows both rows distinctly: "Version 1 | Published | 23 Sept 2026 | Nexus Test Workflow Admin" (unchanged) and "Version 2 | Draft | - | -" (new). A direct read-only DB query confirms both rows coexist (`version_number` 1 and 2, distinct ids) and Version 1's `published_at`/`published_by` are unchanged after Version 2's creation.
+- **Journey Discovery observation (incidental, not part of L-004's own assertion):** While confirming graph copy-forward correctness for this journey, found that Version 2's copied edge (`node_1->node_2`, confirmed present in `workflow_edges` at the DB level, matching Version 1's own edge exactly) does not render on the canvas (`document.querySelectorAll('.react-flow__edge').length` returns 0 despite both nodes rendering correctly). Investigated: `src/app/settings/workflows/[definitionId]/versions/[versionId]/page.tsx`'s edge-mapping code is correct (`id`, `source`, `target` all properly derived from the row). Ruled out a stale-tab artifact via a genuinely fresh tab. Re-checked against "Batch 1 UX Revalidation Fixture" (`a3f17864-d36b-45dd-913f-54874be1f7f2`/`9c4dcb16-0864-415e-b88d-50f5b6c85992`), whose 5 edges were directly, repeatedly confirmed rendering correctly during Batch 1 (`edgeCount: 5`) — the identical live check on the identical fixture now returns `edgeCount: 0`. This is a genuine regression in the shared dev server's current running state, not a per-fixture or per-journey issue, and not present in this ledger's own L-004 assertion (which is about text labeling, confirmed unaffected: the "Version 2"/"Draft" heading and the version-history table are both plain server-rendered HTML, not React Flow canvas elements). A console error (`the name 'friendlyMessageForKnownConstraint' is defined multiple times`, referencing `src/platform/workflow-builder/actions.ts`) persists across hard reloads and a deliberate no-op touch-edit of that file, despite the file on disk (confirmed via direct `grep`) containing no duplicate declaration, `npx tsc --noEmit` passing clean, and all 54 workflow-builder vitest tests passing. This points to a stuck Turbopack dev-server compile/module cache that a source-level fix cannot clear from the outside; clearing it safely requires restarting the shared dev server process, which was not attempted (killing a long-running shared process this session did not start, with the user unavailable to help recover it if the restart fails, is exactly the kind of irreversible-risk action the overnight running rules reserve for the user). Recorded in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md`. Every remaining journey in this run that only needs DB-level graph-correctness evidence (not a live visual canvas edge confirmation) is unaffected and continues normally; any journey whose canonical assertion specifically requires seeing an edge rendered live is provisionally noted rather than silently passed.
+- **Expected result:** Clear "version 2" labeling, version 1 untouched.
+- **Manual UX result:** PASS (L-004's own assertion, fully confirmed).
+- **Existing server/control evidence:** Direct DB read confirming both version rows and unchanged Version 1 audit fields.
+- **Defect found?:** Yes, but scoped to a separate concern (canvas edge rendering) than L-004 itself tests; not counted against L-004's own PASS. See Journey Discovery note above and `OVERNIGHT_PENDING_ACTIONS.md` for the parked remediation.
+- **Fix/regression/browser retest:** N/A for L-004 itself. The edge-rendering regression's remediation is parked (dev server restart required).
+- **Journey Discovery observation:** EXPAND EXISTING JOURNEY candidate for a future pass — "copied edges render correctly on the new draft's canvas" is implied by L-004's own Audit/Data Integrity Checks but not explicitly named as a UX check; worth adding once the current regression is resolved and reverified.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-004 (PASS, with a separately-parked incidental defect)
