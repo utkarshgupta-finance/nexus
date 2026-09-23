@@ -12736,7 +12736,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: Q-001
 - Notes: N/A
 
-### Q-021: Go Live document upload rejects a spoofed-content file via real byte-signature verification, matching Onboarding's own defense-in-depth [DISCOVERED DURING BATCH 22, JOURNEY Q-011, 2026-09-23]
+### Q-021: Go Live document upload rejects a spoofed-content file via real byte-signature verification, matching Onboarding's own defense-in-depth [DISCOVERED DURING BATCH 22, JOURNEY Q-011, 2026-09-23; EXECUTED BATCH 23, FAILED THEN FIXED + PASS, 2026-09-23]
 - Pack: Q - Documents / Evidence
 - Business Objective: Confirm Go Live's document validation is not weaker than Onboarding's for the one dimension Onboarding additionally checks: the file's real bytes, not merely its claimed MIME type/extension/size.
 - Domain: Go Live
@@ -12760,6 +12760,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Dependencies: N/A
 - Related Journeys: Q-006, Q-011
 - Notes: Discovered during Batch 22's execution of Q-011 (confirming Go Live reuses Onboarding's size/type policy, which it does): found Go Live's service imports `validateAttachmentFile` only, not the additional real-byte-signature check. Not fixed at discovery time (a real but non-trivial scope addition to Go Live's own validation depth, not a one-line completion of an already-stated Go Live requirement); scheduled here for dedicated execution. If found to still be missing when executed, this is a bounded PRODUCT GAP to close (extend Go Live's service to also call `matchesAllowedAttachmentSignature`), not a new Product Decision, since the business intent (real evidence, not spoofable by extension/MIME claim alone) is already settled by Q-006's own existence.
+  **Batch 23 closure**: executed via live reproduction (a spoofed-content test fixture, run against the real, unmodified `uploadGoLiveDocument`, confirmed to proceed past validation and reach the point of attempting to build a return value — the pre-fix failure, preserved). Fixed in `src/features/go-live/services/documents.service.ts` (imports and calls `matchesAllowedAttachmentSignature`, mirroring Onboarding exactly). Regression-tested (`documents.service.test.ts`, 2 new tests); Onboarding's own neighbor tests re-run unchanged. See `docs/journey-runs/BATCH_23_RESULTS.md`.
 
 ## Pack R: Audit / Timeline
 
@@ -13588,7 +13589,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: S-012, S-014
-- Notes: N/A
+- Notes: **[EXPANDED, Batch 23, 2026-09-23]** Executed against the four reviewer-facing detail routes (`reviews/[requestId]`, `reviews/change-requests/[requestId]`, `reviews/commercial-versions/[requestId]`, `customers/[customerKey]/go-live/[requestId]`): a malformed (non-UUID) id was found to crash (real defect, `FAILED THEN FIXED + PASS`; see `docs/journey-runs/BATCH_23_RESULTS.md`), root-caused (raw Postgres `22P02` error, uncaught, no `error.tsx` anywhere in the app), and fixed via a shared `isValidUuid` guard (`src/lib/uuid.ts`) applied at the top of all four routes before any data-layer call. **Not yet executed** against other UUID-keyed routes with the same shape (`/forms/customer-onboarding/[requestId]`, `/commercials/[configId]`, `/commercials/[configId]/versions/[requestId]`, `/settings/workflows/[definitionId]`, `/settings/workflows/[definitionId]/versions/[versionId]`) — a future execution should widen this journey's Object/Record Type to explicitly enumerate every UUID-keyed route, not only the four reviewer-facing ones, and apply the same `isValidUuid` guard wherever it is found missing.
 
 ### S-014: Deep link to a governed request, valid id but no permission
 - Pack: S - Search / Navigation / Discovery
