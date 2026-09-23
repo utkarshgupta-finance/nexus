@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
@@ -22,6 +23,7 @@ const COMMERCIAL_CONFIGURATION_READ = { resource: "commercial_configuration", ac
 
 export default async function CommercialVersionReviewRoute({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
+  if (!isValidUuid(requestId)) notFound()
   const session = await getCurrentNexusSession()
 
   const version = await loadVersion(requestId)

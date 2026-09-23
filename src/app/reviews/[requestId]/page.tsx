@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer, hasPermissionForBusinessUnit } from "@/platform/permissions/server"
@@ -16,6 +17,7 @@ const CUSTOMER_READ = { resource: "customer", action: "read" }
 
 export default async function ReviewDetailRoute({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
+  if (!isValidUuid(requestId)) notFound()
   const session = await getCurrentNexusSession()
 
   // PD-001 (A-036): a draft is only readable by its own creator through

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
@@ -21,6 +22,7 @@ const GO_LIVE_READ = { resource: "go_live", action: "read" }
 
 export default async function GoLiveDetailRoute({ params }: { params: Promise<{ customerKey: string; requestId: string }> }) {
   const { customerKey, requestId } = await params
+  if (!isValidUuid(requestId)) notFound()
   const session = await getCurrentNexusSession()
 
   const customer = await getCustomerByKey(customerKey)
