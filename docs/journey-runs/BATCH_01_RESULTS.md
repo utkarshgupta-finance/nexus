@@ -988,33 +988,74 @@ overwriting the original backfilled entries above.
 - **Exact browser actions:** Selected the Decision node by clicking it (confirmed via its `selected` CSS class becoming true), typed "Decision Renamed K022" into the Name field in the properties panel, clicked Save Draft, waited for the "Draft saved." confirmation, then opened the same version URL in a brand new tab to force a genuine server fetch.
 - **Actual rendered result:** The canvas rendered a node labeled "Decision Renamed K022" both immediately after saving and after the fresh reload in a new tab.
 - **Expected result:** The renamed label persists and is what the server returns on a fresh load.
-- **Manual UX result:** PASS
+- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: the rename-and-persist mechanic (typing a new Name and having it survive Save Draft plus a fresh reload). Not yet covered: the canonical assertion's edge-reference half ("updates all local edge references in memory... saving persists the fully consistent new state") because this fixture had no edges at the time of this pass.
 - **Existing server/control evidence:** None needed separately; the rename and its persistence were both observed directly.
 - **Defect found?:** No.
 - **Fix/retest:** N/A.
-- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic. The canonical assertion also covers "updates all local edge references in memory," which could not be exercised here because this fixture had no edges yet (edge-drawing is currently blocked, see the Batch 1 header note on canvas drag interactions). NEW JOURNEY REQUIRED once edge-drawing is unblocked: rename a node that has incoming/outgoing edges and confirm the edges still resolve to the new key after save and reload.
+- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic; the edge-reference half is EXPAND EXISTING JOURNEY, scheduled against the reusable connected fixture built later in this batch (see K-022 edge-reference addendum below).
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-022
+### END HISTORICAL UX REVALIDATION K-022 (PARTIAL, remainder tracked below)
 
-### BEGIN HISTORICAL UX REVALIDATION K-009 / K-023
+### BEGIN HISTORICAL UX REVALIDATION K-009
 
-- **Canonical intent (K-009):** Deleting a scratch node on canvas and saving again (whole-graph replace) leaves the database matching exactly the current canvas state, with no leftover rows, even after repeated add/remove/save cycles.
-- **Canonical intent (K-023):** Deleting the middle node of a chain and saving persists exactly what the client sends (no server-side auto-reconnect), so no edge referencing the deleted node's key survives the save.
-- **Exact user-visible assertion:** After selecting a node and clicking Delete Node, then Save Draft, the deleted node is gone from the canvas both immediately and after a full page reload; no leftover node renders.
+- **Canonical intent:** Deleting a scratch node on canvas and saving again (whole-graph replace) leaves the database matching exactly the current canvas state, with no leftover rows, even after 5 repeated add/remove/save cycles.
+- **Exact user-visible assertion:** After selecting a node and clicking Delete Node, then Save Draft, the deleted node is gone from the canvas both immediately and after a full page reload; this holds across repeated add/remove/save cycles, not just once.
 - **Persona required:** Workflow_Admin-equivalent (write access to workflow_definition).
 - **Persona used:** Real admin account.
 - **Fixture required:** A Draft version with at least one deletable node.
-- **Fixture used:** Same "Batch 1 UX Revalidation Fixture" Draft Version 1 (Start, Approval, Decision Renamed K022, End, End).
+- **Fixture used:** "Batch 1 UX Revalidation Fixture" Draft Version 1 (Start, Approval, Decision Renamed K022, End, End).
 - **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`
 - **Exact browser actions:** Selected one of the two "End" nodes by clicking it (confirmed selected via the properties panel opening with its Delete Node button), clicked Delete Node, confirmed via `document.querySelectorAll` that the canvas dropped from 5 nodes to 4, clicked Save Draft, waited for the "Draft saved." confirmation, then opened the same version URL in a brand new tab.
 - **Actual rendered result:** Exactly 4 nodes rendered after the fresh reload (Start, Approval, Decision Renamed K022, End); the deleted End node did not reappear.
 - **Expected result:** The deletion persists; no leftover row for the deleted node.
-- **Manual UX result:** PASS
+- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: a single delete-and-save cycle persists correctly. Not yet covered: the canonical assertion's explicit 5-repeated-cycle stress variant, only 1 cycle was run in this pass.
 - **Existing server/control evidence:** None needed separately.
 - **Defect found?:** No.
 - **Fix/retest:** N/A.
-- **Journey Discovery observation:** ALREADY COVERED for the core delete-and-persist mechanic. This pass only ran a single delete/save cycle (not K-009's full 5-cycle stress) and the deleted node had no edges connected to it (edge-drawing is currently blocked), so K-023's specific "no edge references the deleted node's key" assertion was not exercised. NEW JOURNEY REQUIRED once edge-drawing is unblocked: delete a node with real incoming and outgoing edges and confirm neither edge survives the save; also repeat the delete/save cycle multiple times to cover K-009's full stress variant.
+- **Journey Discovery observation:** ALREADY COVERED for the single-cycle mechanic; the repeated-cycle stress is REGRESSION TEST ONLY, scheduled immediately after K-010 in this same batch pass.
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-009 / K-023
+### END HISTORICAL UX REVALIDATION K-009 (PARTIAL, remainder tracked below)
+
+### BEGIN HISTORICAL UX REVALIDATION K-023
+
+- **Canonical intent:** Deleting the middle node of a chain (A -> [node] -> B) and saving persists exactly what the client sends (no server-side auto-reconnect), so no edge referencing the deleted node's key survives the save.
+- **Exact user-visible assertion:** After deleting a node that has real incoming and outgoing edges and saving, neither edge survives; the graph is not auto-reconnected (A does not gain a new direct edge to B).
+- **Persona required:** Workflow_Admin-equivalent (write access to workflow_definition).
+- **Persona used:** Real admin account.
+- **Fixture required:** A Draft version with a node that has both an incoming and an outgoing edge.
+- **Fixture used (this pass):** "Batch 1 UX Revalidation Fixture" Draft Version 1, but the deleted node (an "End" node) had no edges connected to it at the time, since edge-drawing had not yet succeeded on this fixture.
+- **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`
+- **Exact browser actions:** Same delete-and-save sequence recorded under K-009 above.
+- **Actual rendered result:** The node disappeared and stayed gone after reload, but this does not exercise K-023's specific claim, since there were no edges to test for survival or auto-reconnect.
+- **Expected result:** Neither the incoming nor outgoing edge of a deleted middle node survives the save, and no new edge is auto-created between its former neighbors.
+- **Manual UX result:** BLOCKED (this pass). The only genuine evidence obtained so far (node deletion persists) belongs to K-009, not to K-023's own canonical assertion, which specifically concerns edges. Not yet exercised at all.
+- **Existing server/control evidence:** None.
+- **Defect found?:** No (assertion not yet tested).
+- **Fix/retest:** N/A.
+- **Journey Discovery observation:** NEW JOURNEY REQUIRED is not applicable, this is the original K-023 journey itself, still pending; scheduled against the reusable connected fixture built later in this batch pass, once a node with real incoming/outgoing edges exists to delete.
+- **Permanent ledger updated:** Yes (this entry, correcting the prior overbroad PASS claim for K-023).
+
+### END HISTORICAL UX REVALIDATION K-023 (BLOCKED pending reusable edge fixture)
+
+### BEGIN HISTORICAL UX REVALIDATION K-010
+
+- **Canonical intent:** Two concurrent editors load the same draft version. The second editor's save is rejected as stale (a friendly error, not a silent overwrite or a raw database error) rather than the first editor's real change being silently discarded. The Refresh control fully recovers the second editor to the current true state.
+- **Exact user-visible assertion:** After Admin A saves first, Admin B's own Save Draft click on the same (now stale) version shows a friendly message explaining the draft changed since it was loaded, with a Refresh control; clicking Refresh reloads the whole page and shows Admin A's real change, not a stale or half-recovered state.
+- **Persona required:** Two independent Workflow_Admin-equivalent sessions (Admin A, Admin B).
+- **Persona used:** Real admin account, in two separate browser tabs both authenticated as the same account (the assertion is about optimistic-locking on the version row, not about two distinct identities).
+- **Fixture required:** A Draft version both sessions load before either saves.
+- **Fixture used:** "Batch 1 UX Revalidation Fixture" Draft Version 1 (Start, Approval, Decision Renamed K022, End at the start of this pass).
+- **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`, opened in two separate fresh browser tabs (Admin A, Admin B) before either saved.
+- **Exact browser actions:** Both tabs loaded the same version. In Admin A's tab, clicked "Form Step" to add a node, confirmed via the DOM that it was added, clicked Save Draft, and confirmed "Draft saved." In Admin B's tab (still holding the pre-save version), clicked Save Draft. Confirmed the rendered error banner text, then clicked the Refresh button shown alongside it, then confirmed via the DOM that Admin B's canvas now shows Admin A's Form Step node.
+- **Actual rendered result:** Admin B's Save Draft attempt rendered: "This workflow draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes." with a Refresh button. Clicking Refresh reloaded the page and rendered all 5 nodes including Admin A's Form Step node, confirming a full, correct recovery rather than a partial or stale one.
+- **Expected result:** Stale save rejected with a friendly message; Refresh fully recovers to the current true state; Admin A's change is never silently lost or overwritten.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately; both the rejection and the recovery were observed directly as rendered UI.
+- **Defect found?:** No. This reconfirms the K-010/K-030 fix (Refresh performs a full page reload, not just a client-side banner clear) is still correct.
+- **Fix/retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED. A follow-on step (Admin B re-adding their own intended change and saving successfully after refresh) was attempted but not completed in this pass due to click-delivery flakiness in Admin B's tab, unrelated to the core canonical assertion (which is about the rejection and the recovery, both of which are confirmed). REGRESSION TEST ONLY: revisit the post-refresh successful resave as a supplementary check if time allows later in this batch.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-010
