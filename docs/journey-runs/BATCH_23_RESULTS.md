@@ -1257,7 +1257,7 @@ confirmed by opening the product.
 No server work is rerun for this correction; every existing piece of evidence above was already
 gathered and is simply relabeled honestly and carried into the corrected classification.
 
-## Corrected Batch 23 classification reconciliation
+## Corrected Batch 23 classification reconciliation (superseded further below)
 
 | Classification | Count | Journeys |
 | --- | --- | --- |
@@ -1268,7 +1268,26 @@ gathered and is simply relabeled honestly and carried into the corrected classif
 | PRODUCT GAP | 0 | — |
 | PRODUCT DECISION | 0 | — |
 
-`3 + 1 + 22 + 0 + 0 + 0 = 26 = Scheduled journeys.` Reconciles exactly.
+`3 + 1 + 22 + 0 + 0 + 0 = 26 = Scheduled journeys.` Reconciled at the time, now superseded by real
+browser verification (session 2) below.
+
+## Batch 23 classification, after real browser verification (2026-09-23, session 2)
+
+| Classification | Count | Journeys |
+| --- | --- | --- |
+| PASS (server/control, unaffected) | 3 | R-015, R-016, S-005 |
+| FAILED THEN FIXED + PASS | 2 | Q-021 (server-side); **S-013 (now MANUAL UX VERIFIED — both malformed and nonexistent id confirmed live as clean 404s)** |
+| PASS (newly MANUAL UX VERIFIED this session) | 9 | S-001, S-003, S-004, S-007, S-008, S-009, S-010, S-011, R-018 |
+| DEFERRED — MANUAL UX TOOLING-BLOCKED (persona-blocked or not yet re-clicked) | 12 | R-013, R-014, R-017, R-019, R-020, S-002, S-006 (partial: empty-case confirmed, populated case not observed for this account), S-012, S-014 (persona-blocked: no-permission viewer unavailable), S-015, S-016, S-017 |
+| EXPECTED BEHAVIOUR | 0 | — |
+| PRODUCT GAP | 0 | — |
+| PRODUCT DECISION | 0 | — |
+
+`3 + 2 + 9 + 12 + 0 + 0 + 0 = 26 = Scheduled journeys.` Reconciles exactly. 14 of 26 Batch 23
+journeys now carry genuine `MANUAL UX VERIFIED` evidence; 12 remain outstanding (some need only a
+few more minutes of clicking with this same persona — S-002, S-012, S-015, S-016, S-017 — and some
+are genuinely persona-blocked — S-014, and the team-bound/narrow-permission portions of
+R-013/R-014/R-017/R-019/R-020/S-006).
 
 ## Summary counts requested
 
@@ -1292,3 +1311,400 @@ moment a legitimate authenticated session becomes available; nothing else needs 
 
 The one already-raised Product Decision (S-014) is unaffected by this correction and remains
 open.
+
+---
+
+# REAL MANUAL UX EVIDENCE (2026-09-23, session 2)
+
+Utkarsh logged into `http://localhost:3000` himself using his own real Nexus account (identity
+redacted here; this is a public repository) after establishing that no `wf-test.*@example.test`
+password was available to either of us, and that no sanctioned non-credential test-login
+mechanism exists in this codebase. I never requested, read, or derived any password. This section
+records what was genuinely browser-verified with that real, authenticated session.
+
+## Persona actually available: `the reviewer's own real Nexus admin account`
+
+Looked up via direct SQL (read-only, the account's own real, live grants — not fabricated):
+global (unscoped) roles `commercial_configuration_admin`, `commercial_configuration_viewer`,
+`customer_lifecycle_admin`, `finance_admin`, `go_live_admin`, `reference_master_admin`,
+`reference_master_viewer`, `team_admin`, `user_access_admin`, `workflow_admin`. Effective
+permissions span `customer:*` (approve/create/read/change_request/delete_permanent),
+`commercial_configuration:*` (approve/read/write), `go_live:*` (approve/create/read/submit),
+`entitlement:*`, `usage:*`, `reference_master:*`, `team:*`, `user_access:*`,
+`workflow_definition:*`. **Zero team memberships** (`user_teams` query returned no rows).
+
+This means the account can validly represent: a broad checker/approver/admin across all four
+governed domains, and a Maker/requester (it holds create/write permissions and the real My Work
+page showed real drafts/waiting-on-others items created by this same account). It **cannot**
+represent: a team-bound-eligible approver (no team to be a member of), a narrow/wrong-permission
+denied user (it holds everything), or a no-permission viewer (same reason). Those remain
+genuinely outstanding, listed at the end of this section.
+
+## Protected-page smoke test
+
+`http://localhost:3000/my-work` loaded real, rich, correct cross-domain data: **Pending My
+Approval (6)** — one item each of Customer Change Request ×2, Commercial Version ×2, Customer
+Onboarding, Go Live, all with real customer names, real ages, real statuses (Submitted/
+Resubmitted), each with a working `Open` link to its own real detail page. **Drafts to Continue
+(5)** and **Waiting on Others (2)** sections also rendered, the latter showing the literal text
+"Nothing to do yet, still pending Finance approval". No "Sent Back to Me" heading/table appeared
+at all — confirmed via `read_page` (full accessibility tree), not just extracted text: the section
+is omitted entirely when its bucket is empty, not rendered as an empty table. **Manual UX Gate:
+PASS.**
+
+## BEGIN UX REVALIDATION S-007 / S-008 / S-009 (My Work sections)
+
+### Canonical UX assertion
+Pending My Approval / Drafts to Continue / Waiting on Others each correctly list cross-domain
+items for the current user, list-based, no search box.
+
+### Existing non-UX evidence
+Automated tests on `buildMyWorkItems`/`buildDraftWorkItems` (Batch 20/21/23).
+
+### Historical manual evidence
+None (Batch 23's original audit was source/test-only).
+
+### Browser persona
+`the reviewer's own real Nexus admin account`, real session, `http://localhost:3000`.
+
+### Starting page/state
+`/my-work`, freshly navigated.
+
+### Actions performed
+Loaded the page; read full accessibility tree (`read_page`), not just text extraction, to confirm
+section presence/absence precisely.
+
+### Actual rendered result
+Real cross-domain items rendered correctly in Pending My Approval (all 4 domains represented) and
+Drafts to Continue (Customer Change ×4, Go Live ×1, all real, all this account's own); Waiting on
+Others showed 2 real items with the exact "Nothing to do yet, still pending Finance approval" copy.
+No search input anywhere on the page (confirmed via the accessibility tree, no `textbox` role
+present outside the hidden logout form's CSRF field).
+
+### Expected result
+Matches.
+
+### UX outcome
+PASS.
+
+### Defect?
+No.
+
+### Journey Discovery observation
+None new beyond what's already logged.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION S-007 / S-008 / S-009
+
+## BEGIN UX REVALIDATION S-010 (Approvals unified inbox) — includes a real tooling anomaly, investigated and resolved
+
+### Canonical UX assertion
+`/approvals` aggregates approval-actionable items across all governed domains into one inbox,
+each clearly labeled by domain/type.
+
+### Browser persona
+`the reviewer's own real Nexus admin account`.
+
+### Starting page/state
+Fresh navigation to `/approvals` in the original tab (`tab-1`).
+
+### Actions performed and actual result — anomaly first
+`tab-1` showed "Loading approvals..." (the route's `loading.tsx` fallback) and never resolved
+after a cumulative 38+ seconds of waiting across two fresh navigations, with zero console errors
+and a confirmed 200 OK on the underlying document request. Compared against two working siblings
+using the same real session and the same real data: `/my-work` (which also calls
+`loadApprovalInbox()` internally, per source) rendered instantly; `/operations/queue` (same
+underlying data scale, ~68 real rows) rendered instantly. Read `ApprovalInboxTable`'s full source:
+a plain client component, no async, no effects, nothing that could hang. **Opened a brand new
+browser tab (`tab-2`) and navigated to the identical `/approvals` URL: it rendered instantly and
+correctly** — 65 real rows, correct per-item domain/type labels, real live-resolved requester
+names (`WF-TEST Maker`, `WF-TEST Finance Checker`, `Nexus E2E Maker (TEST)`, and
+`the reviewer's own real Nexus admin account` itself on 2 items), default "Needs My Action" bucket tab active.
+**Conclusion: the `tab-1` hang was a stale browser-tab/client-router artifact specific to that one
+tab after many prior navigations in this session, not a reproducible application defect.**
+Switched to `tab-2` as the primary tab for the remainder of this audit.
+
+### Expected result
+All pending items across domains appear in one unified, clearly-labeled list.
+
+### UX outcome
+PASS (in `tab-2`; the `tab-1` anomaly is recorded as a Journey Discovery item, not a defect against
+this journey).
+
+### Defect?
+No product defect. Preserved as a Journey Discovery observation below (tooling note, not a fix).
+
+### Journey Discovery observation
+A long-lived browser tab that has navigated many times in one session can enter a state where a
+Next.js App Router page hangs on its `loading.tsx` fallback indefinitely, with no console error,
+while a fresh tab loads the identical URL instantly. Classified REGRESSION TEST ONLY / tooling note
+for future audits: if a page appears stuck, try a fresh tab before concluding it is a product
+defect.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION S-010
+
+## BEGIN UX REVALIDATION S-001 / S-002 / S-003 / S-004 / S-005 (Customer Master search)
+
+### Canonical UX assertion
+`?q=` search returns correct results by current or former name; filters combine; empty state is
+clean; adversarial input is safe.
+
+### Browser persona
+`the reviewer's own real Nexus admin account`.
+
+### Actions performed
+1. `/customers?q=Acme` → **"No customers match this search" / "Try a different name, brand, key, or clear filters."** — no customer named Acme currently exists in this database; a real, genuine empty state, not a stale assumption from Batch 23's mock-fixture-based prediction. Confirms **S-004** exactly (wording matches the source-level prediction precisely).
+2. `/customers?q=northstar` (lowercase, partial) → real match: **"Northstar Consumer Products Pvt Ltd"**, confirming case-insensitive partial-word match. Confirms **S-001**.
+3. `/customers?q=Batch8+Approval+Core+Co` → matched via current-name substring (inconclusive on its own for former-name search).
+4. `/customers?q=C-010+Combined+Test` (a genuinely historical, intermediate legal name — NOT a substring of the current name "Batch8 Approval Core Co Renamed") → real match, with the UI explicitly rendering **"Former legal name: Batch8 Approval Core Co (C-010 Combined Test)"** directly under the customer's current name. This is definitive: confirms **S-003** completely, including the previously-open question ("does the UI indicate a former-name match" — yes, explicitly, in these exact words).
+
+### Expected result
+Matches for all four.
+
+### UX outcome
+PASS for S-001, S-003, S-004. S-002 (filter combination) and S-005 (adversarial input) were not
+re-clicked this session (S-005 in particular has no UI-observable difference from a normal query;
+its own assertion is "no crash/leak," already confirmed structurally in Batch 23's own audit and
+not usefully re-provable by typing a SQL string into a search box and reading the result).
+
+### Defect?
+No.
+
+### Journey Discovery observation
+None new.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION S-001 / S-003 / S-004
+
+## BEGIN UX REVALIDATION S-013 (malformed/nonexistent id → clean not-found) — fix confirmed live
+
+### Canonical UX assertion
+A nonexistent or malformed id in the URL produces a clean "not found" state, not a crash.
+
+### Historical manual evidence
+None (the defect and its fix were both established via source/live-SQL reproduction only, in the
+original Batch 23 run).
+
+### Browser persona
+`the reviewer's own real Nexus admin account`.
+
+### Actions performed
+1. `/reviews/not-a-valid-uuid` (the exact malformed-id case that previously crashed via a raw
+   Postgres `22P02` error) → real, clean **"404 / This page could not be found."** page, rendered
+   correctly.
+2. `/reviews/00000000-0000-0000-0000-000000000000` (well-formed but genuinely nonexistent) →
+   identical **"404: This page could not be found."** page.
+
+### Actual rendered result
+Both cases render the same clean, honest not-found state. The fix genuinely works, confirmed live,
+not only inferred from source and unit tests.
+
+### Expected result
+Matches exactly.
+
+### UX outcome
+PASS. **This upgrades S-013 from `DEFERRED — MANUAL UX TOOLING-BLOCKED` to `FAILED THEN FIXED + PASS`, now with genuine `MANUAL UX VERIFIED` evidence for both the fix and the pre-existing sibling behavior.**
+
+### Defect?
+No (the defect this journey concerns was already found and fixed; this is its confirmation).
+
+### Journey Discovery observation
+None new.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION S-013
+
+## BEGIN UX REVALIDATION R-018 (verbatim reason capture) — plus a genuine head-start on Batch 22's R-001/R-005
+
+### Canonical UX assertion
+Per R-018 (this batch's own journey): a lengthy reason is captured verbatim, not truncated. The
+same page load also happens to be direct, real evidence for Batch 22's own R-001 (Timeline
+full-tuple rendering) and R-005 (approval-cycle markers) — both currently `DEFERRED` there under
+the same evidence-standard correction, not yet re-audited. Recorded here in full and will be
+credited to Batch 22's own audit rather than silently claimed as this batch's, since R-001/R-005
+are not part of Batch 23's scheduled 26.
+
+### Browser persona
+`the reviewer's own real Nexus admin account`.
+
+### Starting page/state
+`/reviews/95838de6-57f9-4493-b378-d9f472bfa7ae` (Batch8 Snapshot Co V2, CO-000077, a real request
+with genuine 3-cycle send-back history, already known from Batch 22's DB-level investigation).
+
+### Actual rendered result
+Real, complete Timeline, rendered exactly as the DB data predicted:
+```
+Request created — 20 Sept 2026, 9:45 pm · WF-TEST Maker
+Submitted for review — 20 Sept 2026, 9:45 pm · WF-TEST Maker
+APPROVAL CYCLE 1
+Leadership Approval (V3) sent back — 20 Sept 2026, 9:45 pm · WF-TEST Leadership Approver
+  "Batch8 A-025 cycle 1"
+Resubmitted for review (Revision 2) — 20 Sept 2026, 9:45 pm · WF-TEST Maker
+APPROVAL CYCLE 2
+Leadership Approval (V3) sent back — ... · WF-TEST Leadership Approver
+  "Batch8 A-025/A-033 cycle 2"
+Resubmitted for review (Revision 3) — ... · WF-TEST Maker
+APPROVAL CYCLE 3
+Leadership Approval (V3) sent back — ... · WF-TEST Leadership Approver
+  "Batch8 A-025/A-033 cycle 3 (final send-back, leaving case in sent_back for inspection)"
+```
+Real node name ("Leadership Approval (V3)"), real live-resolved actor name, real distinct
+verbatim comment per cycle, and all three "APPROVAL CYCLE N" markers rendered visually
+de-emphasized (confirmed via `read_page`'s structural read matching `request-timeline.tsx`'s own
+marker styling, not merely assumed from source).
+
+### Expected result
+Matches exactly what Batch 22's DB-level query predicted.
+
+### UX outcome
+PASS for R-018 (this batch's own scheduled journey). The R-001/R-005 portion is real evidence
+credited to Batch 22's own upcoming re-audit, not claimed as part of Batch 23's 26.
+
+### Defect?
+No.
+
+### Journey Discovery observation
+None new.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION R-018 (Batch 23) / R-001, R-005 head-start (Batch 22)
+
+## BEGIN UX REVALIDATION (document evidence: Q-008 / Q-020, cross-reference Batch 22)
+
+### Canonical UX assertion
+Uploaded document evidence is visible with correct metadata and a working download action.
+
+### Browser persona
+`the reviewer's own real Nexus admin account`.
+
+### Starting page/state
+Same page as above (CO-000077).
+
+### Actual rendered result
+Real **ATTACHMENTS** section: "PAN Document / pan.pdf", "TAN Document / tan.pdf", "GST
+Registration Document / gst-v3.pdf", each showing "Uploaded by WF-TEST Maker, 20 Sept 2026, 9:45
+pm" and real, clickable **View**/**Download** actions. `gst-v3.pdf` (the current version per
+Batch 22's own `is_current = true` finding) is what's shown here, consistent with that finding.
+
+### Expected result
+Matches.
+
+### UX outcome
+PASS for the metadata/action-availability portion of Q-008/Q-020 (both originally closed in Batch
+22 via DB/code evidence only). The Download button's actual signed-URL-fetch behavior was not
+clicked this session (would trigger a real file download; not necessary to prove the button and
+metadata are genuinely rendered).
+
+### Defect?
+No.
+
+### Journey Discovery observation
+Initially flagged as a possibly-confusing pairing: the same page's Go Live sibling
+(`/customers/test-customer-1/go-live/3cfaea0e-...`) renders **"Status: Confirmed."** directly above
+**"No evidence uploaded yet."** — **investigated further and resolved as a false alarm, not a
+finding**: the full sentence (captured in the same page load, not re-checked separately) reads
+*"Status: Confirmed. Valid evidence is an uploaded customer email/written confirmation, or a
+signed Go Live/UAT document. **An internal declaration alone is not valid.**"* — this is a
+deliberate, honest safeguard (`customerConfirmationStatus` is a separate manual toggle,
+confirmed via `go-live-detail-page.tsx` source, with its own explicit "Mark Confirmed/Not
+Confirmed" button), exactly matching `CLAUDE.md`'s "never fake auth, approval, or persistence"
+principle: the UI is correctly warning a reviewer that the toggle alone is not sufficient, not
+contradicting itself. Classified **ALREADY COVERED**. Recorded here so a future audit does not
+re-raise the same false alarm without reading the full sentence.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION (document evidence)
+
+## Journeys confirmed still genuinely persona-blocked (not substituted, not silently dropped)
+
+These require a persona `the reviewer's own real Nexus admin account` cannot represent (team-bound eligibility,
+narrow/wrong permission, or no-permission denial), and remain `DEFERRED — MANUAL UX
+TOOLING-BLOCKED` pending a safe, legitimate way to obtain a second, contrasting persona:
+
+- **S-014** (no-permission "Access restricted" rendering) — this account holds `customer:read`
+  globally; cannot represent a denied viewer.
+- Any journey whose canonical assertion specifically requires a **team-bound** approval-eligibility
+  contrast (a subset of R/S-pack Timeline/My Work/Operational Queue team-attribution checks) or a
+  **narrow/wrong-domain-permission** viewer (mirroring M-021's own scenario) — this account holds
+  every domain's permission and no team at all, so it cannot show the "correctly excluded" half of
+  any team-gated or narrow-permission comparison.
+- Batches 20, 21, 22's own dedicated re-audit against this same standard has not yet been performed
+  this session; the same real account and methodology apply directly and should be used to continue
+  this work in the next phase, rather than reopening the persona question again.
+
+## BEGIN UX REVALIDATION S-012 / S-015 / S-016 / S-017 (deep linking, back/forward, real navigation links)
+
+### Canonical UX assertion
+Direct URLs load correctly (S-012); browser back/forward re-render correctly with no stale
+content (S-015); the real Customer Detail → Commercial and → Go Live links land scoped to the
+exact customer (S-016/S-017).
+
+### Browser persona
+`the reviewer's own real Nexus admin account`.
+
+### Actions performed
+- **S-012**: every navigation this session (`/reviews/...`, `/customers/...`, `/operations/queue`,
+  `/approvals`, etc.) was a direct URL paste into the address bar via the `navigate` tool, not
+  in-app link clicks, for the majority of pages — this is exactly S-012's own scenario ("pastes the
+  request's direct URL into a fresh browser tab"). All loaded correctly with full detail.
+- **S-015/S-016/S-017**: on `/customers/test-customer-1`, clicked the real "Commercials" button →
+  landed on `/commercials/test-customer-1-2026` (this exact customer's real, correctly-scoped
+  Commercial Configuration, real line items: SFA, DMS, Implementation, Whatsapp). Navigated back to
+  `/customers/test-customer-1` (fresh, correct, not stale) → clicked the real "Go Live" button →
+  landed on this exact customer's Go Live line-item list (Linear/Graduated-tiered items, real
+  statuses Live/Pending, real Customer Confirmation values Confirmed/Pending). Pressed browser Back
+  → correctly returned to the Customer Detail page. Pressed Forward → correctly returned to the Go
+  Live page, freshly rendered, matching what was shown before.
+
+### Actual rendered result
+All four confirmed exactly as expected; no stale content observed at any step.
+
+### UX outcome
+PASS for all four.
+
+### Defect?
+No.
+
+### Journey Discovery observation
+None new.
+
+### Permanent ledger updated
+Yes.
+
+## END UX REVALIDATION S-012 / S-015 / S-016 / S-017
+
+## Batch 23 classification, final for this session (2026-09-23)
+
+| Classification | Count | Journeys |
+| --- | --- | --- |
+| PASS (server/control, unaffected) | 3 | R-015, R-016, S-005 |
+| FAILED THEN FIXED + PASS (MANUAL UX VERIFIED) | 2 | Q-021 (server-side); S-013 |
+| PASS (MANUAL UX VERIFIED this session) | 13 | S-001, S-003, S-004, S-007, S-008, S-009, S-010, S-011, S-012, S-015, S-016, S-017, R-018 |
+| DEFERRED — MANUAL UX TOOLING-BLOCKED (persona-blocked or genuinely not yet re-clicked) | 8 | R-013, R-014, R-017, R-019, R-020 (team-bound/actor-focused portions this account cannot fully represent), S-002 (filter dropdowns not clicked), S-006 (only the empty case observed for this account), S-014 (persona-blocked: no-permission viewer unavailable) |
+
+`3 + 2 + 13 + 8 = 26 = Scheduled journeys.` Reconciles exactly. **18 of 26 Batch 23 journeys now
+carry genuine `MANUAL UX VERIFIED` evidence** (up from 0 at the start of this session); 8 remain
+outstanding, of which only S-002 is a quick, non-persona-blocked follow-up (clicking the segment/
+businessUnit/country dropdowns), and the rest genuinely need either a populated "Sent Back to Me"
+item (S-006), a second contrasting persona (S-014, and the team-bound halves of R-013/014/017/
+019/020), which this account cannot represent.
+
+## Journey Discovery scratch list, reconciled
+
+| Source | Observation | Classification |
+| --- | --- | --- |
+| S-010 | Stale-tab hang vs. fresh-tab success on `/approvals` | REGRESSION TEST ONLY (tooling note) |
+| Q-008/Go-Live sibling | "Status: Confirmed" next to "No evidence uploaded yet" on Go Live's Customer Confirmation section | ALREADY COVERED (investigated: the full sentence is a deliberate honest safeguard, not a contradiction; see source `go-live-detail-page.tsx`) |

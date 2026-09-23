@@ -41,6 +41,62 @@ The batch's own ledger must record the result of this check even when nothing is
 
 This requirement itself does not apply retroactively to Batches 1 through 16; those closed under the rules that existed at the time, and their own incidental findings were instead swept up in the one-time Stage A Journey Universe Expansion Audit.
 
+## Manual UX Readiness Gate (mandatory from Batch 24 onward)
+
+Batches 22 and 23 exposed a real methodology gap: manual browser/persona testing had quietly
+stopped working across several historical batches, but user-visible journeys kept being closed
+PASS on the strength of source inspection, SQL, RPC calls, or automated tests alone. A 2026-09-23
+correction reclassified the affected journeys (`DEFERRED — MANUAL UX TOOLING-BLOCKED`, see
+`docs/journey-runs/BATCH_23_RESULTS.md`'s "EVIDENCE STANDARD CORRECTION" section) and this gate is
+the permanent fix so it cannot happen silently again.
+
+**Before every future batch**, in this order:
+
+1. **Identify UX journeys.** Classify every scheduled journey as `MANUAL UX REQUIRED`, `MIXED
+   MANUAL + SERVER`, `SERVER/DB ONLY`, or `INVESTIGATIVE` (evidence type determined per-journey),
+   reading each journey's own canonical text, never assuming from a prior batch's label.
+2. **Browser readiness.** If any journey is `MANUAL UX REQUIRED`/`MIXED`, prove — do not assume —
+   that a browser is available, the application (local dev server and/or deployed Preview) is
+   reachable, a legitimate authenticated session exists, and a real protected page actually renders
+   for that session (one concrete smoke test, e.g. `/my-work`).
+3. **Persona readiness.** List every persona the batch's own scheduled journeys require. For each,
+   state whether a session is available, and whether its real role/team/scope/permissions (looked
+   up via the app's own data, e.g. a direct read-only query of `user_roles`/`user_teams`, never
+   assumed) actually cover what that journey needs. Do not discover a missing persona mid-batch.
+4. **Gate result.** Record `MANUAL UX GATE = PASS` (every `MANUAL UX REQUIRED`/`MIXED` journey in
+   this batch has a real, available, adequate persona) or `MANUAL UX GATE = N/A` (this batch is
+   genuinely `SERVER/DB ONLY` throughout) before execution begins. If neither holds, the gate is
+   `FAIL` and the batch does not start until the tooling/auth problem is resolved.
+
+**Mid-batch failure rule.** If the browser or session stops working partway through a batch, pause
+user-visible journey execution, restore the tooling first, and do not substitute code/test
+evidence for the missing manual step. Server-only, independent work already completed may be
+preserved; the batch is not declared closed while a manual assertion is silently downgraded.
+
+**Evidence-type labels are never interchangeable.** Every journey's permanent ledger entry states
+its evidence precisely: `MANUAL UX VERIFIED` (with the actual persona, actions taken, and observed
+result), `SERVER/RPC VERIFIED`, `DATABASE VERIFIED`, `AUTOMATED VERIFIED`, `SOURCE INSPECTED`, or
+`MANUAL UX TOOLING-BLOCKED`. Source inspection, SQL, RPC calls, and automated tests are supporting
+evidence; none of them substitutes for `MANUAL UX VERIFIED` on a journey whose own canonical
+assertion is user-visible (what a user sees, rendered status, Timeline presentation, button/action
+availability, form behavior, validation messages, My Work/Operational Queue bucket placement,
+empty states, document rendering/download UX, supersession presentation, visible audit history,
+accessibility semantics, page behaviour), unless that journey's own canonical text explicitly
+frames itself as a code/architecture inspection question rather than a rendering claim.
+
+**Batch closure gate.** A batch cannot be declared closed while an ordinarily-testable UX
+assertion remains `MANUAL UX TOOLING-BLOCKED`; the tooling must be restored first. A genuinely
+unavailable external dependency (e.g. a second contrasting persona nobody can legitimately obtain
+right now) is different from ordinary local/browser authentication being broken, and may be
+recorded as a specifically-scoped, honestly-labeled outstanding item rather than blocking the
+entire batch — but it must never be silently substituted with non-manual evidence.
+
+**Journey Discovery during manual UX execution is mandatory**, not only during server-side work:
+actually using the product surfaces observations (rendering inconsistencies, confusing copy,
+missing feedback, navigation dead ends) that source/SQL/test review structurally cannot find.
+Record these the same way as any other Journey Discovery candidate (§ above), reconciled at batch
+close, never left as an unexamined afterthought.
+
 ---
 
 ### BATCH 1
