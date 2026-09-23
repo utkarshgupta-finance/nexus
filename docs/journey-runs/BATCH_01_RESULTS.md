@@ -1047,41 +1047,90 @@ overwriting the original backfilled entries above.
 
 ### END HISTORICAL UX REVALIDATION K-003 (PARTIAL)
 
+### DIAGNOSTIC ADDENDUM: existing-edge interaction recipe (resolves the block above for K-004/K-005/K-007/K-008)
+
+Continuing this same pass per the user's explicit continuous-execution directive, a working recipe was found for interacting with EXISTING edges (as opposed to drawing NEW ones, which remains blocked by the drag limitation above): (1) find the edge's actual SVG path via `document.querySelector('[data-id="..."] path.react-flow__edge-interaction')`; (2) walk `getPointAtLength(totalLength * f)` for `f` from 0.02 to 0.98 in small steps, converting each point to screen space via the path's `getScreenCTM()`; (3) use `document.elementFromPoint` at each candidate to find a point that genuinely resolves to that specific edge (not an overlapping node); (4) click that point via a screenshot taken immediately beforehand (never a reused scale factor). This reliably opens the edge's Transition properties panel. Using this recipe on the existing Draft fixture "WF-TEST J005 two-conditioned plus fallback" (`3b2681fa-862d-47c4-abcb-ea31afa299c2`, version `593ba28c-0107-4c6c-840c-f524f20ee837`), K-004, K-005, K-007, and K-008 were all genuinely completed below.
+
 ### BEGIN HISTORICAL UX REVALIDATION K-004
 
 - **Canonical intent:** The decision-edge condition editor's field dropdown is limited to SUPPORTED_DECISION_FIELDS (today, only "segment").
-- **Manual UX result:** BLOCKED (this pass). Exercising this requires selecting an existing conditioned edge on a Decision node to open its condition editor. The existing candidate fixtures with this edge shape ("WF-TEST J004 not_equals routing", "WF-TEST J005 two-conditioned plus fallback") were not reached this pass; the canvas click/drag reliability limitation documented above (surfaced while attempting the adjacent K-003 investigation on a similarly-shaped read-only canvas) made it unsafe to assume further canvas interaction this pass would produce genuine, trustworthy evidence rather than a false negative from tooling noise.
-- **Journey Discovery observation:** ALREADY COVERED historically per the coverage register; EXPAND EXISTING JOURNEY scheduled for the next pass once the canvas limitation is resolved, using the existing "WF-TEST J004 not_equals routing" fixture (no new edge construction needed, only a click on its existing conditioned edge).
-- **Permanent ledger updated:** Yes (this entry, correcting nothing — no prior overbroad claim existed for K-004 this pass).
+- **Exact user-visible assertion:** Opening the Field dropdown on any Decision node's outgoing edge shows exactly one selectable option, "segment".
+- **Persona required:** Workflow Admin.
+- **Persona used:** Real admin account.
+- **Fixture required:** An existing Decision node with a conditioned outgoing edge.
+- **Fixture used:** Existing "WF-TEST J005 two-conditioned plus fallback" (Draft), Decision -> "ApprovalA (enterprise)" edge (`node_2->node_3`), Field=segment, Operator=equals, Value=enterprise.
+- **Page opened:** `/settings/workflows/3b2681fa-862d-47c4-abcb-ea31afa299c2/versions/593ba28c-0107-4c6c-840c-f524f20ee837`
+- **Exact browser actions performed:** Selected the Decision->ApprovalA edge via a genuine on-path click (recipe above); confirmed the Transition panel opened showing Field=segment; clicked the Field combobox; confirmed via `read_page` that the opened listbox contains exactly one `option`, "segment".
+- **Actual rendered result:** The Field dropdown's listbox rendered exactly one option, "segment".
+- **Expected result:** Only "segment" selectable.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately; the option list was read directly from the live DOM.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-004 (BLOCKED — tooling)
+### END HISTORICAL UX REVALIDATION K-004
 
 ### BEGIN HISTORICAL UX REVALIDATION K-005
 
 - **Canonical intent:** The decision-edge operator dropdown offers only equals/not_equals.
-- **Manual UX result:** BLOCKED (this pass), same reasoning and same candidate existing fixture as K-004 above (the operator dropdown lives in the same edge condition editor).
-- **Journey Discovery observation:** EXPAND EXISTING JOURNEY, scheduled alongside K-004 for the next pass.
+- **Exact user-visible assertion:** Opening the Operator dropdown on any Decision node's outgoing edge shows exactly two options, "equals" and "not_equals".
+- **Persona required:** Workflow Admin.
+- **Persona used:** Real admin account.
+- **Fixture used:** Same as K-004 (Decision->ApprovalA edge on "WF-TEST J005 two-conditioned plus fallback").
+- **Page opened:** Same as K-004.
+- **Exact browser actions performed:** With the same edge selected, clicked the Operator combobox; confirmed via `read_page` that the opened listbox contains exactly two options, "equals" and "not_equals".
+- **Actual rendered result:** The Operator dropdown's listbox rendered exactly "equals" and "not_equals", nothing else (no "changed" or any other operator).
+- **Expected result:** Only equals/not_equals selectable.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-005 (BLOCKED — tooling)
+### END HISTORICAL UX REVALIDATION K-005
 
 ### BEGIN HISTORICAL UX REVALIDATION K-007
 
 - **Canonical intent:** A Decision node with fewer than 2 outgoing edges is blocked at save/publish.
-- **Manual UX result:** BLOCKED (this pass). Requires selecting and deleting one edge from an existing 2-edge Decision node, attempting Validate & Publish, confirming the block, then reloading without saving to discard — a multi-step canvas sequence that the click-reliability limitation above makes untrustworthy to attempt this pass without risking a false result.
-- **Journey Discovery observation:** REGRESSION TEST ONLY / EXPAND EXISTING JOURNEY, scheduled for the next pass.
+- **Exact user-visible assertion:** Attempting Validate & Publish on a Decision node with only 1 outgoing edge is rejected with a clear "at least 2 branches" style error.
+- **Persona required:** Workflow Admin.
+- **Persona used:** Real admin account.
+- **Fixture used:** "WF-TEST J005 two-conditioned plus fallback", temporarily mutated (not saved): deleted the Decision->ApprovalA edge and the Decision->ApprovalD (fallback) edge via the on-path-click + Delete Transition recipe, leaving only Decision->ApprovalB (smb) as the Decision node's sole outgoing edge.
+- **Page opened:** Same as K-004.
+- **Exact browser actions performed:** Selected and deleted 2 of the Decision node's 3 outgoing edges one at a time (confirming the remaining edge list via DOM after each deletion); clicked Validate & Publish; read the rendered error banner; reloaded the page (without ever clicking Save Draft) to discard the mutation and confirm the original 7-edge graph was restored.
+- **Actual rendered result:** "Cannot publish an invalid workflow: ... Decision node "Decision" must have at least two outgoing branches to be a real decision." (plus expected secondary errors about the two now-disconnected Approval nodes, a correct side effect of the deliberate deletion, not a defect). After reload, all 7 original edges and 6 nodes were confirmed restored — the mutation was never persisted.
+- **Expected result:** Publish blocked with a clear minimum-branches error.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately; the rejection was observed directly as rendered UI.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-007 (BLOCKED — tooling)
+### END HISTORICAL UX REVALIDATION K-007
 
 ### BEGIN HISTORICAL UX REVALIDATION K-008
 
 - **Canonical intent:** A Decision node with 2+ unconditioned (fallback) edges is blocked at save/publish.
-- **Manual UX result:** BLOCKED (this pass), same reasoning as K-007.
-- **Journey Discovery observation:** REGRESSION TEST ONLY / EXPAND EXISTING JOURNEY, scheduled for the next pass.
+- **Exact user-visible assertion:** Attempting Validate & Publish on a Decision node with 2 unconditioned outgoing edges is rejected with a clear "at most one fallback" style error.
+- **Persona required:** Workflow Admin.
+- **Persona used:** Real admin account.
+- **Fixture used:** "WF-TEST J005 two-conditioned plus fallback", temporarily mutated (not saved): selected the Decision->ApprovalA (enterprise) edge and clicked "Clear (make this the default branch)", removing its condition so it became a second fallback alongside the existing Decision->ApprovalD (fallback) edge.
+- **Page opened:** Same as K-004.
+- **Exact browser actions performed:** Selected the Decision->ApprovalA edge via the on-path-click recipe; clicked "Clear (make this the default branch)"; confirmed the panel now showed Field="Unset (default branch)"; clicked Validate & Publish; read the rendered error; reloaded the page (without saving) to discard the mutation.
+- **Actual rendered result:** "Cannot publish an invalid workflow: Decision node "Decision" has more than one default (unconditioned) branch; routing would be ambiguous." After reload, the original graph (ApprovalA back to its "enterprise" condition) was confirmed restored.
+- **Expected result:** Publish blocked with a clear ambiguous-routing error.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-008 (BLOCKED — tooling)
+### END HISTORICAL UX REVALIDATION K-008
 
 ### BEGIN HISTORICAL UX REVALIDATION K-017
 
