@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "nexus:provision-test-personas": "tsx --env-file=.env.local --env-file=.env.nexus-test.local scripts/provision-canonical-test-personas.ts",
+    "nexus:test-session": "tsx --env-file=.env.local --env-file=.env.nexus-test.local scripts/nexus-test-session.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

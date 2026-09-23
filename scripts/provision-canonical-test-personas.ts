@@ -1,30 +1,39 @@
 /**
- * Provisions the fresh canonical fictional test-persona set for Nexus
- * Manual UX testing (replaces the retired wf-test.* personas, see
- * scripts/retire-old-test-personas.ts). Exactly four personas: a Maker
- * with no approve permission, a Finance approver and a Legal approver on
- * two distinct existing teams (WF-TEST Finance/WF-TEST Legal, reused,
- * never recreated), and a Restricted user with no roles or teams at all.
- * This is the smallest set that covers Batches 20-23's remaining Manual
- * UX journeys; do not add a fifth persona without a concrete journey that
- * needs it.
+ * Provisions the canonical fictional test-persona set for Nexus Manual UX
+ * testing (replaces the retired wf-test.* personas, see
+ * scripts/retire-old-test-personas.ts): a Maker with no approve permission,
+ * a Finance approver, a Legal approver, a UX approver (three distinct
+ * existing teams, reused, never recreated), and a Restricted user with no
+ * roles or teams at all.
  *
  * Every identity is created through the real, supported Supabase Auth
  * Admin API, never a raw insert into auth.users; every role/team grant
  * goes through the real RPCs (provision_app_user, set_app_user_display_name,
  * grant_user_role, assign_user_to_team), never a raw table insert.
  *
- * Idempotent and safe to re-run: existing personas are reused (found by
- * email via listUsers), only the password is always reset to a freshly
- * generated value, printed once. THIS SCRIPT MUST BE RUN BY A HUMAN, IN
- * THEIR OWN TERMINAL, NEVER BY the agent: the printed passwords are the
- * only way to log in as these personas, and the agent must never read
- * them. Running it yourself and reading the output yourself is exactly
- * the sanctioned path; do not paste the printed passwords into chat.
+ * Passwords are read from named environment variables (see PASSWORD_ENV
+ * below), never generated here and never printed. Set them once in
+ * .env.nexus-test.local (gitignored via the existing .env* rule, never
+ * committed). This script is safe for anyone, including an AI agent, to
+ * run: it never logs a password value, only status per persona.
  *
- * Usage (requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY):
+ * IMPORTANT: an ordinary rerun is idempotent and session-preserving. If a
+ * persona's Auth user already exists, this script never touches its
+ * password (an Admin API password update revokes existing sessions, which
+ * would silently log out anyone already using an isolated-origin browser
+ * session for that persona). It only reconciles app_users active state,
+ * role grants, and team membership. To intentionally rotate a persona's
+ * password (which will log out any existing session for that persona),
+ * pass --reset-passwords explicitly.
  *
- *   npx tsx --env-file=.env.local scripts/provision-canonical-test-personas.ts
+ * Usage (requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and the
+ * NEXUS_TEST_*_PASSWORD variables, e.g. via two --env-file flags):
+ *
+ *   npx tsx --env-file=.env.local --env-file=.env.nexus-test.local \
+ *     scripts/provision-canonical-test-personas.ts
+ *
+ *   npx tsx --env-file=.env.local --env-file=.env.nexus-test.local \
+ *     scripts/provision-canonical-test-personas.ts --reset-passwords
  */
 
 import { createClient } from "@supabase/supabase-js"
@@ -32,25 +41,63 @@ import { createClient } from "@supabase/supabase-js"
 const EXISTING_TEAMS = [
   { code: "wf_test_finance", name: "WF-TEST Finance" },
   { code: "wf_test_legal", name: "WF-TEST Legal" },
+  { code: "ux_verification_team", name: "UX Verification Team" },
 ] as const
 
 const PERSONAS = [
-  { email: "nexus-test-maker@example.test", displayName: "Nexus Test Maker", roleCode: "maker", teamCode: null },
-  { email: "nexus-test-finance@example.test", displayName: "Nexus Test Finance Approver", roleCode: "checker", teamCode: "wf_test_finance" },
-  { email: "nexus-test-legal@example.test", displayName: "Nexus Test Legal Approver", roleCode: "checker", teamCode: "wf_test_legal" },
-  { email: "nexus-test-restricted@example.test", displayName: "Nexus Test Restricted User", roleCode: null, teamCode: null },
+  {
+    email: "nexus-test-maker@example.test",
+    displayName: "Nexus Test Maker",
+    roleCode: "maker",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_MAKER_PASSWORD",
+  },
+  {
+    email: "nexus-test-finance@example.test",
+    displayName: "Nexus Test Finance Approver",
+    roleCode: "checker",
+    teamCode: "wf_test_finance",
+    passwordEnv: "NEXUS_TEST_FINANCE_PASSWORD",
+  },
+  {
+    email: "nexus-test-legal@example.test",
+    displayName: "Nexus Test Legal Approver",
+    roleCode: "checker",
+    teamCode: "wf_test_legal",
+    passwordEnv: "NEXUS_TEST_LEGAL_PASSWORD",
+  },
+  {
+    email: "nexus-test-restricted@example.test",
+    displayName: "Nexus Test Restricted User",
+    roleCode: null,
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_RESTRICTED_PASSWORD",
+  },
+  {
+    email: "nexus-test-ux-approver@example.test",
+    displayName: "Nexus Test UX Approver",
+    roleCode: "checker",
+    teamCode: "ux_verification_team",
+    passwordEnv: "NEXUS_TEST_UX_APPROVER_PASSWORD",
+  },
 ] as const
 
-function randomPassword(): string {
-  return `Nx-${crypto.randomUUID()}`
-}
-
 async function main() {
+  const resetPasswords = process.argv.includes("--reset-passwords")
+
   const url = process.env.SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !serviceRoleKey) {
     console.error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in the environment. Not connecting; nothing was written.")
+    process.exitCode = 1
+    return
+  }
+
+  const missingPasswordEnvs = PERSONAS.filter((p) => !process.env[p.passwordEnv]).map((p) => p.passwordEnv)
+  if (missingPasswordEnvs.length > 0) {
+    console.error(`Missing password environment variable(s): ${missingPasswordEnvs.join(", ")}.`)
+    console.error("Set them in .env.nexus-test.local (gitignored) and pass --env-file=.env.nexus-test.local. Nothing was written.")
     process.exitCode = 1
     return
   }
@@ -68,10 +115,10 @@ async function main() {
     teamIdByCode.set(team.code, existing.id)
   }
 
-  const results: { email: string; displayName: string; password: string; roleCode: string | null; teamCode: string | null }[] = []
+  const results: { email: string; displayName: string; roleCode: string | null; teamCode: string | null; status: "created" | "password reset" | "existing (password preserved)" | "configuration reconciled" }[] = []
 
   for (const persona of PERSONAS) {
-    const password = randomPassword()
+    const password = process.env[persona.passwordEnv] as string
 
     const { data: created, error: createError } = await supabase.auth.admin.createUser({
       email: persona.email,
@@ -81,6 +128,7 @@ async function main() {
     })
 
     let authUserId: string
+    let status: "created" | "password reset" | "existing (password preserved)" | "configuration reconciled" = "created"
     if (createError) {
       if (!/already been registered|already exists/i.test(createError.message)) {
         console.error(`Failed to create ${persona.email}:`, createError.message)
@@ -100,11 +148,20 @@ async function main() {
         continue
       }
       authUserId = existing.id
-      const { error: updateError } = await supabase.auth.admin.updateUserById(authUserId, { password })
-      if (updateError) {
-        console.error(`Failed to reset password for ${persona.email}:`, updateError.message)
-        process.exitCode = 1
-        continue
+      if (resetPasswords) {
+        const { error: updateError } = await supabase.auth.admin.updateUserById(authUserId, { password })
+        if (updateError) {
+          console.error(`Failed to set password for ${persona.email}:`, updateError.message)
+          process.exitCode = 1
+          continue
+        }
+        status = "password reset"
+      } else {
+        // Do not touch the password: an Admin API password update revokes
+        // existing sessions, which would silently log out anyone already
+        // using this persona's isolated-origin browser session. Ordinary
+        // reruns only reconcile role/team/active state below.
+        status = "existing (password preserved)"
       }
     } else {
       authUserId = created.user.id
@@ -132,6 +189,8 @@ async function main() {
       process.exitCode = 1
       continue
     }
+
+    let configChanged = false
 
     const { data: existingRoles } = await supabase
       .from("user_roles")
@@ -163,6 +222,7 @@ async function main() {
         process.exitCode = 1
         continue
       }
+      configChanged = true
     }
 
     if (persona.teamCode) {
@@ -191,30 +251,36 @@ async function main() {
           process.exitCode = 1
           continue
         }
+        configChanged = true
       }
     }
 
-    const { error: activateError } = await supabase.rpc("set_app_user_active", {
-      p_app_user_id: appUser.id,
-      p_is_active: true,
-      p_actor_user_id: null,
-    })
-    if (activateError) console.error(`  ${persona.email}: failed to ensure active:`, activateError.message)
+    const { data: activeCheck } = await supabase.from("app_users").select("is_active").eq("id", appUser.id).maybeSingle()
+    if (!activeCheck?.is_active) {
+      const { error: activateError } = await supabase.rpc("set_app_user_active", {
+        p_app_user_id: appUser.id,
+        p_is_active: true,
+        p_actor_user_id: null,
+      })
+      if (activateError) {
+        console.error(`  ${persona.email}: failed to ensure active:`, activateError.message)
+      } else {
+        configChanged = true
+      }
+    }
 
-    results.push({ email: persona.email, displayName: persona.displayName, password, roleCode: persona.roleCode, teamCode: persona.teamCode })
+    if (status === "existing (password preserved)" && configChanged) {
+      status = "configuration reconciled"
+    }
+
+    results.push({ email: persona.email, displayName: persona.displayName, roleCode: persona.roleCode, teamCode: persona.teamCode, status })
   }
 
   console.log("\nCanonical Nexus test personas provisioned (fictional TEST personas, never for Production use):\n")
   for (const result of results) {
-    console.log(`  ${result.displayName}`)
-    console.log(`    email:    ${result.email}`)
-    console.log(`    password: ${result.password}`)
-    console.log(`    role:     ${result.roleCode ?? "(none)"}`)
-    console.log(`    team:     ${result.teamCode ?? "(none)"}`)
-    console.log("")
+    console.log(`  ${result.displayName}  <${result.email}>  role: ${result.roleCode ?? "(none)"}  team: ${result.teamCode ?? "(none)"}  [${result.status}]`)
   }
-  console.log("Log in at http://localhost:3000/login (or the Preview URL) with each email/password above.")
-  console.log("Do not share these passwords in chat; this output is for your own terminal only.")
+  console.log(`\n${results.length}/${PERSONAS.length} personas ready. No password value was printed by this script.`)
 }
 
 main()

@@ -112,6 +112,16 @@ persona merely because it sounds useful.
   browser tooling cannot isolate sessions, state that precisely (which tabs, which origin, what was
   observed) rather than assuming tabs behave like separate profiles.
 
+**Stale-tab rule (permanent, added 2026-09-23).** Long-lived browser tabs occasionally stop
+delivering synthetic clicks entirely (page content, network, and console all remain otherwise
+normal; even a pure client-side toggle with no server call fails to respond). This has been
+reproduced and confirmed tooling-side, not a Nexus defect: the identical action succeeds immediately
+in a brand-new tab. For any Manual UX action that mutates state, use a fresh browser tab/context
+whenever the current tab shows any sign of stale input delivery, and reproduce a suspected button
+failure once in a fresh tab before ever classifying it as a product defect. Never substitute a
+JS-dispatched synthetic click/pointer event as Manual UX evidence: that would no longer be genuine
+UI interaction, and undermines the standard this gate exists to enforce.
+
 **Gate result.** If every required persona for the batch is available, correctly configured, and
 (where needed) session-isolated: `MANUAL UX GATE = PASS`. If any ordinary prerequisite above is
 missing: `MANUAL UX GATE = FAIL`. Do not start the batch; resolve persona readiness first.
