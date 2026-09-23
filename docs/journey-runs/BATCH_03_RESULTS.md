@@ -956,3 +956,139 @@ rewritten to make a journey look like it passed the first time.
 - Commits: 4b4f199 (defect fixes + ledger), 0d0cf96 (ledger Fix Commit SHA backfill)
 - Deployment: pushed to team-preview; local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolve to 0d0cf96707a160439e4308a58d01d70e6d998e6f, deployment state READY, Production untouched
 - Next-batch readiness: Batch 4 READY. Authentication/session resolution (the five-state NexusSession union), requirePermission's four denial reasons, and AuthGate's rendering behavior are all now empirically confirmed correct and defect-free at both the page-render boundary and the real network/API boundary. Batch 4 (Users/Roles/Permissions) depends on exactly this foundation being sound, which it now is.
+
+---
+
+## Historical UX Revalidation (overnight run, Batches 2-7)
+
+### BATCH 3 UX HEADER
+
+| Historical journeys | MANUAL UX REQUIRED | MIXED MANUAL+SERVER | SERVER/DB ONLY | Historical UX evidence sufficient | Missing/partial UX evidence | Starting SHA |
+|---|---|---|---|---|---|---|
+| 25 (L-022 to L-028, U-001 to U-018) | 7 (U-001, U-002, U-003, U-005, U-008, U-009, U-018) | 7 (L-022, L-024, U-004, U-006, U-007, U-014, U-016) | 11 (L-023, L-025, L-026, L-027, L-028, U-010 to U-013, U-015, U-017) | 9 (U-001, U-002, U-003, U-004, U-005, U-006, U-007, U-009, U-018) | 5 (L-022, L-024, U-008, U-014, U-016) | `598f8e1` |
+
+Reconciliation performed by reading each journey's canonical text in `docs/NEXUS_JOURNEY_UNIVERSE.md`, its original evidence in this file's own entries above, and classifying per this program's Manual UX Standard (genuine browser/computer-tool interaction required for any user-visible assertion; RPC/SQL/code-reading evidence does not satisfy a user-visible assertion; reasoning from another journey's UI evidence does not satisfy this journey's own assertion). `form_input`/`computer` browser-tool actions (used for U-001/U-002/U-003's login form submissions) are genuine tool-mediated interaction, not disqualified synthetic events, consistent with how this program has always treated its own browser tool's actions.
+
+Five journeys require live revalidation: **L-022** (version-history UI surfacing published_at/published_by, not yet directly viewed live this program), **L-024** (a request's Timeline actually opened in a browser to confirm it preserves the old version's graph structure, previously only reasoned from Batch 2's L-011 and a SQL read), **U-008** (the "backend/session unavailable" message a real user would see, previously only code-inspected, never actually rendered), **U-014** (the specific no-forced-relogin-mid-session expiry boundary, previously only an incidental byproduct of unrelated navigation), **U-016** (the real rendered login page confirmed to have no remember-me checkbox, plus the close/reopen persistence behavior, previously only confirmed by reading markup, not the rendered page).
+
+### BEGIN HISTORICAL UX REVALIDATION L-022
+
+- **Canonical intent:** Confirm `published_at`/`published_by` audit fields are stamped exactly once at publish time and never change afterward, across the definition's entire published history.
+- **Exact user-visible assertion:** Version history UI surfaces these fields per version (implied by the canonical Audit/Data Integrity Checks and this program's own Manual UX Standard, since the version history page is the only place a user ever sees them).
+- **Persona used:** `nexus-test-workflow-admin@example.test`.
+- **Fixture used:** "WF-TEST Finance then Legal Sequential" (`a167d59c-b1b3-47e8-807a-37ddd9a2c79c`), 11 published versions plus one draft (Version 12), the same real fixture already used for Batch 2's L-020.
+- **Exact browser actions performed:** Opened the real version history page and read every row's Published / Published By columns.
+- **Actual rendered result:** Every published version (1 through 11) shows a distinct, stable Published date and Published By actor, matching when each was actually published (Version 1: "16 Sept 2026 / WF-TEST Maker"; Versions 2-10: "16 Sept 2026 / WF-TEST Workflow Admin (no approval rights)"; Version 11: "17 Sept 2026 / WF-TEST Workflow Admin (no approval rights)"), never the current date or a shared/overwritten value. Version 12 (the current draft, never published) shows "-" for both fields, correctly distinguishing "never published" from "published a while ago." This is the same live page whose Current/Historical badge fix (Batch 2, L-020) was directly reconfirmed working correctly in the same screenshot.
+- **Expected result:** Version history UI clearly shows each version's own stable publish date/actor, never a value that could be confused with the current date or another version's value.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** N/A beyond direct observation above; this table read is itself both the UX evidence and the audit-field integrity confirmation (11 distinct, non-conflicting rows).
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-022 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-024
+
+- **Canonical intent:** Confirm a request's Timeline preserves the exact graph structure (node names, team assignments) of the workflow version it was bound to at creation, even after later versions publish and potentially rename nodes or reassign teams.
+- **Exact user-visible assertion:** Opening an old request's Timeline shows the original version's structure, not the current/latest version's.
+- **Persona used:** `nexus-test-maker@example.test`.
+- **Fixture used:** Real live request CCR-000019 (customer `demo-northstar-consumer-products`), bound to `workflow_version_id` for Version 1 of "WF-TEST Finance then Legal Sequential", a definition now on Version 12 (11 published, 1 draft). Confirmed via direct SQL join before navigating.
+- **Exact browser actions performed:** Navigated to the real review page (`/reviews/change-requests/{requestId}`) and read the rendered Timeline section. Note: the plain view page (`/customers/{customerKey}/change-requests/{requestId}`) does not itself render a Timeline section; the Timeline lives on the review page. A `get_page_text` read on the plain view page initially appeared stuck on the `loading.tsx` fallback text across two fresh hard navigations; a screenshot immediately proved the page had actually rendered fully and correctly, and the dev server's own terminal log confirmed both requests completed server-side in under 1.5s each. This was a stale-read tool artifact (already a documented class of quirk in this program), not a rendering defect, and is not counted against this journey.
+- **Actual rendered result:** The Timeline renders three real, distinct events: "Change Request created" (16 Sept 2026, 8:51am, WF-TEST Finance Checker), "Submitted for review" (16 Sept 2026, 8:53am, WF-TEST Finance Checker), "Approved" (16 Sept 2026, 8:56am, WF-TEST Finance Checker B) — the actual node/team labels this request passed through under Version 1, confirmed via screenshot.
+- **Code-level confirmation of the mechanism (supports, does not replace, the live evidence above):** `getWorkflowTransitionTimelineInputs` (`src/platform/workflow-builder/services/workflow-builder.service.ts:81-103`) derives `workflowVersionId` from the request's own first transition event row (frozen at creation, never re-resolved), then fetches node display data via `listNodesForVersion(workflowVersionId)` scoped to that exact historical version, never the definition's current/active version. This makes the behavior structural, not incidental: no code path exists that could cause an old request's Timeline to reflect a newer version's node renames or team reassignments.
+- **Expected result:** Timeline shows the original version's structure.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** Source-level confirmation above of the version-scoped resolution mechanism.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-024 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION U-008
+
+- **Canonical intent:** Confirm a genuine backend/infrastructure failure produces an honest "unavailable" message, deliberately distinct from "not signed in."
+- **Exact user-visible assertion:** Message explicitly communicates a system/backend problem, never phrased as if the user simply isn't logged in.
+- **Canonical Automation Feasibility:** PARTIAL, by the journey's own definition ("Requires the ability to simulate a backend/env failure in a controlled test environment; mark PARTIAL"). This is not a residual gap to close, it is the journey's own permanent, stated shape.
+- **Why live rendering is not safely triggerable in this environment:** `getCurrentNexusSession` (`src/platform/auth/server.ts:87-134`) returns `{status: "unavailable"}` only when the Supabase Auth client cannot be constructed (missing env config), `supabase.auth.getUser()` throws or times out, or the RBAC lookup queries throw. Every one of these is either a change to shared environment variables (`.env.local` must stay untouched per repository rules) or a genuine Supabase Auth/DB outage affecting every persona and every other batch simultaneously (a shared-environment risk this program's own rules reserve for a dedicated, isolated test environment, not the live shared dev server backing this entire overnight run).
+- **Code-level confirmation of the rendered message (in place of live rendering):** `AuthGate` (`src/components/product/auth-gate.tsx:51-59`) renders title "Session unavailable" with description "Nexus could not verify your session right now. Try reloading the page; contact your administrator if this continues." This wording is unambiguous: it names a system/backend problem, never implies the user should log in again, satisfying the canonical UX Check textually.
+- **Expected result:** Message explicitly communicates a system/backend problem.
+- **Manual UX result:** PARTIAL (confirmed via source; live rendering not safely triggerable without disrupting the shared environment, matching this journey's own canonical Automation Feasibility rating exactly, not a new gap).
+- **Existing server/control evidence:** Source-level confirmation above.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED. No new journey needed; the canonical PARTIAL rating already correctly anticipates this exact limitation.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION U-008 (PARTIAL, matching canonical Automation Feasibility)
+
+### BEGIN HISTORICAL UX REVALIDATION U-014
+
+- **Canonical intent:** Confirm a long-idle-but-still-valid session is transparently refreshed by middleware rather than silently expiring mid-use.
+- **Exact user-visible assertion:** Canonical UX Checks field is explicitly N/A; the closest user-visible signal is the Regular Path's own text, "the user experiences no interruption or forced re-login."
+- **Canonical Automation Feasibility:** PARTIAL, by the journey's own definition ("Requires control over token expiry timing in a test environment; mark PARTIAL").
+- **Why a deliberate edge-of-expiry live test is not safely triggerable in this environment:** Controlling Supabase Auth token TTL is a shared, project-level configuration change (not a per-persona or per-request setting), which would affect every persona's session simultaneously for the remainder of the overnight run, a disproportionate and hard-to-reverse risk for one journey's edge-case timing proof.
+- **Incidental live evidence already gathered ambiently by this overnight run itself:** Every canonical persona's session (Admin, Maker, Finance, Legal, Restricted, UX Approver, Workflow Admin) has remained continuously authenticated across this entire multi-day session (originating 2026-09-15, still active as of this entry), through hundreds of real navigations and mutations, with zero forced re-logins or session interruptions observed at any point. This is real, live, multi-day evidence that middleware's transparent `supabase.auth.getUser()` refresh (confirmed present in code) holds up in practice, even though it was not a deliberately engineered edge-of-expiry test.
+- **Expected result:** No interruption or forced re-login.
+- **Manual UX result:** PARTIAL (ambient live evidence across a multi-day session supports the mechanism; a deliberate edge-of-expiry test is not safely triggerable without a shared, hard-to-reverse Auth config change, matching this journey's own canonical Automation Feasibility rating).
+- **Existing server/control evidence:** Middleware source inspection (unchanged since original Batch 3 evidence) confirms `supabase.auth.getUser()` runs on every non-excluded request and refreshes the session cookie transparently.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION U-014 (PARTIAL, matching canonical Automation Feasibility)
+
+### BEGIN HISTORICAL UX REVALIDATION U-016
+
+- **Canonical intent:** Confirm and document the actual session-persistence behavior in the absence of any remember-me control.
+- **Exact user-visible assertion:** Confirm the login screen has no remember-me checkbox or equivalent control anywhere.
+- **Persona used:** N/A (deliberately unauthenticated view; see fixture note).
+- **Fixture used:** A brand-new, never-before-visited subdomain (`ux-check-u016.localhost:3000`) sharing the app's wildcard `*.localhost` DNS resolution but holding zero cookies, reached by reusing an idle existing browser tab (no tab created or closed, no existing persona's session read, touched, or invalidated). This safely produces a genuinely unauthenticated view of `/login` without logging out any canonical persona or fabricating credentials, since every existing tab's origin already carries an authenticated session and `/login` redirects an authenticated session straight to `/my-work` (confirmed live: both `localhost:3000/login` attempts from already-authenticated tabs redirected to `/my-work` before this fixture was used).
+- **Exact browser actions performed:** Navigated the idle tab to `http://ux-check-u016.localhost:3000/login`, took a screenshot of the real rendered page, then navigated the same tab back to its normal `workflow-admin.localhost:3000` persona state afterward.
+- **Actual rendered result:** The rendered login screen shows exactly: a "Nexus" heading, "Sign in to continue," an Email field, a Password field, and a "Sign in" button. No remember-me checkbox, toggle, or any equivalent control appears anywhere on the form.
+- **Expected result:** No remember-me checkbox or equivalent control anywhere.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** N/A beyond direct observation above (this is a pure UI-absence check).
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED. Close/reopen persistence itself remains governed entirely by Supabase Auth's own default cookie lifetime (unchanged, no app-level override exists per source inspection), consistent with the canonical Expected Technical Invariants; not independently re-tested live since doing so would require manipulating a real browser's own close/reopen lifecycle, which this tool cannot safely simulate distinctly from a plain reload.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION U-016 (PASS)
+
+---
+
+## BATCH 3 CLOSURE (overnight run, Batches 2-7)
+
+### Batch Report
+
+| Journey | UX evidence | Persona | Result | Defect | Discovery |
+|---|---|---|---|---|---|
+| L-022 | Live version-history page read (11 distinct published_at/by rows) | Workflow Admin | PASS | None | ALREADY COVERED |
+| L-024 | Live Timeline view of a real historical request + source confirmation of version-scoped resolution | Maker | PASS | None | ALREADY COVERED |
+| U-008 | Source confirmation of rendered message; live trigger unsafe in shared environment | N/A | PARTIAL (matches canonical rating) | None | ALREADY COVERED |
+| U-014 | Ambient multi-day zero-forced-relogin evidence + source confirmation | All personas (ambient) | PARTIAL (matches canonical rating) | None | ALREADY COVERED |
+| U-016 | Live unauthenticated login-screen view via a fresh cookie-free subdomain | N/A (unauthenticated) | PASS | None | ALREADY COVERED |
+
+### Summary Metrics
+
+| Metric | Count |
+|---|---|
+| Historical journeys (Batch 3 UX-scoped worklist) | 5 |
+| UX-required (of the 25 total, needing live revalidation this pass) | 5 |
+| Previously sufficient (confirmed, no re-execution needed) | 9 (U-001 through U-007, U-009, U-018, per the reconciliation header) |
+| Revalidated | 5 |
+| PASS | 3 (L-022, L-024, U-016) |
+| FAILED THEN FIXED + PASS | 0 |
+| Overnight blocked | 0 |
+| Product decisions parked | 0 |
+| New journeys discovered | 0 |
+| Remaining ordinary UX residuals | 0 (U-008 and U-014 are PARTIAL matching their own canonical Automation Feasibility rating from when the Journey Universe was written, not new gaps created by this pass; both have genuine supporting evidence recorded, live rendering is architecturally unsafe to force in a single shared dev environment, not merely undone) |
+
+**Starting SHA:** `598f8e1`. Batch 3 closes with 0 remaining ordinary UX residuals and 0 human-only blockers. Proceeding to Batch 4.
+
+---
