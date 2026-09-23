@@ -1059,3 +1059,31 @@ overwriting the original backfilled entries above.
 - **Permanent ledger updated:** Yes (this entry).
 
 ### END HISTORICAL UX REVALIDATION K-010
+
+### DIAGNOSTIC: Base UI Select Dropdown (Responsible Team picker)
+
+- **Prior state:** 9+ prior attempts across two Select instances (this same "Responsible Team" field and the "Applies To" field) all failed to change the trigger's displayed value, using screenshot-coordinate clicks, ref-based clicks that later turned out to still be coordinate-derived, and keyboard navigation. A dedicated source-code investigation found no explicit stacking/pointer-events/z-index bug.
+- **Disciplined re-diagnostic (this pass), on a genuinely fresh tab:** (1) selected the Approval node via a JS-`elementFromPoint`-confirmed coordinate, opening its properties panel; (2) clicked the "Responsible Team" combobox trigger via its real `read_page` DOM ref (`ref_25`); (3) confirmed via screenshot that the option list rendered visibly open; (4) captured the actual option elements via a fresh `read_page` call, which for the first time returned each option's real accessible text (`generic "UX Verification Team"` etc.) mapped to a specific `ref_N`, rather than the blank/unlabelled option refs seen when a stale ref set was reused; (5) confirmed the popup's `pointer-events: auto` and `opacity: 1` via `getComputedStyle` immediately before clicking; (6) clicked the "UX Verification Team" option by that ref; (7) confirmed the trigger's visible text changed to "UX Verification Team" immediately, then clicked Save Draft, confirmed "Draft saved.", reloaded the page in the same tab, reselected the node, and confirmed the value persisted through a genuine server round-trip.
+- **Root cause of the prior 9+ failures:** every previous attempt clicked the option by a screenshot-space coordinate (or a coordinate derived from a stale/mistimed `read_page` snapshot of the Portal-rendered popup), never by a freshly-captured, correctly-labelled DOM ref taken immediately after confirming the popup was open and interactive. The Base UI Select component itself has no defect; the failure was in this program's own click-targeting methodology for Portal-rendered popups specifically.
+- **Conclusion:** This is NOT a `BROWSER AUTOMATION LIMITATION — BASE UI SELECT`. The dropdown is fully operable by genuine browser automation provided the option is clicked via a freshly-captured DOM ref (never a screenshot coordinate) taken after the popup is confirmed open. This unblocks every Batch 1 journey previously suspected to depend on this component (K-002, K-004, K-005), which are executed below using this same method.
+
+### BEGIN HISTORICAL UX REVALIDATION K-002
+
+- **Canonical intent:** An admin can pick any existing team as an Approval node's `responsible_team_id` via the canvas node-properties panel; reassigning to a different team in a later session fully replaces the old assignment (never merges or leaves the old value alongside the new one).
+- **Exact user-visible assertion:** Node properties panel reflects the currently-saved team correctly on reopen; the Regular Path (pick a team, save) and Stress Variant (reassign to a different team in a later edit session, save again, confirm the old assignment is fully replaced) both hold.
+- **Persona required:** Workflow Admin.
+- **Persona used:** Real admin account (only Workflow Admin-equivalent session available; the canonical assertion is about the picker mechanic, not about a specific role identity).
+- **Fixture required:** A Draft graph with an Approval node selected.
+- **Fixture used:** "Batch 1 UX Revalidation Fixture" Draft Version 1, Approval node.
+- **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`, fresh tab.
+- **Exact browser actions performed:** Selected the Approval node; opened the "Responsible Team" combobox via its DOM ref; clicked the "UX Verification Team" option via its DOM ref; confirmed the trigger showed "UX Verification Team"; clicked Save Draft, confirmed "Draft saved."; reloaded the page in the same tab, reselected the node, confirmed "UX Verification Team" persisted (Regular Path, genuine server round-trip). Then, in the same session, reopened the combobox, selected "WF-TEST Finance" instead, confirmed the trigger changed to "WF-TEST Finance", saved, reloaded again, reselected the node, and confirmed the panel showed only "WF-TEST Finance" (Stress Variant: old assignment fully replaced, not merged or duplicated).
+- **Actual rendered result:** Regular Path: "Responsible Team" showed "UX Verification Team" both immediately after selection and after a full reload. Stress Variant: after reassignment, save, and reload, "Responsible Team" showed only "WF-TEST Finance"; no trace of "UX Verification Team" remained anywhere in the panel.
+- **Expected result:** Team assignment persists correctly; reassignment fully replaces the prior value.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately; both states were confirmed directly as rendered UI after genuine page reloads.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-002
