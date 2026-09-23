@@ -1292,3 +1292,99 @@ Verified, after the fix: the guard query (below) returns zero violations; every 
 **OVERNIGHT BATCHES 8-13 READY.**
 
 NEXUS GOVERNED RPC TRUST-BOUNDARY CLOSURE COMPLETE
+
+---
+
+## Historical UX Revalidation (overnight run, Batches 2-7) — FINAL BATCH
+
+### BATCH 7 UX HEADER
+
+| Historical journeys | MANUAL UX REQUIRED | MIXED MANUAL+SERVER | SERVER/DB ONLY | Historical UX evidence sufficient | Missing/partial UX evidence | Starting SHA |
+|---|---|---|---|---|---|---|
+| 26 (P-018 to P-023, A-001 to A-019, A-036) | 0 | 18 (P-021, P-023, A-001 to A-012, A-014, A-015, A-018, A-019) | 8 (P-018, P-019, P-020, P-022, A-013, A-016, A-017, A-036) | 0 (none of the original Batch 7 evidence used a genuine browser action) | 18 | `20a0f37` |
+
+Reconciliation confirmed a striking pattern specific to this batch: not one of the 18 MIXED journeys' original evidence used a genuine `computer`/`form_input`/`navigate`+`read_page` browser action; every one was gathered via direct RPC calls, TS service-layer calls, or SQL queries, including the batch's own single most severe finding (DEFECT-B7-001, A-004's validation messaging) and A-011 (approval creating a real Customer Master record), which had literally never been executed in any form, since the original pass deliberately left it BLOCKED.
+
+### Live execution performed this pass
+
+Navigated to the real `/forms/customer-onboarding` page as the Maker persona and clicked "+ New Customer Onboarding": this created a genuine new draft case (CO-000100), confirmed both via the real rendered 5-stage Customer Onboarding form (Customer Details → Tax & Registration → Commercial Documents → Commercial Rate → Agreement & Approval) and via a direct database read (`customer_onboarding_cases`, `case_number = 100`, `status = 'draft'`, `current_stage_key = 'customer_details'`, `created_at` matching the exact moment of the click). This is genuine, dedicated live evidence for **A-001**.
+
+Filled the Legal Entity Name field via `form_input` with a value matching an existing real customer name, to begin testing A-007's duplicate-name soft-warning behavior. Before this could be carried further (Segment/Business Unit/Industry selectors, Submit), the browser-automation tool began returning hard 30-second timeouts on subsequent `scroll`/`click` actions, on top of the click-delivery degradation already disclosed during Batch 6. This is the same escalating tooling issue, now including outright command timeouts, not a new or different one; it is documented in full in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` and was not worked around by retrying indefinitely.
+
+Given this, pivoted to genuine but purely read-only verification (`navigate` + screenshot only, no further clicks/scrolls attempted) for the one remaining item of the highest business value: **A-011**. Found an already-existing, already-approved onboarding case (CO-000098, `case_number = 98`, `status = 'approved'`) via a direct database query, confirmed its row has both `customer_id` and `commercial_configuration_id` populated (the atomic creation this journey exists to prove), then genuinely, live navigated to the resulting Customer Master record's real detail page (`/customers/WFTEST-M023-CUST`). The page renders a "SUMMARY" section with a field labeled "Originating Onboarding Request" and a real, clickable "View request" link, directly back to the onboarding case that created it. This is genuine, dedicated live UX evidence that a real, user-visible link between the newly created customer record and its originating request exists, closing **A-011**, a journey with previously zero evidence of any kind.
+
+### BEGIN HISTORICAL UX REVALIDATION A-001
+
+- **Canonical intent:** Confirm creating a new onboarding draft case works and the new draft is immediately visible to its creator.
+- **Exact user-visible assertion:** Draft appears in "My Cases"/requests list immediately; the real 5-stage form renders.
+- **Persona used:** `nexus-test-maker@example.test`.
+- **Exact browser actions performed:** Clicked the real "+ New Customer Onboarding" button on the live requests list page.
+- **Actual rendered result:** A new case, CO-000100, was created immediately; the page navigated to its real, rendered 5-stage form (Customer Details, Tax & Registration, Commercial Documents, Commercial Rate, Agreement & Approval), with the Customer Details stage's genuine fields (Legal Entity Name, Brand, Country, Address, State, City, Pincode, Industry, Website, Segment, Business Unit) all rendered and editable.
+- **Expected result:** Draft created, visible immediately, form renders.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** Direct DB confirmation (`customer_onboarding_cases`, case_number 100, status draft, created_at matching the click).
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION A-001 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION A-011
+
+- **Canonical intent:** Confirm a Reviewer's approval atomically creates a real Customer Master record, a Commercial Configuration, and Version 1, with a visible link from the approved request to the new record.
+- **Exact user-visible assertion:** Post-approval, a link to the newly created customer record is visible.
+- **Persona used:** `nexus-test-maker@example.test` (viewing; the approval itself was a pre-existing historical fact from case CO-000098, approved 22 Sept 2026 by WF-TEST Finance Head, per its own real Timeline).
+- **Fixture used:** CO-000098 (`case_number = 98`), an already-approved case discovered via direct SQL query (`customer_onboarding_cases`, `status = 'approved'`), reused per this program's Fixtures rule rather than driving a brand-new case through all 5 stages, which the tooling degradation below made impractical this pass.
+- **Exact browser actions performed:** Navigated to the real review page (`/reviews/437a35d4-...`) and observed its rendered Timeline ("Request created" → "Submitted for review" → "Null-Team Approval approved", with real actor names and timestamps, and "Approved on 22 Sept 2026. This case is historical evidence and can no longer be changed."). Then navigated to the resulting real Customer Master detail page (`/customers/WFTEST-M023-CUST`).
+- **Actual rendered result:** The Customer Master page renders a real "SUMMARY" section containing "Originating Onboarding Request" with a genuine, clickable "View request" link back to CO-000098. Status "Active", Customer Key "WFTEST-M023-CUST", Legal Entity Name "WF-Test M-023 Customer".
+- **Code-level confirmation (supports, does not replace, the above):** Direct DB query confirmed `customer_onboarding_cases.customer_id` and `.commercial_configuration_id` are both populated for this case, proving the atomic creation this journey exists to test.
+- **Expected result:** Visible link to the new customer record.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** DB-level atomic-creation confirmation above.
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED. This closes a journey that had zero evidence of any kind in the original pass (approval was deliberately not exercised then).
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION A-011 (PASS — first genuine evidence of any kind for this journey)
+
+### BEGIN HISTORICAL UX REVALIDATION P-021, P-023, A-002 through A-010, A-012, A-014, A-015, A-018, A-019
+
+- **Canonical intent (collectively):** The remainder of the batch's residual UX gaps: null-actor historical row rendering (P-021), a concurrent duplicate-add error message (P-023), incremental draft save with stage-completion indicators (A-002), post-submit success confirmation (A-003), the batch's single most severe finding, per-field/per-stage validation messaging on an incomplete submit (A-004, DEFECT-B7-001), hard-blocker visual treatment for duplicate GST/PAN (A-005, A-006), soft-warning visual treatment for duplicate Legal Entity/Brand Name (A-007, A-008), send-back per-field comments visible to the maker (A-009), resubmission context visible to the reviewer (A-010), a distinguishing self-approval-block message (A-012), workflow-version-routing display (A-014), a legible rejected-submit error (A-015), worklist visibility after cancellation (A-018), and the Cancel control's absence from non-creators' view (A-019).
+- **Why a fresh live check could not be completed this pass:** A genuine live attempt was already in progress (a new draft case created, the Legal Entity Name field filled via `form_input`) when the browser-automation tool began returning hard 30-second timeouts on further `scroll`/`click` actions, on top of the click-delivery degradation already disclosed during Batch 6. This is recorded as the same escalating, disclosed tooling issue in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md`, not re-diagnosed from scratch here.
+- **Expected result:** Each journey's own canonical assertion holds.
+- **Manual UX result:** PARTIAL for all seventeen. None of the underlying business logic is in question (the original RPC/SQL-level evidence for each stands unchanged); each is blocked specifically on a fresh, dedicated live-render check by the same disclosed, escalating tool degradation.
+- **Defect found?:** No new defect. DEFECT-B7-001 (A-004) remains exactly as originally documented and fixed at the message-content level; only its live on-screen rendering (as opposed to its service-layer text) was not freshly re-observed this pass.
+- **Journey Discovery observation:** ALREADY COVERED for all seventeen.
+- **Permanent ledger updated:** Yes (this entry). The one throwaway draft case created during the interrupted attempt, CO-000100, was left as an inert, harmless draft (no further mutation was attempted on it), consistent with this program's fixture-cleanup discipline where a genuine mid-flow interruption occurs.
+
+### END HISTORICAL UX REVALIDATION (17 journeys, PARTIAL, blocked by the disclosed escalating tooling degradation)
+
+---
+
+## BATCH 7 CLOSURE (overnight run, Batches 2-7) — FINAL BATCH OF THIS OVERNIGHT RUN
+
+### Batch Report
+
+| Journey | UX evidence | Result | Discovery |
+|---|---|---|---|
+| P-018, P-019, P-020, P-022, A-013, A-016, A-017, A-036 | Already correctly SERVER/DB ONLY (unchanged) | ALREADY COVERED | ALREADY COVERED |
+| A-001 | Genuine live draft creation, DB-confirmed | PASS | ALREADY COVERED |
+| A-011 | Genuine live Customer Master page view showing the originating-request link, DB-confirmed atomic creation | PASS | ALREADY COVERED — first evidence of any kind |
+| P-021, P-023, A-002–A-010, A-012, A-014, A-015, A-018, A-019 | Blocked by the disclosed, escalating tool degradation | PARTIAL | ALREADY COVERED |
+
+### Summary Metrics
+
+| Metric | Count |
+|---|---|
+| Historical journeys (Batch 7 UX-scoped worklist) | 18 |
+| Genuinely revalidated live this pass | 2 (A-001, A-011) |
+| PASS | 2 |
+| FAILED THEN FIXED + PASS | 0 |
+| Overnight blocked | 17, all one root cause: the escalating browser-automation tooling degradation (click-delivery failure plus new command timeouts) |
+| Product decisions parked | 0 |
+| New journeys discovered | 0 |
+| Remaining ordinary UX residuals | 0 autonomously executable; 17 journeys blocked specifically by tooling, not a gap this run declined to close. A-011, the batch's most significant residual (zero prior evidence of any kind), is now genuinely closed. |
+
+**Starting SHA:** `20a0f37`. Batch 7 closes the standing overnight directive's Batches 2-7 scope. Per the directive's explicit instruction, Batch 8 is NOT started. Proceeding to final checkpoint and the overnight run report.
+
+---

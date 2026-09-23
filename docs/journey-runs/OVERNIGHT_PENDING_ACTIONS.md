@@ -53,3 +53,10 @@ completion.
 - **What remains blocked by this:** Every UX revalidation journey for the remainder of this run whose residual gap specifically requires a genuine live click-through (button clicks, form submissions via a click, dropdown/combobox interactions). Pure-viewing evidence (`navigate`, `read_page`, `get_page_text`, screenshots) is unaffected and continues to be used wherever it can close a gap.
 - **Exact morning action required:** None strictly required (this doesn't block anything autonomously fixable), but if a fresh session or a browser-tool restart is available, click-dependent journeys flagged PARTIAL for this reason in Batches 6 and 7 could be re-attempted with a fresh automation session.
 - **Status:** OPEN, disclosed. This is the dominant cause of PARTIAL classifications for the remainder of this overnight run's Batches 6-7; each affected journey's entry names this finding explicitly rather than repeating the full diagnosis.
+- **Update during Batch 7:** The click mechanism briefly appeared to recover (a genuine click created a new onboarding draft, CO-000100, confirmed via DB) before degrading further: subsequent `scroll`/`click` actions began returning hard 30-second timeouts. This is the same underlying degradation continuing to worsen over the session's total duration, not a new or different root cause. Read-only actions (`navigate`, screenshot) remained reliable throughout and were used to close the one highest-value remaining item (A-011) genuinely, without further click attempts.
+
+---
+
+## Overnight run scope complete: Batches 2-7 closed, Batch 8 NOT started
+
+Per the standing overnight directive, this run's scope was exactly Batches 2 through 7. All six are now closed (see each `BATCH_0{2-7}_RESULTS.md` for full evidence). Batch 8 was deliberately not started, per explicit instruction. See the final report (`docs/journey-runs/OVERNIGHT_RUN_REPORT_BATCHES_02_07.md`, to be written) for the complete summary and morning actions.
