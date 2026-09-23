@@ -992,7 +992,7 @@ overwriting the original backfilled entries above.
 - **Existing server/control evidence:** None needed separately; the rename and its persistence were both observed directly.
 - **Defect found?:** No.
 - **Fix/retest:** N/A.
-- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic; the edge-reference half is EXPAND EXISTING JOURNEY, scheduled against the reusable connected fixture built later in this batch (see K-022 edge-reference addendum below).
+- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic; the edge-reference half is EXPAND EXISTING JOURNEY, blocked this pass by the canvas drag/click reliability limitation documented under the K-009 diagnostic note (a node with 2 incoming and 2 outgoing edges could not be constructed), scheduled for the next pass.
 - **Permanent ledger updated:** Yes (this entry).
 
 ### END HISTORICAL UX REVALIDATION K-022 (PARTIAL, remainder tracked below)
@@ -1009,14 +1009,88 @@ overwriting the original backfilled entries above.
 - **Exact browser actions:** Selected one of the two "End" nodes by clicking it (confirmed selected via the properties panel opening with its Delete Node button), clicked Delete Node, confirmed via `document.querySelectorAll` that the canvas dropped from 5 nodes to 4, clicked Save Draft, waited for the "Draft saved." confirmation, then opened the same version URL in a brand new tab.
 - **Actual rendered result:** Exactly 4 nodes rendered after the fresh reload (Start, Approval, Decision Renamed K022, End); the deleted End node did not reappear.
 - **Expected result:** The deletion persists; no leftover row for the deleted node.
-- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: a single delete-and-save cycle persists correctly. Not yet covered: the canonical assertion's explicit 5-repeated-cycle stress variant, only 1 cycle was run in this pass.
+- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: two independent delete-and-save cycles now confirmed (see second cycle below), each verified via a genuine fresh-tab reload. Not yet covered: the canonical assertion's explicit 5-repeated-cycle stress variant; only 2 of 5 cycles have been run.
 - **Existing server/control evidence:** None needed separately.
 - **Defect found?:** No.
 - **Fix/retest:** N/A.
-- **Journey Discovery observation:** ALREADY COVERED for the single-cycle mechanic; the repeated-cycle stress is REGRESSION TEST ONLY, scheduled immediately after K-010 in this same batch pass.
+- **Journey Discovery observation:** ALREADY COVERED for the single-cycle mechanic; the repeated-cycle stress is REGRESSION TEST ONLY, partially executed (2/5) this pass; remaining 3 cycles blocked by the browser-automation limitation documented below.
 - **Permanent ledger updated:** Yes (this entry).
 
+**Second cycle (this pass):** In a fresh tab, added a second scratch "Form Step" node to the same fixture (now 6 nodes), clicked Save Draft, confirmed "Draft saved." with 6 nodes rendered; selected the scratch node via its DOM ref, confirmed `.selected` true, clicked Delete Node, confirmed via DOM the canvas dropped back to 5 nodes, clicked Save Draft, confirmed "Draft saved." A subsequent fresh-tab reload confirmed exactly 5 nodes persisted (Start, Approval, Decision Renamed K022, End, Form Step) — no orphan row from the scratch node. Cycles 3-5 were not completed this pass: repeated attempts to select/delete a third scratch node in the same and in newly-opened fresh tabs hit the browser-automation limitation described in the diagnostic note below (canvas clicks that were confirmed on-target via `elementFromPoint` still failed to register a selection after a small number of prior interactions in the same tab). Remaining 3 cycles are REGRESSION TEST ONLY, to be completed once this tooling limitation is resolved or worked around.
+
 ### END HISTORICAL UX REVALIDATION K-009 (PARTIAL, remainder tracked below)
+
+### DIAGNOSTIC: Canvas click/drag reliability limitation (this pass, distinct from the resolved Select-dropdown issue)
+
+- **Finding:** Beyond the Select-dropdown issue (resolved above), this pass surfaced a second, broader tooling limitation: (1) `left_click_drag` on React Flow node bodies never registered any movement at all, across 3 independent fresh-tab attempts with coordinates freshly verified via `elementFromPoint` immediately before each drag (both large ~300px and small ~50px drag distances tested); (2) ordinary (non-drag) canvas clicks — including node selection and even simple in-app link navigation on an unrelated read-only page — intermittently stopped registering after a small, inconsistent number of prior interactions within the same tab, consistent with the already-documented "stale-tab" click-delivery pattern in `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`, but observed here to affect plain clicks more broadly and unpredictably than previously characterized, not only multi-step drags.
+- **Also observed:** the browser tool's own screenshot output resolution varied between consecutive calls on the same unchanged 1400x900 viewport (800x514 vs. 774x498), which silently invalidates any screenshot-space coordinate computed from an earlier screenshot's dimensions; every screenshot-coordinate click now requires a screenshot taken immediately before it, not a reused scale factor.
+- **Conclusion:** Node/edge drag-and-drop (needed to build any NEW connected graph) and, less predictably, plain canvas clicks are genuinely fragile in this environment today, requiring a fresh tab and re-verified coordinates for every few actions at best, and in the case of drag, fresh coordinates alone did not make it work at all across 3 clean attempts. This is classified `BROWSER AUTOMATION LIMITATION — CANVAS DRAG/CLICK RELIABILITY`, not a Nexus product defect. It blocks any journey whose canonical assertion requires constructing a NEW edge or a NEW multi-node connected graph from scratch this pass: K-004, K-005, K-007, K-008, K-017, the edge-reference half of K-022, and K-023. It does NOT block journeys answerable from node-only mutations (rename, delete, team assignment) or from existing pre-built graphs where no new edge needs to be drawn, which is why K-001, K-002, K-009 (partially), K-010, and the rename half of K-022 were still completed genuinely this pass. A brand-new empty draft ("Batch 1 Reusable Connected Graph Fixture", definition id `f33d0e24-3d2c-4d4e-83a2-f64ced153856`) was created in anticipation of building the reusable graph, but remains empty (never saved) since it could not be populated with edges; it is left in place, harmless, for a future pass once this limitation is resolved.
+
+### BEGIN HISTORICAL UX REVALIDATION K-003
+
+- **Canonical intent:** The Builder allows saving and publishing a graph where an Approval node intentionally has no team assigned; the UI does not force a team selection.
+- **Exact user-visible assertion:** A published, active workflow version can contain an Approval node with `responsible_team_id` left null.
+- **Persona required:** Workflow Admin.
+- **Persona used:** Real admin account.
+- **Fixture required:** An existing valid graph with a team-less Approval node, or a fresh one authored and published in this pass.
+- **Fixture used:** Existing "WF-TEST M-006/J-019/M-002 Onboarding Null-Team Single Approval" (Published, Active, Customer Onboarding), Version 1, containing a node literally named "Null-Team Approval".
+- **Page opened:** `/settings/workflows/0a8560dd-ffec-4883-9061-74da6480ef7e/versions/389732d0-831c-45ee-8e84-f15d6a8e449b`
+- **Exact browser actions performed:** Navigated directly to the published version's canvas URL; confirmed via the DOM that exactly 3 nodes render (Start, "Null-Team Approval", End). Attempted to click the "Null-Team Approval" node specifically to open its properties panel and read the Responsible Team field, but all 3 nodes render stacked at an identical, non-laid-out position on this read-only published-version canvas (confirmed via `getBoundingClientRect` — all 3 share the same coordinates), and the topmost node in z-order ("End") intercepts every click at that point, per `elementFromPoint`. The canvas has no ADD NODE panel or Save Draft control in this read-only published view, and dragging to separate the nodes is blocked by the drag limitation documented above.
+- **Actual rendered result:** The node's existence and name ("Null-Team Approval") is confirmed directly from the DOM, and the fact that this version is Published and Active is direct proof the save-and-publish path already succeeded historically with this node's team left null (publish-time validation would have rejected an invalid graph, and no validation rule requires team assignment). However, the specific UI assertion (Responsible Team field visibly showing "None" in the properties panel) could not be exercised this pass due to the node-overlap rendering issue on this read-only view combined with the drag limitation preventing separation.
+- **Expected result:** Responsible Team field shows "None"/blank for this node; publish succeeded historically.
+- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: genuine confirmation via DOM that a team-less Approval node exists in an actually-published, actually-active version (strong indirect evidence the assertion holds, since publish-time validation runs server-side and does not require team_id). Not yet covered: the specific properties-panel "None" rendering, blocked by node-overlap + drag limitation.
+- **Existing server/control evidence:** The version's Published/Active status itself, read directly from the Settings > Workflows list and the version table, is genuine control evidence (not inferred from words like "verified" — it is the actual server-recorded status of a real row).
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A this pass.
+- **Journey Discovery observation:** ALREADY COVERED for the core assertion (team-less node can be published); EXPAND EXISTING JOURNEY for the properties-panel visual confirmation, blocked by the canvas limitation above, scheduled for a future pass once resolved.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-003 (PARTIAL)
+
+### BEGIN HISTORICAL UX REVALIDATION K-004
+
+- **Canonical intent:** The decision-edge condition editor's field dropdown is limited to SUPPORTED_DECISION_FIELDS (today, only "segment").
+- **Manual UX result:** BLOCKED (this pass). Exercising this requires selecting an existing conditioned edge on a Decision node to open its condition editor. The existing candidate fixtures with this edge shape ("WF-TEST J004 not_equals routing", "WF-TEST J005 two-conditioned plus fallback") were not reached this pass; the canvas click/drag reliability limitation documented above (surfaced while attempting the adjacent K-003 investigation on a similarly-shaped read-only canvas) made it unsafe to assume further canvas interaction this pass would produce genuine, trustworthy evidence rather than a false negative from tooling noise.
+- **Journey Discovery observation:** ALREADY COVERED historically per the coverage register; EXPAND EXISTING JOURNEY scheduled for the next pass once the canvas limitation is resolved, using the existing "WF-TEST J004 not_equals routing" fixture (no new edge construction needed, only a click on its existing conditioned edge).
+- **Permanent ledger updated:** Yes (this entry, correcting nothing — no prior overbroad claim existed for K-004 this pass).
+
+### END HISTORICAL UX REVALIDATION K-004 (BLOCKED — tooling)
+
+### BEGIN HISTORICAL UX REVALIDATION K-005
+
+- **Canonical intent:** The decision-edge operator dropdown offers only equals/not_equals.
+- **Manual UX result:** BLOCKED (this pass), same reasoning and same candidate existing fixture as K-004 above (the operator dropdown lives in the same edge condition editor).
+- **Journey Discovery observation:** EXPAND EXISTING JOURNEY, scheduled alongside K-004 for the next pass.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-005 (BLOCKED — tooling)
+
+### BEGIN HISTORICAL UX REVALIDATION K-007
+
+- **Canonical intent:** A Decision node with fewer than 2 outgoing edges is blocked at save/publish.
+- **Manual UX result:** BLOCKED (this pass). Requires selecting and deleting one edge from an existing 2-edge Decision node, attempting Validate & Publish, confirming the block, then reloading without saving to discard — a multi-step canvas sequence that the click-reliability limitation above makes untrustworthy to attempt this pass without risking a false result.
+- **Journey Discovery observation:** REGRESSION TEST ONLY / EXPAND EXISTING JOURNEY, scheduled for the next pass.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-007 (BLOCKED — tooling)
+
+### BEGIN HISTORICAL UX REVALIDATION K-008
+
+- **Canonical intent:** A Decision node with 2+ unconditioned (fallback) edges is blocked at save/publish.
+- **Manual UX result:** BLOCKED (this pass), same reasoning as K-007.
+- **Journey Discovery observation:** REGRESSION TEST ONLY / EXPAND EXISTING JOURNEY, scheduled for the next pass.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-008 (BLOCKED — tooling)
+
+### BEGIN HISTORICAL UX REVALIDATION K-017
+
+- **Canonical intent:** A brand-new user holding only the seeded workflow_admin role can perform the complete create-definition -> create-version -> save-draft-graph -> publish -> activate lifecycle unassisted.
+- **Manual UX result:** BLOCKED (this pass). This journey fundamentally requires authoring a NEW connected graph (at minimum Start -> End with a real edge) from scratch, which requires working edge-drawing drag — confirmed non-functional in 3 independent, disciplined fresh-tab attempts this pass (see diagnostic note above). A definition and empty draft version were created ("Batch 1 Reusable Connected Graph Fixture") in anticipation of this journey but could not be populated with any edge.
+- **Journey Discovery observation:** ALREADY COVERED historically per the coverage register; REGRESSION TEST ONLY, scheduled for the next pass once the drag limitation is resolved.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-017 (BLOCKED — tooling)
 
 ### BEGIN HISTORICAL UX REVALIDATION K-023
 
@@ -1034,7 +1108,7 @@ overwriting the original backfilled entries above.
 - **Existing server/control evidence:** None.
 - **Defect found?:** No (assertion not yet tested).
 - **Fix/retest:** N/A.
-- **Journey Discovery observation:** NEW JOURNEY REQUIRED is not applicable, this is the original K-023 journey itself, still pending; scheduled against the reusable connected fixture built later in this batch pass, once a node with real incoming/outgoing edges exists to delete.
+- **Journey Discovery observation:** NEW JOURNEY REQUIRED is not applicable, this is the original K-023 journey itself, still pending; blocked this pass by the same canvas drag/click reliability limitation documented under the K-009 diagnostic note, scheduled for the next pass once a node with real incoming/outgoing edges can be constructed.
 - **Permanent ledger updated:** Yes (this entry, correcting the prior overbroad PASS claim for K-023).
 
 ### END HISTORICAL UX REVALIDATION K-023 (BLOCKED pending reusable edge fixture)
