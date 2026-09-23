@@ -87,8 +87,21 @@ For every required persona, confirm before execution, not mid-batch:
   (verified via the app's own User Access page, never assumed from a prior batch)
 - a legitimate authentication method exists for that persona (this codebase has no self-service
   signup and no dev-mode auth bypass; every fictional persona's login is provisioned via the
-  Supabase Auth Admin API, historically through the scripts under `scripts/seed-*fixtures.ts`, never
-  through a raw `auth.users` insert or a derived/reset password read by the agent)
+  Supabase Auth Admin API, never through a raw `auth.users` insert or a derived/reset password read
+  by the agent)
+
+**Canonical persona set (2026-09-23 onward)**: the original `scripts/seed-*fixtures.ts` personas
+(`wf-test.*`, `nexus.e2e.*`) were retired on 2026-09-23 (`scripts/retire-old-test-personas.ts`) after
+their passwords were lost with no durable credential store; their `app_users` history remains fully
+intact and queryable, only their interactive logins and active role/team grants were removed. The
+canonical replacement is the smaller, purpose-derived set provisioned by
+`scripts/provision-canonical-test-personas.ts`: `nexus-test-maker@example.test` (Maker, no approve
+permission), `nexus-test-finance@example.test` and `nexus-test-legal@example.test` (Checker, on the
+existing WF-TEST Finance/WF-TEST Legal teams respectively), and `nexus-test-restricted@example.test`
+(no roles, no teams). That script must be run by a human, in their own terminal, never by the agent,
+since it prints each persona's password once; a future persona need not reuse this exact set if a
+batch's own journeys genuinely require something this set doesn't cover, but do not create a new
+persona merely because it sounds useful.
 - a real browser session can actually be established for that persona
 - its role, permissions, team membership, and scope are correct for what the journey needs
 - if two or more personas are needed at the same time (a maker and an approver in the same
