@@ -2,7 +2,7 @@ import "server-only"
 
 import * as documentsData from "../data/documents.data"
 import { listDocumentsForGoLiveRequest } from "../data/go-live.data"
-import { validateAttachmentFile } from "@/features/customer-onboarding/domain/documents"
+import { validateAttachmentFile, matchesAllowedAttachmentSignature } from "@/features/customer-onboarding/domain/documents"
 import type { PersistedGoLiveDocumentMetadata, GoLiveDocumentType } from "../domain/types"
 import type { GoLiveDocumentRow } from "../data/go-live-row-types"
 
@@ -58,6 +58,17 @@ async function uploadGoLiveDocument(input: UploadGoLiveDocumentInput): Promise<P
   const validation = validateAttachmentFile({ name: input.file.name, type: input.file.mimeType, size: actualSizeBytes }, "This document")
   if (!validation.valid) {
     throw new InvalidGoLiveDocumentError(validation.reason)
+  }
+
+  // Q-021 (Batch 23, found and fixed): validateAttachmentFile only
+  // re-confirms the caller-declared name/mimeType, both just labels the
+  // caller attached; a disguised file (real bytes of a different,
+  // disallowed format, renamed with an allowed extension) would still
+  // pass it. This additionally reads the file's own first bytes,
+  // matching onboarding's own documents.service.ts defense-in-depth.
+  const firstBytes = new Uint8Array(await input.file.bytes.slice(0, 4).arrayBuffer())
+  if (!matchesAllowedAttachmentSignature(firstBytes)) {
+    throw new InvalidGoLiveDocumentError(`'${input.file.name}' does not appear to be a genuine PDF or JPEG file. Allowed file types are PDF, JPG and JPEG.`)
   }
 
   const documentId = crypto.randomUUID()
