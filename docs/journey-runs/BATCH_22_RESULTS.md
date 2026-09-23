@@ -1110,6 +1110,8 @@ None newly disposed this run beyond what was already documented (Q-013/Q-014's C
 - Recommendation: Option A (leave as-is). A customer legal-entity rename is a much rarer, more consequential event than an individual's display-name change, is itself a fully governed, auditable Customer Change Request in this system (unlike a casual profile-name edit), and Pack S's former-name search already gives auditors a correct way to resolve "what was this customer called before." Adding a second, narrower snapshot mechanism duplicates that capability for one specific view without a demonstrated real confusion this run encountered.
 - Dependency: none; either option is implementable independently of any other open item.
 
+**DECIDED [PD-007, 2026-09-23]: Option A.** Utkarsh confirmed: keep the current live-resolution behavior; do not add a customer-name snapshot mechanism. Closed and documented in `docs/CUSTOMER_LIFECYCLE.md` §19b, alongside §19a's actor-identity model, so the divergence between the two (customer names live-only, actor names live-plus-frozen-snapshot) is explained rather than left to look like an inconsistency. No code change required (the decision ratifies already-live behavior). This closure does not alter Batch 22's historical arithmetic: R-012 itself already executed and closed PASS during batch execution; this is the closure of the policy question R-012 surfaced, not a re-execution of R-012.
+
 ## Reconstructability
 
 1. Every scheduled journey (all 25) has permanent ledger evidence in this file (BEGIN/END blocks above).

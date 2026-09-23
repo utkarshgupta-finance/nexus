@@ -876,6 +876,59 @@ unified that), so this same optional-input pattern was applied there
 directly rather than forcing an unrelated refactor into this task's
 scope.
 
+### 19b. Customer names in Timeline/page display resolve live, never a snapshot: DECIDED [PD-007, IMPLEMENTED, 2026-09-23]
+
+R-012 (Batch 22 Journey Universe execution, `docs/journey-runs/BATCH_22_RESULTS.md`)
+asked a question the original design never explicitly settled: after a
+Change Request has been approved, and the same customer is later
+renamed via a separate, later Change Request, does that first Change
+Request's Timeline/page display show the customer's name as it was at
+the time (a frozen snapshot, mirroring §19a's actor-identity model,
+`audit_log.actor_display_name_snapshot`), or the customer's current
+name?
+
+Direct code inspection found the current, already-live behavior: no
+customer-name snapshot column or mechanism exists anywhere in the
+schema; `RequestTimelineEvent` never includes the customer name at all
+(the name shown near a Change Request's Timeline is a page-header
+field, resolved fresh via `getCustomerByKey`/`getCustomerById` on every
+render, in both
+`src/app/customers/[customerKey]/change-requests/[requestId]/page.tsx`
+and `src/app/reviews/change-requests/[requestId]/page.tsx`).
+
+**Decision: keep this behavior. Customer names in Customer Change
+Request Timelines (and the surrounding page display) are resolved live
+from the current Customer Master record. Historical customer-name
+snapshots are not maintained. Historical renames remain discoverable
+through the governed customer-name history / former-name search
+(§7, `findCustomersByFormerName`).**
+
+This is a deliberate divergence from §19a's actor-identity model, not
+an oversight to reconcile toward parity:
+
+- The customer record itself is unchanged by a rename; a rename is an
+  edit to one field of an existing, continuously-identified entity, not
+  a new identity replacing an old one the way §19a's concern (which
+  individual acted) is about a specific person's identity at a specific
+  moment.
+- A customer legal-entity rename is itself a governed, fully auditable
+  Customer Change Request (this very journey's own subject), unlike an
+  individual casually editing their own display name; the "when did the
+  name change and why" question is already answered by that Change
+  Request's own record, not lost.
+- §7's former-name search already gives an auditor a correct,
+  purpose-built way to resolve "what was this customer called before,"
+  without needing a second, narrower snapshot mechanism duplicated onto
+  every Timeline event.
+- A customer-name snapshot column would add schema and historical-data
+  complexity (write-once-per-event storage, migration/backfill
+  questions for pre-existing rows) without a demonstrated control gap
+  it would close.
+
+No code change results from this decision (the behavior it ratifies was
+already live); this section exists so the question is not silently
+reopened by a future audit.
+
 ## 20. UX operating system consistency across the three review screens: PARTIAL (Platform Scale Closure, Phase J)
 
 A cross-screen UX audit (Onboarding/Customer Change/Commercial Version
