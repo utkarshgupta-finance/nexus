@@ -1170,3 +1170,125 @@ None disposed this run.
 3. No new journeys were created this run (S-013 was expanded in place in `NEXUS_JOURNEY_UNIVERSE.md`, not assigned a new ID); this expansion is recorded there permanently. **Yes.**
 4. No execution evidence exists only in this conversation: all SQL findings, code reads, and their conclusions are transcribed into this ledger; all code/test/migration/doc changes are in git history. **Confirmed.**
 5. Another engineer could reconstruct this batch from the repository alone: this ledger, the git commit history, the new `src/lib/uuid.ts`/test file, the go-live service fix, and the updated `NEXUS_JOURNEY_UNIVERSE.md` entries together contain every finding, fix, and piece of evidence produced this run. **Yes.**
+
+---
+
+# EVIDENCE STANDARD CORRECTION (2026-09-23)
+
+Utkarsh identified, while observing this run, that no genuine browser/persona interaction had
+occurred anywhere in this batch, and that several user-visible journeys above were classified
+PASS (or EXPECTED BEHAVIOUR) on the strength of code inspection, SQL, RPC calls, or automated
+tests alone. This is a legitimate correction. The rule below is now applied retroactively to
+every Batch 23 journey and will apply going forward.
+
+## The corrected rule
+
+If a journey's canonical assertion is user-visible (what a user sees, rendered status, Timeline
+presentation, button/action availability, form behaviour, validation messages, My Work/
+Operational Queue bucket placement, empty states, document rendering/download UX, supersession
+presentation, visible audit history, accessibility semantics, page behaviour), it cannot be
+classified PASS without genuine browser/manual evidence:
+
+- Browser evidence exists → `MANUAL UX VERIFIED`, with what was actually navigated/clicked/observed.
+- Browser evidence does not exist → `MANUAL UX TOOLING-BLOCKED`, and the journey's final
+  classification becomes `DEFERRED — MANUAL UX TOOLING-BLOCKED`, unless the canonical journey
+  explicitly allows non-browser evidence.
+
+If the canonical journey is specifically about a DB constraint, RPC authorization, uniqueness,
+locking, concurrency, schema, audit persistence, immutable history, migration behaviour,
+server-side trust boundary, or server-side document validation, real server/DB execution remains
+sufficient; no browser interaction is required or was skipped.
+
+Source inspection, SQL, RPC calls, and automated tests are never relabeled as manual UX evidence.
+They are preserved below under their own honest labels (`SOURCE INSPECTED`, `DATABASE VERIFIED`,
+`SERVER/RPC VERIFIED`, `AUTOMATED VERIFIED`) exactly as originally gathered; nothing is erased.
+
+## Verification performed before reclassifying
+
+Checked, this run, for a legitimate already-authenticated session before concluding none exists:
+navigated to `http://localhost:3000/my-work` (redirected to the sign-in page) and to
+`https://nexus-git-team-preview-utkarshgupta-finance.vercel.app/my-work` (same). No session
+exists on either surface. Per the standing restriction, no credential was searched for, derived,
+or reset. Every user-visible journey below is therefore genuinely `MANUAL UX TOOLING-BLOCKED`,
+not a shortcut.
+
+## Reclassification: which journeys are exceptions (server/control, unaffected)
+
+| Journey | Why it is a genuine server/control exception |
+| --- | --- |
+| Q-021 | Canonical assertion is entirely server-side ("validate the actual uploaded file content/byte signature"); its own Journey Universe entry has no rendering claim (UX Checks: N/A). Real pre-fix reproduction and post-fix automated test are the correct evidence type. |
+| R-015 | Canonical assertion is a query-layer cap/ordering mechanism (schema-adjacent), not a rendering claim. |
+| R-016 | Explicitly named exception category: DB constraint / audit persistence / immutable history. Executed live, directly against the real database. |
+| S-005 | Canonical assertion is server-side robustness/injection-safety ("never a 500 or a data leak"), a trust-boundary property, not what a user sees in results. |
+
+## Reclassification: every other Batch 23 journey (22 of 26)
+
+All 22 remaining journeys are reclassified from their original final classification to
+`DEFERRED — MANUAL UX TOOLING-BLOCKED`. In every case, the previously-gathered server/DB/source/
+automated evidence is preserved below under its correct label; only the overall classification
+changes, reflecting that the user-visible component of the canonical assertion was never
+confirmed by opening the product.
+
+| Journey | Original classification | Preserved evidence (relabeled honestly) | Corrected classification |
+| --- | --- | --- | --- |
+| R-013 | EXPECTED BEHAVIOUR | SOURCE INSPECTED (no Timeline tab in `customer-master-detail.tsx`) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| R-014 | EXPECTED BEHAVIOUR | SOURCE INSPECTED (no Timeline UI in settings areas) + DATABASE VERIFIED (real audit_log row counts) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| R-017 | PASS | SOURCE INSPECTED (fresh grep, snapshot columns never read by Timeline code) + DATABASE VERIFIED (real snapshot row re-queried) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| R-018 | PASS | DATABASE VERIFIED (unbounded `text` columns) + AUTOMATED VERIFIED (new verbatim-passthrough test) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| R-019 | PASS | SOURCE INSPECTED (single shared `RequestTimeline` component confirmed via grep across all 4 domains) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| R-020 | PASS | DATABASE VERIFIED (real live rename + revert of one actor mid-cycle, confirmed via SQL before/during/after) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-001 | PASS | AUTOMATED VERIFIED (real `filterCustomerMasterEntries` execution, new tests) + SOURCE INSPECTED (server-side, in-memory) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-002 | PASS | AUTOMATED VERIFIED (4 new tests) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-003 | PASS | DATABASE VERIFIED (real multi-rename customer history query) + SOURCE INSPECTED (merge/dedup logic) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-004 | PASS | SOURCE INSPECTED (distinct empty-state branch) + AUTOMATED VERIFIED (existing test) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-006 | PASS | AUTOMATED VERIFIED (existing real, passing authorization test) + SOURCE INSPECTED (structural no-duplication guarantee) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-007 | PASS | AUTOMATED VERIFIED (7+ existing real, passing tests) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-008 | PASS | SOURCE INSPECTED (deliberate "no duplicates" design comment) + AUTOMATED VERIFIED (existing tests) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-009 | PASS | AUTOMATED VERIFIED (existing real, passing tests) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-010 | PASS | SOURCE INSPECTED (aggregation/labeling) + AUTOMATED VERIFIED (`inbox.test.ts`) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-011 | PASS | SOURCE INSPECTED (real `AuthGate` permission gate, already the same shared component used everywhere) + AUTOMATED VERIFIED (`operational-queue.test.ts`) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-012 | PASS | SOURCE INSPECTED (all 4 routes load from URL id directly) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-013 | FAILED THEN FIXED + PASS | **The server-side defect itself remains genuinely confirmed, not weakened**: reproduced live via direct SQL (`22P02`), root-caused, fixed, regression-tested (`SERVER/DB VERIFIED` + `AUTOMATED VERIFIED`, 6 passing tests). What is not confirmed is the final rendered not-found page a real user would see. | DEFERRED — MANUAL UX TOOLING-BLOCKED (defect fix confirmed server-side; rendered confirmation outstanding) |
+| S-014 | PASS | SOURCE INSPECTED (direct comparison of `notFound()` and `AuthGate`'s denial branch; the two ARE structurally different, a real finding) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-015 | PASS | SOURCE INSPECTED (`force-dynamic`, no client cache across the 3 routes) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-016 | PASS | SOURCE INSPECTED (link href scoped to `context.commercialConfigurations[0]?.id`) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+| S-017 | PASS | SOURCE INSPECTED (link href scoped to `record.key`) | DEFERRED — MANUAL UX TOOLING-BLOCKED |
+
+No server work is rerun for this correction; every existing piece of evidence above was already
+gathered and is simply relabeled honestly and carried into the corrected classification.
+
+## Corrected Batch 23 classification reconciliation
+
+| Classification | Count | Journeys |
+| --- | --- | --- |
+| PASS | 3 | R-015, R-016, S-005 |
+| FAILED THEN FIXED + PASS | 1 | Q-021 |
+| DEFERRED — MANUAL UX TOOLING-BLOCKED | 22 | R-013, R-014, R-017, R-018, R-019, R-020, S-001, S-002, S-003, S-004, S-006, S-007, S-008, S-009, S-010, S-011, S-012, S-013, S-014, S-015, S-016, S-017 |
+| EXPECTED BEHAVIOUR | 0 | — |
+| PRODUCT GAP | 0 | — |
+| PRODUCT DECISION | 0 | — |
+
+`3 + 1 + 22 + 0 + 0 + 0 = 26 = Scheduled journeys.` Reconciles exactly.
+
+## Summary counts requested
+
+- **Journeys genuinely browser-tested this run: 0.** No legitimate authenticated session existed
+  on `localhost:3000` or the deployed preview at any point in this run; none was created or
+  derived, per the standing restriction.
+- **Journeys server/DB-only by design (correctly requiring no browser evidence): 4** — Q-021,
+  R-015, R-016, S-005.
+- **Journeys deferred because manual UX was unavailable: 22** — every other scheduled journey in
+  this batch.
+
+## What DEFERRED means going forward
+
+Every journey marked `DEFERRED — MANUAL UX TOOLING-BLOCKED` above has its server/DB/source/
+automated evidence permanently preserved in its own `BEGIN`/`END` block earlier in this file.
+None of that work needs to be repeated. What remains outstanding, for all 22, is exactly one
+thing: opening the real product in an authenticated browser session and confirming the specific
+user-visible claim each journey makes (a rendered Timeline entry, a My Work bucket placement, a
+search result list, a clicked link landing on the right page, and so on). This is unblocked the
+moment a legitimate authenticated session becomes available; nothing else needs to change.
+
+The one already-raised Product Decision (S-014) is unaffected by this correction and remains
+open.
