@@ -988,14 +988,14 @@ overwriting the original backfilled entries above.
 - **Exact browser actions:** Selected the Decision node by clicking it (confirmed via its `selected` CSS class becoming true), typed "Decision Renamed K022" into the Name field in the properties panel, clicked Save Draft, waited for the "Draft saved." confirmation, then opened the same version URL in a brand new tab to force a genuine server fetch.
 - **Actual rendered result:** The canvas rendered a node labeled "Decision Renamed K022" both immediately after saving and after the fresh reload in a new tab.
 - **Expected result:** The renamed label persists and is what the server returns on a fresh load.
-- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: the rename-and-persist mechanic (typing a new Name and having it survive Save Draft plus a fresh reload). Not yet covered: the canonical assertion's edge-reference half ("updates all local edge references in memory... saving persists the fully consistent new state") because this fixture had no edges at the time of this pass.
-- **Existing server/control evidence:** None needed separately; the rename and its persistence were both observed directly.
+- **Manual UX result:** MANUAL UX VERIFIED — PARTIAL. Covered: (1) the rename-and-persist mechanic (typing a new Name and having it survive Save Draft plus a fresh reload); (2) the edge-reference half of the canonical assertion, verified on the existing "UX Verification Workflow" Version 2 fixture (`/settings/workflows/30f6cc66-6c8a-4915-8e2f-f819fd29034d/versions/860ae0c5-3a1f-4f15-ac29-237c94bc76a1`) by renaming its "Decision" node (which had one real incoming edge from Approval and one real outgoing edge to End) to "Decision Renamed K022 Edge Test", saving, and confirming via a genuine fresh-tab reload that both edges still rendered correctly connected to the renamed node — no dangling or broken edge reference. Not exactly covered: the canonical journey's literal "2 incoming and 2 outgoing edges" starting-state shape (this pass used a 1-incoming/1-outgoing node instead, since no existing fixture with the exact 2-in/2-out shape was found and building one requires the still-blocked new-edge drag); the underlying mechanic being tested (edge references survive a node rename) is the same regardless of edge count, so this is judged a faithful, if not literally identical, expansion.
+- **Existing server/control evidence:** None needed separately; both the rename and the surviving edge connections were observed directly via genuine page reloads.
 - **Defect found?:** No.
 - **Fix/retest:** N/A.
-- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic; the edge-reference half is EXPAND EXISTING JOURNEY, blocked this pass by the canvas drag/click reliability limitation documented under the K-009 diagnostic note (a node with 2 incoming and 2 outgoing edges could not be constructed), scheduled for the next pass.
+- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic and for the edge-reference mechanic in substance; EXPAND EXISTING JOURNEY remains open only for the literal 2-in/2-out topology, scheduled for a future pass once new-edge construction is unblocked.
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION K-022 (PARTIAL, remainder tracked below)
+### END HISTORICAL UX REVALIDATION K-022
 
 ### BEGIN HISTORICAL UX REVALIDATION K-009
 
@@ -1148,19 +1148,19 @@ Continuing this same pass per the user's explicit continuous-execution directive
 - **Persona required:** Workflow_Admin-equivalent (write access to workflow_definition).
 - **Persona used:** Real admin account.
 - **Fixture required:** A Draft version with a node that has both an incoming and an outgoing edge.
-- **Fixture used (this pass):** "Batch 1 UX Revalidation Fixture" Draft Version 1, but the deleted node (an "End" node) had no edges connected to it at the time, since edge-drawing had not yet succeeded on this fixture.
-- **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`
-- **Exact browser actions:** Same delete-and-save sequence recorded under K-009 above.
-- **Actual rendered result:** The node disappeared and stayed gone after reload, but this does not exercise K-023's specific claim, since there were no edges to test for survival or auto-reconnect.
+- **Fixture used:** Existing "UX Verification Workflow" Version 2 (Draft, Go Live domain), a genuinely connected chain Start -> Form Step -> Approval -> Decision -> End. "Form Step" (`node_2`) had exactly one incoming edge (from Start) and one outgoing edge (to Approval) — the exact A -> [node] -> B shape K-023 requires.
+- **Page opened:** `/settings/workflows/30f6cc66-6c8a-4915-8e2f-f819fd29034d/versions/860ae0c5-3a1f-4f15-ac29-237c94bc76a1`
+- **Exact browser actions performed:** Confirmed the connected topology via DOM (`node_1->node_2`, `node_2->node_3`, `node_3->node_5`, `node_5->node_4`); selected the "Form Step" node, confirmed `.selected` true; clicked Delete Node; confirmed via DOM that both edges referencing `node_2` (`node_1->node_2` and `node_2->node_3`) were gone and no new edge from Start to Approval was created; clicked Save Draft, confirmed "Draft saved."; opened the same version URL in a brand-new tab to force a genuine server round-trip.
+- **Actual rendered result:** After the fresh reload, exactly 4 nodes rendered (Start, Approval, End, Decision) with Start now fully disconnected (no outgoing edge at all) and Approval -> Decision -> End intact. No edge from Start to Approval was ever created — confirming no server-side auto-reconnect.
 - **Expected result:** Neither the incoming nor outgoing edge of a deleted middle node survives the save, and no new edge is auto-created between its former neighbors.
-- **Manual UX result:** BLOCKED (this pass). The only genuine evidence obtained so far (node deletion persists) belongs to K-009, not to K-023's own canonical assertion, which specifically concerns edges. Not yet exercised at all.
-- **Existing server/control evidence:** None.
-- **Defect found?:** No (assertion not yet tested).
-- **Fix/retest:** N/A.
-- **Journey Discovery observation:** NEW JOURNEY REQUIRED is not applicable, this is the original K-023 journey itself, still pending; blocked this pass by the same canvas drag/click reliability limitation documented under the K-009 diagnostic note, scheduled for the next pass once a node with real incoming/outgoing edges can be constructed.
-- **Permanent ledger updated:** Yes (this entry, correcting the prior overbroad PASS claim for K-023).
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately; the persisted disconnected state was observed directly via a genuine fresh-tab reload.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry, superseding the prior BLOCKED classification).
 
-### END HISTORICAL UX REVALIDATION K-023 (BLOCKED pending reusable edge fixture)
+### END HISTORICAL UX REVALIDATION K-023
 
 ### BEGIN HISTORICAL UX REVALIDATION K-010
 
