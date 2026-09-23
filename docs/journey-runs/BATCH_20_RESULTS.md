@@ -671,3 +671,21 @@ during the original Pre-Batch-21 closure, without any new mutation.
 M-002, M-003, M-004, M-005, M-007, M-009, M-010, M-012 and J-024 through J-030 were not re-attempted
 this pass; M-007 specifically requires a persona who **is** a member of a responsible team, which
 this zero-team account cannot represent (see PERSONA REQUIRED list in the session report).
+
+## Journey Discovery: stale-tab click-delivery failure (2026-09-23, later session)
+
+While diagnosing an apparently-unresponsive Approve button on a real review page, a genuine
+`computer` tool click on a completely fresh, never-before-clicked fictional Customer Change Request
+(created live through the real UI as `nexus-test-maker`, reason: "Fresh fictional fixture for
+genuine UI Approve-click verification") also failed to register in that same browser tab, including
+on a purely client-side "Show All"/"Hide Unchanged" toggle with no server call at all. Opening the
+identical page in a brand-new browser tab, the same toggle and the same Submit action worked
+immediately (server state verified via direct read-only SQL: `status` moved from `draft` to
+`submitted`, `current_workflow_node_key` populated, `reason`/`effective_date` persisted correctly).
+
+**Conclusion**: this is a browser-automation-tooling limitation (a tab that has been open through
+many navigations stops delivering synthetic clicks, while page content/network/console remain
+otherwise normal), not a Nexus application defect. This matches the same pattern already recorded in
+Batch 23 (S-010's stale-tab `/approvals` hang). Classification: **REGRESSION TEST ONLY** (tooling
+note). Practical mitigation adopted for the rest of this audit: open a fresh tab before any action
+that mutates state, rather than reusing a long-lived tab.
