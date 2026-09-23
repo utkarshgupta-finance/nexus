@@ -944,3 +944,34 @@ was untouched. No additional deployment facts beyond this are recorded here.
 - **Not executed as part of Batch 1.** Placed in Pack K as a new, permanent regression journey rather than retroactively inserted into Batch 1's own 25-journey record, specifically to avoid disturbing Batch 1's already-executed count.
 - **Assigned to and executed in Batch 2.** Full execution record: `docs/journey-runs/BATCH_02_RESULTS.md`, K-030 entry. Final Status there: PASS (the Batch 1 fix was re-proven live under repeated stress: two consecutive stale-reject-refresh-reapply cycles with new real changes landing between them, zero silent overwrites, no new defect found).
 - **Documented in:** commit `2ff63cd` ("Add K-030: Batch 1's stale-refresh regression as a permanent journey"), which also updated the Universe pack index, Coverage Matrix, and Execution Plan (Batch 2 became a 26-journey batch; 783 current-executable journeys total).
+
+---
+
+## Historical Manual UX Revalidation (2026-09-23)
+
+Per the program-wide stricter Manual UX standard, journeys whose Batch 1 evidence
+was "Not historically captured" or otherwise not a genuine browser observation
+are being re-executed live and recorded here as append-only additions, never
+overwriting the original backfilled entries above.
+
+### BEGIN HISTORICAL UX REVALIDATION K-001
+
+- **Batch:** 1
+- **Canonical intent:** The node palette on the Workflow Builder canvas offers exactly the five supported node types; a sixth/unsupported type is only reachable via a direct API bypass and is rejected server-side.
+- **Exact user-visible assertion:** The "Add Node" palette renders exactly five buttons, labeled Start, Form Step, Approval, Decision, End, no more and no fewer.
+- **Required persona:** Workflow_Admin-equivalent (write access to workflow_definition).
+- **Actual persona used:** Real admin account (utkarsh.gupta@mobisy.com), which holds workflow_definition.write.
+- **Required fixture:** Any workflow definition with an editable (Draft) version.
+- **Actual fixture used:** "BATCH2 K-Series Builder Mechanics" (Customer Change, definition id `3ab610ce-6423-42bd-9689-4b6628c05301`), existing Draft Version 1.
+- **Page opened:** `/settings/workflows/3ab610ce-6423-42bd-9689-4b6628c05301/versions/48d557e9-38ef-4ff2-ad18-b2a0183c282c`
+- **Exact browser actions:** Navigated to the version's canvas editor in a fresh browser tab; read the rendered "ADD NODE" panel via the accessibility tree and confirmed via screenshot.
+- **Actual rendered result:** Five buttons rendered in the ADD NODE panel, in this order: "Start", "Form Step", "Approval", "Decision", "End". No sixth option, no fewer.
+- **Expected result:** Exactly five node-type buttons, matching the five supported types.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** Unchanged from the original entry (direct API bypass with an unsupported type rejected by the DB check constraint); not re-executed this pass, only the client-side palette-count assertion was in scope for this revalidation.
+- **Defect found?:** No.
+- **Fix/retest:** N/A.
+- **Journey Discovery observation:** Clicking the "Approval" palette button live added a new node to the canvas (visually confirmed via screenshot), demonstrating the palette's click-to-add mechanism works correctly; however, `read_page`'s accessibility-tree snapshot immediately after the click did not reflect the new node (it only appeared in a subsequent screenshot/`get_page_text` read). This is a tooling observation lag in this session's browser automation layer, not a Nexus defect. Recorded as a permanent methodology note: after a canvas mutation, confirm state via screenshot or `get_page_text`, not `read_page` alone, before concluding a click had no effect.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-001

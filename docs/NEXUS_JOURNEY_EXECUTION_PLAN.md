@@ -122,6 +122,17 @@ failure once in a fresh tab before ever classifying it as a product defect. Neve
 JS-dispatched synthetic click/pointer event as Manual UX evidence: that would no longer be genuine
 UI interaction, and undermines the standard this gate exists to enforce.
 
+**Stale-tab addendum (2026-09-23): tabs can go stale after only one or two actions, not just from
+long wall-clock lifetime.** Reproduced during historical UX revalidation: a genuinely fresh,
+single-navigation tab correctly delivered a click, but the very next click in that same tab (on a
+different button, same page) silently produced zero effect. Treat "stale" as a per-tab click budget
+that can be exhausted quickly, not a time-based property; if a click that should mutate state shows
+no effect, do not assume the tab is still reliable just because it worked once already, open a new
+tab for the retry. Separately, after any canvas or other client-state mutation, confirm the result via
+a screenshot or `get_page_text`, not `read_page` alone: `read_page`'s accessibility-tree snapshot has
+been observed lagging one step behind the actual DOM immediately after a mutating click, which can
+produce a false "click had no effect" reading.
+
 **Gate result.** If every required persona for the batch is available, correctly configured, and
 (where needed) session-isolated: `MANUAL UX GATE = PASS`. If any ordinary prerequisite above is
 missing: `MANUAL UX GATE = FAIL`. Do not start the batch; resolve persona readiness first.
