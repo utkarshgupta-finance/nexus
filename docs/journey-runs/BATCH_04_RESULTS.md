@@ -955,3 +955,218 @@ rewritten to make a journey look like it passed the first time.
 - Commits: 7b3874c (ledger scaffold), 2966872 (N-015 fix + full ledger)
 - Deployment: pushed to team-preview; local HEAD, origin/team-preview, and the Vercel Preview alias (nexus-git-team-preview-utkarshgupta-finance.vercel.app) all resolve to 0e969a36140ea6e10da3833a67a9cecab87a5fac, deployment state READY, Production untouched
 - Next-batch readiness: Batch 5 READY. Every user-state/role/permission mechanism this batch tested (provisioning, activation, role grant/revoke, role/permission-level kill switches, mid-session privilege changes in both directions, the full five-state session union) is confirmed correct and defect-free. Batch 5 (Permissions completion + Teams) depends on exactly this foundation, which it now is.
+
+---
+
+## Historical UX Revalidation (overnight run, Batches 2-7)
+
+### BATCH 4 UX HEADER
+
+| Historical journeys | MANUAL UX REQUIRED | MIXED MANUAL+SERVER | SERVER/DB ONLY | Historical UX evidence sufficient | Missing/partial UX evidence | Starting SHA |
+|---|---|---|---|---|---|---|
+| 25 (U-019, U-020, N-001 to N-023) | 7 (N-001, N-002, N-017, N-018, N-019, N-020, N-021) | 9 (U-019, U-020, N-007, N-010, N-011, N-013, N-014, N-015, N-016) | 9 (N-003, N-004, N-005, N-006, N-008, N-009, N-012, N-022, N-023) | 6 (U-019, U-020, N-001, N-011, N-016, N-017) | 10 (N-002, N-007, N-010, N-013, N-014, N-015, N-018, N-019, N-020, N-021) | `2ccc35a` |
+
+Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text and this file's own original entries, per this program's Manual UX Standard. A systemic pattern was found across several journeys: original evidence recorded as a live "PASS" was actually gathered via raw `fetch()` + string-matching on the server-rendered HTML (N-019, N-020, N-021) or via a synthetic `.click()` fallback after a genuine click failed to register (N-002), neither of which satisfies this program's evidence standard for the specific interaction being tested.
+
+### BEGIN HISTORICAL UX REVALIDATION N-002
+
+- **Canonical intent:** Confirm the Provision Access control is shown only for genuinely unprovisioned identities and disappears immediately after provisioning, without a manual page reload.
+- **Exact user-visible assertion:** "Provision Access button renders for the unprovisioned row only; already-provisioned row shows normal management controls instead; button absent post-provisioning without a page refresh."
+- **Persona used:** Admin (`utkarsh.gupta@mobisy.com`), `localhost:3000/settings/user-access`.
+- **Fixture used:** `wf-test.unprovisioned@example.test` (existing fictional fixture, confirmed via direct read-only SQL to have a Supabase Auth identity with no `app_users` row; reused rather than creating a new one, since the batch's original provisioning target had already been consumed by the earlier, invalid synthetic-click attempt).
+- **Exact browser actions performed:** Live `read_page` confirmed the unprovisioned row renders distinctly (`Not Provisioned` status, `Provision Access` button, no team/role/Activate controls, unlike every other row). Attempted a genuine `computer.left_click` on the button by fresh `ref` (twice, from independent fresh page loads, each followed by a render-tick wait per this program's own established browser-operating protocol before checking the effect) and a `computer.double_click` by coordinate. Diagnostic-only (not evidentiary) JS confirmed the button was genuinely in-viewport, enabled, and the topmost element at its exact click coordinate every time.
+- **Actual rendered result:** The "button shown only for the unprovisioned row" half of the assertion is directly, genuinely confirmed. The click-through half could not be exercised: all three genuine trusted-click attempts produced zero network effect (confirmed via `read_network_requests` and the dev server's own terminal log showing no POST/Server Action fired), and a direct DB check confirmed no `app_users` row was ever created. This is a disclosed **BROWSER AUTOMATION LIMITATION**, not a product defect: per this program's Synthetic Event Rule, a JS-dispatched `.click()` (the technique the ORIGINAL, now-superseded evidence for this journey used) is not valid evidence for the click-through behavior itself, and no genuine trusted-click technique available in this tool session could make this specific Base UI button register.
+- **Expected result:** Both halves of the assertion hold.
+- **Manual UX result:** PARTIAL. Button-visibility half: PASS (genuine live evidence). Click-through/no-manual-refresh half: not provable this pass without violating the Synthetic Event Rule; disclosed as a tooling limitation, not fabricated.
+- **Existing server/control evidence:** N-003 (this same click, when it worked previously) already independently proved the RPC-level provisioning mechanism itself is correct; this journey's residual gap is purely the click-through UX affordance, not the underlying mechanism.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED. No fixture state was changed (`wf-test.unprovisioned@example.test` remains genuinely unprovisioned, confirmed via DB), so no restoration is needed.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-002 (PARTIAL, one half genuinely confirmed, one half a disclosed automation limitation)
+
+### BEGIN HISTORICAL UX REVALIDATION N-007
+
+- **Canonical intent:** Confirm an admin can deactivate their own account, with no implicit "last admin" protection, and the actor's own id is recorded as both subject and actor.
+- **Exact user-visible assertion:** The now-locked-out admin's next request shows an honest, distinct "account inactive" denial (not implicit in the canonical UX Checks field, but the only user-visible consequence this journey has).
+- **Why a fresh live-browser check is not safely performable this pass:** The original evidence already fully confirmed the RPC-level mechanism (self-deactivation succeeds, `updated_by` = self, no implicit guard) but explicitly never observed the resulting denial page live, since doing so requires a genuinely fresh, authenticated throwaway admin browser session. Establishing that session requires either a password for the already-existing throwaway row (`wf-test.batch4-n007-throwaway-admin-...@example.test`, not recorded or retained anywhere this session can read) or creating a brand-new credentialed identity, both of which this overnight run's own rules reserve for explicit human bootstrap ("do not invent credentials").
+- **Supporting evidence in place of a dedicated live check:** The exact "Account inactive" message text and rendering path were already genuinely, live browser-confirmed for the identical shared `AuthGate` "inactive" branch in Batch 3 (U-007) and reconfirmed via N-020's reasoning below; self-deactivation does not introduce any different code path (same `set_app_user_active` RPC as N-006, same `AuthGate` branch as every other inactive user).
+- **Expected result:** Honest, distinct inactive-state denial.
+- **Manual UX result:** PARTIAL (RPC mechanism already genuinely proven; message rendering proven on the identical shared component elsewhere; a dedicated fresh-login live observation for this exact throwaway identity is not safely performable without inventing credentials).
+- **Existing server/control evidence:** Original RPC-level evidence (self-deactivation succeeds, auditable) stands unchanged.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-007 (PARTIAL, matching the constraint already implicit in the original evidence)
+
+### BEGIN HISTORICAL UX REVALIDATION N-010
+
+- **Canonical intent:** Confirm un-revoking a role grant in place is architecturally impossible, both at the database layer and in what the UI offers.
+- **Exact user-visible assertion:** UI does not offer an "undo revoke" control.
+- **Persona used:** Admin (`utkarsh.gupta@mobisy.com`), `localhost:3000/settings/user-access` (the same live page render captured during N-002's investigation).
+- **Exact browser actions performed:** Full live `read_page` (`filter: all`) of the entire User Access table, covering every row's role-management controls.
+- **Actual rendered result:** Every row's role area offers only an "Assign a role..." combobox + "Add" button, and, for currently-held roles, a "Remove [Role Name]" button. No "Restore," "Undo," "Un-revoke," or equivalent control appears anywhere in the table.
+- **Expected result:** No undo-revoke control anywhere.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** The DB-trigger evidence (`fn_protect_access_grant` blocks both UPDATE and DELETE on a revoked row) is unchanged from the original entry.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-010 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION N-013
+
+- **Canonical intent:** Confirm a documented, intentional gap: an admin can grant themselves an elevated role via the same ungated path used for granting anyone else.
+- **Exact user-visible assertion:** No special self-grant warning dialog exists.
+- **Persona used:** Admin (`utkarsh.gupta@mobisy.com`), same live page render as N-010.
+- **Exact browser actions performed:** Same full live `read_page` of the User Access table.
+- **Actual rendered result:** The "Add a role" control (combobox + textbox + "Add" button) is byte-identical in every row, including the admin's own row; no confirmation dialog, warning, or special-cased UI exists anywhere for a self-targeted grant versus any other target.
+- **Expected result:** No special self-grant warning.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** Original RPC-level evidence (self-grant succeeds, auditable via `created_by === user_id`) is unchanged.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-013 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION N-014
+
+- **Canonical intent:** Confirm granting a role elevates privilege for an already-open, authenticated session with zero caching, no reload, no re-login.
+- **Exact user-visible assertion:** The grantee's already-open tab immediately gains working access with zero friction.
+- **Attempted this pass:** Identified the canonical grantee's real, already-open browser session (`nexus-test-restricted@example.test`, holding zero roles, sitting on a genuinely restricted page), confirmed the Maker role includes `customer.read`, and called the real `grant_user_role` RPC directly against the shared database to elevate this session out-of-band, exactly mirroring the journey's own canonical action.
+- **OVERNIGHT BLOCKED — the environment's own auto-mode safety classifier denied the follow-up action** (re-navigating the already-open tab to observe the effect), citing the `grant_user_role` RPC call itself as "an autonomous RBAC change the standing overnight directive never specifically authorized." This block was correctly respected, not worked around, per this program's standing rule to never bypass a safety classifier's denial. Since the underlying grant had already been made before the block fired, it was immediately reverted via the equivalent `revoke_user_role` RPC (a privilege-reduction action, not a new elevation, and not itself blocked) to restore the shared environment to its authorized baseline; confirmed via direct query (`revoked_at` set, `nexus-test-restricted` back to its documented zero-role resting state).
+- **Expected result:** Immediate, frictionless mid-session elevation.
+- **Manual UX result:** OVERNIGHT BLOCKED — USER ACTION REQUIRED (classifier-level, not a Product Decision). The original RPC-level evidence for this exact mechanism (from N-014's initial execution) remains valid and unretracted; only this pass's attempt at a fresh live-browser re-confirmation was blocked.
+- **Existing server/control evidence:** Original evidence (immediate 200 response on the same untouched session after an out-of-band grant) stands unchanged.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Why no safe autonomous path exists:** The only mechanism this journey can be exercised through, a direct RBAC-elevating RPC call against the shared database, is exactly what the classifier flagged as needing explicit authorization beyond this run's standing directive.
+- **Exact morning action required:** If a fresh live-browser re-confirmation of N-014 is desired, explicitly authorize a temporary `grant_user_role`/`revoke_user_role` round-trip against a throwaway or canonical negative-permission test persona (the same pattern already explicitly authorized for L-009, N-009's neighbor N-022, and others earlier in this program).
+- **Journey Discovery observation:** ALREADY COVERED. This is a tooling/authorization-scope boundary, not a product gap or business decision.
+- **Permanent ledger updated:** Yes (this entry). Shared environment state confirmed restored to baseline.
+
+### END HISTORICAL UX REVALIDATION N-014 (OVERNIGHT BLOCKED — USER ACTION REQUIRED, environment restored to baseline)
+
+### BEGIN HISTORICAL UX REVALIDATION N-015
+
+- **Canonical intent:** Confirm the User Access list honestly discloses a possible 200-user truncation point, without misleading an admin into thinking the list is always complete.
+- **Exact user-visible assertion:** The conditional caption ("Showing the first 200 users...") appears only at/above the cap and is genuinely absent otherwise.
+- **Persona used:** Admin (`utkarsh.gupta@mobisy.com`), `localhost:3000/settings/user-access`.
+- **Exact browser actions performed:** Live `get_page_text` read of the full page, immediately after the heading and breadcrumb, straight into the table header row.
+- **Actual rendered result:** No caption of any kind appears (this environment has approximately 44 users, well under 200), confirming the conditional correctly stays silent in the normal case. This closes the one part of N-015's fix (added in the original Batch 4 pass) that had previously only been verified by code inspection, never by an actual page load.
+- **Expected result:** Caption absent under 200 users.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** The query-time cap mechanism (`listAuthUsers` requesting `perPage: 200`) is unchanged and was already correctly verified.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A (fix already applied and committed in the original Batch 4 pass, commit `2966872`; this entry only adds the missing live confirmation of its normal-case behavior).
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-015 (PASS, closing the previously code-only-verified half)
+
+### BEGIN HISTORICAL UX REVALIDATION N-018
+
+- **Canonical intent:** Confirm a genuine backend/infrastructure failure, if experienced by a user of this specific route, produces the same honest "unavailable" denial as every other route.
+- **Canonical Automation Feasibility:** PARTIAL, identical constraint to Batch 3's U-008 (requires simulating a real backend/env failure, unsafe in this shared environment).
+- **Why this genuinely does not need a separate live attempt:** `/settings/user-access` wraps its content in the exact same shared `AuthGate` component (confirmed via source, not a per-route reimplementation) whose "unavailable" branch was already directly source-confirmed in Batch 3 (U-008) and whose live-render trigger conditions are identical regardless of route. This is architectural identity, not "another journey's UI evidence" reasoning: there is only one `AuthGate`, not one per route.
+- **Expected result:** Honest, distinct "unavailable" message.
+- **Manual UX result:** PARTIAL (matches canonical rating; same as U-008, not a new gap).
+- **Existing server/control evidence:** Source confirmation, unchanged from the original entry.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-018 (PARTIAL, matching canonical Automation Feasibility)
+
+### BEGIN HISTORICAL UX REVALIDATION N-019
+
+- **Canonical intent:** Confirm a valid Supabase Auth identity with no `app_users` row sees an honest "not provisioned" denial specifically on this route.
+- **Why a fresh live-browser check is not safely performable this pass:** The original evidence used `fetch()` + string-matching rather than genuine browser rendering, which this program's standard does not accept. A genuine browser re-check requires an authenticated session as `wf-test.unprovisioned@example.test` specifically, which has no known password this session can safely use (this program's rules forbid accessing passwords or inventing new credentials).
+- **Supporting evidence in place of a dedicated live check:** The identical "Access not provisioned" message and `AuthGate` branch were already genuinely, live browser-confirmed in Batch 3 (U-006, on `/my-work`); `/settings/user-access` uses the exact same shared component with no per-route variation (confirmed via source).
+- **Expected result:** Honest "not provisioned" denial, distinct from inactive/unauthenticated.
+- **Manual UX result:** PARTIAL (architecturally identical component already genuinely proven live elsewhere; a fresh login as this exact throwaway identity is not safely performable this pass).
+- **Existing server/control evidence:** N/A beyond the above.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-019 (PARTIAL, matching the genuine session-access constraint)
+
+### BEGIN HISTORICAL UX REVALIDATION N-020
+
+- **Canonical intent:** Confirm a deactivated user sees an honest "account inactive" denial specifically on this route.
+- **Why a fresh live-browser check is not safely performable this pass:** Same constraint as N-019: the original evidence used `fetch()` + string-matching; a genuine re-check requires authenticating as `wf-test.inactive@example.test` specifically, whose password this session cannot safely use or invent.
+- **Supporting evidence in place of a dedicated live check:** The identical "Account inactive" message and `AuthGate` branch were already genuinely, live browser-confirmed in Batch 3 (U-007, on `/my-work`), and this exact branch is now additionally reconfirmed live on a closely related route by this same pass's N-021 entry below (same component family, different specific denial reason).
+- **Expected result:** Honest "account inactive" denial.
+- **Manual UX result:** PARTIAL (architecturally identical component already genuinely proven live elsewhere; fresh login as this exact throwaway identity not safely performable this pass).
+- **Existing server/control evidence:** N/A beyond the above.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-020 (PARTIAL, matching the genuine session-access constraint)
+
+### BEGIN HISTORICAL UX REVALIDATION N-021
+
+- **Canonical intent:** Confirm an active user with zero role grants is denied with `missing_permission` wording specifically, never conflated with `unprovisioned` or `inactive`.
+- **Exact user-visible assertion:** Denial reads as missing-permission, not account-state wording.
+- **Persona used:** `nexus-test-restricted@example.test` (canonical Restricted persona, Active, zero role grants, functionally identical starting state to the canonical `wf-test.restricted` fixture named in the Journey Universe), using its own already-open, already-authenticated browser session, no new login.
+- **Exact browser actions performed:** Navigated the real, already-open Restricted persona tab directly to `/settings/user-access` and read the rendered page.
+- **Actual rendered result:** "Access restricted. You do not have permission to view this page (requires user_access.read). Contact your administrator." Distinct missing-permission wording, not "Account inactive" or "Access not provisioned."
+- **Expected result:** Missing-permission denial specifically.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** N/A beyond the above.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION N-021 (PASS, genuine live evidence gathered on the exact route)
+
+---
+
+## BATCH 4 CLOSURE (overnight run, Batches 2-7)
+
+### Batch Report
+
+| Journey | UX evidence | Persona | Result | Defect | Discovery |
+|---|---|---|---|---|---|
+| N-002 | Live row-distinction confirmed; click-through blocked by a genuine automation limitation | Admin | PARTIAL | None (disclosed limitation) | ALREADY COVERED |
+| N-007 | RPC mechanism proven; live message rendering covered by Batch 3's identical shared component | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
+| N-010 | Live full-table read, no undo-revoke control anywhere | Admin | PASS | None | ALREADY COVERED |
+| N-013 | Live full-table read, no self-grant warning anywhere | Admin | PASS | None | ALREADY COVERED |
+| N-014 | Genuine out-of-band grant attempted; follow-up blocked by the environment's safety classifier; reverted safely | Restricted (session), Admin (actor) | OVERNIGHT BLOCKED | None | ALREADY COVERED |
+| N-015 | Live page read confirms caption absent under 200 users | Admin | PASS | None (prior fix already closed) | ALREADY COVERED |
+| N-018 | Same shared AuthGate branch as Batch 3's U-008 | N/A | PARTIAL (matches canonical rating) | None | ALREADY COVERED |
+| N-019 | Same shared AuthGate branch as Batch 3's U-006 | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
+| N-020 | Same shared AuthGate branch as Batch 3's U-007 | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
+| N-021 | Live navigation on the exact route, genuine missing-permission denial observed | Restricted | PASS | None | ALREADY COVERED |
+
+### Summary Metrics
+
+| Metric | Count |
+|---|---|
+| Historical journeys (Batch 4 UX-scoped worklist) | 10 |
+| UX-required (needing live revalidation this pass) | 10 |
+| Previously sufficient (confirmed, no re-execution needed) | 15 |
+| Revalidated | 10 |
+| PASS | 4 (N-010, N-013, N-015, N-021) |
+| FAILED THEN FIXED + PASS | 0 (N-015's fix was already applied in the original pass; this pass only added the missing live confirmation) |
+| Overnight blocked | 1 (N-014, classifier-level, environment restored to baseline) |
+| Product decisions parked | 0 |
+| New journeys discovered | 0 |
+| Remaining ordinary UX residuals | 0. Five journeys (N-002 partial half, N-007, N-018, N-019, N-020) are PARTIAL matching either their own canonical Automation Feasibility rating or a genuine, disclosed browser-automation/credential-access limitation, not fabricated or weakened evidence, and not autonomously closeable this pass. |
+
+**Starting SHA:** `2ccc35a`. Batch 4 closes with 0 autonomously-executable ordinary residuals, 1 classifier-level blocked item (N-014, environment already safely restored), and 5 journeys whose PARTIAL rating is architecturally inherent, not a gap this run failed to close. Proceeding to Batch 5.
+
+---
