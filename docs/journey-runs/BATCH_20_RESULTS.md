@@ -570,3 +570,104 @@ untested element (which persona sees which section) is exactly what the classifi
 establishes independently.** Park this specific piece; pick it up the moment a legitimately authenticated
 second-persona session is available (a real teammate login, an approved interactive auth step, or an explicit
 future authorization to use the reset-script credentials for login).
+
+# REAL MANUAL UX RE-VERIFICATION (2026-09-23, Batches 20-23 Manual UX audit)
+
+With a real, authenticated browser session now available (the reviewer's own real Nexus admin
+account, zero team memberships, broad global read/approve permissions), M-006 and M-008 were
+re-verified live using real, pre-existing data, no new fixtures created.
+
+## BEGIN UX REVALIDATION M-006
+
+### Persona
+Authenticated global-admin test persona (zero team memberships).
+
+### Starting page/state
+`/operations/queue` (real live data) cross-referenced against `/my-work` (real live data, same
+session).
+
+### Actions performed
+Loaded both pages; cross-referenced items appearing in both. `CC-000092` ("WF-TEST J-Decision
+Probe Co") shows Team "-" (null responsible team) on `/operations/queue`, and the same item appears
+under "Pending My Approval" on `/my-work` for this zero-team viewer.
+
+### Actual rendered result
+A real, live item with a null responsible team is classified `pending_my_approval` for a viewer who
+belongs to no teams at all, directly confirming `isResponsibleTeam`'s null-team short-circuit live,
+not merely via direct expression evaluation.
+
+### Expected result
+Matches: `responsibleTeamId === null` makes `isResponsibleTeam` true independent of `viewerTeamIds`.
+
+### UX outcome
+PASS (upgraded from direct-expression-evaluation evidence to genuine MANUAL UX VERIFIED).
+
+### Defect?
+No.
+
+### Journey Discovery observation
+None new.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION M-006
+
+## BEGIN UX REVALIDATION M-008
+
+### Persona
+Same real admin account (zero team memberships, holds `customer.approve`/`go_live.approve`, i.e.
+genuinely `canApprove = true`).
+
+### Starting page/state
+Same two pages as M-006.
+
+### Actions performed
+Cross-referenced every `/operations/queue` item carrying a non-null Team value (e.g. `CCR-000055`
+Team "WF-TEST Legal", `CCR-000050` Team "WF-TEST Finance") against `/my-work`'s "Pending My
+Approval" section for this same viewer.
+
+### Actual rendered result
+None of the non-null-team items appear under "Pending My Approval" for this viewer, despite this
+account genuinely holding `canApprove = true` domain-wide. Only the null-team items (M-006) appear.
+This is real, live, first-hand confirmation that team membership (not merely domain permission)
+gates `isResponsibleTeam`, using the current account itself as the "wrong/no team" viewer, no second
+persona required.
+
+### Expected result
+Matches exactly.
+
+### UX outcome
+PASS (upgraded from a different-persona-based confirmation to a fresh, real, live confirmation with
+the current session).
+
+### Defect?
+No.
+
+### Journey Discovery observation
+None new.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION M-008
+
+## Bonus: M-011 fix reconfirmed on new, independent real data
+
+`CC-000003` and `GLR-000003` both carry a null Team on `/operations/queue` yet appear under
+"Waiting on Others" (not "Pending My Approval") on `/my-work` for this account. Both were created
+by this same account, so the M-011 fix (`isSelfCreated` excluded from `pending_my_approval`) is
+directly, freshly reconfirmed live on a completely different real data pair than the one used
+during the original Pre-Batch-21 closure, without any new mutation.
+
+## Manual UX re-verification summary, this pass
+
+| Journey | Before | After |
+| --- | --- | --- |
+| M-006 | Direct expression evaluation | MANUAL UX VERIFIED |
+| M-008 | Different-persona classifier computation | MANUAL UX VERIFIED (current account, no second persona needed) |
+| M-011 | Verified during Pre-Batch-21 closure | Reconfirmed live on independent real data |
+
+M-002, M-003, M-004, M-005, M-007, M-009, M-010, M-012 and J-024 through J-030 were not re-attempted
+this pass; M-007 specifically requires a persona who **is** a member of a responsible team, which
+this zero-team account cannot represent (see PERSONA REQUIRED list in the session report).

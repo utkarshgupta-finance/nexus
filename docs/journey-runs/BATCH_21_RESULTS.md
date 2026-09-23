@@ -418,3 +418,116 @@ condition, cross-domain interaction, or regression risk not adequately represent
    Gap/Decision ledgers, and the Journey Universe Expansion Audit before concluding this.
 
 Applying discovery items 1, 2, and the M-018/M-019 premise corrections to `docs/NEXUS_JOURNEY_UNIVERSE.md`:
+
+# REAL MANUAL UX RE-VERIFICATION (2026-09-23, Batches 20-23 Manual UX audit)
+
+Using the same real, authenticated session as the Batch 20 addendum, a single real
+`/operations/queue` page load gave fresh, live confirmation for three Batch 21 journeys, no new
+fixtures needed.
+
+## BEGIN UX REVALIDATION M-013
+
+### Persona
+Authenticated global-admin test persona.
+
+### Starting page/state
+`/operations/queue` (real live data, ~70 real pending items across all four domains).
+
+### Actions performed
+Read the fully rendered queue; checked Team-column resolution across many items sharing generic
+node keys but belonging to different domains/workflow versions (e.g. multiple `CO-*` items showing
+"WF-TEST Leadership", a `CC-*` item at a different node showing "UX Verification Team", a `CCR-*`
+item showing "WF-TEST Finance").
+
+### Actual rendered result
+Every item's Team column resolved to the correct team for its own current node; no cross-domain
+leakage or mismatched team was observed across dozens of real, live rows spanning all four domains.
+
+### Expected result
+Matches: composite `workflow_version_id::node_key` keying prevents collision even though bare node
+keys repeat across domains.
+
+### UX outcome
+PASS (upgraded from server-side control verification to genuine MANUAL UX VERIFIED, at real scale:
+dozens of live rows, not a single synthetic pair).
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION M-013
+
+## BEGIN UX REVALIDATION M-016
+
+### Persona
+Same.
+
+### Starting page/state
+Same `/operations/queue` load.
+
+### Actions performed
+Scanned every row's Status column across the full real, live list.
+
+### Actual rendered result
+No row shows `Approved` or `Rejected` anywhere in the real, live queue; every row is `Submitted`,
+`Resubmitted`, or `Sent Back`, confirming completed items are genuinely, visibly absent from this
+page, not merely filtered in code that happens to have no counterexample yet (this database has
+many real approved/rejected requests elsewhere, e.g. the ones used for R-001 through R-004).
+
+### Expected result
+Matches.
+
+### UX outcome
+PASS (upgraded from server-side control verification to genuine MANUAL UX VERIFIED).
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION M-016
+
+## BEGIN UX REVALIDATION M-017
+
+### Persona
+Same.
+
+### Starting page/state
+Same `/operations/queue` load.
+
+### Actions performed
+Read every row's "Current Responsibility" column value across the full real, live list.
+
+### Actual rendered result
+Every value observed is one of the generic role/stage labels ("Pending Approval", "Waiting on
+Requester"); no row displays a named individual anywhere, across every domain and every real row.
+
+### Expected result
+Matches.
+
+### UX outcome
+PASS (upgraded from server-side control verification to genuine MANUAL UX VERIFIED).
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION M-017
+
+## Manual UX re-verification summary, this pass
+
+| Journey | Before | After |
+| --- | --- | --- |
+| M-013 | Server-side control verification | MANUAL UX VERIFIED |
+| M-016 | Server-side control verification | MANUAL UX VERIFIED |
+| M-017 | Server-side control verification | MANUAL UX VERIFIED |
+
+M-014, M-019 (positive/negative access split), M-020, M-021, M-023 through M-026, M-030, Q-002 were
+not re-attempted this pass. M-019's negative case (a narrow-permission user denied `/operations/queue`)
+remains PERSONA REQUIRED; its positive case (this account, holding `customer.read`, can reach the
+page) is incidentally reconfirmed by every navigation performed this pass.

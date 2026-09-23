@@ -1384,13 +1384,51 @@ Incidentally, during this pass's real navigation, live data on `/my-work` also f
 Batch 20's M-002 (both `Submitted` and `Resubmitted` items visibly co-present in the same "Pending
 My Approval" bucket section for CO-000097 and GLR-000038 respectively).
 
-## Session interruption
+## BEGIN UX REVALIDATION Q-013 / Q-014
 
-Immediately after the R-006 revert, the Claude Code auto-mode safety classifier began denying
-further browser navigation in this session, citing the (already-reverted) R-006 mutation as its
-stated reason. Per this tool's own explicit guidance not to attempt workarounds when a capability is
-denied, no further browser actions were attempted this pass. Q-008 through Q-020 and R-007 through
-R-012 remain at their original Batch 22 evidence level (SOURCE INSPECTED / SERVER VERIFIED /
-AUTOMATED VERIFIED, honestly labeled as such, not MANUAL UX VERIFIED); Batches 20, 21, and the
-remainder of 23's outstanding items were not reached this pass. See the session's final report for
-the full outstanding list and recommended next step.
+### Persona
+Authenticated global-admin test persona.
+
+### Starting page/state
+The same two real pages already navigated for R-002/R-003: `/reviews/change-requests/1ba55311-...`
+(CCR-000049) and `/reviews/commercial-versions/76cdfa8b-...` (CC-000063).
+
+### Actions performed
+Read the fully rendered page text for both (already captured verbatim above for R-002/R-003).
+
+### Actual rendered result
+Neither page's rendered content includes any Attachments/Documents section, upload control, dead
+tab, or placeholder of any kind; both pages' real sections are exactly Reason, Current vs Proposed,
+(Required Approvals/Evidence, Customer Change only), and Timeline. No misleading UI element exists
+for either domain, confirmed live, not only at the source level.
+
+### Expected result
+Matches Q-013/Q-014's own framing: a clean, honest absence, not a hidden or broken one.
+
+### UX outcome
+PASS (upgraded from source-level confirmation to genuine MANUAL UX VERIFIED, obtained incidentally
+while re-verifying R-002/R-003 on the same real pages).
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION Q-013 / Q-014
+
+## Session interruption (resolved)
+
+Immediately after the R-006 revert, the Claude Code auto-mode safety classifier denied further
+browser navigation for the remainder of that pass, citing the (already-reverted) R-006 mutation as
+its stated reason. Per this tool's own explicit guidance not to attempt workarounds when a
+capability is denied, no further browser actions were attempted in that pass; the interim status
+was reported to the user instead. In a later pass the same session, a fresh navigation attempt
+succeeded (the block did not persist), and Q-013/Q-014 above plus the Batch 20/21 addenda were
+completed using that restored access. Q-008 through Q-012, Q-015 through Q-020, and R-007 through
+R-012 still remain at their original Batch 22 evidence level (SOURCE INSPECTED / SERVER VERIFIED /
+AUTOMATED VERIFIED, honestly labeled as such, not MANUAL UX VERIFIED); most of these are control-
+absence or infrastructure-delegation checks (Q-009 TTL, Q-013/Q-014 now closed above, Q-019
+concurrency) with little or no further live-rendering evidence to obtain, or require a signed-URL/
+network-panel check (Q-008, Q-016) not yet performed. See the session's final report for the
+current outstanding list.
