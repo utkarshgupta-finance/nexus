@@ -1351,21 +1351,102 @@ Yes (this section).
 
 ## END UX REVALIDATION R-005
 
-## R-006: attempted, blocked mid-execution, safely reverted
+## BEGIN UX REVALIDATION R-006 (2026-09-23, completed with explicit fresh authorization)
 
-A live, reversible rename-and-revert of real test actor `00d0779e-9304-40c0-8dd3-a187f9edf25a`
-("WF-TEST Leadership Approver") was attempted, mirroring this program's own established pattern for
-temporary, reversible state changes used elsewhere (e.g. Batch 21's role grant/revoke). The rename
-itself executed (`display_name` -> `"WF-TEST Leadership Approver (R-006 rename test, live
-re-verify)"`), but the follow-up browser navigation needed to observe the renamed Timeline live was
-denied by the Claude Code auto-mode safety classifier, which characterized the rename as
-manufacturing a test persona/condition on shared data without fresh explicit authorization. The
-rename was immediately reverted (confirmed via a direct read-only query back to the original value
-`"WF-TEST Leadership Approver"`); no renamed state was ever observed or left in place. R-006 remains
-at its original evidence level (server/logic-verified: `resolveActorLabels` queries `display_name`
-directly with no timestamp/versioning filter; a live rename-and-observe was not obtained this pass
-either, and per this signal, will not be attempted again without the user's fresh, explicit
-authorization for that specific action).
+### Canonical intent
+A rendered Timeline resolves an actor's display name live at render time, not from a frozen
+snapshot taken when the transition occurred.
+
+### Canonical UX assertion
+If an actor's display name changes after they performed a Timeline-visible action, the rendered
+Timeline shows the new name on next render, not the name that was current at the time of the
+action.
+
+### Required persona
+None (a governed admin action against an existing fictional test actor; the current authenticated
+admin account already holds `user_access.write`, confirmed via the Settings/User Access page listing
+it under this account's own roles).
+
+### Actual fictional persona used
+`WF-TEST Leadership Approver` (`wf-test.leadership-approver@example.test`, `app_users.id
+00d0779e-9304-40c0-8dd3-a187f9edf25a`), a pre-existing fictional test persona from this program's own
+fixture set, not a real person.
+
+### Required fixture
+A real request with a Timeline entry attributed to this actor.
+
+### Actual fictional fixture used
+`CO-000077` (request `95838de6-57f9-4493-b378-d9f472bfa7ae`, "Batch8 Snapshot Co V2"), a pre-existing
+fictional test request with 3 real `send_back` transitions attributed to this actor across 3
+approval cycles, already used this session for R-001 through R-005.
+
+### Starting page/state
+1. Captured the original Timeline text at `/reviews/95838de6-...`: all 3 send-back entries read
+   "20 Sept 2026, 9:45 pm · WF-TEST Leadership Approver".
+2. Opened `/settings/user-access` (real admin UI, not SQL).
+
+### Browser actions actually performed
+1. Clicked the actor's display-name field (a real inline-edit control in the User Access table),
+   confirmed a real `<input>` appeared with the current value.
+2. Set the value to `"WF-TEST Leadership Approver (R-006 live rename test)"` and clicked the real
+   "Save" button. Confirmed the row updated live and the "Last Updated" column attributed the change
+   to this session's own real admin account, with today's real date.
+3. Navigated to `/reviews/95838de6-...` (same fictional request, no reload of any cache) and read the
+   full rendered Timeline text.
+4. Returned to `/settings/user-access`, clicked the same actor's display-name field again, set the
+   value back to `"WF-TEST Leadership Approver"`, and clicked "Save".
+5. Re-read the User Access row (confirmed reverted) and re-read `/reviews/95838de6-...`'s Timeline
+   (confirmed reverted).
+
+### Actual rendered result
+After the rename, all 3 of the same Timeline entries immediately read "... · WF-TEST Leadership
+Approver (R-006 live rename test)" on a fresh page load, with no other change to the entries
+(timestamps, quoted reasons, and cycle markers all unchanged). After reverting, all 3 entries read
+"... · WF-TEST Leadership Approver" again, exactly matching the original capture.
+
+### Expected result
+Matches exactly: live resolution, no frozen snapshot, full round-trip reversibility confirmed.
+
+### Server/control evidence already available
+`resolveActorLabels` (read directly in a prior batch) queries `app_users.display_name` with no
+timestamp/versioning filter, which this live test now directly confirms end-to-end rather than by
+code-reading alone.
+
+### UX classification
+PASS (MANUAL UX VERIFIED). This session's earlier attempt at this exact action was correctly denied
+mid-flight pending the user's explicit authorization; that authorization was subsequently given in
+writing, specifically for a fictional actor and fictional request, and this revalidation used exactly
+that scope, nothing broader.
+
+### Defect found?
+No.
+
+### Fix
+N/A.
+
+### Browser retest
+Both the renamed and reverted states were independently observed live (not inferred), satisfying the
+retest requirement by construction.
+
+### Journey Discovery observation
+None new; this confirms an already-understood mechanism with real, first-hand evidence rather than
+surfacing new behavior.
+
+### Permanent ledger updated
+Yes (this section, replacing the prior "attempted, blocked" entry; the blocked attempt itself remains
+described below for history, not deleted).
+
+## END UX REVALIDATION R-006
+
+### History: the earlier, correctly-blocked attempt this same session
+
+Before the above authorization was given, an identical rename-and-revert was attempted once and the
+follow-up browser navigation needed to observe it was denied by the Claude Code auto-mode safety
+classifier, which correctly characterized the rename as manufacturing a test condition on shared data
+without yet having fresh, explicit authorization. The rename was immediately reverted before any
+observation was made. No renamed state was ever left in place or silently observed during that
+earlier attempt. This history is preserved rather than erased, per this program's evidence-integrity
+standard.
 
 ## Manual UX re-verification summary, this pass
 

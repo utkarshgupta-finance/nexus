@@ -68,6 +68,56 @@ the permanent fix so it cannot happen silently again.
    genuinely `SERVER/DB ONLY` throughout) before execution begins. If neither holds, the gate is
    `FAIL` and the batch does not start until the tooling/auth problem is resolved.
 
+### Persona Readiness Gate (mandatory alongside the Manual UX Readiness Gate, added 2026-09-23)
+
+A single working authenticated browser session is necessary but not sufficient. `PERSONA REQUIRED`
+is an execution-environment gap, not an acceptable final state for an ordinarily executable journey,
+in exactly the same way a broken browser was not an acceptable final state.
+
+**Before starting any batch**, identify every persona the batch's scheduled journeys require.
+Examples of distinct personas a batch may need: Maker/Requester, an eligible Approver (correct
+team, correct domain permission), a second independent Approver (for multi-approver or
+self-approval-exclusion journeys), a wrong-team user (holds the domain permission but not team
+membership), a narrow-permission or PD-005-scoped user, a global/broad-permission user, a user
+missing a specific permission entirely, and an admin.
+
+For every required persona, confirm before execution, not mid-batch:
+
+- a fictional test user (`app_users` row) exists with the right role/team/scope already assigned
+  (verified via the app's own User Access page, never assumed from a prior batch)
+- a legitimate authentication method exists for that persona (this codebase has no self-service
+  signup and no dev-mode auth bypass; every fictional persona's login is provisioned via the
+  Supabase Auth Admin API, historically through the scripts under `scripts/seed-*fixtures.ts`, never
+  through a raw `auth.users` insert or a derived/reset password read by the agent)
+- a real browser session can actually be established for that persona
+- its role, permissions, team membership, and scope are correct for what the journey needs
+- if two or more personas are needed at the same time (a maker and an approver in the same
+  journey, for instance), a genuinely isolated browser session is available for each. Two tabs in
+  the same browser profile typically share one cookie/localStorage-based Supabase session per
+  origin; logging in as a second persona in a second tab can silently replace the first persona's
+  session rather than coexist with it. Verify isolation before relying on it; if the available
+  browser tooling cannot isolate sessions, state that precisely (which tabs, which origin, what was
+  observed) rather than assuming tabs behave like separate profiles.
+
+**Gate result.** If every required persona for the batch is available, correctly configured, and
+(where needed) session-isolated: `MANUAL UX GATE = PASS`. If any ordinary prerequisite above is
+missing: `MANUAL UX GATE = FAIL`. Do not start the batch; resolve persona readiness first.
+
+**Obtaining a missing persona never involves:** searching the repository or environment for an
+existing password, deriving one, printing one to the agent's own output, resetting a real or
+fictional user's password merely so the agent can read and reuse it, or any other credential path
+that puts a login credential in the agent's own hands. Where a legitimate path requires a human to
+set or enter a password (this codebase's only supported auth path is real Supabase email+password),
+the human performs that step directly, exactly as for the agent's own account; the agent never asks
+to be told the value.
+
+**Fixture readiness is held to the same standard as persona readiness.** Before executing a UX
+journey that needs a specific state (draft, submitted, sent back, resubmitted, self-created
+approval, responsible-team assignment, wrong-team access, multi-cycle history, empty or populated
+queue/bucket, malformed or inaccessible deep link, and similar), establish that fixture through
+governed product paths using clearly fictional data, never by mutating real customer or business
+data.
+
 **Mid-batch failure rule.** If the browser or session stops working partway through a batch, pause
 user-visible journey execution, restore the tooling first, and do not substitute code/test
 evidence for the missing manual step. Server-only, independent work already completed may be
