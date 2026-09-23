@@ -960,7 +960,7 @@ overwriting the original backfilled entries above.
 - **Canonical intent:** The node palette on the Workflow Builder canvas offers exactly the five supported node types; a sixth/unsupported type is only reachable via a direct API bypass and is rejected server-side.
 - **Exact user-visible assertion:** The "Add Node" palette renders exactly five buttons, labeled Start, Form Step, Approval, Decision, End, no more and no fewer.
 - **Required persona:** Workflow_Admin-equivalent (write access to workflow_definition).
-- **Actual persona used:** Real admin account (utkarsh.gupta@mobisy.com), which holds workflow_definition.write.
+- **Actual persona used:** Real admin account, which holds workflow_definition.write.
 - **Required fixture:** Any workflow definition with an editable (Draft) version.
 - **Actual fixture used:** "BATCH2 K-Series Builder Mechanics" (Customer Change, definition id `3ab610ce-6423-42bd-9689-4b6628c05301`), existing Draft Version 1.
 - **Page opened:** `/settings/workflows/3ab610ce-6423-42bd-9689-4b6628c05301/versions/48d557e9-38ef-4ff2-ad18-b2a0183c282c`
@@ -975,3 +975,46 @@ overwriting the original backfilled entries above.
 - **Permanent ledger updated:** Yes (this entry).
 
 ### END HISTORICAL UX REVALIDATION K-001
+
+### BEGIN HISTORICAL UX REVALIDATION K-022
+
+- **Canonical intent:** Renaming a node's key in the properties panel updates all local edge references in memory, and saving persists the fully consistent new state in one whole-graph replace.
+- **Exact user-visible assertion:** After typing a new name into the selected node's Name field and clicking Save Draft, the node's new label is what renders on the canvas, both immediately and after a full page reload.
+- **Persona required:** Workflow_Admin-equivalent (write access to workflow_definition).
+- **Persona used:** Real admin account.
+- **Fixture required:** Any workflow definition with an editable Draft version and at least one node.
+- **Fixture used:** New workflow "Batch 1 UX Revalidation Fixture" (Customer Onboarding, definition id `a3f17864-d36b-45dd-913f-54874be1f7f2`), Draft Version 1, built live via the palette (Start, Approval, Decision, End, End nodes added one at a time).
+- **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`
+- **Exact browser actions:** Selected the Decision node by clicking it (confirmed via its `selected` CSS class becoming true), typed "Decision Renamed K022" into the Name field in the properties panel, clicked Save Draft, waited for the "Draft saved." confirmation, then opened the same version URL in a brand new tab to force a genuine server fetch.
+- **Actual rendered result:** The canvas rendered a node labeled "Decision Renamed K022" both immediately after saving and after the fresh reload in a new tab.
+- **Expected result:** The renamed label persists and is what the server returns on a fresh load.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately; the rename and its persistence were both observed directly.
+- **Defect found?:** No.
+- **Fix/retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED for the core rename-and-persist mechanic. The canonical assertion also covers "updates all local edge references in memory," which could not be exercised here because this fixture had no edges yet (edge-drawing is currently blocked, see the Batch 1 header note on canvas drag interactions). NEW JOURNEY REQUIRED once edge-drawing is unblocked: rename a node that has incoming/outgoing edges and confirm the edges still resolve to the new key after save and reload.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-022
+
+### BEGIN HISTORICAL UX REVALIDATION K-009 / K-023
+
+- **Canonical intent (K-009):** Deleting a scratch node on canvas and saving again (whole-graph replace) leaves the database matching exactly the current canvas state, with no leftover rows, even after repeated add/remove/save cycles.
+- **Canonical intent (K-023):** Deleting the middle node of a chain and saving persists exactly what the client sends (no server-side auto-reconnect), so no edge referencing the deleted node's key survives the save.
+- **Exact user-visible assertion:** After selecting a node and clicking Delete Node, then Save Draft, the deleted node is gone from the canvas both immediately and after a full page reload; no leftover node renders.
+- **Persona required:** Workflow_Admin-equivalent (write access to workflow_definition).
+- **Persona used:** Real admin account.
+- **Fixture required:** A Draft version with at least one deletable node.
+- **Fixture used:** Same "Batch 1 UX Revalidation Fixture" Draft Version 1 (Start, Approval, Decision Renamed K022, End, End).
+- **Page opened:** `/settings/workflows/a3f17864-d36b-45dd-913f-54874be1f7f2/versions/9c4dcb16-0864-415e-b88d-50f5b6c85992`
+- **Exact browser actions:** Selected one of the two "End" nodes by clicking it (confirmed selected via the properties panel opening with its Delete Node button), clicked Delete Node, confirmed via `document.querySelectorAll` that the canvas dropped from 5 nodes to 4, clicked Save Draft, waited for the "Draft saved." confirmation, then opened the same version URL in a brand new tab.
+- **Actual rendered result:** Exactly 4 nodes rendered after the fresh reload (Start, Approval, Decision Renamed K022, End); the deleted End node did not reappear.
+- **Expected result:** The deletion persists; no leftover row for the deleted node.
+- **Manual UX result:** PASS
+- **Existing server/control evidence:** None needed separately.
+- **Defect found?:** No.
+- **Fix/retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED for the core delete-and-persist mechanic. This pass only ran a single delete/save cycle (not K-009's full 5-cycle stress) and the deleted node had no edges connected to it (edge-drawing is currently blocked), so K-023's specific "no edge references the deleted node's key" assertion was not exercised. NEW JOURNEY REQUIRED once edge-drawing is unblocked: delete a node with real incoming and outgoing edges and confirm neither edge survives the save; also repeat the delete/save cycle multiple times to cover K-009's full stress variant.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION K-009 / K-023
