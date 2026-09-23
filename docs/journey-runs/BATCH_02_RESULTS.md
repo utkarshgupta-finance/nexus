@@ -1100,3 +1100,61 @@ Denominator fixed per the above; not changed during this pass. Reconciliation pe
 - **Permanent ledger updated:** Yes (this entry).
 
 ### END HISTORICAL UX REVALIDATION L-020 (FAILED THEN FIXED + PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-021
+
+- **Canonical intent:** Confirm deactivating the sole active definition for a context, with no replacement activated, cleanly blocks new request creation for that context rather than silently routing requests to nowhere. Corresponds to previously-fixed defect K-L021-D01 (all four domain create RPCs used to insert a request with a null `workflow_version_id` when no active definition existed), whose fix was previously verified only via direct RPC calls, never through the real "Create Go Live Request" UI form.
+- **Exact user-visible assertion:** "The Requestor sees a clear, actionable error, not a confusing generic failure, when attempting to create a request with no active workflow configured for the context."
+- **Persona required:** Workflow Admin (to deactivate), Requestor (Maker, to attempt creation).
+- **Persona used:** `nexus-test-workflow-admin@example.test` (deactivation attempt only, see below); Maker persona not yet reached.
+- **Fixture identified for this test (recorded here so this does not need to be re-derived):** Customer `batch8-approval-core-co` ("Batch8 Approval Core Co Renamed"), an existing fictional customer from a prior batch's fixture set, reused per the Fixtures rule ("search existing fictional fixtures... reuse canonically-equivalent existing topology") rather than building a new one. It has an approved, recurring commercial component (`stable_component_key` = `9154402d-78dd-42a1-8561-9b8fee1a5a40`, highest approved `commercial_configuration_versions.version_number` = 51) with no existing non-cancelled `go_live_requests` row for that `stable_component_key`, confirmed via direct read-only SQL join (`commercial_configuration_versions` status=`approved` join `commercial_components` `is_recurring=true` join `customers`, `not exists` against `go_live_requests` excluding `status='cancelled'`). The real UI path is `/customers/batch8-approval-core-co/go-live/new?stableComponentKey=9154402d-78dd-42a1-8561-9b8fee1a5a40`, reached from the customer's Go Live tab (confirmed via source: `createGoLiveRequestAction` -> `create_go_live_request` RPC, errors parsed via `parseGoLiveError`, gated on `{resource: "go_live", action: "create"}`).
+- **Starting state confirmed:** "WF-TEST Decision Route Finance or Legal" (Go Live, Published) was the sole active Go Live definition, matching L-021's canonical precondition (Definition A is the sole active definition for this context).
+- **Exact browser actions performed:** As Workflow Admin, clicked the real "Deactivate" button on "WF-TEST Decision Route Finance or Legal" on the live Workflows settings list (`workflow-admin.localhost:3000/settings/workflows`), twice, each time from a freshly reloaded page with a freshly re-read DOM reference (not a stale/cached ref), per this program's established stale-tab retry protocol.
+- **Actual rendered result:** Both click attempts silently failed to take effect. The Active/Deactivate badge and button state remained unchanged in the UI (not a stale-read artifact: confirmed independently via a direct database read of `workflow_definitions.is_active` and `updated_at`, both unchanged across both attempts). The browser console showed, on every page load and after every click, the exact same compile error already documented as parked in `OVERNIGHT_PENDING_ACTIONS.md`: `the name 'friendlyMessageForKnownConstraint' is defined multiple times`, `./src/platform/workflow-builder/actions.ts`. Since every workflow-definition mutation (`setWorkflowDefinitionActiveAction`, `replaceActiveWorkflowDefinitionAction`, and every other action this journey would need) is exported from that same module, the module's failure to compile blocks the mutation itself, not merely the React Flow canvas rendering the earlier-documented instance of this same root cause affected. This expands the known scope of the parked issue: it is not only a cosmetic edge-rendering regression, it also currently blocks real Activate/Deactivate/governed-swap mutations through the UI.
+- **Expected result:** Deactivation succeeds, then a clear, actionable error is shown to the Requestor attempting to create a Go Live request with no active definition configured.
+- **Manual UX result:** OVERNIGHT BLOCKED — USER ACTION REQUIRED. Cannot proceed past the deactivation step through genuine UI action right now.
+- **Existing server/control evidence:** The original K-L021-D01 fix (rejecting a null-`workflow_version_id` insert at the RPC layer) remains in place at the code level (unchanged since its original fix, confirmed by inspecting `create_go_live_request` and the equivalent RPCs for the other three domains); this journey's residual gap is specifically re-proving it through the real UI, which is what is now blocked.
+- **Defect found?:** No new defect. This is the same already-parked stale-compile-cache issue, now confirmed to have a materially broader blast radius (blocks real workflow-definition mutations, not just canvas rendering).
+- **Fix/regression/browser retest:** Cannot be completed until the shared dev server is restarted (see `OVERNIGHT_PENDING_ACTIONS.md`, scope note added this entry).
+- **Why no safe autonomous path exists:** No UI path other than the Deactivate button reaches a naive direct-deactivate of the sole active Go Live definition, and that control is non-functional for the reason above. There is no alternate legitimate fixture or route around a broken module compile. Restarting the shared dev server process was already correctly identified as reserved for the user (irreversible-risk, shared long-running process, user offline to help recover if the restart fails).
+- **Exact morning action required:** Restart the shared dev server (same action already requested in `OVERNIGHT_PENDING_ACTIONS.md`). Once restarted, resume L-021 exactly at the deactivation step using the fixture recorded above (no re-derivation needed): deactivate "WF-TEST Decision Route Finance or Legal" (id `f26d1cff-40e0-485e-bb35-3601c83625c1`) as Workflow Admin, then as Maker attempt to create a Go Live request at `/customers/batch8-approval-core-co/go-live/new?stableComponentKey=9154402d-78dd-42a1-8561-9b8fee1a5a40`, observe and record the exact rendered error text, then immediately reactivate "WF-TEST Decision Route Finance or Legal" to restore shared fixture state (matching the same restore discipline already used for L-007/L-009).
+- **Journey Discovery observation:** ALREADY COVERED in scope; no new journey required. The broadened understanding of the parked defect's blast radius is recorded in `OVERNIGHT_PENDING_ACTIONS.md`, not as a new Journey Universe entry, since it is a dev-environment/tooling issue, not a product behavior gap.
+- **Permanent ledger updated:** Yes (this entry). No shared fixture state was actually changed (both deactivation attempts genuinely no-opped, confirmed via DB read), so no restoration step is needed at this time.
+
+### END HISTORICAL UX REVALIDATION L-021 (OVERNIGHT BLOCKED — USER ACTION REQUIRED)
+
+---
+
+## BATCH 2 CLOSURE (overnight run, Batches 2-7)
+
+### Batch Report
+
+| Journey | UX evidence | Persona | Result | Defect | Discovery |
+|---|---|---|---|---|---|
+| L-002 | Genuine two-tab draft-creation race, live before/after retest | Workflow Admin | FAILED THEN FIXED + PASS | K-L002-D02: raw Postgres constraint error leaked to user | EXPAND EXISTING (stress variant is the only reachable path) |
+| L-004 | Version 2 heading/history table, live DOM read | Workflow Admin | PASS | None for L-004 itself (see incidental discovery) | ALREADY COVERED |
+| L-006 | Disabled-button/tooltip inspection, live DOM | Workflow Admin | PASS | None | ALREADY COVERED |
+| L-007 | Live Activate click, source confirmation | Workflow Admin | PASS (re-scoped, stronger than canonical) | None | ALREADY COVERED, doc-tightening candidate |
+| L-015 | Genuine two-tab optimistic-lock race, live retest | Workflow Admin | PASS | None | ALREADY COVERED |
+| L-018 | Live Create Workflow form, list-page read | Workflow Admin | PASS | None | ALREADY COVERED |
+| L-020 | Live version-history page, screenshot before/after fix | Workflow Admin | FAILED THEN FIXED + PASS | Missing current-vs-historical distinction | ALREADY COVERED, now with real fix |
+| L-021 | Fixture identified, deactivation attempted and found non-functional | Workflow Admin (deactivation only) | OVERNIGHT BLOCKED — USER ACTION REQUIRED | None new (parked dev-server issue, scope expanded) | ALREADY COVERED, blocked on tooling |
+
+### Summary Metrics
+
+| Metric | Count |
+|---|---|
+| Historical journeys (Batch 2 UX-scoped worklist) | 8 |
+| UX-required | 8 |
+| Previously sufficient (confirmed, no re-execution needed) | 0 (all 8 required genuine re-execution or fix) |
+| Revalidated | 8 |
+| PASS | 5 (L-004, L-006, L-007, L-015, L-018) |
+| FAILED THEN FIXED + PASS | 2 (L-002, L-020) |
+| Overnight blocked | 1 (L-021, pending dev-server restart) |
+| Product decisions parked | 0 |
+| New journeys discovered | 0 (all Journey Discovery observations classified ALREADY COVERED or EXPAND EXISTING, none required a new Journey ID) |
+| Remaining ordinary UX residuals | 0 (the only open item, L-021, is a human-only dev-server-restart blocker, not an autonomously executable residual) |
+
+**Starting SHA:** `586c990`. Batch 2 closes with all autonomously-executable UX residuals complete; the sole remaining item (L-021) is recorded precisely in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` and requires only a dev-server restart to finish, not a business decision. Proceeding to Batch 3 per the overnight run's "Moving to the Next Batch" rule (human-only blockers do not hold the run at the current batch).
+
+---
