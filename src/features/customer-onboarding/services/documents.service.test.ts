@@ -14,17 +14,23 @@ vi.mock("server-only", () => ({}))
 const uploadDocumentBytes = vi.fn()
 const supersedeCurrentDocuments = vi.fn()
 const insertDocumentMetadata = vi.fn()
+const getDocumentById = vi.fn()
+const createSignedDownloadUrl = vi.fn()
 
 vi.mock("../data/documents.data", () => ({
   uploadDocumentBytes: (...args: unknown[]) => uploadDocumentBytes(...args),
   supersedeCurrentDocuments: (...args: unknown[]) => supersedeCurrentDocuments(...args),
   insertDocumentMetadata: (...args: unknown[]) => insertDocumentMetadata(...args),
+  getDocumentById: (...args: unknown[]) => getDocumentById(...args),
+  createSignedDownloadUrl: (...args: unknown[]) => createSignedDownloadUrl(...args),
 }))
 
 beforeEach(() => {
   uploadDocumentBytes.mockReset()
   supersedeCurrentDocuments.mockReset().mockResolvedValue(undefined)
   insertDocumentMetadata.mockReset()
+  getDocumentById.mockReset()
+  createSignedDownloadUrl.mockReset()
 })
 
 // Real PDF magic bytes ("%PDF-1.4..."), not arbitrary text: since the
@@ -153,5 +159,48 @@ describe("uploadOnboardingDocument (Platform Scale Closure, Phase R/U)", () => {
     })
 
     expect(callOrder).toEqual(["supersede", "insert"])
+  })
+})
+
+/**
+ * Q-008/Q-010 (Batch 22): the row-exists-first contract underlying the
+ * signed-URL download flow, plus getOnboardingDocumentRequestId, the
+ * resolver the download action now uses (Q-018 incidental defect fix)
+ * to scope-check before ever generating a signed URL.
+ */
+describe("getOnboardingDocumentDownloadUrl / getOnboardingDocumentRequestId (Q-008, Q-010, Q-018)", () => {
+  it("never generates a signed URL for a document that does not exist (Q-010)", async () => {
+    getDocumentById.mockResolvedValue(null)
+    const { getOnboardingDocumentDownloadUrl } = await import("./documents.service")
+
+    const url = await getOnboardingDocumentDownloadUrl("no-such-doc")
+
+    expect(url).toBeNull()
+    expect(createSignedDownloadUrl).not.toHaveBeenCalled()
+  })
+
+  it("generates a signed URL from the document's own storage_path once the row is proven to exist (Q-008)", async () => {
+    getDocumentById.mockResolvedValue({ document_id: "doc-1", request_id: "req-1", storage_path: "req-1/tax/gst_certificate/doc-1.pdf" })
+    createSignedDownloadUrl.mockResolvedValue("https://storage.example.test/signed?token=abc")
+    const { getOnboardingDocumentDownloadUrl } = await import("./documents.service")
+
+    const url = await getOnboardingDocumentDownloadUrl("doc-1")
+
+    expect(createSignedDownloadUrl).toHaveBeenCalledWith("req-1/tax/gst_certificate/doc-1.pdf")
+    expect(url).toBe("https://storage.example.test/signed?token=abc")
+  })
+
+  it("resolves the owning request_id for a real document, the lookup the download action scopes against before authorizing", async () => {
+    getDocumentById.mockResolvedValue({ document_id: "doc-1", request_id: "req-1", storage_path: "req-1/tax/gst_certificate/doc-1.pdf" })
+    const { getOnboardingDocumentRequestId } = await import("./documents.service")
+
+    expect(await getOnboardingDocumentRequestId("doc-1")).toBe("req-1")
+  })
+
+  it("resolves null for a nonexistent document, never leaking a fabricated request_id", async () => {
+    getDocumentById.mockResolvedValue(null)
+    const { getOnboardingDocumentRequestId } = await import("./documents.service")
+
+    expect(await getOnboardingDocumentRequestId("no-such-doc")).toBeNull()
   })
 })

@@ -19,6 +19,7 @@ import {
   listApprovedCaseTaxIdentity,
   approveOnboardingEffectiveDateException,
   getOnboardingCaseBusinessUnit,
+  getOnboardingCaseScope,
 } from "./services/case.service"
 import {
   createVersionFromActive,
@@ -29,7 +30,7 @@ import {
   cancelVersion,
   loadVersion,
 } from "./services/commercial-version.service"
-import { uploadOnboardingDocument, getOnboardingDocumentDownloadUrl } from "./services/documents.service"
+import { uploadOnboardingDocument, getOnboardingDocumentDownloadUrl, getOnboardingDocumentRequestId } from "./services/documents.service"
 import { findPotentialDuplicates } from "./domain/duplicate-detection"
 import type { CommercialRateDraft } from "./domain/commercial-rate"
 import type { CustomerOnboardingCase, PersistedOnboardingDocumentMetadata, OnboardingDocumentType } from "./domain/types"
@@ -362,6 +363,18 @@ type UploadDocumentActionResult = { ok: true; document: PersistedOnboardingDocum
  * onboarding evidence never had before. Gated on `customer.create`, the
  * same permission Save Draft/Submit already require: uploading evidence
  * is part of filling in the case, not a separate reviewer capability.
+ *
+ * Batch 22 (Q-018 incidental defect, found and fixed): this had been the
+ * one `customer.create`-gated onboarding action still using the plain,
+ * global-only `requirePermission`, unlike every sibling case action in
+ * this file (createOnboardingCaseAction is the sole other exception, and
+ * legitimately so: there is no request yet to scope by at creation
+ * time). A user holding only a PD-005 customer/business-unit-scoped
+ * grant (no global `customer.create`) could reach this request's own
+ * review page but was then wrongly denied when uploading evidence to
+ * it. Fixed to scope exactly like sendBackOnboardingCaseAction/
+ * approveOnboardingCaseAction: business-unit before a customer exists,
+ * customer once approval has resolved one.
  */
 async function uploadOnboardingDocumentAction(
   requestId: string,
@@ -370,7 +383,10 @@ async function uploadOnboardingDocumentAction(
   formData: FormData
 ): Promise<UploadDocumentActionResult> {
   try {
-    const actor = await requirePermission("customer", "create")
+    const scope = await getOnboardingCaseScope(requestId)
+    const actor = scope?.customerId
+      ? await requirePermissionForCustomer("customer", "create", scope.customerId)
+      : await requirePermissionForBusinessUnit("customer", "create", scope?.businessUnit ?? null)
     const file = formData.get("file")
     if (!(file instanceof File)) return { ok: false, error: "No file was received." }
     // Browser adapter boundary (Platform Scale Closure, Phase R): the
@@ -393,9 +409,28 @@ async function uploadOnboardingDocumentAction(
 
 type DownloadUrlActionResult = { ok: true; url: string } | { ok: false; error: string }
 
+/**
+ * Q-008/Q-018 (Batch 22, incidental defect found and fixed): this had
+ * used the plain, global-only `requirePermission("customer", "read")`,
+ * unlike the request's own review page (`ReviewDetailRoute`), which
+ * already grants a PD-005 customer/business-unit-scoped viewer access
+ * via `additionalAccessGranted`. A purely scoped viewer could reach the
+ * review page and see the documents list, then be wrongly denied a
+ * signed download URL for evidence on a request they are genuinely
+ * authorized to read. The document is resolved to its owning request
+ * first (never generating a signed URL before authorization succeeds),
+ * scoped exactly like the review page's own resolution.
+ */
 async function getOnboardingDocumentDownloadUrlAction(documentId: string): Promise<DownloadUrlActionResult> {
   try {
-    await requirePermission("customer", "read")
+    const requestId = await getOnboardingDocumentRequestId(documentId)
+    if (!requestId) return { ok: false, error: "Document not found." }
+    const scope = await getOnboardingCaseScope(requestId)
+    if (scope?.customerId) {
+      await requirePermissionForCustomer("customer", "read", scope.customerId)
+    } else {
+      await requirePermissionForBusinessUnit("customer", "read", scope?.businessUnit ?? null)
+    }
     const url = await getOnboardingDocumentDownloadUrl(documentId)
     if (!url) return { ok: false, error: "Document not found." }
     return { ok: true, url }

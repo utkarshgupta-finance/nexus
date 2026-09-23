@@ -135,12 +135,25 @@ async function getOnboardingDocumentDownloadUrl(documentId: string): Promise<str
   return documentsData.createSignedDownloadUrl(row.storage_path)
 }
 
+/**
+ * Batch 22 (Q-018 incidental defect): resolves which request a document
+ * belongs to, so the download action can apply the same PD-005
+ * customer/business-unit scoping the request's own review page already
+ * enforces, before ever generating a signed URL. Null if the document
+ * does not exist.
+ */
+async function getOnboardingDocumentRequestId(documentId: string): Promise<string | null> {
+  const row = await documentsData.getDocumentById(documentId)
+  return row?.request_id ?? null
+}
+
 export {
   uploadOnboardingDocument,
   listOnboardingDocuments,
   listOnboardingDocumentsWithUploader,
   listOnboardingDocumentsForRevision,
   getOnboardingDocumentDownloadUrl,
+  getOnboardingDocumentRequestId,
   InvalidDocumentError,
 }
 export type { DocumentUploadInput }

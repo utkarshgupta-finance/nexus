@@ -46,7 +46,7 @@ vi.mock("@/features/customers/server", () => ({
   listCustomerMaster: (...args: unknown[]) => listCustomerMaster(...args),
 }))
 
-import { submitOnboardingCase, getOnboardingCase, approveOnboardingCase } from "./case.service"
+import { submitOnboardingCase, getOnboardingCase, approveOnboardingCase, getOnboardingCaseScope } from "./case.service"
 
 const COMPLETE_CUSTOMER_DETAILS = {
   customer_legal_entity_name: "Batch7 Test Co",
@@ -217,6 +217,61 @@ describe("getOnboardingCase creator-only draft visibility (PD-001, A-036)", () =
     listRevisionsForRequest.mockResolvedValue([])
     const result = await getOnboardingCase("no-such-request", "maker-a")
     expect(result).toBeNull()
+  })
+})
+
+/**
+ * Batch 22 (Q-018 incidental defect found and fixed): getOnboardingCaseScope
+ * is what document upload/download actions now call to apply the same
+ * PD-005 scoping the review page already applies, instead of the plain,
+ * global-only permission check they had used before. This guards the
+ * exact customerId/businessUnit resolution those actions depend on.
+ */
+describe("getOnboardingCaseScope (Batch 22, Q-018 incidental defect fix)", () => {
+  function scopeCaseRow(overrides: Partial<Record<string, unknown>>) {
+    return {
+      request_id: "req-1",
+      case_number: 1,
+      status: "submitted",
+      current_stage_key: "approval",
+      sent_back_reason: null,
+      sent_back_at: null,
+      sent_back_by: null,
+      sent_back_target_stage_key: null,
+      approved_by: null,
+      approved_at: null,
+      cancelled_by: null,
+      cancelled_at: null,
+      cancelled_reason: null,
+      customer_id: null,
+      commercial_configuration_id: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      created_by: "maker-a",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      workflow_version_id: null,
+      current_workflow_node_key: null,
+      ...overrides,
+    }
+  }
+
+  it("returns null for a genuinely nonexistent request id", async () => {
+    getCaseByRequestId.mockResolvedValue(null)
+    const scope = await getOnboardingCaseScope("no-such-request")
+    expect(scope).toBeNull()
+  })
+
+  it("resolves businessUnit from the raw draft form data and a null customerId before approval", async () => {
+    getCaseByRequestId.mockResolvedValue(scopeCaseRow({ status: "draft", customer_id: null }))
+    getLatestRevisionForRequest.mockResolvedValue({ status: "draft", raw_data: { business_unit: "core" }, effective_data: null })
+    const scope = await getOnboardingCaseScope("req-1")
+    expect(scope).toEqual({ customerId: null, businessUnit: "core" })
+  })
+
+  it("resolves the real customerId once approval has created one, exactly like ReviewDetailRoute's own branch", async () => {
+    getCaseByRequestId.mockResolvedValue(scopeCaseRow({ status: "approved", customer_id: "cust-1" }))
+    getLatestRevisionForRequest.mockResolvedValue({ status: "submitted", raw_data: {}, effective_data: { values: { business_unit: "core" } } })
+    const scope = await getOnboardingCaseScope("req-1")
+    expect(scope?.customerId).toBe("cust-1")
   })
 })
 

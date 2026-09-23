@@ -178,6 +178,23 @@ async function getOnboardingCaseBusinessUnit(requestId: string): Promise<string 
   return typeof businessUnit === "string" && businessUnit.length > 0 ? businessUnit : null
 }
 
+type OnboardingCaseScope = { customerId: string | null; businessUnit: string | null }
+
+/**
+ * Batch 22 (Q-018 incidental defect): the same customerId/businessUnit
+ * pair `ReviewDetailRoute` already resolves inline for its own
+ * `hasPermissionForCustomer`/`hasPermissionForBusinessUnit` branch,
+ * extracted so document upload/download actions can apply the identical
+ * PD-005 scoping instead of the coarse global-only check they had been
+ * using. Null only if the request itself does not exist.
+ */
+async function getOnboardingCaseScope(requestId: string): Promise<OnboardingCaseScope | null> {
+  const caseRow = await caseData.getCaseByRequestId(requestId)
+  if (!caseRow) return null
+  const businessUnit = await getOnboardingCaseBusinessUnit(requestId)
+  return { customerId: caseRow.customer_id, businessUnit }
+}
+
 /** Serves both a first Submit and a post-send-back Resubmit: the RPC itself derives which one applies from the case's current status. */
 async function submitOnboardingCase(requestId: string, actorUserId: string): Promise<CustomerOnboardingCase> {
   const draft = await caseData.getLatestRevisionForRequest(requestId)
@@ -501,5 +518,6 @@ export {
   listApprovedCaseTaxIdentity,
   approveOnboardingEffectiveDateException,
   getOnboardingCaseBusinessUnit,
+  getOnboardingCaseScope,
 }
 export type { ReviewQueueEntry, ApprovedCaseTaxIdentity, OnboardingSendBackEntry, OnboardingFieldCommentEntry, MyOnboardingRequestEntry }
