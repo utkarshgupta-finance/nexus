@@ -28,6 +28,7 @@ const PERSONAS: Record<string, { email: string; passwordEnv: string; displayName
   legal: { email: "nexus-test-legal@example.test", passwordEnv: "NEXUS_TEST_LEGAL_PASSWORD", displayName: "Legal Approver" },
   restricted: { email: "nexus-test-restricted@example.test", passwordEnv: "NEXUS_TEST_RESTRICTED_PASSWORD", displayName: "Restricted User" },
   "ux-approver": { email: "nexus-test-ux-approver@example.test", passwordEnv: "NEXUS_TEST_UX_APPROVER_PASSWORD", displayName: "UX Approver" },
+  "workflow-admin": { email: "nexus-test-workflow-admin@example.test", passwordEnv: "NEXUS_TEST_WORKFLOW_ADMIN_PASSWORD", displayName: "Workflow Admin" },
 }
 
 async function main() {
