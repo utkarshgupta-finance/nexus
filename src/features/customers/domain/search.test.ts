@@ -93,4 +93,47 @@ describe("filterCustomerMasterEntries", () => {
   it("returns nothing when nothing matches", () => {
     expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: "does-not-exist" })).toEqual([])
   })
+
+  it("treats a whitespace-only query as no filter at all (S-001 stress variant)", () => {
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: "   " })).toEqual(ENTRIES)
+  })
+
+  it("filters by businessUnit code (S-002)", () => {
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, businessUnit: "india_enterprise" })).toEqual([NORTHSTAR])
+  })
+
+  it("filters by country code (S-002)", () => {
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, country: "IN" })).toEqual(ENTRIES)
+  })
+
+  it("combines segment + businessUnit + country + status as a logical AND across all four (S-002)", () => {
+    expect(
+      filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, segment: "enterprise", businessUnit: "india_enterprise", country: "IN", status: "inactive" })
+    ).toEqual([NORTHSTAR])
+    expect(
+      filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, segment: "enterprise", businessUnit: "india_enterprise", country: "IN", status: "active" })
+    ).toEqual([])
+  })
+
+  it("still matches a customer by a segment/businessUnit/country code even if that code has since been deactivated in Reference Master: filtering compares the customer's own stored code, never re-validates it against the currently-active option list (S-002 historical variant, P-006)", () => {
+    // No lookup against a live/active reference-option list happens anywhere
+    // in filterCustomerMasterEntries; it compares filters.segment directly
+    // against the customer record's own resolved code, so a deactivated
+    // code (still legitimately stored on an existing customer) is unaffected.
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, segment: "smb" })).toEqual([AURORA])
+  })
+
+  it("treats SQL-metacharacter-laden and very long adversarial query strings as plain, safe substrings, never crashing or matching everything (S-005)", () => {
+    const sqlInjectionAttempt = "'; DROP TABLE customers; --"
+    expect(() => filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: sqlInjectionAttempt })).not.toThrow()
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: sqlInjectionAttempt })).toEqual([])
+
+    const percentEncodedPayload = "%27%20OR%20%271%27%3D%271"
+    expect(() => filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: percentEncodedPayload })).not.toThrow()
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: percentEncodedPayload })).toEqual([])
+
+    const extremelyLongQuery = "a".repeat(10_000)
+    expect(() => filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: extremelyLongQuery })).not.toThrow()
+    expect(filterCustomerMasterEntries(ENTRIES, { ...EMPTY_FILTERS, query: extremelyLongQuery })).toEqual([])
+  })
 })

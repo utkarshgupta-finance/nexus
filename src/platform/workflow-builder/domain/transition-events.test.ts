@@ -82,6 +82,25 @@ describe("buildWorkflowTransitionEvents", () => {
     expect(events[0].detail).toBe("Budget concerns.")
   })
 
+  it("captures a lengthy, multi-paragraph rejection reason verbatim, including line breaks and special characters, with no truncation (R-018)", () => {
+    const longReason = [
+      "This request cannot proceed as submitted for several reasons:",
+      "1. The effective date conflicts with an existing commercial term (see attached).",
+      "2. The GST number on file does not match the uploaded certificate — please re-verify.",
+      "3. Pricing tier \"Enterprise+\" requires Finance sign-off, which is missing.",
+      "Please address all three points & resubmit. Contact finance@example.test with questions.",
+    ].join("\n")
+
+    const events = buildWorkflowTransitionEvents(
+      [transition({ action: "reject", fromNodeKey: "node_leadership", toNodeKey: null, actorUserId: "leadership-user", comment: longReason })],
+      NODE_DISPLAY,
+      ACTOR_LABELS
+    )
+
+    expect(events[0].detail).toBe(longReason)
+    expect(events[0].detail?.length).toBe(longReason.length)
+  })
+
   it("folds a terminal detail into the final approval line instead of adding a second 'Approved' line", () => {
     const events = buildWorkflowTransitionEvents(
       [transition({ fromNodeKey: "node_leadership", toNodeKey: "node_end", actorUserId: "leadership-user" })],
