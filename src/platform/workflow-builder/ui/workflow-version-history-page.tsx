@@ -39,6 +39,10 @@ function WorkflowVersionHistoryPage({
   const [isDiscarding, startDiscardTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
+  /** Batch 2, L-020: every published version rendered an identical "Published" badge, with nothing distinguishing the one actually used for new request resolution (the highest version_number) from superseded-but-retained history. */
+  const publishedVersionNumbers = rows.filter(({ version }) => version.status === "published").map(({ version }) => version.versionNumber)
+  const currentPublishedVersionNumber = publishedVersionNumbers.length > 0 ? Math.max(...publishedVersionNumbers) : null
+
   function handleNewDraft() {
     setError(null)
     startTransition(async () => {
@@ -116,9 +120,18 @@ function WorkflowVersionHistoryPage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="ghost" className={version.status === "published" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
-                        {version.status === "published" ? "Published" : "Draft"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="ghost" className={version.status === "published" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
+                          {version.status === "published" ? "Published" : "Draft"}
+                        </Badge>
+                        {version.status === "published" && version.versionNumber === currentPublishedVersionNumber ? (
+                          <Badge variant="ghost" className="bg-primary/10 text-primary">
+                            Current
+                          </Badge>
+                        ) : version.status === "published" ? (
+                          <span className="text-xs text-muted-foreground">Historical</span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{version.publishedAt ? formatTimestampDate(version.publishedAt) : "-"}</TableCell>
                     <TableCell className="text-muted-foreground">{publishedByLabel ?? "-"}</TableCell>

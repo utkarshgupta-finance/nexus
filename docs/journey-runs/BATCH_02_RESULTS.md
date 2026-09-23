@@ -1005,3 +1005,98 @@ Denominator fixed per the above; not changed during this pass. Reconciliation pe
 - **Permanent ledger updated:** Yes (this entry).
 
 ### END HISTORICAL UX REVALIDATION L-004 (PASS, with a separately-parked incidental defect)
+
+### BEGIN HISTORICAL UX REVALIDATION L-006
+
+- **Canonical intent:** Confirm a definition cannot be activated while it only has draft (never-published) versions, or none at all.
+- **Exact user-visible assertion:** "Error message clearly states a published version is required first."
+- **Persona used:** `nexus-test-workflow-admin@example.test`.
+- **Fixtures used:** (1) "Batch 1 Reusable Connected Graph Fixture" (`f33d0e24-3d2c-4d4e-83a2-f64ced153856`, Customer Change, matching canonical Domain exactly) — one draft, never published, satisfying the Stress Variant's first sub-case. (2) A brand-new fictional definition "L-006 Zero Version Test" (Customer Change), created fresh with zero versions at all, satisfying the second sub-case.
+- **Exact browser actions performed:** On the real Workflows list page, inspected the "Activate" button for both fixtures directly (`disabled` property and `title` attribute).
+- **Actual rendered result:** For both fixtures, the Activate button is genuinely `disabled` (not merely styled to look disabled), with `title="Publish a version before activating this workflow."` — a native browser tooltip shown on real hover. This is stronger than the canonical text implies: rather than allowing the click and then showing a post-failure error message, the UI proactively prevents the invalid action altogether while still clearly communicating why via the tooltip.
+- **Expected result:** Error message clearly states a published version is required first.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** N/A beyond the above; the disabled-button mechanism makes the underlying RPC's own error message unreachable through the real UI (a stronger guarantee, not a gap).
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED — the canonical assertion is satisfied (arguably exceeded) by a disabled-button-with-tooltip pattern rather than a post-click error toast; no gap to expand.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-006 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-007
+
+- **Canonical intent:** Confirm the partial unique index truly blocks a naive direct activation (as opposed to the governed swap RPC) of a second definition for a context that already has one active.
+- **Exact user-visible assertion:** "Error message directs the admin toward the correct swap action rather than a raw constraint error."
+- **Persona used:** `nexus-test-workflow-admin@example.test`.
+- **Fixtures used:** "WF-TEST Decision Route Finance or Legal" (Go Live, Published, Active) and "Batch 15 Go Live Finance Approval" (Go Live, Published, Inactive) — both real, pre-existing fictional Go Live fixtures, matching the canonical Domain exactly.
+- **Exact browser actions performed:** Clicked "Activate" on the inactive fixture while the other was active.
+- **Actual rendered result:** The click succeeded completely: "Batch 15 Go Live Finance Approval" became Active, "WF-TEST Decision Route Finance or Legal" was automatically deactivated — a full, correct governed swap, not a rejected naive activation. Read the source (`src/platform/workflow-builder/ui/workflow-definitions-page.tsx:45-46,81-88`) to understand why: by deliberate design, the list page's "Activate" button *always* calls `replaceActiveWorkflowDefinitionAction` (the governed swap RPC), never the naive `setWorkflowDefinitionActiveAction`. There is no UI path that reaches a naive direct-activate attempt at all.
+- **Expected result (canonical):** A naive direct activate is rejected with a message directing the admin to the swap action.
+- **Actual expected result (this product's real design):** A real user can never trigger the naive path at all — the only Activate control the UI offers already performs the safe swap. The underlying RPC-level protection this journey originally describes still exists and matters (defense against a raw/crafted API call, not reachable from the UI), but it is architecturally unreachable by a genuine user click, making it a stronger guarantee than "clear error message," not a gap.
+- **Manual UX result:** PASS (re-scoped): the UX assertion is trivially satisfied because the UI structurally never offers the dangerous path in the first place.
+- **Existing server/control evidence:** N/A beyond source confirmation above; the RPC-level rejection of a raw naive activate call (if invoked directly, bypassing the UI) is a separate, already-covered server/control invariant, not re-tested here since it has no live UI path.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED, with a note: this journey's canonical framing (assumes a user-reachable "naive activate" control exists) does not match this product's actual, safer design (only the governed swap is ever exposed). Worth a future documentation tightening in `NEXUS_JOURNEY_UNIVERSE.md` to describe the real UI's guarantee rather than an error-message expectation, but not treated as a defect since the actual behavior is strictly safer than what was specified.
+- **Permanent ledger updated:** Yes (this entry). Restored "WF-TEST Decision Route Finance or Legal" as the active Go Live definition afterward (re-activated it via the same governed swap) to leave shared fixture state as found.
+
+### END HISTORICAL UX REVALIDATION L-007 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-015
+
+- **Canonical intent:** Confirm `row_version` protects the version row's own lifecycle transitions from a lost-update race between two concurrent admins.
+- **Exact user-visible assertion:** "Admin B sees a clear 'this was changed by someone else, please refresh' message."
+- **Persona used:** `nexus-test-workflow-admin@example.test`, two separate tabs simulating Admin A and Admin B holding the same initial `row_version` (matching the same "two tabs, one persona, independent client-side state" pattern already established and accepted for concurrency journeys in this program, e.g. Batch 1's K-010).
+- **Fixture used:** "K-017 Workflow Admin Lifecycle Test" Draft Version 2 (`e8a1dcc8-e056-4dbf-a0dc-5fdd8f4cdbd0`/`fa9cab9d-bfe9-42cf-876d-233d6a57ff5d`), Customer Change domain (matches canonical Domain exactly).
+- **Exact browser actions performed:** Loaded the identical draft URL in two tabs (both holding the same `row_version`). Clicked "Save Draft" in Tab A first — succeeded ("Draft saved."), bumping `row_version`. Immediately clicked "Validate & Publish" in Tab B, which still held the now-stale `row_version` from before Tab A's save.
+- **Actual rendered result:** Tab B rendered: "This workflow draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes." with a "Refresh" button directly beneath it — exactly the clear, actionable message the canonical UX Check requires, plus the Recovery/Resilience Variant's own "reload to get the current state" affordance built directly into the error UI. A direct DB read afterward confirms exactly one action took effect: Version 2 remains `status=draft` (not double-published or corrupted), `row_version=2` reflecting only Tab A's successful save.
+- **Expected result:** Clear stale-state message, no lost update, no corruption.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** Direct DB read confirming single, consistent state after the race (above).
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED, now with genuine two-tab live evidence rather than simulated sequential RPC calls.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-015 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-018
+
+- **Canonical intent:** Confirm the documented default of a newly created definition being inactive when its context already has an active definition, preventing an accidental silent takeover.
+- **Exact user-visible assertion:** "UI clearly shows the new definition as inactive immediately after creation, not ambiguously 'pending.'"
+- **Persona used:** `nexus-test-workflow-admin@example.test`.
+- **Starting state confirmed:** "WF-TEST Simple One-Step Approval" (Customer Onboarding, Published) was already Active, matching the canonical precondition.
+- **Exact browser actions performed:** Created a brand-new definition "L-018 New Definition Inactive Test" with Applies To = Customer Onboarding via the real Create Workflow form; navigated to the definitions list immediately after.
+- **Actual rendered result:** The new row reads "Inactive" plainly and immediately — no "pending," no blank, no ambiguity — right alongside "No versions yet" in the Version/Status columns.
+- **Expected result:** Clear "inactive" labeling immediately after creation.
+- **Manual UX result:** PASS.
+- **Existing server/control evidence:** N/A beyond direct observation above.
+- **Defect found?:** No.
+- **Fix/regression/browser retest:** N/A.
+- **Journey Discovery observation:** ALREADY COVERED.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-018 (PASS)
+
+### BEGIN HISTORICAL UX REVALIDATION L-020
+
+- **Canonical intent:** Confirm published version history is fully retained (never pruned) and that "the active version" is purely a computed, not stored, concept.
+- **Exact user-visible assertion:** "Version history UI clearly marks version 4 [i.e., the highest published version] as current/active and 1 through 3 as historical."
+- **Persona used:** `nexus-test-workflow-admin@example.test`.
+- **Fixture used:** "WF-TEST Finance then Legal Sequential" (`a167d59c-b1b3-47e8-807a-37ddd9a2c79c`), Customer Change (matches canonical Domain exactly), with 11 published versions plus one draft — comfortably exceeding the canonical "4 published versions" starting state.
+- **Exact browser actions performed:** Opened the real version history page and read the rendered Status column for every row.
+- **Actual rendered result (defect found):** Every published version (1 through 11) rendered an identical green "Published" badge. Nothing distinguished Version 11 (the one actually used for new request resolution) from Versions 1-10 (superseded but retained history) — the canonical assertion was not met.
+- **Root cause:** `src/platform/workflow-builder/ui/workflow-version-history-page.tsx` rendered the Status badge purely from `version.status` (`"published"` vs `"draft"`), with no concept of "highest published version_number among this definition's rows."
+- **Fix:** Computed `currentPublishedVersionNumber` (the max `versionNumber` among published rows) once per page render; added a second "Current" badge next to Published for that one row, and a plain "Historical" label for every other published row. Draft rows unaffected.
+- **Regression test:** This repo has no existing `.test.tsx` convention for UI components (confirmed: zero exist anywhere in `src/`) — correctness here is verified via genuine live browser retest below, consistent with this whole program's own Manual UX methodology. `npx tsc --noEmit` and `npx eslint` both clean on the changed file.
+- **Genuine retest after fix:** Reloaded the same live page. Version 11 now shows "Published" + "Current"; Versions 1 through 10 each show "Published" + "Historical"; Version 12 (draft) unaffected. Confirmed via screenshot.
+- **Expected result:** Clear current-vs-historical distinction.
+- **Manual UX result:** FAILED THEN FIXED + PASS.
+- **Existing server/control evidence:** N/A beyond the live retest.
+- **Defect found?:** Yes (new, not previously documented — the original ledger's evidence for this journey was a borrowed observation from an adjacent test, never a dedicated check of this exact table).
+- **Fix/regression/browser retest:** Complete, as described above.
+- **Journey Discovery observation:** ALREADY COVERED, now with a genuine dedicated check and a real fix.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END HISTORICAL UX REVALIDATION L-020 (FAILED THEN FIXED + PASS)
