@@ -8,7 +8,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     // Several test files cold-load a dynamic `import(...)` module graph
     // inside the test body (a deliberate pattern proving a real module
     // boundary, e.g. `server-only` guards). 30000ms gives real headroom

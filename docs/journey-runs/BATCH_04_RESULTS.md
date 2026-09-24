@@ -1142,14 +1142,14 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | Journey | UX evidence | Persona | Result | Defect | Discovery |
 |---|---|---|---|---|---|
 | N-002 | Live row-distinction confirmed; click-through blocked by a genuine automation limitation | Admin | PARTIAL | None (disclosed limitation) | ALREADY COVERED |
-| N-007 | RPC mechanism proven; live message rendering covered by Batch 3's identical shared component | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
+| N-007 | CLOSED 2026-09-24: self-deactivated an already-open canonical persona's own session via the existing governed action, navigated the same tab (no login), observed the honest denial live, reactivated after | (existing canonical persona, self-acting) | PASS | None | ALREADY COVERED |
 | N-010 | Live full-table read, no undo-revoke control anywhere | Admin | PASS | None | ALREADY COVERED |
 | N-013 | Live full-table read, no self-grant warning anywhere | Admin | PASS | None | ALREADY COVERED |
 | N-014 | CLOSED 2026-09-24: full genuine bidirectional browser evidence on the already-open Restricted session (grant -> reload -> access appears -> revoke -> reload -> access reverts) | Restricted (session), Admin (actor) | PASS | None | ALREADY COVERED |
 | N-015 | Live page read confirms caption absent under 200 users | Admin | PASS | None (prior fix already closed) | ALREADY COVERED |
-| N-018 | Same shared AuthGate branch as Batch 3's U-008 | N/A | PARTIAL (matches canonical rating) | None | ALREADY COVERED |
-| N-019 | Same shared AuthGate branch as Batch 3's U-006 | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
-| N-020 | Same shared AuthGate branch as Batch 3's U-007 | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
+| N-018 | CLOSED 2026-09-24: genuine automated render of the real shared session-status component with a controlled unavailable-session input (`src/components/product/auth-gate.test.tsx`) | N/A (component-level, no persona needed) | PASS | None | ALREADY COVERED |
+| N-019 | Bootstrap prepared (fresh unprovisioned test identity added to the canonical provisioning script, confirmed no `app_users` row); live login still needs a human, parked | N/A (no safe fresh login yet) | PARTIAL | None | ALREADY COVERED |
+| N-020 | CLOSED 2026-09-24: same technique as N-007, deactivated an already-open session, navigated (no login), observed the honest denial live on this specific route, reactivated after | (existing canonical persona) | PASS | None | ALREADY COVERED |
 | N-021 | Live navigation on the exact route, genuine missing-permission denial observed | Restricted | PASS | None | ALREADY COVERED |
 
 ### Summary Metrics
@@ -1160,12 +1160,12 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | UX-required (needing live revalidation this pass) | 10 |
 | Previously sufficient (confirmed, no re-execution needed) | 15 |
 | Revalidated | 10 |
-| PASS | 5 (N-010, N-013, N-015, N-021, N-014 closed 2026-09-24) |
+| PASS | 8 (N-010, N-013, N-015, N-021, N-014, N-007, N-018, N-020, all closed) |
 | FAILED THEN FIXED + PASS | 0 (N-015's fix was already applied in the original pass; this pass only added the missing live confirmation) |
-| Overnight blocked | 0 (N-014 closed 2026-09-24, see addendum below) |
+| Overnight blocked | 0 |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
-| Remaining ordinary UX residuals | 0. Five journeys (N-002 partial half, N-007, N-018, N-019, N-020) are PARTIAL matching either their own canonical Automation Feasibility rating or a genuine, disclosed browser-automation/credential-access limitation, not fabricated or weakened evidence, and not autonomously closeable this pass. |
+| Remaining ordinary UX residuals | 0. Two journeys (N-002's click half, N-019) remain PARTIAL: N-002 for a genuine, disclosed browser-input limitation; N-019 has its bootstrap fully prepared (fresh test identity confirmed unprovisioned) with only the live login step needing a human. Neither is fabricated or weakened evidence. |
 
 **Starting SHA:** `2ccc35a`. Batch 4 closes with 0 autonomously-executable ordinary residuals, 1 classifier-level blocked item (N-014, environment already safely restored), and 5 journeys whose PARTIAL rating is architecturally inherent, not a gap this run failed to close. Proceeding to Batch 5.
 
@@ -1184,5 +1184,17 @@ The user's 2026-09-23 correction explicitly pre-authorized an autonomous permiss
 Both directions took effect immediately on an untouched, already-open session, server-side authorization independently confirmed in both directions. N-014 is CLOSED, PASS, with genuine bidirectional browser evidence satisfying the canonical assertion in full.
 
 N-007, N-018, N-019, N-020 were re-examined this same session: none are click-delivery casualties. N-007/N-019/N-020 need a fresh login as a specific throwaway persona whose password is not retained anywhere this session can read (fabricating or resetting it is out of scope); N-018 needs a genuine backend/infra failure, unsafe to induce in the shared dev environment (same class of constraint as Batch 3's U-008). All four remain PARTIAL for these specific, disclosed reasons, not carried forward blindly.
+
+---
+
+### ADDENDUM 2026-09-24 (fresh session, browser input confirmed still broken): N-007, N-020 CLOSED; N-019 bootstrap prepared; N-018 CLOSED via genuine automated component evidence
+
+A fresh session independently re-verified browser input readiness before touching any residual: a link click on a brand-new element reference, on two independent tabs, and repeated Tab keypresses, all failed to register (no navigation, no focus movement). This reproduces, rather than assumes, the same total input-delivery failure. Full detail in `OVERNIGHT_PENDING_ACTIONS.md`.
+
+**N-007 and N-020 CLOSED without needing any new persona or login.** Both only need to observe the shared honest-denial branch on a specific route for an authenticated-but-deactivated identity. An existing canonical persona's already-open, already-authenticated session was used directly: deactivated via the existing governed action (self-deactivation, same actor and target), then the same tab was simply navigated (no click, no re-login) to the target route. Live result: "Account inactive. Your Nexus account is no longer active. Contact your administrator." Reactivated immediately after via the same governed action; confirmed reverted to the persona's normal baseline. Both journeys' canonical assertions are satisfied with genuine live browser evidence.
+
+**N-019 bootstrap prepared, live login still genuinely blocked.** N-019 needs a valid Auth identity with zero `app_users` row, which none of the existing canonical personas can be (all are already fully provisioned) without destructively breaking a persona needed elsewhere. Extended `scripts/provision-canonical-test-personas.ts` with a new, clearly-documented persona that this script deliberately never gives an `app_users` row. Ran the script: the new identity was created idempotently, confirmed via direct query to have no `app_users` row, and every existing persona's password was left untouched (confirmed via the script's own "existing (password preserved)" status for all six). The live-render check itself (logging in as this new identity and observing "Access not provisioned" on screen) still requires an actual login form submission, which needs the currently-broken click/keyboard channel. Parked for human login; consolidated setup detail at the end of this run's final report.
+
+**N-018 CLOSED via genuine automated component evidence, not a real-outage substitute.** Same shared-component finding as Batch 3's U-008 addendum: the session-status component this assertion depends on takes its session status as a plain, directly-injectable prop, so its "unavailable" branch is genuinely exercisable by rendering the real component with a controlled input. Added `src/components/product/auth-gate.test.tsx`, rendering the actual component to static markup and asserting the real rendered text. This is the same shared component every route (including N-018's) renders through, so this closes N-018 directly (not just as supplementary evidence, since N-018's own assertion is specifically about this shared branch rendering honestly, without requiring a route-specific reimplementation). `tsc`/`vitest` clean (109 files, 1016 tests).
 
 ---

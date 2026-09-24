@@ -71,6 +71,28 @@ completion.
 
 ---
 
+## Third pass, 2026-09-24 (fresh session): browser input re-verified from first principles, still broken; six more closures
+
+A genuinely fresh session was instructed not to inherit the prior session's browser-input finding as fact. It verified independently before touching any residual: a link click on a brand-new element reference on one tab, retried on a second, completely independent tab, plus repeated Tab keypresses to test keyboard focus as a separate channel. All failed to register (no navigation, no focus movement off the page body). **BROWSER INPUT READINESS = FAIL**, confirmed fresh, not carried forward. Given this, the 34 click-dependent residuals could not be attacked directly this pass; work instead focused on what a fresh session could still do differently: reconcile the register, close what doesn't need a click, and prepare what needs a human.
+
+- **N-007 and N-020 CLOSED without any new persona.** Both only need a deactivated identity's honest denial observed on a specific route. Realized neither needs a fresh login at all: an existing canonical persona's own already-open, already-authenticated session was deactivated via the existing governed action (self-deactivation), then the same tab was simply navigated, no click, no re-login, to the target route. Live result: the honest "Account inactive" message. Reactivated immediately after, confirmed reverted. This is the same class of reversible, governed-path action already authorized for N-014, applied to a different existing persona rather than a new one.
+- **N-019 bootstrap prepared, live login genuinely still blocked.** This journey needs an Auth identity with zero `app_users` row, which none of the six existing canonical personas can be without destructively breaking one needed elsewhere. Added a new, clearly-documented persona to `scripts/provision-canonical-test-personas.ts` that this script deliberately never provisions an `app_users` row for. Ran the script: idempotent, created only the new identity, left all six existing personas' passwords untouched (confirmed via the script's own per-persona status output), confirmed via direct query the new identity genuinely has no `app_users` row. The live-render step itself needs an actual login form submission, which needs the still-broken click/keyboard channel. Consolidated setup detail at the end of this document.
+- **N-018 CLOSED via genuine automated component evidence.** The shared session-status component (`AuthGate`) takes its session status as a plain, directly-injectable prop, so its "unavailable" branch is genuinely exercisable by rendering the real component with a controlled input, no real backend failure needed. Added `src/components/product/auth-gate.test.tsx`, rendering the actual component to static markup and asserting the real rendered fallback text appears (and the gated content does not). Same finding strengthens Batch 3's U-008 (same component, same branch), though U-008's own canonical Automation Feasibility rating stays PARTIAL by design. `tsc`/`vitest` clean (109 files, 1016 tests).
+- **P-021 reclassified PRODUCT DECISION REQUIRED, not tooling-blocked.** Confirmed again this pass, more precisely: the journey's own canonical wording assumes a UI surface exists to render `reference_options` audit history; no such surface exists anywhere in the app. Building one is a structural addition needing a scope decision (where should it live), not a bounded fix this session should make unilaterally. Full detail in `BATCH_07_RESULTS.md`'s third addendum.
+
+---
+
+## Consolidated human-login setup needed (one item)
+
+Only one journey (N-019) genuinely needs a human to complete, once browser input is restored (this session's own tool, or any other working automation channel, or a person driving the browser directly):
+
+- **Email:** `nexus-test-unprovisioned@example.test`
+- **Password environment variable name:** `NEXUS_TEST_UNPROVISIONED_PASSWORD` (set in `.env.nexus-test.local`, gitignored; value never printed by the provisioning script or by this session)
+- **Suggested isolated origin:** any previously-unused `*.localhost:3000` subdomain (e.g. `unprovisioned.localhost:3000`), so its session cookie stays independent of every other open persona tab
+- **What to do:** log in at that origin with that email/password, then navigate to `/settings/user-access` and confirm the honest "Access not provisioned" message renders (this is the same shared `AuthGate` branch already proven correct by the automated test above; only this specific identity's live render is outstanding)
+
+---
+
 ## Overnight run scope complete: Batches 2-7 closed, Batch 8 NOT started
 
 Per the standing overnight directive, this run's scope was exactly Batches 2 through 7. All six are now closed (see each `BATCH_0{2-7}_RESULTS.md` for full evidence). Batch 8 was deliberately not started, per explicit instruction. See the final report (`docs/journey-runs/OVERNIGHT_RUN_REPORT_BATCHES_02_07.md`, to be written) for the complete summary and morning actions.

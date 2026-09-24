@@ -4,9 +4,12 @@
  * scripts/retire-old-test-personas.ts): a Maker with no approve permission,
  * a Finance approver, a Legal approver, a UX approver (three distinct
  * existing teams, reused, never recreated), a Restricted user with no
- * roles or teams at all, and a Workflow Admin holding only the
- * workflow_admin role (no team, no other role) for role-isolation testing
- * of the Workflow Builder's own admin lifecycle (K-017).
+ * roles or teams at all, a Workflow Admin holding only the workflow_admin
+ * role (no team, no other role) for role-isolation testing of the
+ * Workflow Builder's own admin lifecycle (K-017), and an Unprovisioned
+ * user: a genuine Auth identity this script deliberately never gives an
+ * app_users row (N-019), the one intentional exception in this file to
+ * "every persona is a normal, fully provisioned identity."
  *
  * Every identity is created through the real, supported Supabase Auth
  * Admin API, never a raw insert into auth.users; every role/team grant
@@ -48,11 +51,28 @@ const EXISTING_TEAMS = [
 
 const PERSONAS = [
   {
+    email: "nexus-test-unprovisioned@example.test",
+    displayName: "Nexus Test Unprovisioned User",
+    roleCode: null,
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_UNPROVISIONED_PASSWORD",
+    // A genuine Supabase Auth identity that intentionally has no app_users
+    // row at all (N-019: "a valid Auth identity with no app_users row sees
+    // an honest 'Access not provisioned' denial"). Every other persona in
+    // this list gets an app_users row via provision_app_user below; this
+    // one deliberately never does, so it must stay last in any reasoning
+    // about "does an existing persona already cover this" and first in any
+    // review of this file, since it is the one intentional exception to
+    // "every identity here is a normal, fully provisioned persona."
+    skipAppUserProvisioning: true,
+  },
+  {
     email: "nexus-test-maker@example.test",
     displayName: "Nexus Test Maker",
     roleCode: "maker",
     teamCode: null,
     passwordEnv: "NEXUS_TEST_MAKER_PASSWORD",
+    skipAppUserProvisioning: false,
   },
   {
     email: "nexus-test-finance@example.test",
@@ -60,6 +80,7 @@ const PERSONAS = [
     roleCode: "checker",
     teamCode: "wf_test_finance",
     passwordEnv: "NEXUS_TEST_FINANCE_PASSWORD",
+    skipAppUserProvisioning: false,
   },
   {
     email: "nexus-test-legal@example.test",
@@ -67,6 +88,7 @@ const PERSONAS = [
     roleCode: "checker",
     teamCode: "wf_test_legal",
     passwordEnv: "NEXUS_TEST_LEGAL_PASSWORD",
+    skipAppUserProvisioning: false,
   },
   {
     email: "nexus-test-restricted@example.test",
@@ -74,6 +96,7 @@ const PERSONAS = [
     roleCode: null,
     teamCode: null,
     passwordEnv: "NEXUS_TEST_RESTRICTED_PASSWORD",
+    skipAppUserProvisioning: false,
   },
   {
     email: "nexus-test-ux-approver@example.test",
@@ -81,6 +104,7 @@ const PERSONAS = [
     roleCode: "checker",
     teamCode: "ux_verification_team",
     passwordEnv: "NEXUS_TEST_UX_APPROVER_PASSWORD",
+    skipAppUserProvisioning: false,
   },
   {
     email: "nexus-test-workflow-admin@example.test",
@@ -88,6 +112,7 @@ const PERSONAS = [
     roleCode: "workflow_admin",
     teamCode: null,
     passwordEnv: "NEXUS_TEST_WORKFLOW_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
   },
 ] as const
 
@@ -174,6 +199,14 @@ async function main() {
       }
     } else {
       authUserId = created.user.id
+    }
+
+    if (persona.skipAppUserProvisioning) {
+      // Intentionally stop here: this persona must remain a valid Auth
+      // identity with no app_users row (see the comment on this persona's
+      // entry above). Calling provision_app_user would defeat the point.
+      results.push({ email: persona.email, displayName: persona.displayName, roleCode: null, teamCode: null, status: status === "created" ? "created" : status })
+      continue
     }
 
     const { data: appUser, error: provisionError } = await supabase.rpc("provision_app_user", {
