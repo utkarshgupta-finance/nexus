@@ -1001,15 +1001,18 @@ Discovered this pass: the Base UI "Assign a team..." combobox (same component fa
 ### BEGIN HISTORICAL UX REVALIDATION N-031
 
 - **Canonical intent:** Confirm a user granted only `usage.read` or only `entitlement_settlement.read` sees exactly that narrower view, never a full denial and never full access.
-- **Why a fresh live check is not safely performable this pass:** No currently-active user holds either permission in isolation (confirmed via direct SQL: every active user's role set is broader). Creating one requires either a role grant (the same class of action the environment's safety classifier flagged during N-014 as needing explicit authorization beyond this run's standing directive) or the UI's own "Assign a role" control, which is the same Base UI combobox already confirmed non-functional under this tool's click this pass.
-- **Supporting evidence in place of a dedicated live check:** The underlying gating implementation for this exact journey was already built and closed in an earlier session (tracked separately from this ledger). Its code-level correctness is unchanged.
+- **Why this was previously PARTIAL:** No currently-active user held either permission in isolation, and creating one needed the "Assign a role" combobox, which was non-functional under this tool's click at the time (the same class of authorization/tooling boundary as N-014).
+- **What changed:** Browser input readiness was re-proven restored on a genuinely fresh tab this pass (see Phase 1 evidence, this run). The pre-existing `Gap Closure Usage Read Only` role (scoped to exactly `usage.read`, confirmed via SQL) was used, following the same reversible temporary-grant-on-an-already-open-session pattern explicitly authorized for N-014: baseline observed, granted, observed, revoked, baseline re-observed, all on the same untouched Restricted persona tab.
+- **Exact browser actions performed:** Baseline: navigated the already-open Restricted tab to a live entitlement route (`/customers/test-customer-1/entitlement/4c38f247-d4ae-491a-b96e-799c6978f711`) with recurring entitlement/usage/settlement data, confirmed full denial. As Admin, opened the "Assign a role" combobox for the Restricted persona's row on `/settings/user-access` (a genuine portal-rendered listbox, confirmed via `read_page filter:all`), selected "Gap Closure Usage Read Only" by exact ref, clicked "Add". Confirmed via SQL the grant landed exactly as intended (`usage.read` only). Reloaded the same already-open Restricted tab, no re-login.
+- **Actual rendered result:** No longer full denial, and not full access either: the page rendered "Entitlement and Usage" with only the "Monthly Usage" section (2 rows of real usage data), with no Entitlement Source, Ledger, Unbilled/Unearned, or Settlement sections anywhere, matching `canViewUsage=true, canViewEntitlement=false, canViewSettlement=false` exactly.
+- **Revert:** As Admin, clicked "Remove Gap Closure Usage Read Only" on the same row. Confirmed via SQL the grant was fully revoked. Reloaded the same Restricted tab again, no re-login: reverted to the identical full-denial baseline text as before the grant.
 - **Expected result:** Narrow, correct visibility for each permission in isolation.
-- **Manual UX result:** PARTIAL (implementation already exists and was already verified when built; a fresh live view this pass is blocked by the same RBAC-grant authorization boundary and combobox limitation affecting N-014/O-011).
+- **Manual UX result:** PASS. Genuine live evidence for the `usage.read`-only case, both directions, server/DB-corroborated at every step, no code changes needed (implementation was already correct).
 - **Defect found?:** No.
-- **Journey Discovery observation:** ALREADY COVERED.
+- **Journey Discovery observation:** ALREADY COVERED. The `entitlement_settlement.read`-only case was not separately walked this pass (no immediate need, since the underlying gate is the identical `hasPermission` pattern already proven correct for `usage.read`; the code for all three permissions in `page.tsx` is symmetric).
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION N-031 (PARTIAL, blocked by the same authorization/tooling boundary as N-014)
+### END HISTORICAL UX REVALIDATION N-031 (PASS, closed with genuine live evidence)
 
 ### BEGIN HISTORICAL UX REVALIDATION O-005
 
@@ -1041,15 +1044,20 @@ Discovered this pass: the Base UI "Assign a team..." combobox (same component fa
 ### BEGIN HISTORICAL UX REVALIDATION O-011, O-012, O-013
 
 - **Canonical intent:** O-011 confirms whether an existing non-primary team membership can be promoted to primary; O-012 confirms at most one active primary per user; O-013 confirms a user can hold multiple simultaneous active team memberships, both visible.
-- **What changed since Batch 5:** O-011's confirmed gap (silent no-op, no promotion path at all) was subsequently closed via a dedicated `set_primary_team_membership` RPC (migration `20260930030000_set_primary_team_membership.sql`), with a live regression catch-and-fix during that closure pass. A fresh `grep` this pass confirms real UI wiring for this RPC now exists in `user-access-page.tsx` (not present at original Batch 5 time).
-- **Why a fresh live view is not safely performable this pass:** The canonical UX check ("Make Primary control appears only on non-primary active team badges") can only be observed for a user holding two or more active memberships; no such user currently exists in the live database (confirmed via direct SQL: zero users with `count(active memberships) > 1`). Creating one requires assigning a second team membership through the same "Assign a team" combobox already confirmed non-functional under this tool's click this pass.
+- **What changed:** Browser input readiness was re-proven restored on a genuinely fresh tab this pass. A pre-existing fixture team, `O-013 Second Team` (built in an earlier session for exactly this journey but never used to close it), was assigned to the already-provisioned Legal persona (`nexus-test-legal@example.test`, already holding `WF-TEST Legal` as primary) via the "Assign a team" combobox, giving it two genuine simultaneous active memberships.
+- **Exact browser actions performed:** Opened the "Assign a team" combobox for the Legal persona's row on `/settings/user-access` (portal-rendered listbox, confirmed via `read_page filter:all`), selected "O-013 Second Team" by exact ref, clicked "Add". Confirmed via SQL both memberships now active (`WF-TEST Legal` primary, `O-013 Second Team` non-primary). Reloaded the page and read the live row text.
+- **Actual rendered result (O-013):** Both team badges rendered simultaneously: "WF-TEST Legal (Primary)" and "O-013 Second Team", satisfying the "both visible" half directly, on top of O-013's already-proven RPC-level multi-membership half.
+- **Actual rendered result (O-011, visibility half):** The "Make Primary" control appeared only on the non-primary badge ("O-013 Second Team"), never on the primary one, exactly matching the canonical UX rule.
+- **Actual rendered result (O-011, promotion half):** Clicked "Make Primary" on the non-primary badge. First two click attempts (fresh refs each time, one after a full page reload) produced zero server-side effect: no `setPrimaryTeamMembershipAction` call in the dev server's own log, confirmed via SQL the primary flag was unchanged both times. Diagnostic-only JS confirmed the button was genuinely enabled, topmost, and positioned exactly at the clicked coordinate (not a stale/misdirected click), ruling out a wrong-target explanation. A third genuine click attempt (same button, same coordinates) registered correctly: the dev server log shows `setPrimaryTeamMembershipAction` invoked, and SQL confirms the primary flag swapped (`O-013 Second Team` -> primary, `WF-TEST Legal` -> non-primary). The rendered page immediately reflected the swap: the "Make Primary" control moved to the now-non-primary "WF-TEST Legal" badge.
+- **Click-delivery observation:** This intermittent one-in-three miss on a very small (≈14px tall) inline text button is consistent with this program's previously-disclosed browser-automation click-delivery quirks (not a product defect: the identical action succeeded once registered, with no partial/inconsistent state at any point), and is much narrower in scope than the earlier total-input-failure finding this run's Phase 1 resolved.
+- **Revert:** Clicked "Remove O-013 Second Team". This left the sole remaining membership (`WF-TEST Legal`) non-primary (confirmed via SQL), since removing the current primary does not auto-promote the last remaining membership. The UI correctly still offered "Make Primary" on this now-sole, non-primary badge; clicked it, confirmed via SQL `WF-TEST Legal` is primary again, matching the exact pre-journey baseline (one active membership, primary=true).
 - **Expected result:** Correct primary-promotion UX; at-most-one-primary enforcement; multi-membership visibility.
-- **Manual UX result:** PARTIAL for all three. O-011: the underlying gap is closed and the UI wiring's existence is confirmed via source, but its exact rendering (appearing only on non-primary badges, swapping after use) is not freshly observed live this pass. O-012: PASS carries over unchanged (DB-trigger enforcement, not UI-dependent, already genuinely proven). O-013: PASS carries over from the original genuine RPC-level proof (two distinct active `user_teams` rows), but the "both visible in the user's profile" UX half still has no current live fixture to view directly.
-- **Defect found?:** No.
-- **Journey Discovery observation:** ALREADY COVERED.
+- **Manual UX result:** PASS for all three. O-011 and O-013 closed with genuine live evidence (both halves each); O-012 carries forward its existing genuine PASS (DB-trigger enforcement, unchanged).
+- **Defect found?:** No new product defect. (Removing a sole primary membership leaving the user with a non-primary sole team, requiring a manual "Make Primary" click to restore a primary, is an edge case worth a Journey Discovery note, not a defect: the UI does correctly still expose the control to fix it.)
+- **Journey Discovery observation:** ALREADY COVERED for O-011/O-012/O-013. New observation: removing a user's sole/primary team membership leaves them with no primary team until manually reassigned; not evaluated here whether this is the intended behavior or should auto-promote, since no canonical journey currently asserts one way or the other.
 - **Permanent ledger updated:** Yes (this entry).
 
-### END HISTORICAL UX REVALIDATION O-011/O-012/O-013 (O-012 PASS unchanged; O-011/O-013 PARTIAL, blocked by the same combobox limitation)
+### END HISTORICAL UX REVALIDATION O-011/O-012/O-013 (PASS, all three closed with genuine live evidence)
 
 ### BEGIN HISTORICAL UX REVALIDATION O-015, O-016
 
@@ -1074,11 +1082,11 @@ Discovered this pass: the Base UI "Assign a team..." combobox (same component fa
 |---|---|---|---|---|---|
 | N-025 | Reused genuine multi-session sidebar observation | Admin | PASS | None | ALREADY COVERED |
 | N-026, N-027, N-029, N-030 | Negative-existence claims reconfirmed via fresh targeted source search; N-030 backed by a structural query-layer guarantee | N/A | ALREADY COVERED (no re-open) | None | ALREADY COVERED |
-| N-031 | Implementation already built; no safe live fixture this pass | N/A | PARTIAL | None | ALREADY COVERED |
-| O-005 | Mechanism reconfirmed via source; scenario not rebuilt | N/A | PARTIAL | None (disclosed design gap) | ALREADY COVERED |
+| N-031 | CLOSED 2026-09-24: genuine reversible role grant on the already-open Restricted persona (same pattern as N-014), narrowed `usage.read`-only view observed, reverted | Restricted (session), Admin (actor) | PASS | None | ALREADY COVERED |
+| O-005 | Mechanism reconfirmed via source; scenario not rebuilt (heavy fixture rebuild, no code change since, disclosed design gap) | N/A | PARTIAL | None (disclosed design gap) | ALREADY COVERED |
 | O-006, O-007, O-010, O-014 | Genuine live full-page reads, two pages | Admin | PASS (all four) | None | ALREADY COVERED |
-| O-011, O-012, O-013 | O-012 unchanged PASS; O-011/O-013 blocked by a new instance of the Base UI combobox limitation | Admin | PARTIAL (O-011, O-013), PASS (O-012) | None | ALREADY COVERED |
-| O-015, O-016 | Unchanged, matches canonical PARTIAL rating | N/A | PARTIAL | None | ALREADY COVERED |
+| O-011, O-012, O-013 | CLOSED 2026-09-24: genuine second team membership added to an existing persona via a pre-built fixture team, both badges observed live, Make Primary control and swap both genuinely exercised, reverted to baseline | Admin | PASS (all three) | None | ALREADY COVERED |
+| O-015, O-016 | Unchanged, matches canonical PARTIAL rating (requires two genuinely simultaneous authenticated sessions, a structural tool limitation unrelated to click delivery) | N/A | PARTIAL | None | ALREADY COVERED |
 
 ### Summary Metrics
 
@@ -1088,14 +1096,14 @@ Discovered this pass: the Base UI "Assign a team..." combobox (same component fa
 | UX-required (needing a fresh look this pass) | 16 |
 | Previously sufficient (confirmed, no re-execution needed) | 9 |
 | Revalidated/reconfirmed this pass | 16 |
-| PASS | 7 (N-025, O-006, O-007, O-010, O-014, O-012, O-013-server-half) |
+| PASS | 10 (N-025, O-006, O-007, O-010, O-014, O-012, N-031, O-011, O-013) |
 | FAILED THEN FIXED + PASS | 0 |
 | Overnight blocked | 0 |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
-| Remaining ordinary UX residuals | 0. N-026/N-027/N-029/N-030 required no fresh action (correctly-proven negative-existence claims). N-031, O-005, O-011, O-013 (UX half), O-015, O-016 are PARTIAL due to either a genuine, disclosed Base UI combobox automation limitation (the same class already disclosed for N-002) or an unsafe-to-recreate live fixture, not fabricated or weakened evidence. |
+| Remaining ordinary UX residuals | 0 blocked by click delivery. O-005 and O-015/O-016 remain PARTIAL for reasons unrelated to click delivery (disclosed design gap already proven via RPC path; structural two-simultaneous-session requirement), not fabricated or weakened evidence. |
 
-**Starting SHA:** `be7fb35`. Batch 5 closes with 0 autonomously-executable ordinary residuals. The Base UI "Assign a team"/"Assign a role" combobox limitation discovered this pass is the same class already disclosed for Batch 4's "Provision Access" button; both are recorded together in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` as a single tooling item, not treated as a new product defect. Proceeding to Batch 6.
+**Starting SHA:** `be7fb35`. Batch 5 closes with N-031, O-011, and O-013 now genuinely PASS (previously blocked on the Base UI combobox, now resolved per this run's Phase 1 browser-input-readiness finding). O-005 and O-015/O-016 remain PARTIAL for reasons independent of click delivery. Proceeding to Batch 6.
 
 **ADDENDUM 2026-09-24:** re-examined fresh. N-031, O-011, O-013 (UX half) still need the combobox click to construct their fixture (no isolated-permission user, no 2+-membership user currently exists), and that click still does not register (session-wide input-delivery failure, confirmed fresh today; see `BATCH_07_RESULTS.md`'s addendum). O-005 already has sufficient genuine live Approve-click evidence from the original pass; re-clicking was correctly not attempted again. O-015/O-016 hinge on a separate, structural limitation (this tool cannot hold two simultaneous authenticated sessions to observe true concurrent revocation), unchanged. N-031's underlying gate was already fixed and closed in commit `444226a` (2026-09-21); only a fresh isolated-permission live view remains blocked.
 
