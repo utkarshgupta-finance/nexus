@@ -215,6 +215,26 @@ function CustomerOnboardingPage({
     // eslint-disable-next-line react-hooks/immutability -- SurveyJS Model is an imperative instance; priming it with the real persisted revision data is its documented `data` setter, the same class of mutation use-survey-model.ts already disables this rule for.
     survey.data = initialCase.currentRevision.data
 
+    // A freshly-mounted SurveyJS Model always defaults to its own page 0,
+    // regardless of which stage this case is actually parked at (e.g. a
+    // case sent back for revision at "Tax & Registration" reloaded in a
+    // new tab). Without this sync, the page renders the wrong survey
+    // page's fields (Customer Details) under the correct-looking "Tax &
+    // Registration" header, and the true current page's fields never
+    // appear until the user manually clicks a stage tab or Next/Previous.
+    const initialStage = CUSTOMER_ONBOARDING_STAGES.find((entry) => entry.key === initialCase.currentStageKey)
+    if (initialStage && initialStage.order <= SURVEY_STAGE_ORDER_LIMIT) {
+      // Setting currentPageNo synchronously in the same tick as `survey.data`
+      // does not stick (survey-react-ui's own mount pass resets it back to
+      // page 0 afterwards); deferring one microtask, past that pass, is what
+      // makes it hold, mirroring how a real stage-tab click (which happens
+      // well after mount) reliably works.
+      queueMicrotask(() => {
+        // eslint-disable-next-line react-hooks/immutability -- see the survey.data assignment above; same imperative Model API.
+        survey.currentPageNo = initialStage.order - 1
+      })
+    }
+
     let currentCountry: string | null = (survey.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.country) as string) ?? null
 
     function loadStatesForCountry(countryCode: string | null) {

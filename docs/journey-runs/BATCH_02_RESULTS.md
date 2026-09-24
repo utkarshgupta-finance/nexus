@@ -1157,4 +1157,6 @@ Denominator fixed per the above; not changed during this pass. Reconciliation pe
 
 **Starting SHA:** `586c990`. Batch 2 closes with all autonomously-executable UX residuals complete; the sole remaining item (L-021) is recorded precisely in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` and requires only a dev-server restart to finish, not a business decision. Proceeding to Batch 3 per the overnight run's "Moving to the Next Batch" rule (human-only blockers do not hold the run at the current batch).
 
+**ADDENDUM 2026-09-24:** dev server was cleanly restarted per the user's instruction. The stale compile error blocking L-021's Deactivate/Go-Live click-through is now cleared, but L-021 itself still needs a genuine click to execute (Deactivate button), which this session's browser-automation tool cannot currently deliver (session-wide input-delivery failure, confirmed fresh today, not a stale carryover; full detail in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` and `BATCH_07_RESULTS.md`'s addendum). L-021 remains open, now reclassified as a browser-automation limitation rather than a dev-server-restart blocker.
+
 ---

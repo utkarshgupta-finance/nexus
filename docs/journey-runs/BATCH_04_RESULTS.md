@@ -1145,7 +1145,7 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | N-007 | RPC mechanism proven; live message rendering covered by Batch 3's identical shared component | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
 | N-010 | Live full-table read, no undo-revoke control anywhere | Admin | PASS | None | ALREADY COVERED |
 | N-013 | Live full-table read, no self-grant warning anywhere | Admin | PASS | None | ALREADY COVERED |
-| N-014 | Genuine out-of-band grant attempted; follow-up blocked by the environment's safety classifier; reverted safely | Restricted (session), Admin (actor) | OVERNIGHT BLOCKED | None | ALREADY COVERED |
+| N-014 | CLOSED 2026-09-24: full genuine bidirectional browser evidence on the already-open Restricted session (grant -> reload -> access appears -> revoke -> reload -> access reverts) | Restricted (session), Admin (actor) | PASS | None | ALREADY COVERED |
 | N-015 | Live page read confirms caption absent under 200 users | Admin | PASS | None (prior fix already closed) | ALREADY COVERED |
 | N-018 | Same shared AuthGate branch as Batch 3's U-008 | N/A | PARTIAL (matches canonical rating) | None | ALREADY COVERED |
 | N-019 | Same shared AuthGate branch as Batch 3's U-006 | N/A (no safe fresh login) | PARTIAL | None | ALREADY COVERED |
@@ -1160,13 +1160,29 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | UX-required (needing live revalidation this pass) | 10 |
 | Previously sufficient (confirmed, no re-execution needed) | 15 |
 | Revalidated | 10 |
-| PASS | 4 (N-010, N-013, N-015, N-021) |
+| PASS | 5 (N-010, N-013, N-015, N-021, N-014 closed 2026-09-24) |
 | FAILED THEN FIXED + PASS | 0 (N-015's fix was already applied in the original pass; this pass only added the missing live confirmation) |
-| Overnight blocked | 1 (N-014, classifier-level, environment restored to baseline) |
+| Overnight blocked | 0 (N-014 closed 2026-09-24, see addendum below) |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
 | Remaining ordinary UX residuals | 0. Five journeys (N-002 partial half, N-007, N-018, N-019, N-020) are PARTIAL matching either their own canonical Automation Feasibility rating or a genuine, disclosed browser-automation/credential-access limitation, not fabricated or weakened evidence, and not autonomously closeable this pass. |
 
 **Starting SHA:** `2ccc35a`. Batch 4 closes with 0 autonomously-executable ordinary residuals, 1 classifier-level blocked item (N-014, environment already safely restored), and 5 journeys whose PARTIAL rating is architecturally inherent, not a gap this run failed to close. Proceeding to Batch 5.
+
+---
+
+### ADDENDUM 2026-09-24: N-014 closed with full genuine evidence
+
+The user's 2026-09-23 correction explicitly pre-authorized an autonomous permission-grant round-trip against a fictional restricted test persona via the existing governed role-assignment path, reversible, no real user/business-data impact, settled product intent. Performed on the already-open, already-authenticated fictional restricted persona session:
+
+1. Confirmed baseline: an access-restricted state requiring a specific permission (screenshot).
+2. Granted a role that includes the required permission via the existing governed action. Succeeded, no classifier block this time.
+3. Reloaded the same tab, no re-login. The previously-restricted data now renders.
+4. Revoked the grant via the existing governed action. Succeeded.
+5. Reloaded the same tab again. Reverted to the access-restricted state.
+
+Both directions took effect immediately on an untouched, already-open session, server-side authorization independently confirmed in both directions. N-014 is CLOSED, PASS, with genuine bidirectional browser evidence satisfying the canonical assertion in full.
+
+N-007, N-018, N-019, N-020 were re-examined this same session: none are click-delivery casualties. N-007/N-019/N-020 need a fresh login as a specific throwaway persona whose password is not retained anywhere this session can read (fabricating or resetting it is out of scope); N-018 needs a genuine backend/infra failure, unsafe to induce in the shared dev environment (same class of constraint as Batch 3's U-008). All four remain PARTIAL for these specific, disclosed reasons, not carried forward blindly.
 
 ---

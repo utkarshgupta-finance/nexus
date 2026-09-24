@@ -1097,4 +1097,6 @@ Discovered this pass: the Base UI "Assign a team..." combobox (same component fa
 
 **Starting SHA:** `be7fb35`. Batch 5 closes with 0 autonomously-executable ordinary residuals. The Base UI "Assign a team"/"Assign a role" combobox limitation discovered this pass is the same class already disclosed for Batch 4's "Provision Access" button; both are recorded together in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md` as a single tooling item, not treated as a new product defect. Proceeding to Batch 6.
 
+**ADDENDUM 2026-09-24:** re-examined fresh. N-031, O-011, O-013 (UX half) still need the combobox click to construct their fixture (no isolated-permission user, no 2+-membership user currently exists), and that click still does not register (session-wide input-delivery failure, confirmed fresh today; see `BATCH_07_RESULTS.md`'s addendum). O-005 already has sufficient genuine live Approve-click evidence from the original pass; re-clicking was correctly not attempted again. O-015/O-016 hinge on a separate, structural limitation (this tool cannot hold two simultaneous authenticated sessions to observe true concurrent revocation), unchanged. N-031's underlying gate was already fixed and closed in commit `444226a` (2026-09-21); only a fresh isolated-permission live view remains blocked.
+
 ---

@@ -1091,4 +1091,6 @@ Five journeys require live revalidation: **L-022** (version-history UI surfacing
 
 **Starting SHA:** `598f8e1`. Batch 3 closes with 0 remaining ordinary UX residuals and 0 human-only blockers. Proceeding to Batch 4.
 
+**ADDENDUM 2026-09-24:** re-examined fresh per the user's instruction not to carry forward stale classifications. U-008 (needs a genuine backend/infra failure) and U-014 (needs an Auth token-TTL config change affecting every persona) both still require an environment-safety-unsafe action to observe live, unchanged from the original rating; no new autonomous path exists. Both remain PARTIAL for this specific, disclosed reason.
+
 ---
