@@ -114,6 +114,18 @@ const PERSONAS = [
     passwordEnv: "NEXUS_TEST_WORKFLOW_ADMIN_PASSWORD",
     skipAppUserProvisioning: false,
   },
+  {
+    email: "nexus-test-user-access-admin@example.test",
+    displayName: "Nexus Test User Access Admin",
+    // Holds user_access_admin only, deliberately never team_admin (O-021:
+    // "a user_access_admin holder attempting a team-management action is
+    // denied for lacking team.write, even though role management and team
+    // management are both nominally 'admin' work"). No team membership.
+    roleCode: "user_access_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_USER_ACCESS_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
 ] as const
 
 async function main() {
