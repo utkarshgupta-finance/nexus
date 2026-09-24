@@ -82,14 +82,13 @@ A genuinely fresh session was instructed not to inherit the prior session's brow
 
 ---
 
-## Consolidated human-login setup needed (one item)
+## CLOSED (2026-09-24): N-019, human login completed
 
-Only one journey (N-019) genuinely needs a human to complete, once browser input is restored (this session's own tool, or any other working automation channel, or a person driving the browser directly):
+The user logged in manually at `http://unprovisioned.localhost:3000` (verified read-only beforehand: real login page, zero cookies, zero `localStorage` keys, no console/network errors, no credential entered or accessed by this session). This session then verified the existing session only: authenticated email matches the fresh unprovisioned test identity, confirmed via direct query it still has no `app_users` row, and observed the genuine "Access not provisioned" message on two separate protected routes (no route granted inappropriate access). N-019 is CLOSED, PASS. The persona-bootstrap category is now empty.
 
-- **Email:** `nexus-test-unprovisioned@example.test`
-- **Password environment variable name:** `NEXUS_TEST_UNPROVISIONED_PASSWORD` (set in `.env.nexus-test.local`, gitignored; value never printed by the provisioning script or by this session)
-- **Suggested isolated origin:** any previously-unused `*.localhost:3000` subdomain (e.g. `unprovisioned.localhost:3000`), so its session cookie stays independent of every other open persona tab
-- **What to do:** log in at that origin with that email/password, then navigate to `/settings/user-access` and confirm the honest "Access not provisioned" message renders (this is the same shared `AuthGate` branch already proven correct by the automated test above; only this specific identity's live render is outstanding)
+Separately, ahead of this login, the user asked to rotate only this one identity's Auth password (a local env var change) without touching any other persona. Done via a scoped, one-off Admin API call targeting only that user's Auth id; confirmed via `updated_at` timestamps that no other persona's Auth record changed.
+
+---
 
 ---
 

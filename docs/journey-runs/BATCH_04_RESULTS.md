@@ -1148,7 +1148,7 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | N-014 | CLOSED 2026-09-24: full genuine bidirectional browser evidence on the already-open Restricted session (grant -> reload -> access appears -> revoke -> reload -> access reverts) | Restricted (session), Admin (actor) | PASS | None | ALREADY COVERED |
 | N-015 | Live page read confirms caption absent under 200 users | Admin | PASS | None (prior fix already closed) | ALREADY COVERED |
 | N-018 | CLOSED 2026-09-24: genuine automated render of the real shared session-status component with a controlled unavailable-session input (`src/components/product/auth-gate.test.tsx`) | N/A (component-level, no persona needed) | PASS | None | ALREADY COVERED |
-| N-019 | Bootstrap prepared (fresh unprovisioned test identity added to the canonical provisioning script, confirmed no `app_users` row); live login still needs a human, parked | N/A (no safe fresh login yet) | PARTIAL | None | ALREADY COVERED |
+| N-019 | CLOSED 2026-09-24: fresh unprovisioned test identity, human login completed on its own isolated origin; verified live on two separate protected routes, both correctly rendered "Access not provisioned", confirmed no `app_users` row exists and no route granted inappropriate access | (fresh unprovisioned test persona) | PASS | None | ALREADY COVERED |
 | N-020 | CLOSED 2026-09-24: same technique as N-007, deactivated an already-open session, navigated (no login), observed the honest denial live on this specific route, reactivated after | (existing canonical persona) | PASS | None | ALREADY COVERED |
 | N-021 | Live navigation on the exact route, genuine missing-permission denial observed | Restricted | PASS | None | ALREADY COVERED |
 
@@ -1160,12 +1160,12 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | UX-required (needing live revalidation this pass) | 10 |
 | Previously sufficient (confirmed, no re-execution needed) | 15 |
 | Revalidated | 10 |
-| PASS | 8 (N-010, N-013, N-015, N-021, N-014, N-007, N-018, N-020, all closed) |
+| PASS | 9 (N-010, N-013, N-015, N-021, N-014, N-007, N-018, N-020, N-019, all closed) |
 | FAILED THEN FIXED + PASS | 0 (N-015's fix was already applied in the original pass; this pass only added the missing live confirmation) |
 | Overnight blocked | 0 |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
-| Remaining ordinary UX residuals | 0. Two journeys (N-002's click half, N-019) remain PARTIAL: N-002 for a genuine, disclosed browser-input limitation; N-019 has its bootstrap fully prepared (fresh test identity confirmed unprovisioned) with only the live login step needing a human. Neither is fabricated or weakened evidence. |
+| Remaining ordinary UX residuals | 0. One journey (N-002's click half) remains PARTIAL for a genuine, disclosed browser-input limitation, not fabricated or weakened evidence. N-019 closed 2026-09-24 (see addendum below): the human login step completed, live evidence gathered on two protected routes. |
 
 **Starting SHA:** `2ccc35a`. Batch 4 closes with 0 autonomously-executable ordinary residuals, 1 classifier-level blocked item (N-014, environment already safely restored), and 5 journeys whose PARTIAL rating is architecturally inherent, not a gap this run failed to close. Proceeding to Batch 5.
 
@@ -1196,5 +1196,20 @@ A fresh session independently re-verified browser input readiness before touchin
 **N-019 bootstrap prepared, live login still genuinely blocked.** N-019 needs a valid Auth identity with zero `app_users` row, which none of the existing canonical personas can be (all are already fully provisioned) without destructively breaking a persona needed elsewhere. Extended `scripts/provision-canonical-test-personas.ts` with a new, clearly-documented persona that this script deliberately never gives an `app_users` row. Ran the script: the new identity was created idempotently, confirmed via direct query to have no `app_users` row, and every existing persona's password was left untouched (confirmed via the script's own "existing (password preserved)" status for all six). The live-render check itself (logging in as this new identity and observing "Access not provisioned" on screen) still requires an actual login form submission, which needs the currently-broken click/keyboard channel. Parked for human login; consolidated setup detail at the end of this run's final report.
 
 **N-018 CLOSED via genuine automated component evidence, not a real-outage substitute.** Same shared-component finding as Batch 3's U-008 addendum: the session-status component this assertion depends on takes its session status as a plain, directly-injectable prop, so its "unavailable" branch is genuinely exercisable by rendering the real component with a controlled input. Added `src/components/product/auth-gate.test.tsx`, rendering the actual component to static markup and asserting the real rendered text. This is the same shared component every route (including N-018's) renders through, so this closes N-018 directly (not just as supplementary evidence, since N-018's own assertion is specifically about this shared branch rendering honestly, without requiring a route-specific reimplementation). `tsc`/`vitest` clean (109 files, 1016 tests).
+
+---
+
+### ADDENDUM 2026-09-24 (N-019 CLOSED): human login completed, live evidence gathered
+
+The isolated origin for the fresh unprovisioned test identity was independently verified read-only before any login: the real login page rendered, zero cookies and zero `localStorage` keys were present (no session carryover from any other persona tab), and no console or network errors occurred. No credential was entered or accessed by this session at any point.
+
+The user completed the one-time login manually. This session then verified the existing authenticated browser session only (no sign-in performed, no password accessed):
+
+1. Confirmed the authenticated email shown in the app's own UI matches the fresh unprovisioned test identity.
+2. Re-confirmed via direct query that this identity still has no `app_users` row.
+3. Observed the actual rendered page: "Access not provisioned. Your account ... is authenticated but has not been granted access to Nexus. Contact your administrator."
+4. Navigated to a second, different protected route (`/settings/user-access`) and confirmed the identical honest denial renders there too, ruling out any route being inadvertently exempted from the gate.
+
+N-019 is CLOSED, PASS, with genuine live browser evidence on two independent routes, satisfying the canonical assertion in full. This was the last open persona-bootstrap item; the category is now empty.
 
 ---
