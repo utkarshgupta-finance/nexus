@@ -1050,7 +1050,7 @@ add P-013 to Batch 7's scheduled count.
 ## Summary
 
 - Scheduled journeys: 25 (P-018 through P-023, A-001 through A-019), all present exactly once in this ledger.
-- PASS: 19 (P-018, P-019, P-020, P-021, P-022, P-023, A-001, A-003, A-007, A-008, A-009, A-010, A-012, A-014, A-015, A-016, A-017, A-018, A-019)
+- PASS: 19 (P-018, P-019, P-020, P-021, P-022, P-023, A-001, A-003, A-007, A-008, A-009, A-010, A-012, A-014, A-015, A-016, A-017, A-018, A-019) — **SUPERSEDED for P-021**: reclassified **PRODUCT DECISION REQUIRED** in the "third pass" addendum below (no audit/actor-history UI surface exists for `reference_options` anywhere in the app; this was a genuine premise gap in the journey's own canonical wording, not something this original pass correctly verified). Effective PASS count: 18.
 - FAILED THEN FIXED + PASS: 4 (A-002, A-004, A-005, A-006)
 - BLOCKED (deliberately not executed, in-scope decision, not a tooling failure): 1 (A-011)
 - EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY (stale journey premise, current behavior is correct): 1 (A-013)
@@ -1066,7 +1066,7 @@ add P-013 to Batch 7's scheduled count.
 | P-018 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
 | P-019 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
 | P-020 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
-| P-021 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | PASS | PASS |
+| P-021 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | PASS | **SUPERSEDED, see below: PRODUCT DECISION REQUIRED** |
 | P-022 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
 | P-023 | N/A | N/A | N/A | PASS | N/A | PASS | N/A | PASS | N/A | PASS |
 | A-001 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
