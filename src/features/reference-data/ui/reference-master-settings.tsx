@@ -20,6 +20,8 @@ import {
   updateCurrencyRateAction,
 } from "../actions"
 import type { ActionResult } from "../actions"
+import { ReferenceOptionActivitySheet } from "./reference-option-activity-sheet"
+import type { ActivityTarget } from "./reference-option-activity-sheet"
 
 /**
  * Customer Onboarding Settings: the governed administrative workspace for
@@ -241,6 +243,8 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [confirmingDeactivateValue, setConfirmingDeactivateValue] = useState<string | null>(null)
+  const [activityTarget, setActivityTarget] = useState<ActivityTarget | null>(null)
+  const [activityOpen, setActivityOpen] = useState(false)
 
   // Generic "standard" Add form state (auto-suggested code, editable).
   const [newLabel, setNewLabel] = useState("")
@@ -311,6 +315,11 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
       return { ...current, [listKey]: nextList }
     })
     setAddError(null)
+  }
+
+  function openActivity(target: ActivityTarget) {
+    setActivityTarget(target)
+    setActivityOpen(true)
   }
 
   function requestDeactivate(value: string) {
@@ -599,35 +608,44 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {!canWrite ? (
-                      <span className="text-[0.7rem] text-muted-foreground">-</span>
-                    ) : confirmingDeactivateValue === option.value ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-[0.65rem] text-muted-foreground">
-                          Deactivate &quot;{option.label}&quot;? It will no longer be available for new selections. Existing historical records will remain
-                          unchanged.
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <PendingButton variant="destructive" size="sm" pending={isSaving} pendingLabel="Deactivating..." onClick={() => confirmDeactivate(option.value)}>
-                            Confirm
-                          </PendingButton>
-                          <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => setConfirmingDeactivateValue(null)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <PendingButton
-                        variant="outline"
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="ghost"
                         size="sm"
-                        pending={isSaving}
-                        pendingLabel={option.active ? "Deactivating..." : "Activating..."}
-                        disabled={snapshotUnavailable}
-                        onClick={() => (option.active ? requestDeactivate(option.value) : activate(option.value))}
+                        onClick={() => openActivity({ listKey: activeList.key, code: option.value, label: option.label, active: option.active })}
                       >
-                        {option.active ? "Deactivate" : "Activate"}
-                      </PendingButton>
-                    )}
+                        Activity
+                      </Button>
+                      {!canWrite ? (
+                        <span className="text-[0.7rem] text-muted-foreground">-</span>
+                      ) : confirmingDeactivateValue === option.value ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[0.65rem] text-muted-foreground">
+                            Deactivate &quot;{option.label}&quot;? It will no longer be available for new selections. Existing historical records will remain
+                            unchanged.
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <PendingButton variant="destructive" size="sm" pending={isSaving} pendingLabel="Deactivating..." onClick={() => confirmDeactivate(option.value)}>
+                              Confirm
+                            </PendingButton>
+                            <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => setConfirmingDeactivateValue(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <PendingButton
+                          variant="outline"
+                          size="sm"
+                          pending={isSaving}
+                          pendingLabel={option.active ? "Deactivating..." : "Activating..."}
+                          disabled={snapshotUnavailable}
+                          onClick={() => (option.active ? requestDeactivate(option.value) : activate(option.value))}
+                        >
+                          {option.active ? "Deactivate" : "Activate"}
+                        </PendingButton>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -773,6 +791,8 @@ function ReferenceMasterSettings({ initialSnapshot, snapshotUnavailable, canWrit
         </>
         )}
       </div>
+
+      <ReferenceOptionActivitySheet target={activityTarget} open={activityOpen} onOpenChange={setActivityOpen} />
     </div>
   )
 }

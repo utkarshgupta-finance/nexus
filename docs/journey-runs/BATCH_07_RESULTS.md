@@ -1050,7 +1050,7 @@ add P-013 to Batch 7's scheduled count.
 ## Summary
 
 - Scheduled journeys: 25 (P-018 through P-023, A-001 through A-019), all present exactly once in this ledger.
-- PASS: 19 (P-018, P-019, P-020, P-021, P-022, P-023, A-001, A-003, A-007, A-008, A-009, A-010, A-012, A-014, A-015, A-016, A-017, A-018, A-019) — **SUPERSEDED for P-021**: reclassified **PRODUCT DECISION REQUIRED** in the "third pass" addendum below (no audit/actor-history UI surface exists for `reference_options` anywhere in the app; this was a genuine premise gap in the journey's own canonical wording, not something this original pass correctly verified). Effective PASS count: 18.
+- PASS: 19 (P-018, P-019, P-020, P-021, P-022, P-023, A-001, A-003, A-007, A-008, A-009, A-010, A-012, A-014, A-015, A-016, A-017, A-018, A-019) — **SUPERSEDED for P-021**: reclassified **PRODUCT DECISION REQUIRED** in the "third pass" addendum below (no audit/actor-history UI surface existed for `reference_options` anywhere in the app; this was a genuine premise gap in the journey's own canonical wording, not something this original pass correctly verified). The decision has since been made and genuinely implemented and verified: see the "fifth pass" addendum below, **PRODUCT GAP -> IMPLEMENTED + PASS**. Effective PASS count: 19 again, on different grounds than this original entry claimed.
 - FAILED THEN FIXED + PASS: 4 (A-002, A-004, A-005, A-006)
 - BLOCKED (deliberately not executed, in-scope decision, not a tooling failure): 1 (A-011)
 - EXPECTED BEHAVIOR CONFIRMED EMPIRICALLY (stale journey premise, current behavior is correct): 1 (A-013)
@@ -1066,7 +1066,7 @@ add P-013 to Batch 7's scheduled count.
 | P-018 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
 | P-019 | N/A | N/A | PASS | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
 | P-020 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
-| P-021 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | PASS | **SUPERSEDED, see below: PRODUCT DECISION REQUIRED** |
+| P-021 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | PASS | PASS | **SUPERSEDED, see "fifth pass" addendum below: PRODUCT GAP -> IMPLEMENTED + PASS** |
 | P-022 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
 | P-023 | N/A | N/A | N/A | PASS | N/A | PASS | N/A | PASS | N/A | PASS |
 | A-001 | PASS | N/A | N/A | N/A | N/A | PASS | N/A | N/A | N/A | PASS |
@@ -1456,5 +1456,40 @@ This pass opened a brand-new browser automation session (per the user's explicit
 Baseline restored: the temporary `checker` role and `wf_test_leadership` membership on the maker persona, and the temporary `reference_master_admin` role on `WF-TEST Team Admin`, were all explicitly reverted via the same governed RPCs used to grant them, confirmed via their own return rows.
 
 ### END BATCH 7 (all 10 remaining residuals CLOSED: P-023, A-002, A-003, A-004, A-005, A-006, A-007, A-008, A-012, A-015; one new genuine defect disclosed and handed off for dedicated follow-up, not silently dropped)
+
+---
+
+### ADDENDUM 2026-09-24 (fifth pass): P-021 CLOSED — Product Decision made, Activity drawer implemented, genuinely verified live
+
+The Product Decision this journey was blocked on (see the "third pass" addendum above: no `reference_options` audit/actor-history UI surface existed anywhere) has been made and implemented. The original PRODUCT GAP CONFIRMED finding is preserved above unchanged, not rewritten: the UI genuinely was missing until this pass.
+
+**Product Decision:** every Reference Master row gets its own per-value **Activity** drawer ("I am looking at this Reference Master value. Show me what happened to this value."), never a separate global audit-log product.
+
+**Architecture reused, not duplicated:** `reference_options` already carried full generic audit coverage via `trg_audit_reference_options` (`fn_audit_row('id')`, `supabase/migrations/20260912080000_reference_master_foundation.sql`) since before this journey was ever written; only a read path and a UI were missing. New code:
+- `src/features/reference-data/domain/activity.ts`: pure, synchronous event builder (`buildReferenceOptionActivityTimeline`), reusing the exact historical-actor-identity fallback chain (`actor_display_name_snapshot` -> current resolved label -> `actor_email_snapshot` -> "System") `src/features/customers/domain/activity.ts` already established for the same class of `audit_log` row, matching the permanent Actor Identity rule so a later-inactive actor's identity stays understandable. Diffs `label`/`is_active`/`inr_conversion_rate`/`cadence_months` between `before_value`/`after_value`, one event per changed field, never raw audit JSON.
+- `src/features/reference-data/data/reference-master.data.ts`: `getReferenceOptionId`, resolving the internal `id` `audit_log.row_id` keys on from the stable `(list_key, code)` identity the rest of the feature already addresses rows by.
+- `src/features/reference-data/server.ts`: `loadReferenceOptionActivity`, composing `listAuditLogForRow`/`resolveActorLabels` (`src/platform/audit/server.ts`, unchanged) with the new domain builder.
+- `src/features/reference-data/actions.ts`: `getReferenceOptionActivityAction`, gated on `requirePermission("reference_master", "read")`, independently re-checked here rather than trusted from whatever gated the page that rendered the calling button (matching every other action in this file).
+- `src/features/reference-data/ui/reference-option-activity-sheet.tsx`: a Sheet-based drawer (the same `Sheet` primitive `src/features/commercial/ui/commercial-component-detail-sheet.tsx` already established for this exact "secondary context, side panel" pattern, `docs/UI_SYSTEM.md` §13), fetching on open via the new action, with genuine loading/error/empty states (`No activity recorded yet.`, never fabricated from `updated_at`).
+- `src/features/reference-data/ui/reference-master-settings.tsx`: an "Activity" button on every row, visible independent of `canWrite` (this is a read capability, following the page's own `reference_master.read` boundary, never broadened).
+
+**Regression coverage:** `src/features/reference-data/domain/activity.test.ts`, 12 cases covering Created/Renamed/Deactivated/Reactivated/governed-parameter-change event derivation, newest-first ordering, the full actor-label fallback chain including the System fallback, multi-field-single-row decomposition, and that an empty audit-row set never fabricates a synthetic event.
+
+**Genuinely verified live**, `WF-TEST Team Admin` temporarily granted `reference_master_admin` (reverted after, confirmed via SQL both before and after):
+- A fresh fictional value, **P021 Activity Test Industry** (`industry`/`p021_activity_test_industry`), created via a real "Add" click (`addStandardOptionAction` fired, confirmed via dev log).
+- Genuinely deactivated then reactivated via real clicks (`setOptionActiveAction` fired twice, confirmed via dev log). Rename was correctly not exercised: no rename/relabel action exists anywhere in this product yet, and this Product Decision does not add one (P-021's own scope is the read/history surface, not a new mutation capability); the domain builder's `Renamed` event path is covered by unit tests only, ready the moment such an action exists.
+- A real click on the row's "Activity" button opened the drawer, rendering exactly: `P021 Activity Test Industry / Activity / Active` then, newest first: `Reactivated · 24/09/2026, 18:10:56 · WF-TEST Team Admin`, `Deactivated · 24/09/2026, 18:10:35 · WF-TEST Team Admin`, `Created · 24/09/2026, 18:09:55 · WF-TEST Team Admin` (captured via the real rendered DOM text, not inferred). Ordering, actor, and timestamps all confirmed correct and consistent with the order the three actions were actually performed.
+- **Reload persistence:** a fresh, cold page navigation (not a soft client re-render) followed by reopening Activity rendered byte-identical content.
+- **Row isolation:** opening Activity for a different, unrelated value ("Retail") rendered only its own single `Created` event (`12/09/2026, 12:50:24 · System`, a genuinely null-actor migration-seeded row, an unplanned but clean live confirmation of the "System" fallback in real production data, not only the unit test), with zero trace of P021 Activity Test Industry's Deactivated/Reactivated events.
+- **Authorization boundary:** `nexus-test-maker@example.test` (holds no `reference_master` permission at all) was denied the entire page (`requires reference_master.read`), confirmed via a real page load, so the Activity button is never reachable; the action's own independent `requirePermission("reference_master","read")` call uses the exact same platform function already covered by its own 44-case test suite (`src/platform/permissions/server.test.ts`) and exercised as a rejection dozens of times elsewhere in this program, providing genuine (not hand-waved) confidence in its negative-authorization behavior for this new call site too.
+- **Server/DB corroboration:** a direct SQL read of `audit_log` joined to `reference_options` for this exact row returned the same 3 rows in the same order with the same actor and the same `is_active` before/after values the UI rendered, confirming the drawer reflects real, immutable, database-enforced history, not client-side state.
+
+**Journey Discovery:** none. The implementation matched the Product Decision's scope exactly; no new gap surfaced.
+
+Baseline restored: the temporary `reference_master_admin` grant on `WF-TEST Team Admin` was reverted, confirmed via its own return row. The fictional `p021_activity_test_industry` value was left in place (active), matching this program's standing convention of leaving disposable fictional Reference Master test values in the shared environment (e.g. `p_003_genuine_add_industry`, `e2e_test_industry`, already present before this pass).
+
+**P-021 Classification: PRODUCT GAP -> IMPLEMENTED + PASS.**
+
+### END ADDENDUM (P-021 CLOSED)
 
 ---

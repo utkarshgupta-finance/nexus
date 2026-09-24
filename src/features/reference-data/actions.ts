@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache"
 
 import { requirePermission } from "@/platform/permissions/server"
 import { AuthorizationError } from "@/platform/permissions"
-import { addReferenceOption, setReferenceOptionActive, updateCurrencyInrConversionRate } from "./server"
+import { addReferenceOption, loadReferenceOptionActivity, setReferenceOptionActive, updateCurrencyInrConversionRate } from "./server"
 import { ReferenceMasterOperationError } from "./domain/errors"
 import { isValidIsoCurrencyCode } from "./domain/currency-codes"
 import type { ReferenceOption } from "./domain/types"
+import type { ReferenceOptionActivityEvent } from "./domain/activity"
 
 /**
  * Server Actions for the Customer Onboarding Settings screen
@@ -38,13 +39,17 @@ function revalidateReferenceMasterConsumers() {
   revalidatePath("/customers")
 }
 
-function toActionError(error: unknown): ActionResult {
-  if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+function toActionErrorMessage(error: unknown): string {
+  if (error instanceof AuthorizationError) return error.message
   if (error instanceof ReferenceMasterOperationError) {
-    if (error.kind === "conflict") return { ok: false, error: "This value already exists in this list." }
-    return { ok: false, error: error.message }
+    if (error.kind === "conflict") return "This value already exists in this list."
+    return error.message
   }
-  return { ok: false, error: "An unexpected error occurred while saving. Please try again." }
+  return "An unexpected error occurred while saving. Please try again."
+}
+
+function toActionError(error: unknown): ActionResult {
+  return { ok: false, error: toActionErrorMessage(error) }
 }
 
 /** Add flow for every Level 1 "standard" list (Industry, Segment, Business Unit, Tax Identifier Type, Pricing Unit). */
@@ -132,5 +137,31 @@ async function updateCurrencyRateAction(code: string, rate: number | null): Prom
   }
 }
 
-export { addStandardOptionAction, addCurrencyOptionAction, addInvoiceFrequencyOptionAction, setOptionActiveAction, updateCurrencyRateAction }
-export type { ActionResult }
+type ActivityActionResult = { ok: true; events: ReferenceOptionActivityEvent[] } | { ok: false; error: string }
+
+/**
+ * P-021 Product Decision: History visibility follows the same
+ * `reference_master.read` boundary as the rest of this Settings area,
+ * never broadened just because history is being added, and independently
+ * re-checked here rather than trusted from whatever gated the page that
+ * rendered the button that called this.
+ */
+async function getReferenceOptionActivityAction(listKey: string, code: string): Promise<ActivityActionResult> {
+  try {
+    await requirePermission("reference_master", "read")
+    const events = await loadReferenceOptionActivity(listKey, code)
+    return { ok: true, events }
+  } catch (error) {
+    return { ok: false, error: toActionErrorMessage(error) }
+  }
+}
+
+export {
+  addStandardOptionAction,
+  addCurrencyOptionAction,
+  addInvoiceFrequencyOptionAction,
+  setOptionActiveAction,
+  updateCurrencyRateAction,
+  getReferenceOptionActivityAction,
+}
+export type { ActionResult, ActivityActionResult }

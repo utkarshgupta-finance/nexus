@@ -2,11 +2,15 @@ import "server-only"
 
 import { toCountryOptions, toPhoneCountryCodeOptions } from "./domain/countries"
 import { buildPersistedSnapshot, emptySnapshot, toReferenceOption } from "./domain/snapshot"
+import { buildReferenceOptionActivityTimeline, collectAuditActorIds } from "./domain/activity"
+import type { ReferenceOptionActivityEvent } from "./domain/activity"
 import {
+  getReferenceOptionId,
   insertReferenceOption,
   listAllReferenceOptions,
   updateReferenceOption,
 } from "./data/reference-master.data"
+import { listAuditLogForRow, resolveActorLabels } from "@/platform/audit/server"
 import type { ReferenceListKey, ReferenceMasterSnapshot, ReferenceOption } from "./domain/types"
 
 /**
@@ -129,12 +133,32 @@ async function updateInvoiceFrequencyCadence(
   return toReferenceOption(row)
 }
 
+/**
+ * P-021 Product Decision (Activity drawer, "reuse existing server-side
+ * audit information... do not create a duplicate audit subsystem"):
+ * reads the existing generic `audit_log` rows for one `reference_options`
+ * row (`trg_audit_reference_options` already captures every INSERT/
+ * UPDATE) and shapes them into a readable event stream. Empty array, not
+ * an error, when the code no longer resolves to a row (an honest empty
+ * state, never a fabricated one) or when it resolves but has genuinely
+ * no audit rows yet (should not happen once created through a governed
+ * action, but is not this function's job to assert).
+ */
+async function loadReferenceOptionActivity(listKey: string, code: string): Promise<ReferenceOptionActivityEvent[]> {
+  const id = await getReferenceOptionId(listKey, code)
+  if (!id) return []
+  const auditRows = await listAuditLogForRow("reference_options", id)
+  const actorLabels = await resolveActorLabels(collectAuditActorIds(auditRows))
+  return buildReferenceOptionActivityTimeline(auditRows, actorLabels)
+}
+
 export {
   loadReferenceMasterSnapshot,
   addReferenceOption,
   setReferenceOptionActive,
   updateCurrencyInrConversionRate,
   updateInvoiceFrequencyCadence,
+  loadReferenceOptionActivity,
   emptySnapshot,
   PERSISTED_LIST_KEYS,
 }

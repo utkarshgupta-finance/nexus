@@ -29,6 +29,14 @@ async function listAllReferenceOptions(): Promise<ReferenceOptionRow[]> {
   return data ?? []
 }
 
+/** The internal `id` `audit_log.row_id` actually keys on, resolved from the stable `(list_key, code)` identity the rest of this feature addresses a row by. `null` if no such row exists (a deleted/never-existed code), so the Activity read path can show an honest empty state rather than throwing. */
+async function getReferenceOptionId(listKey: string, code: string): Promise<string | null> {
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase.from("reference_options").select("id").eq("list_key", listKey).eq("code", code).maybeSingle()
+  if (error) throw new ReferenceMasterOperationError(parseReferenceMasterError(error))
+  return data?.id ?? null
+}
+
 type InsertReferenceOptionInput = {
   listKey: string
   code: string
@@ -118,5 +126,5 @@ async function updateReferenceOption(input: UpdateReferenceOptionInput): Promise
   throw new ReferenceMasterOperationError({ kind: "invalid_input", message: "updateReferenceOption requires at least one field to update." })
 }
 
-export { listAllReferenceOptions, insertReferenceOption, updateReferenceOption }
+export { listAllReferenceOptions, getReferenceOptionId, insertReferenceOption, updateReferenceOption }
 export type { InsertReferenceOptionInput, UpdateReferenceOptionInput }
