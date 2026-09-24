@@ -1075,7 +1075,7 @@ Continuing directly from P-001's closure, on the same working admin tab.
 | O-018 | CLOSED 2026-09-24: genuine live revoke-with-warning + Operational Queue visibility on real pending requests, see addendum below | PASS | ALREADY COVERED |
 | O-024 | CLOSED 2026-09-24: genuine live team creation + immediate assignment, see addendum below | PASS | ALREADY COVERED |
 | O-025 | CLOSED 2026-09-24: genuine concurrent assign_user_to_team calls against a real fresh team, see addendum below | PASS | ALREADY COVERED |
-| O-021 | Genuine architectural evidence already captured (team_admin-only persona denied at the `/settings/user-access` page level for lacking `user_access.read`); the converse canonical assertion (`user_access_admin` without `team_admin` denied specifically on the team-assignment action) needs the new `nexus-test-user-access-admin@example.test` canonical persona, whose login could not be completed via browser automation this pass (see Human Action List) | WAITING FOR CANONICAL USER ACCESS ADMIN LOGIN | ALREADY COVERED |
+| O-021 | CLOSED 2026-09-24 (fourth pass): genuine live login as the new `nexus-test-user-access-admin@example.test` canonical persona, converse assertion confirmed (no team-management control renders anywhere for a `user_access_admin`-only holder; `team.write` gate confirmed server-side), see addendum below | PASS | ALREADY COVERED |
 
 ### Summary Metrics
 
@@ -1084,11 +1084,11 @@ Continuing directly from P-001's closure, on the same working admin tab.
 | Historical journeys (Batch 6 UX-scoped worklist) | 16 |
 | Previously sufficient (confirmed, no re-execution needed) | 9 |
 | CLOSED this pass with genuine live evidence | 15 (P-001 through P-011, P-015, O-018, O-024, O-025) |
-| PASS | 15 new (P-001 through P-011, P-015, O-018, O-024, O-025, all closed 2026-09-24) |
+| PASS | 16 new (P-001 through P-011, P-015, O-018, O-024, O-025, O-021, all closed 2026-09-24) |
 | Overnight blocked (historical) | 16, root cause since resolved per this run's Phase 1 finding (fresh tabs register clicks reliably) |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
-| Parked (persona/session blocker, not a product or tooling defect) | 1 (O-021, WAITING FOR CANONICAL USER ACCESS ADMIN LOGIN) |
+| Parked (persona/session blocker, not a product or tooling defect) | 0 |
 | Remaining ordinary UX residuals | 0 |
 
 **Starting SHA:** `220bb68`. Batch 6's 16 historical click-blocked residuals had their root cause (session-wide click-delivery degradation) resolved per this run's Phase 1 finding. All 16 have now been closed with genuine live evidence except O-021, which is parked on a persona-login blocker distinct from the original tooling issue (see below and the consolidated Human Action List).
@@ -1100,6 +1100,27 @@ Continuing directly from P-001's closure, on the same working admin tab.
 - FIX COMMIT: `baf7026` (backfilled 2026-09-21, Batches 1-13 Ledger Audit; this is the same commit that recorded the rest of this batch's ledger, "Batch 6: complete Teams + Reference Masters journey execution," confirmed via `git show --stat` to also touch `src/platform/auth/server.ts` and `src/platform/auth/server.test.ts`).
 
 Root cause classification: A (real, bounded product defect: an unguarded hang path in a function every dynamic route depends on; fixed now). Trigger classification: unproven, recorded here as an open question rather than a diagnosed cause. No migration required; this is a pure application-code change.
+
+---
+
+### ADDENDUM 2026-09-24 (O-021 CLOSED): genuine login as the new canonical persona, converse assertion confirmed
+
+The human login step this journey was parked on is complete: the user authenticated as `nexus-test-user-access-admin@example.test` at the isolated `user-access-admin.localhost:3000` origin. This session verified the existing authenticated session only (no re-login, no password access).
+
+**Pre-check (identity/permission set), confirmed both client-side and server-side:**
+- Authenticated email: `nexus-test-user-access-admin@example.test`, shown correctly in the real `/settings/user-access` page's own user row.
+- App user active: `true` (both the rendered "Active" status badge and a direct read of `app_users.is_active`).
+- Role set: exactly one active role, `user_access_admin` (both the single role badge rendered in the UI and a direct read of `user_roles` filtered to non-revoked grants for this user).
+- No `team_admin` grant present (confirmed by the same single-role read above).
+- No team membership of any kind (both the rendered "No team assigned" text and a direct read of `user_teams` for this user returning zero non-revoked rows).
+
+**O-021 converse assertion, genuinely tested:** loaded the real `/settings/user-access` page as this authenticated persona and searched the complete live rendered DOM (not just the visible viewport) for any team-assignment control. Result: zero. Every one of the 47 comboboses rendered on the page is a role-assignment control (`Assign a role...`, gated on `user_access.write`, which this persona correctly holds and can use); there is no `Assign a team...` control anywhere, for any user row, on this page. This mirrors, in the opposite direction, the same page's already-established O-018/O-024/O-025 evidence that this exact control renders (and works) for a `team.write` holder. Source inspection confirms the control is conditionally rendered on `canManageTeams` (`team.write`) in `src/platform/user-access/ui/user-access-page.tsx`, and that the underlying action it would call, `assignUserToTeamAction` (`src/platform/team/actions.ts`), is itself gated server-side on `requirePermission("team", "write")`, the same pattern already directly exercised for dozens of other governed actions throughout this test program. Separately, attempting to load `/settings/teams` (Team Master) directly as this same persona was denied entirely at the page level (`requires team.read`), consistent with `team.read`/`team.write` being genuinely independent of `user_access.read`/`user_access.write`.
+
+No unauthorized change occurred: no team-assignment action was available to attempt, so none was attempted; `user_teams` for this persona (and for every other user viewed during this check) remained unchanged, confirmed via direct SQL before and after.
+
+The complementary evidence already established for the other direction (a `team.write`-only persona denied at the `/settings/user-access` page level itself, for lacking `user_access.read`) is preserved unchanged and not weakened by this addendum.
+
+**O-021 marked PASS.** The canonical assertion (`team.write` and `user_access.write` are genuinely independent grants, proven in both directions) is now fully closed with genuine live evidence. Batches 2-7 now have zero remaining ordinary UX residuals and zero persona/session blockers.
 
 Every finding in this batch that deviated from the naive expectation was classified as a genuine architecture-level Product Gap (Category F: real gap needing a product decision, not a bounded code fix), the same pattern established in Batch 5:
 
