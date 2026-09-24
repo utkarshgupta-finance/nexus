@@ -1141,7 +1141,7 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 
 | Journey | UX evidence | Persona | Result | Defect | Discovery |
 |---|---|---|---|---|---|
-| N-002 | Live row-distinction confirmed; click-through blocked by a genuine automation limitation | Admin | PARTIAL | None (disclosed limitation) | ALREADY COVERED |
+| N-002 | CLOSED 2026-09-24: live row-distinction confirmed; click-through re-executed on a fresh tab, in-place UI update confirmed via DOM read and SQL, no reload | Admin | PASS | None (a process mistake mid-journey was caught and reverted, not a product defect) | ALREADY COVERED |
 | N-007 | CLOSED 2026-09-24: self-deactivated an already-open canonical persona's own session via the existing governed action, navigated the same tab (no login), observed the honest denial live, reactivated after | (existing canonical persona, self-acting) | PASS | None | ALREADY COVERED |
 | N-010 | Live full-table read, no undo-revoke control anywhere | Admin | PASS | None | ALREADY COVERED |
 | N-013 | Live full-table read, no self-grant warning anywhere | Admin | PASS | None | ALREADY COVERED |
@@ -1160,12 +1160,12 @@ Reconciliation performed against `docs/NEXUS_JOURNEY_UNIVERSE.md` canonical text
 | UX-required (needing live revalidation this pass) | 10 |
 | Previously sufficient (confirmed, no re-execution needed) | 15 |
 | Revalidated | 10 |
-| PASS | 9 (N-010, N-013, N-015, N-021, N-014, N-007, N-018, N-020, N-019, all closed) |
+| PASS | 10 (N-002, N-010, N-013, N-015, N-021, N-014, N-007, N-018, N-020, N-019, all closed) |
 | FAILED THEN FIXED + PASS | 0 (N-015's fix was already applied in the original pass; this pass only added the missing live confirmation) |
 | Overnight blocked | 0 |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
-| Remaining ordinary UX residuals | 0. One journey (N-002's click half) remains PARTIAL for a genuine, disclosed browser-input limitation, not fabricated or weakened evidence. N-019 closed 2026-09-24 (see addendum below): the human login step completed, live evidence gathered on two protected routes. |
+| Remaining ordinary UX residuals | 0. N-002 closed 2026-09-24 (see addendum below): the click-through half was re-executed on a genuinely fresh tab once browser input readiness was proven restored. N-019 closed 2026-09-24 (see addendum below): the human login step completed, live evidence gathered on two protected routes. |
 
 **Starting SHA:** `2ccc35a`. Batch 4 closes with 0 autonomously-executable ordinary residuals, 1 classifier-level blocked item (N-014, environment already safely restored), and 5 journeys whose PARTIAL rating is architecturally inherent, not a gap this run failed to close. Proceeding to Batch 5.
 
@@ -1211,5 +1211,17 @@ The user completed the one-time login manually. This session then verified the e
 4. Navigated to a second, different protected route (`/settings/user-access`) and confirmed the identical honest denial renders there too, ruling out any route being inadvertently exempted from the gate.
 
 N-019 is CLOSED, PASS, with genuine live browser evidence on two independent routes, satisfying the canonical assertion in full. This was the last open persona-bootstrap item; the category is now empty.
+
+---
+
+### ADDENDUM 2026-09-24 (N-002 CLOSED): click-through half re-executed on a genuinely fresh tab, browser input readiness confirmed restored
+
+A separate session proved, from first principles, that the total browser-input-delivery failure recorded above and in `OVERNIGHT_PENDING_ACTIONS.md` is tied to specific old/long-lived tab instances, not a permanent global backend failure: a genuinely fresh tab (created new, not reused) registers clicks, keystrokes, and Tab-focus correctly on the first attempt (7-part proof recorded separately, including a real reversible mutation with server/DB corroboration). This directly supersedes the "total input-delivery failure" finding for any residual attempted on a fresh tab going forward.
+
+N-002's click-through half was re-attempted on such a fresh tab (Admin, `localhost:3000/settings/user-access`). **First attempt found a process defect, not a product defect:** the click landed on the wrong row (`nexus-test-unprovisioned@example.test`, the N-019 fixture, mistaken for the intended `wf-test.unprovisioned@example.test` row after a `read_page` interactive-filter call silently stopped short of the full table). Confirmed via SQL: an `app_users` row had been created for the N-019 identity, which must stay unprovisioned per N-019's own closed invariant. Immediately reverted: confirmed via foreign-key check that the accidental row had zero references anywhere (fresh, no team/role/audit-log/resource rows), deleted it directly, and re-confirmed via SQL that the N-019 identity's `app_users` row is null again, restoring its exact pre-mistake state.
+
+Retried correctly, this time locating the exact ref for `wf-test.unprovisioned@example.test`'s "Provision Access" button via a full `read_page(filter: all)` pass (not the truncated `interactive` filter) and clicking by that ref directly. Result: the row transformed live, in place, no page reload, no navigation: `Not Provisioned` / `Provision Access` became `Active` / `No team assigned` / `No roles assigned` / `Deactivate`, confirmed both via `get_page_text` on the same live DOM and via direct SQL (`app_users.id` now matches `auth.users.id` for this identity, `updated_by` = the acting admin). The `nexus-test-unprovisioned@example.test` row was independently re-confirmed still `Not Provisioned` throughout, both before and after.
+
+N-002 is now CLOSED, PASS in full (both halves): the Provision Access button renders only for the genuinely unprovisioned row, and disappears immediately after provisioning without a manual refresh, both with genuine trusted-click evidence, no synthetic events used at any point.
 
 ---

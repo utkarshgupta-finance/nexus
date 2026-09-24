@@ -57,4 +57,17 @@ describe("parseCaseError", () => {
     expect(parsed.kind).toBe("onboarding_effective_date_exception_pending")
     expect(parsed.message).toContain("both a BU Head and a Finance Head must approve")
   })
+
+  it("maps WORKFLOW_NO_ACTIVE_DEFINITION to its own kind instead of the generic unknown fallback (L-021)", () => {
+    const parsed = parseCaseError({
+      message:
+        "WORKFLOW_NO_ACTIVE_DEFINITION: no active workflow definition with a published version exists for customer_onboarding; a new case cannot be created until one is activated",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_no_active_definition")
+    expect(parsed.message).toBe(
+      "no active workflow definition with a published version exists for customer_onboarding; a new case cannot be created until one is activated"
+    )
+  })
 })

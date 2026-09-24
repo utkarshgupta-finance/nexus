@@ -30,6 +30,7 @@ type ChangeErrorKind =
   | "workflow_team_required"
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
+  | "workflow_no_active_definition"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -62,6 +63,7 @@ const NAMED_TOKEN_KINDS: Record<string, ChangeErrorKind> = {
   WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
+  WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
 }
 
 const SQLSTATE_KINDS: Record<string, ChangeErrorKind> = {

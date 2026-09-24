@@ -26,6 +26,7 @@ type CommercialVersionErrorKind =
   | "workflow_team_required"
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
+  | "workflow_no_active_definition"
   | "commercial_version_draft_stale"
   | "commercial_version_effective_date_out_of_order"
   | "commercial_version_effective_date_adjacent_to_open_component_start"
@@ -58,6 +59,7 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   WORKFLOW_TEAM_REQUIRED: "workflow_team_required",
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
+  WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
   COMMERCIAL_VERSION_DRAFT_STALE: "commercial_version_draft_stale",
   COMMERCIAL_VERSION_CUSTOMER_INACTIVE: "commercial_version_customer_inactive",
   // PD-006 final business decision (Product Decision Closure): found

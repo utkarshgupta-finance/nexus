@@ -60,4 +60,17 @@ describe("parseCommercialVersionError", () => {
     const parsed = parseCommercialVersionError({ message: 'duplicate key value violates unique constraint "some_other_constraint"', code: "23505" })
     expect(parsed.kind).toBe("conflict")
   })
+
+  it("maps WORKFLOW_NO_ACTIVE_DEFINITION to its own kind instead of the generic unknown fallback (L-021)", () => {
+    const parsed = parseCommercialVersionError({
+      message:
+        "WORKFLOW_NO_ACTIVE_DEFINITION: no active workflow definition with a published version exists for commercial_configuration; a new version cannot be created until one is activated",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_no_active_definition")
+    expect(parsed.message).toBe(
+      "no active workflow definition with a published version exists for commercial_configuration; a new version cannot be created until one is activated"
+    )
+  })
 })

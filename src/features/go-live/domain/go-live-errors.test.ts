@@ -42,6 +42,19 @@ describe("parseGoLiveError", () => {
     expect(error.goLiveError.kind).toBe("go_live_request_submit_not_owner")
   })
 
+  it("maps WORKFLOW_NO_ACTIVE_DEFINITION to its own kind instead of the generic unknown fallback (L-021)", () => {
+    const parsed = parseGoLiveError({
+      message:
+        "WORKFLOW_NO_ACTIVE_DEFINITION: no active workflow definition with a published version exists for go_live; a new request cannot be created until one is activated",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_no_active_definition")
+    expect(parsed.message).toBe(
+      "no active workflow definition with a published version exists for go_live; a new request cannot be created until one is activated"
+    )
+  })
+
   it("still falls back to unknown for a genuinely unrecognized token", () => {
     const parsed = parseGoLiveError({ message: "SOME_FUTURE_TOKEN_NOT_YET_MAPPED: detail" })
     expect(parsed.kind).toBe("unknown")

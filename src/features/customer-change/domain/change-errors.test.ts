@@ -40,4 +40,17 @@ describe("parseChangeError", () => {
     expect(parsed.message).toBe("This draft was changed by someone else since you loaded it. Refresh the page to see the latest version before saving your changes.")
     expect(parsed.message).not.toMatch(/row_version|database|version mismatch/i)
   })
+
+  it("maps WORKFLOW_NO_ACTIVE_DEFINITION to its own kind instead of the generic unknown fallback (L-021)", () => {
+    const parsed = parseChangeError({
+      message:
+        "WORKFLOW_NO_ACTIVE_DEFINITION: no active workflow definition with a published version exists for customer_change; a new change request cannot be created until one is activated",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_no_active_definition")
+    expect(parsed.message).toBe(
+      "no active workflow definition with a published version exists for customer_change; a new change request cannot be created until one is activated"
+    )
+  })
 })
