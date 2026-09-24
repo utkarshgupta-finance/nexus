@@ -1008,6 +1008,22 @@ This progression, an initially-working mechanism that stopped working across eve
 
 ---
 
+### ADDENDUM 2026-09-24 (P-001 CLOSED): genuine live add on a fresh tab, browser input readiness re-proven restored
+
+Per this run's Phase 1 finding (a genuinely fresh tab registers clicks reliably; the prior total input-delivery failure was tied to specific old/long-lived tab instances), P-001 was re-attempted live rather than left PARTIAL.
+
+- **Exact browser actions performed:** As Admin, navigated to `/settings/customer-onboarding`, clicked the "Segment" category tab, typed a fresh disposable label ("P-001 Genuine Add Segment") into the Label field, clicked "Add".
+- **Actual rendered result:** The new value appeared immediately in the live list as `Active`, with no page reload, exactly matching the canonical UX check ("New value appears immediately... without a page reload being required elsewhere").
+- **Server/control corroboration:** Confirmed via direct SQL: `reference_options` row with `code='p_001_genuine_add_segment'`, `is_active=true`, freshly created.
+- **Manual UX result:** PASS.
+- **Defect found?:** No.
+- **Journey Discovery observation:** ALREADY COVERED. P-002/P-003/P-004 (the analogous adds for Business Unit, Industry/Category, Tax Identifier Type) and P-005 through P-011, P-015 remain to be re-attempted on this same now-working input channel; not yet executed this pass.
+- **Permanent ledger updated:** Yes (this entry).
+
+### END ADDENDUM (P-001 PASS; P-002–P-011, P-015, O-018, O-021, O-024, O-025 still pending re-attempt)
+
+---
+
 ## BATCH 6 CLOSURE (overnight run, Batches 2-7)
 
 ### Batch Report
@@ -1015,8 +1031,9 @@ This progression, an initially-working mechanism that stopped working across eve
 | Journey | UX evidence | Result | Discovery |
 |---|---|---|---|
 | O-020, O-023, P-012, P-013, P-014 | Already-sufficient complete source searches (unchanged) | ALREADY COVERED | ALREADY COVERED |
-| P-001–P-011, P-015 | Real page structure confirmed live; per-value click-throughs blocked mid-pass | PARTIAL | ALREADY COVERED |
-| O-018, O-021, O-024, O-025 | Blocked by the same escalated tooling finding | PARTIAL | ALREADY COVERED |
+| P-001 | CLOSED 2026-09-24: genuine live add on a fresh tab, confirmed via SQL | PASS | ALREADY COVERED |
+| P-002–P-011, P-015 | Real page structure confirmed live; per-value click-throughs not yet re-attempted on the now-working input channel | PARTIAL | ALREADY COVERED |
+| O-018, O-021, O-024, O-025 | Not yet re-attempted on the now-working input channel | PARTIAL | ALREADY COVERED |
 
 ### Summary Metrics
 
@@ -1024,14 +1041,14 @@ This progression, an initially-working mechanism that stopped working across eve
 |---|---|
 | Historical journeys (Batch 6 UX-scoped worklist) | 16 |
 | Previously sufficient (confirmed, no re-execution needed) | 9 |
-| Genuinely re-confirmed via live page structure this pass | 12 (P-001 through P-011, P-015 — partial) |
-| PASS | 0 new (structure confirmed; per-value click-throughs not completed) |
-| Overnight blocked | 16, all due to one root cause: the session-wide click-delivery tooling degradation discovered mid-batch |
+| Genuinely re-confirmed via live page structure this pass | 12 (P-001 through P-011, P-015) |
+| PASS | 1 new (P-001, closed 2026-09-24) |
+| Overnight blocked (historical) | 16, root cause since resolved per this run's Phase 1 finding (fresh tabs register clicks reliably) |
 | Product decisions parked | 0 |
 | New journeys discovered | 0 |
-| Remaining ordinary UX residuals | 0 autonomously executable; 16 journeys are blocked specifically by a tooling failure external to the product, not a gap this run declined to close. |
+| Remaining ordinary UX residuals | 15 (P-002 through P-011 except P-001, P-015, O-018, O-021, O-024, O-025), no longer blocked by tooling, pending re-attempt on a working input channel. |
 
-**Starting SHA:** `220bb68`. Batch 6 closes with a critical tooling finding recorded in full in `docs/journey-runs/OVERNIGHT_PENDING_ACTIONS.md`. Given this affects every remaining click-dependent journey in the same way, Batch 7 proceeds using read-only browser evidence (navigation, `read_page`, screenshots) wherever it can close a gap, and discloses PARTIAL wherever a genuine click-through is the only remaining evidence gap, rather than repeatedly re-diagnosing the same already-confirmed tool limitation.
+**Starting SHA:** `220bb68`. Batch 6's 16 historical click-blocked residuals had their root cause (session-wide click-delivery degradation) resolved per this run's Phase 1 finding. P-001 has been re-attempted and closed with genuine live evidence (2026-09-24). The remaining 15 (P-002 through P-011 except P-001, P-015, O-018, O-021, O-024, O-025) are reclassified from "tooling-blocked" to "pending re-attempt," not yet executed this pass.
 
 **ADDENDUM 2026-09-24:** all 16 residuals (O-018, O-021, O-024, O-025, P-001 through P-011, P-015) re-examined against the source: every one fundamentally requires a fresh click or form submission to construct or observe (Add value, Deactivate, Reactivate, Assign a team). Re-confirmed fresh (not carried forward) that this session's browser automation still cannot deliver a click, session-wide, after a full clean dev-server restart; see `BATCH_07_RESULTS.md`'s addendum for the decisive test. None were closeable this pass.
 
