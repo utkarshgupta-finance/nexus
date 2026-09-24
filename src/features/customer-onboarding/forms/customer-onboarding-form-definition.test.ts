@@ -2,6 +2,7 @@ import { Model } from "survey-core"
 import { describe, expect, it } from "vitest"
 
 import {
+  applyCityKeepIncorrectValues,
   buildCustomerOnboardingFormDefinition,
   CUSTOMER_ONBOARDING_FIELD_KEYS,
   DEFAULT_COUNTRY_CODE,
@@ -364,5 +365,51 @@ describe("clearing incompatible tax branch data on Country change", () => {
     }
     expect(survey.data[CUSTOMER_ONBOARDING_FIELD_KEYS.gstNumber]).toBeUndefined()
     expect(survey.data[CUSTOMER_ONBOARDING_FIELD_KEYS.pan]).toBeUndefined()
+  })
+})
+
+describe("City survives SurveyJS's own clearIncorrectValues() pass", () => {
+  // Regression coverage for a real, confirmed data-loss defect: City's
+  // `choices` is permanently empty (its real options come from an async
+  // server search, see its definition above), so SurveyJS's own
+  // `clearIncorrectValues()` -- which the engine runs on every question on
+  // every stage-tab navigation, not only on submit -- always finds an
+  // already-selected City "not present in its choices" and silently wipes
+  // it, even though the value had already been saved. Reproduced live: a
+  // requester selects a City, moves to another Customer Onboarding stage
+  // and back, and the next Save Draft persists the case with City missing
+  // entirely (not merely blank), because `survey.data` never carried it.
+  it("without the fix, clearIncorrectValues() wipes an already-selected City", () => {
+    const survey = new Model(buildCustomerOnboardingFormDefinition(FAKE_OPTIONS).json)
+    const city = survey.getQuestionByName(CUSTOMER_ONBOARDING_FIELD_KEYS.city)
+    survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.city, "57702")
+    expect(city.value).toBe("57702")
+    city.clearIncorrectValues()
+    expect(city.value).toBeUndefined()
+  })
+
+  it("applyCityKeepIncorrectValues keeps an already-selected City across clearIncorrectValues()", () => {
+    const survey = new Model(buildCustomerOnboardingFormDefinition(FAKE_OPTIONS).json)
+    applyCityKeepIncorrectValues(survey)
+    const city = survey.getQuestionByName(CUSTOMER_ONBOARDING_FIELD_KEYS.city)
+    survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.city, "57702")
+    city.clearIncorrectValues()
+    expect(city.value).toBe("57702")
+    expect(survey.data[CUSTOMER_ONBOARDING_FIELD_KEYS.city]).toBe("57702")
+  })
+
+  it("State is never at risk of the same clearIncorrectValues() loss once its choices are loaded", () => {
+    // Unlike City, State's `choices` are populated from a real fetch (see
+    // ../ui/customer-onboarding-page.tsx's `loadStatesForCountry`), so once
+    // loaded, a selected State is a genuinely correct value and
+    // clearIncorrectValues() must not touch it. This is what makes City's
+    // permanently-empty `choices` the actual root cause, not something
+    // common to every geography field.
+    const survey = new Model(buildCustomerOnboardingFormDefinition(FAKE_OPTIONS).json)
+    const state = survey.getQuestionByName(CUSTOMER_ONBOARDING_FIELD_KEYS.state)
+    state.choices = [{ value: "KA", text: "Karnataka" }]
+    survey.setValue(CUSTOMER_ONBOARDING_FIELD_KEYS.state, "KA")
+    state.clearIncorrectValues()
+    expect(state.value).toBe("KA")
   })
 })

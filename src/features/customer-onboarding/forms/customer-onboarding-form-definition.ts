@@ -1,3 +1,4 @@
+import type { Model } from "survey-core"
 import type { SurveyFormDefinition } from "@/platform/forms/types"
 import type { ReferenceListKey, ReferenceOption } from "@/features/reference-data"
 import { GEOGRAPHY_COMBOBOX_QUESTION_TYPE } from "./geography-question-model"
@@ -205,7 +206,9 @@ function buildCustomerOnboardingFormDefinition(
                   // Its `choices` stay empty: City's real options come from
                   // ../ui/geography-combobox-question.tsx's own server
                   // search, keyed off this question's `name`, not from
-                  // SurveyJS's own choicesLazyLoad pipeline.
+                  // SurveyJS's own choicesLazyLoad pipeline. See
+                  // ../ui/customer-onboarding-page.tsx's `keepIncorrectValues`
+                  // assignment for why that matters.
                   enableIf: `{${CUSTOMER_ONBOARDING_FIELD_KEYS.country}} notempty`,
                   placeholder: "Select country first",
                   startWithNewLine: false,
@@ -465,10 +468,37 @@ function fieldKeysToClearOnCountryChange(newCountry: string | null): string[] {
   return newCountry === DEFAULT_COUNTRY_CODE ? NON_INDIA_TAX_FIELD_KEYS : INDIA_TAX_FIELD_KEYS
 }
 
+/**
+ * City's `choices` is permanently empty (see its definition above for why:
+ * real options come from ../ui/geography-combobox-question.tsx's own
+ * server search, never from SurveyJS's own choices pipeline). Without
+ * this, SurveyJS's own `clearIncorrectValues()`, which it runs on every
+ * question on every stage-tab navigation, not only on submit, finds an
+ * already-selected City "not present in its choices" and silently wipes
+ * it back to empty the moment the requester moves to another stage and
+ * back, even though the value had already been saved. Confirmed by direct
+ * reproduction: without this, `question.clearIncorrectValues()` sets a
+ * real, previously-set city value to `undefined`.
+ *
+ * This must be applied to the live Question instance, not folded into the
+ * JSON `buildCustomerOnboardingFormDefinition` returns:
+ * `Serializer.addClass` in ./geography-question-model.ts registers the
+ * `geographycombobox` type with an empty own-property list, and SurveyJS's
+ * JSON loader only accepts keys a question's class explicitly owns, so a
+ * `keepIncorrectValues` key in the JSON is silently dropped instead of
+ * reaching this question. A pure function taking the constructed `Model`
+ * so this fix is unit-testable without mounting
+ * ../ui/customer-onboarding-page.tsx, the one caller that applies it.
+ */
+function applyCityKeepIncorrectValues(survey: Model): void {
+  survey.getQuestionByName(CUSTOMER_ONBOARDING_FIELD_KEYS.city).keepIncorrectValues = true
+}
+
 export {
   CUSTOMER_ONBOARDING_FIELD_KEYS,
   DEFAULT_COUNTRY_CODE,
   TAX_IDENTIFIER_TYPE_OTHER,
+  applyCityKeepIncorrectValues,
   buildCustomerOnboardingFormDefinition,
   fieldKeysToClearOnCountryChange,
 }

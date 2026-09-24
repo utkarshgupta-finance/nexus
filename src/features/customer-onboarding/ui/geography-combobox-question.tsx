@@ -137,7 +137,21 @@ function CityGeographyCombobox({
   const countryValue = surveyModel?.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.country) as string | undefined
   const stateValue = surveyModel?.getValue(CUSTOMER_ONBOARDING_FIELD_KEYS.state) as string | undefined
 
-  const [selectedOption, setSelectedOption] = useState<ComboboxOption | null>(null)
+  // Seeded from `question.value` (falling back to the raw stored code as
+  // its own label, same fallback `ChoiceGeographyCombobox` above uses for
+  // an unloaded choice), never `null`, so a component that mounts with a
+  // value already set (a reopened draft, or a remount from navigating to
+  // another stage and back) never renders as if nothing were selected.
+  // Leaving this `null` on mount was a real bug: Base UI's Combobox is
+  // controlled by `selectedOption`, and briefly rendering it as `null`
+  // while `items` is still `[]` (also just-reset on mount) let the
+  // library observe "no known item matches this value" and call
+  // `onValueChange(null)` back, which `handleValueChange` below then
+  // wrote straight into `question.value`, silently clearing a City the
+  // user had already picked (and already saved) out from under them.
+  const [selectedOption, setSelectedOption] = useState<ComboboxOption | null>(() =>
+    question.value ? { value: String(question.value), label: String(question.value) } : null
+  )
   const [items, setItems] = useState<ComboboxOption[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [inputValue, setInputValue] = useState("")
@@ -151,12 +165,26 @@ function CityGeographyCombobox({
   // currently loaded page of async results, so it is cached in state and
   // only reset here when `question.value` itself changes underneath this
   // component (an external Save Draft reload or a Country/State reset),
-  // never on a render caused by something else.
+  // never on a render caused by something else. This must handle a value
+  // newly APPEARING, not just disappearing: on a genuine first page load,
+  // this component mounts before ../ui/customer-onboarding-page.tsx's own
+  // effect has primed `survey.data` from the persisted revision, so
+  // `question.value` is still empty at construction time (the mount-time
+  // seed above correctly starts `null`) and only becomes the real saved
+  // city on the very next render. Only resetting on the "value cleared"
+  // branch left that real value permanently unreflected in the trigger.
   const [lastSyncedValue, setLastSyncedValue] = useState(question.value)
   if (lastSyncedValue !== question.value) {
     setLastSyncedValue(question.value)
     if (question.value == null || question.value === "") {
       setSelectedOption(null)
+    } else if (selectedOption?.value !== String(question.value)) {
+      // Only the raw-code fallback: a value that arrived through this
+      // component's own `handleValueChange` already set a properly
+      // labeled `selectedOption` (e.g. "Anekal") in the same render pass
+      // that update; re-deriving here would immediately downgrade that
+      // label to the bare code the next render for no reason.
+      setSelectedOption({ value: String(question.value), label: String(question.value) })
     }
   }
 

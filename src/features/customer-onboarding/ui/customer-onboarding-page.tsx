@@ -48,6 +48,7 @@ import {
 } from "../domain/stage-status"
 import type { CustomerOnboardingStageKey } from "../domain/types"
 import {
+  applyCityKeepIncorrectValues,
   buildCustomerOnboardingFormDefinition,
   CUSTOMER_ONBOARDING_FIELD_KEYS,
   DEFAULT_COUNTRY_CODE,
@@ -214,6 +215,8 @@ function CustomerOnboardingPage({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- SurveyJS Model is an imperative instance; priming it with the real persisted revision data is its documented `data` setter, the same class of mutation use-survey-model.ts already disables this rule for.
     survey.data = initialCase.currentRevision.data
+
+    applyCityKeepIncorrectValues(survey)
 
     // A freshly-mounted SurveyJS Model always defaults to its own page 0,
     // regardless of which stage this case is actually parked at (e.g. a
