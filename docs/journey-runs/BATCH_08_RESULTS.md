@@ -386,3 +386,31 @@ Not itself one of Batch 8's 25 scheduled IDs (A-011 was Batch 7 scope, explicitl
 - This is the first batch in this entire project to execute a real onboarding approval, confirming atomic Customer Master + Commercial Configuration + Commercial Change (Version 1) creation works correctly end to end.
 
 ---
+
+## ADDENDUM 2026-09-25: Historical UX revalidation (first pass, partial)
+
+Per the same Historical UX Revalidation program applied to Batches 2-7: this batch's original evidence for most journeys was RPC/script-based, not genuine browser interaction. All `wf-test.*` personas used in the original run have since been retired (interactive login intentionally removed, per `scripts/retire-old-test-personas.ts`); this pass uses the canonical `nexus-test-*` personas plus the real Admin account, and fresh fictional fixtures where the original ones were RPC-only.
+
+**Journeys revalidated with genuine browser evidence this pass (11 of 25):**
+
+- **A-020 (Cancel rejected on non-draft case): PASS.** Opened an already-`submitted` real case (CO-000104) as `nexus-test-maker@example.test`: the Maker's own case view shows no Cancel affordance at all once non-draft (a stronger form of the invariant than the original script-only test). Server-side guard independently re-confirmed live: `cancel_customer_onboarding_case` still rejects with `ONBOARDING_CASE_NOT_CANCELLABLE`, naming the actual status.
+- **A-021 (Document upload happy path): PASS.** Created a fresh fictional case (CO-000111, "Batch8 UXRevalidation Co") as the Maker through the real "+ New Customer Onboarding" flow, genuinely filled every Customer Details field through real UI interaction, and uploaded a real PDF to the GST Registration Document slot. Confirmed "Saved" with correct actor/timestamp attribution, surviving a cold reload.
+- **A-022 (Document upload rejected for exceeding size limit): FAILED THEN FIXED + PASS.** A genuine, newly-discovered defect, distinct from the original DEFECT-B8-001: an exactly-1,048,576-byte (1 MiB) PDF, precisely at the UI's own advertised "Max 1 MB" ceiling, was rejected with a raw framework error, `Body exceeded 1 MB limit`, before the app's own validation ever ran. Root cause: Next.js's own default Server Action body-size limit is exactly 1 MB (`1024*1024` bytes), identical to this app's `MAX_ATTACHMENT_BYTES`, leaving zero headroom for the surrounding multipart/form-data overhead. Fix: `next.config.ts` now sets `experimental.serverActions.bodySizeLimit = "2mb"`. Retested live post-fix: an exactly-1,048,576-byte file is now accepted ("Saved"); a 1,048,577-byte file is still correctly rejected, now with the app's own friendly message ("...Maximum allowed size is 1 MB..."), not a framework error.
+- **A-023 (Document upload rejected for invalid file type): PASS (regression).** Re-verified live that the original DEFECT-B8-001 fix (content-sniffing via `matchesAllowedAttachmentSignature`) still holds: a real PNG-signature file disguised as `.pdf` was genuinely uploaded through the browser and correctly rejected with "does not appear to be a genuine PDF or JPEG file."
+- **A-024 (Document re-upload preserves append-only history): PASS.** Replaced the PAN Document slot with a v2 file through genuine UI interaction; confirmed via direct DB read that v1 (`is_current = false`, never deleted) and v2 (`is_current = true`) both exist with distinct, correct metadata.
+- **B-001 (View customer's full record): PASS.** Viewed the existing "Batch8 Approval Core Co Renamed" fixture as the real Admin account; every field renders correctly, absent optional fields show "Not available" rather than an error.
+- **B-002/B-004 (Customer search, name/brand substring and exact filters): PASS.** Genuine text search for "Batch8 Approval" returns exactly the one matching customer.
+- **B-003 (Customer search, exact key lookup): PASS.** Genuine text search for the exact key `batch8-approval-core-co` returns exactly the one match.
+- **B-007 (Former-name search resolver): PASS.** Genuine text search for the fixture's intermediate historical name ("C-010 Combined Test", not a substring of its current name) correctly surfaces the customer with a "Former legal name: ..." badge, confirming former-name matching still works against real production data.
+- **B-008 (Deactivate customer with reason): PASS.** Genuine "Deactivate Customer" click on the fixture customer, with a real reason entered through the UI. Confirmed via direct `audit_log` read: `is_active` flipped `true -> false`, reason correctly stored in `actor_context.reason`. Fixture restored to `is_active = true` immediately afterward via the same governed RPC, to avoid disrupting any other batch's shared state.
+
+**Not completed this pass (14 of 25), explicitly not silently marked PASS:**
+
+- **B-005, B-006** (active/inactive filter, combined query+filter): the Status filter combobox resisted repeated genuine click attempts within this session's automation tooling; not re-derived live this pass. The underlying `filterCustomerMasterEntries` pure-function unit test suite (unchanged this session) still covers both cases and continues to pass (1035/1035). Not a product regression; a revalidation-session tooling gap.
+- **A-025, A-026, A-027, A-028, A-029, A-030, A-031, A-032, A-033, A-034, A-035, ACC-001**: not yet started this pass. A-030's underlying concurrent-save mechanism was independently, freshly re-verified earlier this same session (two genuinely concurrent RPC calls against the real `save_customer_onboarding_draft`, see the Batches 2-7 reconciliation work); the rest retain only their original RPC/script-level evidence pending a future continuation. A fresh fictional draft case (CO-000111) remains available in-progress (Customer Details, Tax & Registration, and Commercial Documents stages complete) for that continuation.
+
+**New defect this pass:** DEFECT-B8-REVAL-001 (A-022, Server Action body-size ceiling with zero headroom over the app's own file-size limit), found and fixed in this addendum, `next.config.ts`.
+
+**Checkpoint:** `tsc --noEmit` clean, `vitest run` 1035/1035, `eslint` 0 errors (1 pre-existing, unrelated warning). Live status tracked in `docs/journey-runs/RUN_STATE.json` / `docs/journey-runs/CURRENT_RUN_STATUS.md` (`npm run journey:status`).
+
+---

@@ -4,11 +4,11 @@
   "batchStatus": "IN_PROGRESS",
   "scheduled": 25,
   "journeys": [
-    { "id": "A-020", "status": "NOT_STARTED" },
+    { "id": "A-020", "status": "COMPLETE", "classification": "PASS" },
     { "id": "A-021", "status": "COMPLETE", "classification": "PASS" },
-    { "id": "A-022", "status": "IN_PROGRESS", "executionState": "DEFECT_INVESTIGATION" },
-    { "id": "A-023", "status": "NOT_STARTED" },
-    { "id": "A-024", "status": "NOT_STARTED" },
+    { "id": "A-022", "status": "COMPLETE", "classification": "FIXED_PASS" },
+    { "id": "A-023", "status": "COMPLETE", "classification": "PASS" },
+    { "id": "A-024", "status": "COMPLETE", "classification": "PASS" },
     { "id": "A-025", "status": "NOT_STARTED" },
     { "id": "A-026", "status": "NOT_STARTED" },
     { "id": "A-027", "status": "NOT_STARTED" },
@@ -21,20 +21,20 @@
     { "id": "A-034", "status": "NOT_STARTED" },
     { "id": "A-035", "status": "NOT_STARTED" },
     { "id": "ACC-001", "status": "NOT_STARTED" },
-    { "id": "B-001", "status": "NOT_STARTED" },
-    { "id": "B-002", "status": "NOT_STARTED" },
-    { "id": "B-003", "status": "NOT_STARTED" },
-    { "id": "B-004", "status": "NOT_STARTED" },
+    { "id": "B-001", "status": "COMPLETE", "classification": "PASS" },
+    { "id": "B-002", "status": "COMPLETE", "classification": "PASS" },
+    { "id": "B-003", "status": "COMPLETE", "classification": "PASS" },
+    { "id": "B-004", "status": "COMPLETE", "classification": "PASS" },
     { "id": "B-005", "status": "NOT_STARTED" },
     { "id": "B-006", "status": "NOT_STARTED" },
-    { "id": "B-007", "status": "NOT_STARTED" },
-    { "id": "B-008", "status": "NOT_STARTED" }
+    { "id": "B-007", "status": "COMPLETE", "classification": "PASS" },
+    { "id": "B-008", "status": "COMPLETE", "classification": "PASS" }
   ],
-  "currentJourney": "A-022",
-  "currentExecutionState": "DEFECT_INVESTIGATION",
+  "currentJourney": "A-025",
+  "currentExecutionState": "NOT_STARTED",
   "defectsFound": 1,
-  "defectsFixed": 0,
-  "openDefects": 1,
+  "defectsFixed": 1,
+  "openDefects": 0,
   "productDecisionsFound": 0,
   "journeyDiscovery": {
     "ALREADY_COVERED": 0,
@@ -45,6 +45,6 @@
     "PRODUCT_DECISION_REQUIRED": 0
   },
   "lastCheckpoint": null,
-  "blockingIssue": null,
-  "notes": "A-022: exactly-1MiB PDF upload rejected with 'Body exceeded 1 MB limit' (Next.js Server Action body-size cap), not the app's own 1MB document-size validation. Under investigation."
+  "blockingIssue": "B-005/B-006 (status filter, combined query+filter) not freshly UI-clicked this pass: the status-filter combobox resisted repeated genuine click attempts within this session's time budget. Underlying filterCustomerMasterEntries unit tests (unchanged this session) still cover both cases; not treated as failing, just not re-derived live. A-025 through A-035 and ACC-001 not yet started this pass, pending next continuation.",
+  "notes": "A-022 FIXED: exactly-1MiB PDF was rejected with 'Body exceeded 1 MB limit' (Next.js Server Action body-size cap had zero headroom over the app's own 1MB file limit). Fixed via next.config.ts experimental.serverActions.bodySizeLimit='2mb'. Retested live: exact 1MB now accepted ('Saved'), 1MB+1B still rejected with the app's own friendly message. A-023 regression retested live: disguised PNG-as-.pdf still correctly rejected (DEFECT-B8-001 fix holds). A-024: re-upload (PAN v1->v2) via genuine UI, is_current flip confirmed via SQL. A-020: submitted case's Maker view shows no Cancel affordance; server RPC still rejects with ONBOARDING_CASE_NOT_CANCELLABLE. B-001/002/003/004/007/008: all confirmed live via Admin persona against the existing 'Batch8 Approval Core Co Renamed' fixture (view, name/brand search, exact key search, former-name search) and a real deactivate-with-reason mutation (audit_log reason confirmed, fixture restored to active afterward). Fixture case CO-000111 (Batch8 UXRevalidation Co) remains in-progress in draft, usable for a future continuation of A-025/026/033/034/035/ACC-001."
 }

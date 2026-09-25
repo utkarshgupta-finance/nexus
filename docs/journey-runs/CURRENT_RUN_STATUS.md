@@ -7,18 +7,18 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 - **Current Batch:** 8 (Historical UX revalidation: Batch 8)
 - **Batch status:** IN_PROGRESS
 - **Scheduled journey count:** 25
-- **Completed journey count:** 1
-- **Remaining journey count:** 24
-- **Percentage complete:** 4%
-- **Current journey ID:** A-022
-- **Current journey execution state:** DEFECT_INVESTIGATION
+- **Completed journey count:** 11
+- **Remaining journey count:** 14
+- **Percentage complete:** 44%
+- **Current journey ID:** A-025
+- **Current journey execution state:** NOT_STARTED
 
-> Batch 8: 1 / 25 complete (4%)
+> Batch 8: 11 / 25 complete (44%)
 
 ## Classification counts
 
-- **PASS:** 1
-- **FAILED THEN FIXED + PASS:** 0
+- **PASS:** 10
+- **FAILED THEN FIXED + PASS:** 1
 - **EXPECTED BEHAVIOUR:** 0
 - **PRODUCT GAP:** 0
 - **PRODUCT DECISION REQUIRED:** 0
@@ -28,15 +28,15 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Current activity
 
-- **Last journey completed:** A-021
-- **Journey currently executing:** A-022
-- **Next 3 journeys:** A-023, A-024, A-025
+- **Last journey completed:** A-024
+- **Journey currently executing:** A-025
+- **Next 3 journeys:** A-026, A-027, A-028
 
 ## Findings
 
 - **Defects found:** 1
-- **Defects fixed:** 0
-- **Open defects:** 1
+- **Defects fixed:** 1
+- **Open defects:** 0
 - **Product Decisions found:** 0
 - **Journey Discovery:**
   - ALREADY COVERED: 0
@@ -49,11 +49,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** ca7dc7e
+- **Current HEAD:** 6eb776c
 - **Working tree:** dirty
 - **Latest test checkpoint:** None run yet this batch
-- **Blocking environment issue:** None
+- **Blocking environment issue:** B-005/B-006 (status filter, combined query+filter) not freshly UI-clicked this pass: the status-filter combobox resisted repeated genuine click attempts within this session's time budget. Underlying filterCustomerMasterEntries unit tests (unchanged this session) still cover both cases; not treated as failing, just not re-derived live. A-025 through A-035 and ACC-001 not yet started this pass, pending next continuation.
 
 ## Timestamp
 
-- **Last status update:** 2026-09-25 14:26:02 UTC
+- **Last status update:** 2026-09-25 15:10:35 UTC
