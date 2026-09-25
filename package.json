@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "nexus:provision-test-personas": "tsx --env-file=.env.local --env-file=.env.nexus-test.local scripts/provision-canonical-test-personas.ts",
-    "nexus:test-session": "tsx --env-file=.env.local --env-file=.env.nexus-test.local scripts/nexus-test-session.ts"
+    "nexus:test-session": "tsx --env-file=.env.local --env-file=.env.nexus-test.local scripts/nexus-test-session.ts",
+    "journey:status": "node scripts/journey-status.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

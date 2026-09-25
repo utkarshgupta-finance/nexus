@@ -506,3 +506,21 @@ into a second backlog.
   identity", DESIGNED / IMPLEMENTATION DEFERRED) has itself been designed
   first. Do not add a `p_source_type` parameter or any import-file
   handling opportunistically ahead of that trigger.
+- **PARKED: Post-Journey Automated Test Coverage Audit** (recorded
+  2026-09-25, explicitly not to be started until the trigger below is
+  met). Different question from "does the existing test suite pass"
+  (`vitest` green does not establish that all meaningful Nexus business
+  logic has adequate automated coverage). Once due, the audit assesses:
+  statement/branch/function/line coverage; automated coverage broken down
+  by Nexus domain; production modules with zero or weak tests;
+  authorization invariants; financial invariants; concurrency/data-
+  integrity controls; workflow controls; missing regression coverage; and
+  a P0/P1/P2 ranking of automated-test gaps. Objective is NOT artificial
+  100% coverage; it is that important Nexus business/control invariants
+  have appropriate automated protection, while Journey/Manual UX testing
+  continues to prove the real product experience. **Trigger: only after
+  the entire historical Journey/Manual UX revalidation program (all
+  batches, all Journey Discovery follow-ups, all defects, and all Product
+  Decisions arising from that program) is fully reconciled.** Do not
+  start this audit opportunistically ahead of that trigger, and do not
+  let ordinary batch work expand into it.
