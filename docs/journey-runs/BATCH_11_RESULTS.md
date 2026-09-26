@@ -225,3 +225,73 @@ Allowed Final Status values: PASS / FAILED THEN FIXED + PASS / BLOCKED / BLOCKED
 - No journeys blocked, parked, or skipped without a documented reason. All 25 scheduled journeys resolved to a final status.
 
 ---
+
+## REVALIDATION PASS (2026-09-26)
+
+Historical UX revalidation re-derived all 25 journeys, continuing the
+Batches 10-12 run immediately after Batch 10's closure. Genuine live
+evidence per journey: real RPC/database calls for the domain's own
+state-machine and trigger-level invariants (matching this batch's own
+predominant "Automation Feasibility: FULL" designation), source
+inspection for structural/architectural claims unchanged since the
+original run.
+
+### Result: 25 / 25 terminal (24 PASS, 1 PRODUCT GAP unresolved by design)
+
+- **C-034, C-035**: reconfirmed; C-035 live-retested end to end (self-
+  approval blocked for the creator, a different checker's approval
+  succeeded).
+- **D-001 through D-023**: all reconfirmed. Notable points:
+  - **D-003, D-004, D-015, D-021** (no governed Commercial Configuration
+    deactivate/reactivate lifecycle) were originally PRODUCT GAP
+    CONFIRMED; the underlying question was since decided and closed
+    (Commercial Configuration will NOT gain this lifecycle, by design).
+    Reclassified PASS, matching how this program handles a closed
+    decision (per PD-004/C-030 in this same run and PD-003/B-011 in
+    Batch 9): code still matches the decided behavior exactly.
+  - **D-006/D-019** (duplicate-scope components) and the closure
+    mechanism they exercise (**D-007, D-008, D-009, D-016**) were
+    live-verified together on the real Batch 8 fixture configuration:
+    a version with two byte-identical components was approved,
+    persisting both as independently open rows (no dedup, no exclusion
+    constraint), while correctly closing the two previously-open
+    components the day before the new effective date, never deleting
+    them.
+  - **D-010, D-011, D-012, D-023** (component/configuration
+    immutability) were live-retested against a freshly built disposable
+    customer/configuration/component, mirroring the original's own
+    isolation methodology: direct writes to `transaction_currency`,
+    `fx_snapshot_rate`, and a second `effective_to` write were all
+    rejected by `fn_protect_commercial_component_lifecycle`; a
+    configuration `name` edit succeeded while a `key` edit was rejected
+    by `fn_protect_commercial_configuration_lifecycle`.
+  - **D-017** (orphaned legacy ungoverned RPC) remains genuinely
+    unresolved: reconfirmed the service-layer wrapper is still exported
+    but has no caller anywhere in the reachable application code.
+    Recorded PRODUCT GAP CONFIRMED, unchanged, since no decision has
+    closed this one.
+  - **D-020** (long version-chain correctness) reconfirmed with real
+    data at a stronger scale than the original: the fixture configuration
+    now carries 26 real version rows (13 approved, 5 cancelled, 8
+    rejected) accumulated across this whole revalidation program,
+    confirmed no duplication and zero cross-configuration data bleed.
+  - **D-022 (PD-005)** was originally FAILED (no cross-customer
+    isolation existed); the decision was since made and implemented.
+    Live-reconfirmed by granting the existing `wf-test.pd005-scoped-viewer`
+    persona a fresh scoped `checker` role against the fixture customer
+    only, then calling the same `fn_user_has_customer_scoped_permission`
+    function the real page's `hasPermissionForCustomer` check resolves
+    through: in-scope access allowed, a different customer's
+    Commercial Configuration correctly blocked. Temporary grant revoked
+    immediately after. Reclassified PASS.
+- No new defects found this pass. No new Journey Discovery
+  classifications raised.
+
+### Status
+
+- Scheduled: 25. Terminal: 25. PASS: 24. PRODUCT GAP: 1 (D-017,
+  unresolved by design, not a defect).
+- Defects found this pass: 0. Open: 0.
+- Continuing to Batch 12 per the governing continuous-run instruction.
+
+---
