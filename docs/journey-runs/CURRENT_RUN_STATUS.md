@@ -49,11 +49,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 2fc4055
+- **Current HEAD:** 9ec087e
 - **Working tree:** dirty
 - **Latest test checkpoint:** None run yet this batch
 - **Blocking environment issue:** B-014: fix migration 20261009000000_fix_approve_rpcs_dead_end_at_zero_approval_graph.sql is authored and committed to the working tree but not yet applied to the remote database. `supabase db push` requires interactive CLI authentication (supabase login / SUPABASE_ACCESS_TOKEN) and the project database password per this repo's own migration rule (CLAUDE.md); the CLI hung waiting for that and was killed rather than working around it. Needs the user to run the push (or supply auth) before B-014 can be retested and closed. All other Batch 9 journeys are unaffected and continuing.
 
 ## Timestamp
 
-- **Last status update:** 2026-09-26 06:12:10 UTC
+- **Last status update:** 2026-09-26 06:16:52 UTC

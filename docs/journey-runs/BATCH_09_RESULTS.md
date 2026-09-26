@@ -389,26 +389,32 @@ C-008 reconfirmed PASS (B-010 reconfirmed EXPECTED_BEHAVIOR). Two real
 defects were found during this pass, both via live retest, not by reading
 old evidence:
 
-**DEFECT-B9-C002-001 (found and FIXED this pass).** The only two live UI
-entry points that ever create a Customer Change Request,
-`/customers/[customerKey]/change-requests/new` and
-`/customers/[customerKey]/change/new/both`, call
-`createChangeRequest` from `features/customer-change/services/change-request.service.ts`
-directly and never checked `customer.is_active`. The inactive-customer
-guard this pass's C-002 journey was meant to reconfirm only ever existed
-in `createChangeRequestAction` (`features/customer-change/actions.ts`), a
-Server Action with zero call sites anywhere in the live application
-(grepped, confirmed dead code). The original C-002 evidence read that
-dead action and concluded the real flow was blocked; live retesting
-against the actual reachable route found a genuine bypass: a full draft
-Customer Change Request (CCR-000110) was created against a deliberately
-deactivated customer with no error at all. Fixed in both page routes with
-the same friendly "Customer is inactive" render already established as
-precedent by the Commercials-side equivalent fix (PD-003 on
-`/commercials/[configId]/versions/new`), instead of duplicating the dead
-action's logic. Retested live: the block now holds, confirmed zero stray
-drafts created; `npx tsc --noEmit` clean after the fix. Stray draft
-CCR-000110 cancelled during cleanup.
+**DEFECT-B9-C002-001 (found and FIXED this pass).** Recorded at
+architectural level per this run's public-repository documentation rule
+(invariant, observed weakness, risk, fix, regression evidence), not as a
+reproducible exploit recipe.
+
+- Invariant under test: a Customer Change Request may not be opened
+  against an inactive customer (`docs/CUSTOMER_LIFECYCLE.md`'s reactivate-
+  first rule, the same one C-002 originally documented).
+- Observed Weakness: **FAILED**. The precondition check was implemented
+  in exactly one place, a Server Action with no live call sites anywhere
+  in the application; every reachable creation entry point bypassed it
+  entirely. The original C-002 evidence read the unreachable guard and
+  concluded the real flow enforced it; live retesting against the actual
+  reachable code path found the precondition was never evaluated there.
+- Risk: application-layer precondition gap on a governed write path, not
+  a data-integrity or permission-boundary defect; the database layer's
+  own guarantees around approved business truth were unaffected.
+- Fix: the precondition now runs at the top of both reachable creation
+  entry points, ahead of the mutation, rendering an explanatory "Customer
+  is inactive" state instead of proceeding, matching the presentation
+  already established as precedent by this codebase's equivalent
+  Commercials-side fix (PD-003).
+- Regression Evidence: retested live. The precondition now holds; the
+  reachable paths create nothing when the target customer is inactive.
+  `npx tsc --noEmit` clean after the fix. The one stray record created
+  during discovery, before the fix landed, was cancelled during cleanup.
 
 **DEFECT-B9-B014-001 (found this pass, fix authored, NOT YET APPLIED,
 external blocker).** `approve_customer_change_request` and its three
