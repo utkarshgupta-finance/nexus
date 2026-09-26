@@ -372,3 +372,125 @@ Allowed Final Status values: PASS / FAILED THEN FIXED + PASS / BLOCKED / BLOCKED
 - No journeys deferred, blocked, or skipped. All 25 scheduled journeys resolved to a final status.
 
 ---
+
+## REVALIDATION PASS (2026-09-26)
+
+Historical UX revalidation re-derived all 25 journeys via genuine Manual UX
+Standard evidence (real browser interaction where the assertion is
+user-visible, direct RPC calls only where a journey's own invariant is a
+database/backend guard with no reachable UI-repeatable path, e.g. an
+idempotency check the UI structurally prevents re-triggering). Batch 8 was
+accepted as closed beforehand; A-031 remains honestly PARTIAL.
+
+### Result: 24 / 25 terminal, 1 external blocker
+
+All of B-009, B-011 through B-013, B-015 through B-025, and C-001 through
+C-008 reconfirmed PASS (B-010 reconfirmed EXPECTED_BEHAVIOR). Two real
+defects were found during this pass, both via live retest, not by reading
+old evidence:
+
+**DEFECT-B9-C002-001 (found and FIXED this pass).** The only two live UI
+entry points that ever create a Customer Change Request,
+`/customers/[customerKey]/change-requests/new` and
+`/customers/[customerKey]/change/new/both`, call
+`createChangeRequest` from `features/customer-change/services/change-request.service.ts`
+directly and never checked `customer.is_active`. The inactive-customer
+guard this pass's C-002 journey was meant to reconfirm only ever existed
+in `createChangeRequestAction` (`features/customer-change/actions.ts`), a
+Server Action with zero call sites anywhere in the live application
+(grepped, confirmed dead code). The original C-002 evidence read that
+dead action and concluded the real flow was blocked; live retesting
+against the actual reachable route found a genuine bypass: a full draft
+Customer Change Request (CCR-000110) was created against a deliberately
+deactivated customer with no error at all. Fixed in both page routes with
+the same friendly "Customer is inactive" render already established as
+precedent by the Commercials-side equivalent fix (PD-003 on
+`/commercials/[configId]/versions/new`), instead of duplicating the dead
+action's logic. Retested live: the block now holds, confirmed zero stray
+drafts created; `npx tsc --noEmit` clean after the fix. Stray draft
+CCR-000110 cancelled during cleanup.
+
+**DEFECT-B9-B014-001 (found this pass, fix authored, NOT YET APPLIED,
+external blocker).** `approve_customer_change_request` and its three
+sibling RPCs (`approve_customer_onboarding_case`,
+`approve_commercial_configuration_version`, `approve_go_live_request`,
+all in `supabase/migrations/20260925000000_workflow_runtime_v1_sequential_execution.sql`)
+authorize against the workflow node the request is currently sitting at,
+then ask `fn_resolve_workflow_next_approval` to step PAST that node to
+find what comes next. That resolver's contract is "step past the argument
+node"; it has no outgoing edge to step to when the argument is already
+the graph's own End node. A `customer_change` workflow_version with zero
+Approval nodes between Start and End (a real, `published` shape actually
+selectable in this environment, e.g. `k017_workflow_admin_lifecycle`) has
+`submit_customer_change_request` land `current_workflow_node_key` on the
+End node directly (via the same resolver called correctly with
+`p_from_node_key = null`, which walks from Start and does not need to
+step past anything). Clicking Approve on such a request then asks the
+resolver to step past the End node, finds nothing, and raises
+`WORKFLOW_GRAPH_DEAD_END`, a token absent from every domain's own
+`NAMED_TOKEN_KINDS` map, so the checker sees a generic "An unexpected
+error occurred. Reference: NX-..." instead of the approval finalizing.
+Reproduced live: CCR-000109's Approve click on the real review page, as
+`nexus-test-ux-approver@example.test`, failed exactly this way.
+
+Fix authored as
+`supabase/migrations/20261009000000_fix_approve_rpcs_dead_end_at_zero_approval_graph.sql`:
+before calling the resolver, look up the CURRENT node's own type directly;
+if it is already `end`, finalize immediately instead of asking the
+resolver to step past it. Purely additive, applied identically to all
+four `approve_*` RPCs; every existing multi-approval-node path is
+untouched, since the short-circuit only fires when the current node's own
+type is `end`.
+
+Application blocked: `supabase db push` requires interactive CLI
+authentication (`supabase login` / `SUPABASE_ACCESS_TOKEN`) and the
+project database password, per this repo's own migration rule. Neither
+was available non-interactively in this session; the CLI hung waiting for
+a password prompt on a redirected stdin and was killed rather than worked
+around (no `execute_sql`-based DDL apply, per the same migration rule
+reserving MCP Supabase tools for read-only inspection). B-014 is recorded
+`PENDING_HUMAN_ACTION` / `EXTERNAL_BLOCKER`, not a defect classification
+itself, since the defect it depends on is already fully diagnosed and
+fixed in the working tree.
+
+**Resume instruction for B-014**, once the migration is applied (`npx
+supabase db push` with real credentials, or run by Utkarsh directly):
+CCR-000109 (request_id `07188a6e-0333-4769-8a9c-ce308857cd84`) is a real
+submitted Customer Change Request against `batch9-change-fixture-co`
+(zero Commercial Configurations); its real review page is reachable at
+`/reviews/change-requests/07188a6e-0333-4769-8a9c-ce308857cd84` on the
+`ux-approver` persona. Click Approve; it should now finalize instead of
+raising `WORKFLOW_GRAPH_DEAD_END`. Then attempt permanent deletion on
+`batch9-change-fixture-co` via genuine UI and confirm the real rejection
+`CUSTOMER_DELETE_HAS_APPROVED_CHANGE_HISTORY` (or its live UI wording),
+completing B-014. A second real submitted request, CCR-000113 (request_id
+`e6844943-9c74-4ff4-9d02-6eb88aa3da46`, C-006's own R1) is also sitting in
+this same blocked state against `batch8-uxrevalidation-co` and should be
+retested at the same time, not left stranded.
+
+### Other findings this pass
+
+- C-007 and C-008 (the FINANCE_HEAD / deduped BU_HEAD "Required
+  Approvals" evidence panel) were confirmed live on the same draft used
+  to set up B-014/C-001/C-003/C-005 (CCR-000109), not a separate fixture,
+  since the Segment and Business Unit edits needed for B-014's fixture
+  happened to be the exact two fields those journeys already required.
+- B-021's live regression additionally reconfirmed the `row_version`
+  bump-per-write behavior first surfaced in the original run: a plain
+  `set_customer_active` toggle (unrelated to any governed-field write)
+  reliably advances `row_version` by exactly 1 per call, which C-006 used
+  to construct its staleness precondition without depending on the
+  blocked approve path at all.
+- No new Journey Discovery classifications raised (no gap found requiring
+  a new journey, expansion, or Product Decision beyond the two defects
+  above).
+
+### Status
+
+- Scheduled: 25. Terminal: 24. Pending human action: 1 (B-014).
+- PASS: 20. EXPECTED_BEHAVIOR: 1 (B-010). FIXED_PASS: 1 (C-002).
+- Defects found this pass: 2. Fixed this pass: 1. Open: 1 (pending DB
+  migration apply, not further engineering work).
+- Batch 10 not started, per explicit instruction.
+
+---

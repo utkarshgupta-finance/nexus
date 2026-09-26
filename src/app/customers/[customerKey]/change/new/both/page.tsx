@@ -33,6 +33,24 @@ async function CreateBothAndShow({ customerKey }: { customerKey: string }) {
   const customer = await getCustomerByKey(customerKey)
   if (!customer) notFound()
 
+  /**
+   * Real defect found via live retest (Batch 9, C-002): same missing
+   * inactive-customer guard as `/customers/[customerKey]/change-requests/new`,
+   * on this route's own Customer Details half. Checked before the
+   * Commercials lookup below so an inactive customer never reaches
+   * either create call.
+   */
+  if (!customer.is_active) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <PageHeader
+          title="Customer is inactive"
+          description="This customer is inactive. Reactivate the customer before creating a Change Request."
+        />
+      </div>
+    )
+  }
+
   const context = await loadCustomerDetailContext(customer.id)
   const commercialConfigurationId = context.commercialConfigurations[0]?.id ?? null
   if (!commercialConfigurationId) notFound()

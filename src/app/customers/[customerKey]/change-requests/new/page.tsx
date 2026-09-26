@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 
 import { AuthGate } from "@/components/product/auth-gate"
+import { PageHeader } from "@/components/product/page-header"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { requirePermission } from "@/platform/permissions/server"
 import { getCustomerByKey } from "@/features/customers/server"
@@ -25,6 +26,29 @@ async function CreateAndRedirect({ customerKey }: { customerKey: string }) {
   if (!customer) notFound()
 
   const actor = await requirePermission("customer", "change_request")
+
+  /**
+   * Real defect found via live retest (Batch 9, C-002): this bare
+   * create-and-redirect route called the service layer directly and
+   * never enforced the inactive-customer precondition, even though the
+   * (unreachable, dead) `createChangeRequestAction` Server Action in
+   * `features/customer-change/actions.ts` already implements this exact
+   * check. Nothing in the live UI ever calls that action; this route,
+   * and `/customers/[customerKey]/change/new/both`, are the only real
+   * entry points. `create_customer_change_request` has no RPC-level
+   * guard by design (B-010), so this must be enforced here.
+   */
+  if (!customer.is_active) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <PageHeader
+          title="Customer is inactive"
+          description="This customer is inactive. Reactivate the customer before creating a Change Request."
+        />
+      </div>
+    )
+  }
+
   const changeRequest = await createChangeRequest(customer.id, actor.appUserId)
   redirect(`/customers/${customerKey}/change-requests/${changeRequest.requestId}`)
   return null
