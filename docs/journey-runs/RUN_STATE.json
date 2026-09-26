@@ -1,7 +1,7 @@
 {
   "batch": "9",
   "batchLabel": "Historical UX revalidation: Batch 9",
-  "batchStatus": "24_OF_25_TERMINAL_ONE_EXTERNAL_BLOCKER",
+  "batchStatus": "COMPLETE",
   "scheduled": 25,
   "journeys": [
     { "id": "B-009", "status": "COMPLETE", "classification": "PASS" },
@@ -9,7 +9,7 @@
     { "id": "B-011", "status": "COMPLETE", "classification": "PASS" },
     { "id": "B-012", "status": "COMPLETE", "classification": "PASS" },
     { "id": "B-013", "status": "COMPLETE", "classification": "PASS" },
-    { "id": "B-014", "status": "PENDING_HUMAN_ACTION", "classification": "EXTERNAL_BLOCKER" },
+    { "id": "B-014", "status": "COMPLETE", "classification": "FIXED_PASS" },
     { "id": "B-015", "status": "COMPLETE", "classification": "PASS" },
     { "id": "B-016", "status": "COMPLETE", "classification": "PASS" },
     { "id": "B-017", "status": "COMPLETE", "classification": "PASS" },
@@ -30,11 +30,11 @@
     { "id": "C-007", "status": "COMPLETE", "classification": "PASS" },
     { "id": "C-008", "status": "COMPLETE", "classification": "PASS" }
   ],
-  "currentJourney": "B-014",
-  "currentExecutionState": "24/25 terminal. Only B-014 remains, blocked on the same external dependency documented in blockingIssue (supabase db push). No further independent work remains in Batch 9.",
+  "currentJourney": null,
+  "currentExecutionState": "Batch 9 fully reconciled: 25/25 terminal. Migration applied, B-014 retested live and PASSED (real approval finalized, real deletion-eligibility rejection confirmed). Second stranded request (C-006's R1, CCR-000113) retested too: correctly rejected with its own real staleness guard, no dead-end error. Batch 10 not started.",
   "defectsFound": 2,
-  "defectsFixed": 1,
-  "openDefects": 1,
+  "defectsFixed": 2,
+  "openDefects": 0,
   "productDecisionsFound": 0,
   "journeyDiscovery": {
     "ALREADY_COVERED": 0,
@@ -45,6 +45,6 @@
     "PRODUCT_DECISION_REQUIRED": 0
   },
   "lastCheckpoint": null,
-  "blockingIssue": "B-014: fix migration 20261009000000_fix_approve_rpcs_dead_end_at_zero_approval_graph.sql is authored and committed to the working tree but not yet applied to the remote database. `supabase db push` requires interactive CLI authentication (supabase login / SUPABASE_ACCESS_TOKEN) and the project database password per this repo's own migration rule (CLAUDE.md); the CLI hung waiting for that and was killed rather than working around it. Needs the user to run the push (or supply auth) before B-014 can be retested and closed. All other Batch 9 journeys are unaffected and continuing.",
-  "notes": "Batch 9 revalidation starting. Batch 8 closed 25/25 (23 PASS, 1 FIXED_PASS, 1 PARTIAL honestly disclosed). Using CO-000111's approved customer ('Batch8 UXRevalidation Co', key batch8-uxrevalidation-co) as the Batch 9 fixture per the plan's own 'Required fixtures: The Customer Master record created in Batch 8.' DEFECT-B9-B014-001: approve_customer_change_request (and sibling approve_customer_onboarding_case / approve_commercial_configuration_version / approve_go_live_request) misfire WORKFLOW_GRAPH_DEAD_END on final Approve when current_workflow_node_key already equals the graph's End node (zero-Approval-node workflow, e.g. k017_workflow_admin_lifecycle). Fix authored, pending remote apply. DEFECT-B9-C002-001 (FIXED): the inactive-customer precondition for creating a Customer Change Request was implemented only in a Server Action with no live call sites; the reachable creation entry points never enforced it. Fixed by moving the precondition to the reachable entry points, matching the Commercials-side PD-003 precedent (friendly 'Customer is inactive' state instead of proceeding). Live-retested: precondition holds, zero stray drafts created. See BATCH_09_RESULTS.md's REVALIDATION PASS section for the full architectural writeup."
+  "blockingIssue": null,
+  "notes": "Batch 9 revalidation complete: 25/25. Batch 8 closed 25/25 (23 PASS, 1 FIXED_PASS, 1 PARTIAL honestly disclosed). Using CO-000111's approved customer ('Batch8 UXRevalidation Co', key batch8-uxrevalidation-co) as the Batch 9 fixture per the plan's own 'Required fixtures: The Customer Master record created in Batch 8.' DEFECT-B9-B014-001 (FIXED, migration applied via supabase db push): approve_customer_change_request and its three sibling approve_* RPCs misfired WORKFLOW_GRAPH_DEAD_END on final Approve when current_workflow_node_key already equals the graph's End node (zero-Approval-node workflow, e.g. k017_workflow_admin_lifecycle). Migration applied and live-retested on two separate submitted requests: CCR-000109 finalized correctly (Segment/Business Unit genuinely applied, confirmed via the real permanent-deletion-eligibility rejection referencing that approved history); CCR-000113 correctly hit its own real, unrelated staleness guard instead of the dead-end error, then rejected to close out cleanly. DEFECT-B9-C002-001 (FIXED): the inactive-customer precondition for creating a Customer Change Request was implemented only in a Server Action with no live call sites; the reachable creation entry points never enforced it. Fixed by moving the precondition to the reachable entry points, matching the Commercials-side PD-003 precedent (friendly 'Customer is inactive' state instead of proceeding). Live-retested: precondition holds, zero stray drafts created. See BATCH_09_RESULTS.md's REVALIDATION PASS section for the full architectural writeup."
 }

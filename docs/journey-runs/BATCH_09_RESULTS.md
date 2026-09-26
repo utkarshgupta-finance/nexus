@@ -382,12 +382,12 @@ database/backend guard with no reachable UI-repeatable path, e.g. an
 idempotency check the UI structurally prevents re-triggering). Batch 8 was
 accepted as closed beforehand; A-031 remains honestly PARTIAL.
 
-### Result: 24 / 25 terminal, 1 external blocker
+### Result: 25 / 25 terminal
 
 All of B-009, B-011 through B-013, B-015 through B-025, and C-001 through
 C-008 reconfirmed PASS (B-010 reconfirmed EXPECTED_BEHAVIOR). Two real
 defects were found during this pass, both via live retest, not by reading
-old evidence:
+old evidence, and both fixed:
 
 **DEFECT-B9-C002-001 (found and FIXED this pass).** Recorded at
 architectural level per this run's public-repository documentation rule
@@ -416,8 +416,7 @@ reproducible exploit recipe.
   `npx tsc --noEmit` clean after the fix. The one stray record created
   during discovery, before the fix landed, was cancelled during cleanup.
 
-**DEFECT-B9-B014-001 (found this pass, fix authored, NOT YET APPLIED,
-external blocker).** `approve_customer_change_request` and its three
+**DEFECT-B9-B014-001 (found and FIXED this pass).** `approve_customer_change_request` and its three
 sibling RPCs (`approve_customer_onboarding_case`,
 `approve_commercial_configuration_version`, `approve_go_live_request`,
 all in `supabase/migrations/20260925000000_workflow_runtime_v1_sequential_execution.sql`)
@@ -448,31 +447,30 @@ four `approve_*` RPCs; every existing multi-approval-node path is
 untouched, since the short-circuit only fires when the current node's own
 type is `end`.
 
-Application blocked: `supabase db push` requires interactive CLI
-authentication (`supabase login` / `SUPABASE_ACCESS_TOKEN`) and the
-project database password, per this repo's own migration rule. Neither
-was available non-interactively in this session; the CLI hung waiting for
-a password prompt on a redirected stdin and was killed rather than worked
-around (no `execute_sql`-based DDL apply, per the same migration rule
-reserving MCP Supabase tools for read-only inspection). B-014 is recorded
-`PENDING_HUMAN_ACTION` / `EXTERNAL_BLOCKER`, not a defect classification
-itself, since the defect it depends on is already fully diagnosed and
-fixed in the working tree.
+Application was initially blocked: `supabase db push` requires
+interactive CLI authentication (`supabase login` / `SUPABASE_ACCESS_TOKEN`)
+and the project database password, per this repo's own migration rule,
+neither of which was available non-interactively at first. Once Utkarsh
+authenticated the CLI, `npx supabase db push` applied the migration
+cleanly (`npx supabase migration list` confirmed local and remote both at
+`20261009000000`).
 
-**Resume instruction for B-014**, once the migration is applied (`npx
-supabase db push` with real credentials, or run by Utkarsh directly):
-CCR-000109 (request_id `07188a6e-0333-4769-8a9c-ce308857cd84`) is a real
-submitted Customer Change Request against `batch9-change-fixture-co`
-(zero Commercial Configurations); its real review page is reachable at
-`/reviews/change-requests/07188a6e-0333-4769-8a9c-ce308857cd84` on the
-`ux-approver` persona. Click Approve; it should now finalize instead of
-raising `WORKFLOW_GRAPH_DEAD_END`. Then attempt permanent deletion on
-`batch9-change-fixture-co` via genuine UI and confirm the real rejection
-`CUSTOMER_DELETE_HAS_APPROVED_CHANGE_HISTORY` (or its live UI wording),
-completing B-014. A second real submitted request, CCR-000113 (request_id
-`e6844943-9c74-4ff4-9d02-6eb88aa3da46`, C-006's own R1) is also sitting in
-this same blocked state against `batch8-uxrevalidation-co` and should be
-retested at the same time, not left stranded.
+Retested live afterward: CCR-000109's real review page, as
+`nexus-test-ux-approver@example.test`, now finalizes on Approve instead of
+raising `WORKFLOW_GRAPH_DEAD_END`. The customer's Segment and Business
+Unit were genuinely updated to the proposed values, and the Latest Change
+Request now reads Approved. A subsequent genuine permanent-deletion
+attempt on the same customer was correctly rejected, citing the approved
+Change Request as protected history, confirming the fix did not disturb
+any downstream guarantee.
+
+A second real submitted request left in this same state, CCR-000113
+(`e6844943-9c74-4ff4-9d02-6eb88aa3da46`, C-006's own R1), was retested
+too rather than left stranded: Approve correctly surfaced its own real,
+unrelated staleness rejection (the customer's `row_version` had moved on
+since this request was created, exactly the condition C-006 deliberately
+constructed), with no dead-end error. Rejected afterward to close the
+fixture out cleanly.
 
 ### Other findings this pass
 
@@ -493,10 +491,9 @@ retested at the same time, not left stranded.
 
 ### Status
 
-- Scheduled: 25. Terminal: 24. Pending human action: 1 (B-014).
-- PASS: 20. EXPECTED_BEHAVIOR: 1 (B-010). FIXED_PASS: 1 (C-002).
-- Defects found this pass: 2. Fixed this pass: 1. Open: 1 (pending DB
-  migration apply, not further engineering work).
+- Scheduled: 25. Terminal: 25.
+- PASS: 22. EXPECTED_BEHAVIOR: 1 (B-010). FIXED_PASS: 2 (B-014, C-002).
+- Defects found this pass: 2. Fixed this pass: 2. Open: 0.
 - Batch 10 not started, per explicit instruction.
 
 ---

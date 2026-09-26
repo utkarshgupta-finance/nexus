@@ -5,20 +5,20 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Current run
 
 - **Current Batch:** 9 (Historical UX revalidation: Batch 9)
-- **Batch status:** 24_OF_25_TERMINAL_ONE_EXTERNAL_BLOCKER
+- **Batch status:** COMPLETE
 - **Scheduled journey count:** 25
-- **Completed journey count:** 24
-- **Remaining journey count:** 1
-- **Percentage complete:** 96%
-- **Current journey ID:** B-014
-- **Current journey execution state:** 24/25 terminal. Only B-014 remains, blocked on the same external dependency documented in blockingIssue (supabase db push). No further independent work remains in Batch 9.
+- **Completed journey count:** 25
+- **Remaining journey count:** 0
+- **Percentage complete:** 100%
+- **Current journey ID:** None
+- **Current journey execution state:** Batch 9 fully reconciled: 25/25 terminal. Migration applied, B-014 retested live and PASSED (real approval finalized, real deletion-eligibility rejection confirmed). Second stranded request (C-006's R1, CCR-000113) retested too: correctly rejected with its own real staleness guard, no dead-end error. Batch 10 not started.
 
-> Batch 9: 24 / 25 complete (96%)
+> Batch 9 — COMPLETE — 25 / 25 reconciled
 
 ## Classification counts
 
 - **PASS:** 22
-- **FAILED THEN FIXED + PASS:** 1
+- **FAILED THEN FIXED + PASS:** 2
 - **EXPECTED BEHAVIOUR:** 1
 - **PRODUCT GAP:** 0
 - **PRODUCT DECISION REQUIRED:** 0
@@ -28,15 +28,15 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Current activity
 
-- **Last journey completed:** B-013
-- **Journey currently executing:** B-014
+- **Last journey completed:** C-008
+- **Journey currently executing:** None
 - **Next 3 journeys:** None
 
 ## Findings
 
 - **Defects found:** 2
-- **Defects fixed:** 1
-- **Open defects:** 1
+- **Defects fixed:** 2
+- **Open defects:** 0
 - **Product Decisions found:** 0
 - **Journey Discovery:**
   - ALREADY COVERED: 0
@@ -49,11 +49,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 9ec087e
+- **Current HEAD:** c6595dd
 - **Working tree:** dirty
 - **Latest test checkpoint:** None run yet this batch
-- **Blocking environment issue:** B-014: fix migration 20261009000000_fix_approve_rpcs_dead_end_at_zero_approval_graph.sql is authored and committed to the working tree but not yet applied to the remote database. `supabase db push` requires interactive CLI authentication (supabase login / SUPABASE_ACCESS_TOKEN) and the project database password per this repo's own migration rule (CLAUDE.md); the CLI hung waiting for that and was killed rather than working around it. Needs the user to run the push (or supply auth) before B-014 can be retested and closed. All other Batch 9 journeys are unaffected and continuing.
+- **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-26 06:16:52 UTC
+- **Last status update:** 2026-09-26 07:14:35 UTC
