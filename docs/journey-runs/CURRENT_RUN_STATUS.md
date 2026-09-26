@@ -5,32 +5,32 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Current run
 
 - **Current Batch:** 8 (Historical UX revalidation: Batch 8)
-- **Batch status:** IN_PROGRESS
+- **Batch status:** COMPLETE
 - **Scheduled journey count:** 25
-- **Completed journey count:** 11
-- **Remaining journey count:** 14
-- **Percentage complete:** 44%
-- **Current journey ID:** A-025
-- **Current journey execution state:** NOT_STARTED
+- **Completed journey count:** 25
+- **Remaining journey count:** 0
+- **Percentage complete:** 100%
+- **Current journey ID:** None
+- **Current journey execution state:** COMPLETE
 
-> Batch 8: 11 / 25 complete (44%)
+> Batch 8 — COMPLETE — 25 / 25 reconciled
 
 ## Classification counts
 
-- **PASS:** 10
+- **PASS:** 23
 - **FAILED THEN FIXED + PASS:** 1
 - **EXPECTED BEHAVIOUR:** 0
 - **PRODUCT GAP:** 0
 - **PRODUCT DECISION REQUIRED:** 0
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
-- **PARTIAL:** 0
+- **PARTIAL:** 1
 
 ## Current activity
 
-- **Last journey completed:** A-024
-- **Journey currently executing:** A-025
-- **Next 3 journeys:** A-026, A-027, A-028
+- **Last journey completed:** B-008
+- **Journey currently executing:** None
+- **Next 3 journeys:** None
 
 ## Findings
 
@@ -49,11 +49,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 6eb776c
+- **Current HEAD:** 9b1916e
 - **Working tree:** dirty
 - **Latest test checkpoint:** None run yet this batch
-- **Blocking environment issue:** B-005/B-006 (status filter, combined query+filter) not freshly UI-clicked this pass: the status-filter combobox resisted repeated genuine click attempts within this session's time budget. Underlying filterCustomerMasterEntries unit tests (unchanged this session) still cover both cases; not treated as failing, just not re-derived live. A-025 through A-035 and ACC-001 not yet started this pass, pending next continuation.
+- **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-25 15:10:35 UTC
+- **Last status update:** 2026-09-26 04:11:02 UTC
