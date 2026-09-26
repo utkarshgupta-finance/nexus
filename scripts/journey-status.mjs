@@ -113,6 +113,14 @@ function buildDashboardMarkdown(state, git, now) {
   lines.push(``)
   lines.push(`> ${headline}`)
   lines.push(``)
+  if (state.run) {
+    const overallComplete = (state.run.priorBatchesComplete ?? 0) + complete
+    const overallScheduled = state.run.scheduledTotal ?? scheduled
+    lines.push(`## Continuous run (Batches ${state.run.batches.join("-")})`)
+    lines.push(``)
+    lines.push(`> Overall: ${overallComplete} / ${overallScheduled} complete — ${overallScheduled - overallComplete} remaining.`)
+    lines.push(``)
+  }
   lines.push(`## Classification counts`)
   lines.push(``)
   for (const [key, label] of Object.entries(CLASSIFICATION_LABELS)) {
@@ -167,6 +175,12 @@ function buildConsoleSummary(state, git) {
   lines.push(pad("Current", `${state.currentJourney ?? "None"} - ${state.currentExecutionState ?? current?.executionState ?? "NOT_STARTED"}`))
   lines.push(pad("Remaining", `${remaining}`))
   lines.push(``)
+  if (state.run) {
+    const overallComplete = (state.run.priorBatchesComplete ?? 0) + complete
+    const overallScheduled = state.run.scheduledTotal ?? scheduled
+    lines.push(pad("Overall run", `${overallComplete} / ${overallScheduled} (Batches ${state.run.batches.join("-")})`))
+    lines.push(``)
+  }
   lines.push(pad("PASS", counts.PASS))
   lines.push(pad("FIXED + PASS", counts.FIXED_PASS))
   lines.push(pad("EXPECTED", counts.EXPECTED_BEHAVIOR))

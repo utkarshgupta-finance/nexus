@@ -259,3 +259,56 @@ Allowed Final Status values: PASS / FAILED THEN FIXED + PASS / BLOCKED / BLOCKED
 - No journeys blocked, parked, or skipped without a documented reason. All 25 scheduled journeys resolved to a final status (24 resolved outright, 1 correctly deferred to its natural home in Batch 12).
 
 ---
+
+## REVALIDATION PASS (2026-09-26)
+
+Historical UX revalidation re-derived all 25 journeys, as part of a
+continuous Batches 10-12 run started immediately after Batch 9's closure
+(commit `cf95c18`). Genuine live evidence gathered per journey: real
+browser interaction (MANUAL UX VERIFIED) where the assertion is
+user-visible (C-009 through C-011 combined-requirements panel), direct
+RPC calls (SERVER/RPC VERIFIED) for backend state-machine invariants
+matching this batch's own original "Automation Feasibility: FULL"
+designation, and source inspection (SOURCE INSPECTED) for structural
+claims (C-024, C-028, C-032) unchanged since the original run.
+
+### Result: 25 / 25 terminal, all PASS
+
+All 25 journeys reconfirmed. Notable points:
+
+- **C-025 and C-027** were not independently re-executed: both already
+  carry stronger real-environment evidence than a fresh synthetic
+  reproduction would (C-025 from Batch 9's own live discovery of the
+  Finance node's zero-eligible-approver gap; C-027 from the original
+  run's explicitly-authorized live workflow-graph swap, executed once
+  and restored). Citing existing evidence per this program's own
+  "do not rerun if evidence is already sufficient" discipline.
+- **C-030 (PD-004)** was live-reconfirmed rather than merely cited,
+  since it is a P1 behavioral claim: created, submitted, and fully
+  approved a request entirely while the customer was inactive
+  throughout, confirming the change still applies exactly as the
+  closed decision requires. Reclassified PASS (from the original's
+  PRODUCT DECISION REQUIRED), matching how PD-003/B-011 was handled in
+  Batch 9's own revalidation, since the decision is no longer open.
+- **C-011** additionally confirms the deliberate V1 simplification even
+  more strongly than the original run: today's live, active
+  `customer_change` workflow has zero Approval nodes (a real,
+  environment-confirmed difference from the original's 3-node Finance/
+  Legal/Leadership chain), so a single ordinary `customer.approve`
+  holder, with none of the FINANCE_HEAD/BU_HEAD-specific roles the
+  Required Approvals panel lists, fully finalizes the combined request.
+- **C-029** was tested with the stronger of the original's two request
+  pairs (disjoint fields only), since it is the more surprising and
+  sufficient proof that the staleness guard is whole-row, not
+  field-level; the redundant overlapping-field pair was not
+  separately reconstructed.
+- No new defects found this pass. No new Journey Discovery
+  classifications raised.
+
+### Status
+
+- Scheduled: 25. Terminal: 25. PASS: 25.
+- Defects found this pass: 0. Open: 0.
+- Continuing to Batch 11 per the governing continuous-run instruction.
+
+---
