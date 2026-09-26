@@ -343,7 +343,7 @@ Built directly from this file's own REVALIDATION PASS entries above and the orig
 | E-017 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live idempotent retry-approve; `commercial_changes` row count confirmed unchanged via direct query. |
 | E-018 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live MUG-threshold approval; new `commercial_commitments` row confirmed linked to the new component via direct query. |
 | E-019 | PASS | SOURCE INSPECTED | Re-grepped the full `src/` tree and schema for any journal/GL/accounting-posting mechanism: zero results. |
-| E-020 | PRODUCT GAP CONFIRMED | SOURCE INSPECTED, DATABASE VERIFIED (existence only) | Legacy RPC's continued existence confirmed live via direct query; the underlying coexistence risk itself was not independently reproduced via a live collision. **Flagged: this evidence is weaker than the journey's own objective (demonstrating actual coexistence behavior, not just the legacy path's continued existence).** Not actioned in this bounded pass since it was not one of the five named reconciliation items; recorded honestly here and in Tech Debt rather than silently upgraded. |
+| E-020 | PRODUCT GAP CONFIRMED | SERVER/RPC VERIFIED, DATABASE VERIFIED | **Resolved in the follow-up reconciliation below.** Previously existence-only evidence (the legacy RPC's continued presence, not the actual coexistence behavior); now a real coexistence collision has been reproduced live. |
 | E-021 | PASS | SERVER/RPC VERIFIED | See E-010/E-011/E-021 above. |
 | E-022 | PRODUCT GAP CONFIRMED | SERVER/RPC VERIFIED, DATABASE VERIFIED | **Resolved this pass, see below.** Previously code-reading only; now live-confirmed. |
 | E-023 | PASS | SERVER/RPC VERIFIED | Live second-draft-creation attempt against the same configuration failed immediately with `uq_commercial_configuration_versions_one_open_per_config`. |
@@ -355,6 +355,18 @@ No other journey's evidence was found weaker than its objective requires.
 The prior framing ("PRODUCT GAP CONFIRMED" alongside "code-reading evidence only" and "needs a live-submit confirmation pass") was self-contradictory, correctly flagged. Performed the smallest safe live verification, on the disposable E-010/E-021 test configuration (never real commercial history): approved a designation-based component carrying zero rate rows through the real approval path. The approval succeeded without error, and a direct query confirmed a real, permanently open component now exists in that shape. This genuinely travels through the real server/database boundary, not merely the application-layer mapping function inspected originally: the invariant that a designation-based component prices at least one designation is not enforced as a minimum-row-count check at the schema level (only structural presence is checked, not non-emptiness), matching what the application-layer read had already suggested. Architectural detail in `docs/TECH_DEBT.md`'s own entry for this gap; recipe-level reproduction detail deliberately not repeated in this public ledger.
 
 **E-022 = PRODUCT GAP CONFIRMED**, now on live server-boundary evidence, not source-inspection inference alone.
+
+### E-020 resolution (second follow-up, same day)
+
+The first evidence-reconciliation pass only reconfirmed that the legacy RPC still exists; it did not reproduce the journey's actual objective (a governed Commercial Change in progress genuinely coexisting with an independent legacy-path change), correctly flagged as weaker than the objective requires. Performed the missing coexistence test, on the same disposable, never-real-history test configuration used for E-010/E-021/E-022:
+
+1. Created and submitted a real governed Commercial Change (a genuine "in progress" state: submitted, pending approval, routed to a real reviewing team) against the disposable configuration's one open component.
+2. While that governed change sat pending, independently invoked the legacy ungoverned path against the same configuration with an earlier effective date than the governed change's own. It succeeded, closing the configuration's currently-open component. The legacy path does not itself open a replacement component; it only closes what is currently open.
+3. Confirmed directly: the governed change's own request row was completely unaffected by this (identical status, effective date, and row version before and after).
+4. Approved the governed change. The approval succeeded without any conflict or error.
+5. Direct query of the resulting components confirmed the coexistence risk empirically: the legacy-closed component and the governed change's newly-approved component are both individually correct and immutable, but a real gap in effective, currently-active commercial terms now exists between the two, exactly matching what the code-level characterization predicted. Neither path destroyed or overwrote the other's data; the resulting inconsistency is a genuine business-data gap, not data corruption.
+
+**E-020 = PRODUCT GAP CONFIRMED**, now on genuine reproduced coexistence-behavior evidence, not existence-only evidence. Full architectural detail (not a step-by-step reproduction) already recorded in `docs/TECH_DEBT.md`'s existing entry for this gap; this confirms that entry's risk was real, not merely theoretical.
 
 ### Tech Debt reconciliation (this pass)
 
