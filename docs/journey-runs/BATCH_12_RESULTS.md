@@ -313,3 +313,55 @@ No fixture state was left dirty: the temporary `WF-TEST Legal Checker` team gran
 **Batches 10-12 continuous run: 75/75 complete.**
 
 ---
+
+## EVIDENCE RECONCILIATION PASS (2026-09-26)
+
+Bounded reconciliation requested after the Batches 10-12 closure report, scoped to: (1) an authoritative per-journey evidence table for this batch, (2) resolving E-022's self-contradictory evidence framing, (3)/(4) two Batch 11 items (D-009, D-020, addressed in `BATCH_11_RESULTS.md`), (5) Tech Debt reconciliation. Not a re-run of the batch; only journeys with a genuine evidence gap were touched.
+
+### Authoritative Batch 12 evidence table
+
+Built directly from this file's own REVALIDATION PASS entries above and the original per-journey entries, not from conversational narration.
+
+| Journey | Classification | Evidence type(s) | Summary |
+|---|---|---|---|
+| D-024 | PASS | DATABASE VERIFIED | Live SQL query against the fixture: interior date and closing-boundary date both returned exactly the correct open components, no double-count, no gap. |
+| E-001 | PASS | SOURCE INSPECTED | `getCurrentCommercialRateDraft` still filters `effectiveTo === null`; not independently exercised live this batch (low-risk, structurally simple, consistent with citation policy). |
+| E-002 | PASS | SERVER/RPC VERIFIED | Live RPC call with `p_change_category = 'initial_setup'` rejected with `COMMERCIAL_VERSION_INVALID_CATEGORY`. |
+| E-003 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Composite: proven by this batch's own real draft-to-approve calls (E-005 through E-018), each independently live-verified below. |
+| E-004 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live draft save (row_version 1 to 2) and cancel; open components queried unaffected throughout. |
+| E-005 | PASS | SERVER/RPC VERIFIED | Live cancel-while-submitted rejected with `COMMERCIAL_VERSION_NOT_CANCELLABLE`. |
+| E-006 / E-024 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live empty-reason reject rejected; live real-reason reject succeeded; `reason` vs `decision_reason` confirmed distinct via direct row read. |
+| E-007 | PASS | SERVER/RPC VERIFIED | Live self-approval attempt rejected with `SELF_APPROVAL_NOT_ALLOWED`. |
+| E-008 | PASS | SERVER/RPC VERIFIED (team half), SOURCE INSPECTED (permission half) | Live wrong-team approval attempt rejected with `WORKFLOW_TEAM_REQUIRED`; the separate permission-only half cited from already-proven code, not re-derived. |
+| E-009 | PASS | SERVER/RPC VERIFIED | Live approval by a genuinely re-granted, correct-team member succeeded; `decided_by` confirmed. |
+| E-010 / E-011 / E-021 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live: fresh disposable customer, segment changed via the fully governed Customer Change path, draft submitted after the change, routed to Legal, confirming submission-time (not creation-time) resolution. E-011 cited as an established negative/contrast case, not re-run. |
+| E-012 | PASS | SERVER/RPC VERIFIED | Reconfirmed as part of E-009's live approval call; correct `p_expected_current_node_key` passed. |
+| E-013 | PASS | SERVER/RPC VERIFIED | Live stale-`expected_row_version` save rejected with `COMMERCIAL_VERSION_DRAFT_STALE`. |
+| E-014 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live renewal approval with a future effective_date; prior component's `effective_to` confirmed via direct row read to close exactly one day before the future date. |
+| E-015 / PD-006 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live: a genuine backward-extension correction succeeded (new predecessor row, original row untouched); a live mid-history-conflict correction was correctly rejected with `COMMERCIAL_VERSION_EFFECTIVE_DATE_CONFLICTS_WITH_HISTORY`. Both halves of the closed decision directly reproduced. |
+| E-016 | PASS | SERVER/RPC VERIFIED | Live "other"-category version taken through full create/submit/approve. |
+| E-017 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live idempotent retry-approve; `commercial_changes` row count confirmed unchanged via direct query. |
+| E-018 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live MUG-threshold approval; new `commercial_commitments` row confirmed linked to the new component via direct query. |
+| E-019 | PASS | SOURCE INSPECTED | Re-grepped the full `src/` tree and schema for any journal/GL/accounting-posting mechanism: zero results. |
+| E-020 | PRODUCT GAP CONFIRMED | SOURCE INSPECTED, DATABASE VERIFIED (existence only) | Legacy RPC's continued existence confirmed live via direct query; the underlying coexistence risk itself was not independently reproduced via a live collision. **Flagged: this evidence is weaker than the journey's own objective (demonstrating actual coexistence behavior, not just the legacy path's continued existence).** Not actioned in this bounded pass since it was not one of the five named reconciliation items; recorded honestly here and in Tech Debt rather than silently upgraded. |
+| E-021 | PASS | SERVER/RPC VERIFIED | See E-010/E-011/E-021 above. |
+| E-022 | PRODUCT GAP CONFIRMED | SERVER/RPC VERIFIED, DATABASE VERIFIED | **Resolved this pass, see below.** Previously code-reading only; now live-confirmed. |
+| E-023 | PASS | SERVER/RPC VERIFIED | Live second-draft-creation attempt against the same configuration failed immediately with `uq_commercial_configuration_versions_one_open_per_config`. |
+
+No other journey's evidence was found weaker than its objective requires.
+
+### E-022 resolution
+
+The prior framing ("PRODUCT GAP CONFIRMED" alongside "code-reading evidence only" and "needs a live-submit confirmation pass") was self-contradictory, correctly flagged. Performed the smallest safe live verification, on the disposable E-010/E-021 test configuration (never real commercial history): approved a designation-based component carrying zero rate rows through the real approval path. The approval succeeded without error, and a direct query confirmed a real, permanently open component now exists in that shape. This genuinely travels through the real server/database boundary, not merely the application-layer mapping function inspected originally: the invariant that a designation-based component prices at least one designation is not enforced as a minimum-row-count check at the schema level (only structural presence is checked, not non-emptiness), matching what the application-layer read had already suggested. Architectural detail in `docs/TECH_DEBT.md`'s own entry for this gap; recipe-level reproduction detail deliberately not repeated in this public ledger.
+
+**E-022 = PRODUCT GAP CONFIRMED**, now on live server-boundary evidence, not source-inspection inference alone.
+
+### Tech Debt reconciliation (this pass)
+
+`docs/TECH_DEBT.md` had no existing entry for either gap. Two new entries added to the "Now" section:
+- D-017 / E-020 (orphaned legacy ungoverned Commercial RPC): new entry added, referencing both journey IDs and this pass's live existence-confirmation.
+- E-022 (missing minimum-rate-row validation): new entry added, referencing the live confirmation above.
+
+No duplicate entries created.
+
+---

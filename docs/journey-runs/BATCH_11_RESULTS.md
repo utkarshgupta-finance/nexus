@@ -295,3 +295,35 @@ original run.
 - Continuing to Batch 12 per the governing continuous-run instruction.
 
 ---
+
+## EVIDENCE RECONCILIATION PASS (2026-09-26)
+
+Bounded follow-up requested after the Batches 10-12 closure report, addressing two specific items whose original evidence was closure-mechanics/source-inspection only, not a genuine rendered UI check.
+
+### D-009: rendered diff classification (unchanged vs changed vs added)
+
+Original evidence (both the initial pass and this batch's own revalidation pass above) was `SOURCE INSPECTED` only: direct reading of `commercial-rate-diff.ts`'s classification logic, with an explicit note that "no browser session was driven." That is a genuine gap against this journey's specific objective, which is about the rendered review screen, not the underlying function in isolation.
+
+Performed the missing UI verification, nothing else: signed in as `nexus-test-maker@example.test` against the local dev instance, opened the real Commercial Configuration detail page for the Batch 8 fixture (`93d9b669-...`), used "Create New Version" to create a genuine draft, then (after the Base UI Select component in this environment did not respond to keyboard interaction reliably) set the draft's proposed rate via the same governed `save_commercial_configuration_version_draft` RPC the real form itself calls, submitted it, and loaded the real reviewer screen (`/reviews/commercial-versions/[requestId]`).
+
+First attempt surfaced a self-inflicted fixture error, not a product defect: the proposed payload needs to be nested under a `commercial_rate` key (`toCommercialRateDraft` in `commercial-version-mappers.ts` reads `values["commercial_rate"]`), which the first attempt omitted, causing the screen to show the component as "Removed" and Billing Currency as "Not set." Corrected and resubmitted with `pricing_rule_kind` unchanged (`flat_fee`) and only the amount changed from 6,500 to 7,200 (INR), a genuine rate-only edit.
+
+**Live browser evidence obtained:** the review screen correctly rendered the component with a "Changed" badge, Current INR 6,500, Proposed INR 7,200, Change +10.8%. Screenshot taken. This confirms the diff classification renders correctly for a rate-only edit in the real reviewer UI, not only in the underlying function read in isolation.
+
+D-009 reclassifies its evidence from `SOURCE INSPECTED` to `MANUAL UX VERIFIED` (supplementing, not replacing, the original source-level confirmation of `added`/`removed`/`unchanged` handling, which was not separately re-derived here). **Final status unchanged: PASS.** The disposable test version was rejected afterward to close it out cleanly; no fixture state left dirty.
+
+### D-020: Commercial Configuration detail page with a long version chain
+
+Original evidence was structural/DB-count only (26 real version rows accumulated), with no record of the actual page having been rendered and observed. Genuine gap against this journey's specific objective (page load, chain rendering, navigation, no blocking, no cross-config bleed), not artificial benchmarking.
+
+Performed the missing read-only browser check: loaded `/commercials/93d9b669-2178-44c9-8f95-116350819dc9` as `nexus-test-maker@example.test`.
+
+- **Page loads:** confirmed, full render, no errors.
+- **Version chain renders correctly:** all 18 rows of the Version History table rendered in correct sequential order (Version 18 down to Version 1), each with the correct status (Approved/Scheduled or Superseded), category, effective dates, billing currency, and FX snapshot. (18 is the count of terminal-successful, customer-facing versions specifically; the 26+ figure from Batch 11's own count includes cancelled/rejected versions, which this customer-facing history table correctly does not list. Confirmed by direct comparison, not a discrepancy.)
+- **Navigation remains usable:** clicking "View details" on a superseded row correctly swapped the summary panel to that historical version's own data ("Showing Version 16 (historical, read-only)") while the Version History table itself stayed intact.
+- **No obvious rendering failure / excessive blocking:** page rendered promptly at both a narrow (1600px) and full desktop (1920px) width. One observation, not a chain-length defect: at 1600px the Version History table's columns overflow the viewport width (this reproduces with any row count, including a single row, since it is a fixed total column width, not something that scales with 18 rows); at 1920px every column fits with no horizontal scroll needed. Noted for completeness, not escalated, since it is unrelated to the actual thing D-020 tests (chain length).
+- **No duplicate/cross-config data:** confirmed, all 18 rows belong to this one customer/configuration, sequential version numbers, no foreign rows.
+
+D-020 reclassifies its evidence from structural/DB-count only to `MANUAL UX VERIFIED` (browser) plus `DATABASE VERIFIED` (the underlying row count). **Final status unchanged: PASS.**
+
+---

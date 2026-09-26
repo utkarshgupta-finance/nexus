@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 55cc14c
+- **Current HEAD:** 7131271
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batch 12 close: tsc clean, dashboard regenerated, commit pending
+- **Latest test checkpoint:** Batches 10-12 evidence reconciliation close: tsc clean, dashboard regenerated
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-26 10:43:20 UTC
+- **Last status update:** 2026-09-26 13:25:55 UTC
