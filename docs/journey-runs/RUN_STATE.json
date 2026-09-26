@@ -31,7 +31,7 @@
     { "id": "C-008", "status": "COMPLETE", "classification": "PASS" }
   ],
   "currentJourney": null,
-  "currentExecutionState": "Batch 9 fully reconciled: 25/25 terminal. Migration applied, B-014 retested live and PASSED (real approval finalized, real deletion-eligibility rejection confirmed). Second stranded request (C-006's R1, CCR-000113) retested too: correctly rejected with its own real staleness guard, no dead-end error. Batch 10 not started.",
+  "currentExecutionState": "Batch 9 fully reconciled: 25/25 terminal. Migration applied, B-014 retested live and PASSED (real approval finalized, real deletion-eligibility rejection confirmed). Second stranded request (C-006's R1, CCR-000113) retested too: correctly rejected with its own real staleness guard, no dead-end error. Bounded shared approve-RPC regression check completed for the other three affected domains (Customer Onboarding PASS, Go Live PASS, Commercial Configuration PASS WITH SAFE BOUNDED VERIFICATION; see BATCH_09_RESULTS.md's REVALIDATION PASS section). No throwaway workflow scaffolding remains. Batch 10 not started.",
   "defectsFound": 2,
   "defectsFixed": 2,
   "openDefects": 0,

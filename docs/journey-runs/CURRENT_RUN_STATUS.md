@@ -11,7 +11,7 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 - **Remaining journey count:** 0
 - **Percentage complete:** 100%
 - **Current journey ID:** None
-- **Current journey execution state:** Batch 9 fully reconciled: 25/25 terminal. Migration applied, B-014 retested live and PASSED (real approval finalized, real deletion-eligibility rejection confirmed). Second stranded request (C-006's R1, CCR-000113) retested too: correctly rejected with its own real staleness guard, no dead-end error. Batch 10 not started.
+- **Current journey execution state:** Batch 9 fully reconciled: 25/25 terminal. Migration applied, B-014 retested live and PASSED (real approval finalized, real deletion-eligibility rejection confirmed). Second stranded request (C-006's R1, CCR-000113) retested too: correctly rejected with its own real staleness guard, no dead-end error. Bounded shared approve-RPC regression check completed for the other three affected domains (Customer Onboarding PASS, Go Live PASS, Commercial Configuration PASS WITH SAFE BOUNDED VERIFICATION; see BATCH_09_RESULTS.md's REVALIDATION PASS section). No throwaway workflow scaffolding remains. Batch 10 not started.
 
 > Batch 9 — COMPLETE — 25 / 25 reconciled
 
@@ -49,11 +49,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** c6595dd
+- **Current HEAD:** 0f3106b
 - **Working tree:** dirty
 - **Latest test checkpoint:** None run yet this batch
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-26 07:14:35 UTC
+- **Last status update:** 2026-09-26 08:12:10 UTC

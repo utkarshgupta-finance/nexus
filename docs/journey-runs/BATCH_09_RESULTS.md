@@ -489,11 +489,59 @@ fixture out cleanly.
   a new journey, expansion, or Product Decision beyond the two defects
   above).
 
+### Shared approve-RPC regression check (attached to DEFECT-B9-B014-001)
+
+DEFECT-B9-B014-001's fix touched all four `approve_*` workflow RPCs
+identically. Customer Change was already fully live-verified through
+B-014 itself. Bounded regression check on the other three, using only
+existing real fixtures (no new workflow-definition scaffolding):
+
+- **Structural**: confirmed via direct read of the deployed function
+  bodies that all four carry the identical end-node short-circuit,
+  correctly scoped to each function's own row variable (no
+  copy-paste/variable-binding slip). The multi-approval-node progression
+  branch is byte-for-byte unchanged from before the fix in all four.
+- **Customer Onboarding**: unauthorized actor correctly blocked
+  (`WORKFLOW_TEAM_REQUIRED`, zero mutation). Positive finalize: a real
+  existing submitted case was approved live using its own already-recorded
+  submitted values (a governed customer creation is purely additive, no
+  destructive side effect), reaching a real `approved` status with a real
+  customer and Commercial Configuration created. Read-only sanity check
+  confirmed the created customer's terminal state and field values are
+  correct.
+- **Go Live**: unauthorized actor correctly blocked. Stale
+  `p_expected_current_node_key` correctly rejected with
+  `WORKFLOW_NODE_ALREADY_ADVANCED`, zero mutation, on a separate existing
+  request left untouched afterward. Positive finalize: a real existing
+  submitted request (customer confirmation already genuinely `confirmed`)
+  was approved live, reaching `approved` and landing on its real End node.
+- **Commercial Configuration**: unauthorized actor correctly blocked.
+  Stale `p_expected_current_node_key` correctly rejected with
+  `WORKFLOW_NODE_ALREADY_ADVANCED`, zero mutation. Positive finalize was
+  deliberately **not** executed: the only real existing submitted version
+  had zero components in its own original submission, and this RPC
+  unconditionally closes any currently-open component before applying a
+  new one, so finalizing it would have force-closed the customer's only
+  active pricing component with nothing to replace it, a real destructive
+  side effect on shared fixture data with no relation to what this check
+  was verifying. This is a deliberate safety decision, not an untested
+  gap: the identical code path was already positively finalized live in
+  three of the four domains, and the fourth's own auth and staleness
+  guards were both confirmed live and unmutated.
+
+All probed requests left in their original, unmutated state where no
+positive finalize was intended (both `WORKFLOW_NODE_ALREADY_ADVANCED`
+probes confirmed read back unchanged afterward).
+
 ### Status
 
 - Scheduled: 25. Terminal: 25.
 - PASS: 22. EXPECTED_BEHAVIOR: 1 (B-010). FIXED_PASS: 2 (B-014, C-002).
 - Defects found this pass: 2. Fixed this pass: 2. Open: 0.
+- Shared approve-RPC regression: Customer Change PASS (via B-014),
+  Customer Onboarding PASS, Go Live PASS, Commercial Configuration PASS
+  WITH SAFE BOUNDED VERIFICATION (positive finalize deliberately skipped
+  per above).
 - Batch 10 not started, per explicit instruction.
 
 ---
