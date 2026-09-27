@@ -1,9 +1,12 @@
 import "server-only"
 
 import * as teamData from "../data/team.data"
+import { listAuthUsers, listAppUsers } from "@/platform/user-access/data/user-access.data"
 import { toTeam } from "../domain/types"
 import type { Team } from "../domain/types"
 import type { UserTeamGrantRow } from "../data/team.data"
+import { buildTeamMembershipEntries } from "../domain/membership"
+import type { TeamMembershipEntry } from "../domain/membership"
 
 /**
  * Application service for the Team Master module (task Phase K). Thin
@@ -65,6 +68,24 @@ async function listActiveUserTeamGrants(): Promise<UserTeamGrantRow[]> {
   return teamData.listActiveUserTeamGrants()
 }
 
+/**
+ * PD-009 (docs/AUTHORIZATION_MODEL.md section 25): the team-membership
+ * view a `team.write`-only admin manages, deliberately reading only
+ * auth identity, app_users, and team grants, never role data. This is a
+ * platform-to-platform read (reusing `platform/user-access`'s own
+ * identity reads), the same already-established pattern
+ * `user-access.service.ts` uses in reverse to show team badges.
+ */
+async function listTeamMembershipEntries(): Promise<TeamMembershipEntry[]> {
+  const [authUsers, appUsers, teams, teamGrants] = await Promise.all([
+    listAuthUsers(),
+    listAppUsers(),
+    teamData.listActiveTeams(),
+    teamData.listActiveUserTeamGrants(),
+  ])
+  return buildTeamMembershipEntries(authUsers, appUsers, teams, teamGrants)
+}
+
 export {
   listTeams,
   listActiveTeams,
@@ -76,4 +97,5 @@ export {
   getActiveTeamIdsForUser,
   countActiveMembersByTeam,
   listActiveUserTeamGrants,
+  listTeamMembershipEntries,
 }

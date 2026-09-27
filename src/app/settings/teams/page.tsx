@@ -4,8 +4,9 @@ import type { SettingsNavItem } from "@/components/product/settings-nav"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
 import { sessionHasPermission } from "@/platform/permissions"
-import { listTeams } from "@/platform/team/server"
+import { listTeams, listActiveTeams, listTeamMembershipEntries } from "@/platform/team/server"
 import { TeamMasterPage } from "@/platform/team/ui/team-master-page"
+import { TeamMembershipPage } from "@/platform/team/ui/team-membership-page"
 
 /**
  * Team Master (task Phase K): a governed teams catalog, no hardcoded
@@ -20,9 +21,11 @@ export default async function TeamMasterRoute() {
   const session = await getCurrentNexusSession()
 
   let teams: Awaited<ReturnType<typeof listTeams>> = []
+  let assignableTeams: Awaited<ReturnType<typeof listActiveTeams>> = []
+  let membershipEntries: Awaited<ReturnType<typeof listTeamMembershipEntries>> = []
   let unavailable = false
   try {
-    teams = await listTeams()
+    ;[teams, assignableTeams, membershipEntries] = await Promise.all([listTeams(), listActiveTeams(), listTeamMembershipEntries()])
   } catch {
     unavailable = true
   }
@@ -49,7 +52,10 @@ export default async function TeamMasterRoute() {
           <p className="p-6 text-xs text-muted-foreground">Team Master could not be read right now. Please try again shortly.</p>
         </div>
       ) : (
-        <TeamMasterPage teams={teams} canWrite={canWrite} />
+        <>
+          <TeamMasterPage teams={teams} canWrite={canWrite} />
+          <TeamMembershipPage entries={membershipEntries} assignableTeams={assignableTeams} canWrite={canWrite} />
+        </>
       )}
     </AuthGate>
   )

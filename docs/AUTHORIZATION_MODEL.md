@@ -797,3 +797,91 @@ an authorized viewer (the record's own creator, `nexus-test-maker@
 example.test`) is unaffected: the full real detail page renders exactly
 as before. Full detail in `docs/journey-runs/BATCH_23_RESULTS.md`'s
 S-014 entry.
+
+## 25. Team membership management must not require user_access.write: DECIDED [PD-009, IMPLEMENTED, 2026-09-27]
+
+**Found during Batch 24 (T-015, T-016), Fresh Execution program.** The
+only UI surface that ever called `assignUserToTeamAction`/
+`removeUserFromTeamAction` (both already correctly gated on `team.write`
+alone at the Server Action layer) was the Team column on
+`/settings/user-access`. That entire route is itself page-gated on
+`user_access.read`, a permission that exists in this schema only bundled
+with `user_access.write` inside the single `user_access_admin` role. So
+a real admin holding `team.write` but not `user_access_admin` could never
+reach the one place team membership was actually managed, even though
+the server-side authorization for the mutation itself was already
+correct and independent. T-015's own Recovery/Resilience Variant ("a
+separate admin who DOES hold team.write can perform the team assignment
+successfully") and T-016's Regular Path ("Admin removes the user from
+the team") both silently assumed a persona this schema cannot produce.
+
+**DECIDED [PD-009]:** team administration must remain independently
+delegable from User Access administration. A user holding `team.write`
+must be able to assign and remove team membership without being granted
+`user_access.write` or the `user_access_admin` role. Do not solve this by
+granting a team administrator the `user_access_admin` role; `team.write`
+must never imply `user_access.write`.
+
+**Implementation:** a new Team Membership section on the existing Team
+Master page (`/settings/teams`, already gated on `team.read` for viewing
+and `team.write` for every mutation, no change to that gate), rendered
+alongside the existing team catalog table:
+
+- `src/platform/team/domain/membership.ts`: a new, deliberately
+  role-blind pure composer, `buildTeamMembershipEntries`, reading only
+  Supabase Auth identity, `app_users`, and team grants. It is
+  structurally incapable of returning role data because it is never
+  given any: least privilege enforced at the composer's own input
+  signature, not just by hiding a column client-side.
+- `src/platform/team/services/team.service.ts`: `listTeamMembershipEntries`
+  composes this from `platform/user-access`'s own `listAuthUsers`/
+  `listAppUsers` reads (a platform-to-platform read, the same
+  already-established pattern `user-access.service.ts` itself uses in
+  reverse to show each user's team badges) plus this module's own
+  `listActiveTeams`/`listActiveUserTeamGrants`.
+- `src/platform/team/ui/team-membership-page.tsx`: a new client
+  component wired to the exact same, already-correctly-gated
+  `assignUserToTeamAction`/`removeUserFromTeamAction`/
+  `setPrimaryTeamMembershipAction`/`checkTeamRemovalImpactAction` the
+  User Access page already used (including the same O-018 warn-but-allow
+  pre-removal impact check). No new Server Action was written; none of
+  the existing ones changed.
+- `src/app/settings/teams/page.tsx`: fetches the new list and renders the
+  new section beneath the existing team catalog. Nothing about the
+  route's own `AuthGate`/`team.read` gate changed.
+
+By construction, this surface has no display-name editing, no role
+assignment/removal, and no activate/deactivate control for users: those
+remain exclusively on `/settings/user-access`, unreachable and
+unaffected by this change. `user_access.write` is not implied by
+`team.write` anywhere in this implementation; the User Access page and
+its own permission gates are untouched.
+
+**Verified live** with the real `nexus-test-team-admin@example.test`
+persona (holds `team_admin` only, confirmed via direct query to hold
+exactly `team.read`/`team.write`, no `user_access` permission at all):
+reached the new Team Membership section on `/settings/teams`, and
+genuinely assigned the disposable `nexus-test-provisioning-target@
+example.test` fixture to the disposable "T-017 UI Verification Team"
+fixture, confirmed the badge appeared, then removed the same membership
+and confirmed the badge disappeared, all via real manual clicks
+(performed by Utkarsh directly, after the agent's own browser-automation
+attempts hit a reproducible click-delivery limitation on this Base UI
+Select unrelated to the feature's own correctness). Independently
+verified afterward via direct database query: a `user_teams` row was
+created (`created_at` 2026-09-27 12:59:09 UTC, `created_by` resolving to
+`nexus-test-team-admin@example.test`) and correctly revoked one minute
+later (`revoked_at` 13:00:11 UTC, `revoked_by` the same actor); the row
+remains queryable, never hard-deleted; the affected user's active team
+membership count is back to zero (no future team-bound approval
+eligibility remains); the affected user's active role-grant count and
+`app_users.is_active` are both unchanged from before this test; and
+`nexus-test-team-admin@example.test` itself still holds exactly the
+single `team_admin` role, confirming no role or `user_access` permission
+was granted to it in the process. The same persona was independently
+reconfirmed still unable to reach `/settings/user-access` at all (still
+gated on `user_access.read`, which `team_admin` does not hold), and
+`nexus-test-user-access-admin@example.test` (holds `user_access_admin`,
+explicitly no `team.write`) was reconfirmed still unable to see any
+team-assignment control anywhere. Full detail in
+`docs/journey-runs/BATCH_24_RESULTS.md`'s T-015/T-016 closure entries.

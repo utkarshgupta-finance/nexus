@@ -18,6 +18,9 @@ export {
   getActiveTeamIdsForUser,
   countActiveMembersByTeam,
   listActiveUserTeamGrants,
+  listTeamMembershipEntries,
 } from "./services/team.service"
 export type { Team } from "./domain/types"
 export type { UserTeamGrantRow } from "./data/team.data"
+export type { TeamMembershipEntry, TeamMembershipGrant } from "./domain/membership"
+export { labelForTeamMembershipEntry } from "./domain/membership"

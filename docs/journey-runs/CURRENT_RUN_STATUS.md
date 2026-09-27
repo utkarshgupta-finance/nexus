@@ -4,7 +4,7 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Current run
 
-- **Current Batch:** 24 (Fresh execution: Batch 24 (Search/Discovery finish, Settings: Reference Master + User Access + Team Master))
+- **Current Batch:** 24 (Fresh execution: Batch 24 (Search/Discovery finish, Settings: Reference Master + User Access + Team Master) - CLOSED, fully evidence-clean)
 - **Batch status:** COMPLETE
 - **Scheduled journey count:** 25
 - **Completed journey count:** 25
@@ -21,14 +21,14 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Classification counts
 
-- **PASS:** 13
-- **FAILED THEN FIXED + PASS:** 0
+- **PASS:** 20
+- **FAILED THEN FIXED + PASS:** 1
 - **EXPECTED BEHAVIOUR:** 0
 - **PRODUCT GAP:** 4
 - **PRODUCT DECISION REQUIRED:** 0
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
-- **PARTIAL:** 8
+- **PARTIAL:** 0
 
 ## Current activity
 
@@ -38,26 +38,26 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Findings
 
-- **Defects found:** 0
-- **Defects fixed:** 0
+- **Defects found:** 1
+- **Defects fixed:** 1
 - **Open defects:** 0
-- **Product Decisions found:** 0
+- **Product Decisions found:** 1
 - **Journey Discovery:**
-  - ALREADY COVERED: 0
+  - ALREADY COVERED: 7
   - EXPAND EXISTING JOURNEY: 1
   - NEW JOURNEY REQUIRED: 1
   - REGRESSION TEST ONLY: 0
-  - FUTURE MODULE: 0
+  - FUTURE MODULE: 1
   - PRODUCT DECISION REQUIRED: 0
 
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** e5e6d2c
+- **Current HEAD:** 68a073e
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batch 24 complete + self-corrected: 25/25 journeys, 0 defects, 0 Product Decisions, 8 PARTIAL (S-024, T-010, T-011, T-012, T-013, T-016, T-017, T-018), 2 Journey Discovery items (T-008, T-017), both tracked in ledger not filed as Tech Debt
+- **Latest test checkpoint:** Batch 24 CLOSED, fully evidence-clean: 25/25 journeys, 18 PASS, 1 FIXED+PASS (S-024), 4 permanent PRODUCT_GAP (S-019-022), 2 PRODUCT_GAP_RESOLVED via PD-009 (T-015, T-016, tracked as PASS in this schema per dashboard-compatibility note below), 0 PARTIAL, 0 BLOCKED, 0 open defects, 0 open Product Decisions
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 11:20:45 UTC
+- **Last status update:** 2026-09-27 13:06:16 UTC
