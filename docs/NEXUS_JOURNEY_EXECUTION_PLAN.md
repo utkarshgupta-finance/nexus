@@ -1,6 +1,6 @@
 # Nexus Journey Execution Plan
 
-Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md) and [NEXUS_JOURNEY_COVERAGE_MATRIX.md](NEXUS_JOURNEY_COVERAGE_MATRIX.md). This plan originally sequenced all 782 current-executable journeys into 32 batches of 25 (the final batch holds 7); Batch 1 execution added K-030, making Batch 2 a 26-journey batch and the total 783. After Batch 16, the Stage A Journey Universe Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`) added 8 further journeys (E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002), bringing the total to 793 and inserting a new Batch 18 dedicated to them; every batch from the former Batch 18 onward shifted down by one number (former Batch 18 is now Batch 19, and so on through former Batch 32, now Batch 33). Batch 17's own scope was deliberately left unchanged, since none of the 8 new journeys are a prerequisite for it. No journey has been executed as part of producing this plan; it exists to make later execution efficient and dependency-safe.
+Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md) and [NEXUS_JOURNEY_COVERAGE_MATRIX.md](NEXUS_JOURNEY_COVERAGE_MATRIX.md). This plan originally sequenced all 782 current-executable journeys into 32 batches of 25 (the final batch holds 7); Batch 1 execution added K-030, making Batch 2 a 26-journey batch and the total 783. After Batch 16, the Stage A Journey Universe Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`) added 8 further journeys (E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002), bringing the total to 793 and inserting a new Batch 18 dedicated to them; every batch from the former Batch 18 onward shifted down by one number (former Batch 18 is now Batch 19, and so on through former Batch 32, now Batch 33). Batch 17's own scope was deliberately left unchanged, since none of the 8 new journeys are a prerequisite for it. During Batch 24's execution, T-025 was discovered (a NEW JOURNEY REQUIRED finding from T-017) and, per explicit user confirmation on 2026-09-27, placed directly into Batch 25 rather than deferred, making Batch 25 a 26-journey batch and the total 794; no other batch was renumbered. No journey has been executed as part of producing this plan; it exists to make later execution efficient and dependency-safe.
 
 **Product Decision Closure (2026-09-22):** all three product decisions left open after Stage A and Batch 17 (Commercial Configuration deactivate/reactivate, I-015 entitlement reversal, I-024 settlement reversal) were decided and reconciled before Batch 18 began. D-003/D-004/D-015/D-021, I-015, and I-024 were rewritten in `NEXUS_JOURNEY_UNIVERSE.md` to test the decided/implemented behavior; no journey count, batch membership, or batch numbering changed as a result (the Journey Discovery Check for this closure work, in `docs/journey-runs/BATCH_17_RESULTS.md`, found zero new journey candidates). Batch 18's own scope (E-029 through ACC-002, above) is unaffected.
 
@@ -434,12 +434,12 @@ close, never left as an unexamined afterthought.
 **Depends on:** Batch 23.
 
 ### BATCH 25
-**Journey IDs:** T-019 through T-024, AB-001 through AB-019
-**Purpose:** Finish Settings (the team-deactivation-does-not-block-approval inconsistency as a dedicated Settings-side check, T-019), then begin Security/Direct Action: direct-URL and bypass-the-UI attempts against every governed domain.
-**Required personas:** An adversarial tester with varying, deliberately mismatched permissions/teams
-**Required fixtures:** In-flight requests across all four domains, at known current workflow nodes, to attempt direct-action bypass against.
+**Journey IDs:** T-019 through T-025, AB-001 through AB-019
+**Purpose:** Finish Settings (the team-deactivation-does-not-block-approval inconsistency as a dedicated Settings-side check, T-019; and T-025, the duplicate-team-display-name check discovered during Batch 24's T-017 and placed here as the closest dependency-safe, domain-coherent slot since it belongs to Pack T / Settings and this batch is where the Settings pack closes), then begin Security/Direct Action: direct-URL and bypass-the-UI attempts against every governed domain.
+**Required personas:** An adversarial tester with varying, deliberately mismatched permissions/teams; team_admin (team.write) for T-025
+**Required fixtures:** In-flight requests across all four domains, at known current workflow nodes, to attempt direct-action bypass against; an existing named team (for T-025's duplicate-name attempt).
 **Expected duration:** 5-6 hours
-**Risk concentration:** P0 concentrated almost entirely in this batch's AB journeys (server-side enforcement is the last line of defense).
+**Risk concentration:** P0 concentrated almost entirely in this batch's AB journeys (server-side enforcement is the last line of defense). T-025 is P3.
 **Depends on:** Batch 24.
 
 ### BATCH 26
@@ -518,8 +518,8 @@ close, never left as an unexamined afterthought.
 
 ## Summary
 
-- 33 batches total: 1 batch of 26 (Batch 2), 1 backlog batch of 8 (Batch 18, inserted by the Stage A Journey Universe Expansion Audit), 30 full batches of 25, 1 final batch of 7.
-- Total current-executable journeys sequenced: 793 (K-030 added after Batch 1 execution; E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002 added by the Stage A Journey Universe Expansion Audit after Batch 16, `docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`).
+- 33 batches total: 2 batches of 26 (Batch 2; Batch 25, revised 2026-09-27 after T-025 was added), 1 backlog batch of 8 (Batch 18, inserted by the Stage A Journey Universe Expansion Audit), 29 full batches of 25, 1 final batch of 7.
+- Total current-executable journeys sequenced: 794 (K-030 added after Batch 1 execution; E-029, E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002 added by the Stage A Journey Universe Expansion Audit after Batch 16, `docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`; T-025 added 2026-09-27, discovered during Batch 24's T-017 execution, placed directly into Batch 25 per explicit user confirmation since it belongs to Pack T / Settings and Batch 25 is where the Settings pack closes).
 - Estimated total execution duration if run sequentially by a single team: roughly 138-169 hours across the full plan; batches 25-28 (Security and Concurrency) and 7-20 (the full customer-to-approvals chain) are the largest time investments due to multi-session/multi-persona setup overhead.
 - The two FUTURE packs (Forms Hub, MRR Recognition) are intentionally absent from this plan; they have no batches because they are not executable against the current product.
 - Batches 1 through 17 are historical/immutable in scope (already executed, or, for Batch 17, executed under the plan as it existed before this audit). Batch 18 onward reflects the post-Stage-A plan; no batch number before 18 was changed.

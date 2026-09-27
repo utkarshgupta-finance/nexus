@@ -5,9 +5,9 @@
   "scheduled": 25,
   "run": {
     "batches": ["24"],
-    "scheduledTotal": 176,
+    "scheduledTotal": 177,
     "priorBatchesComplete": 0,
-    "runLabel": "Fresh execution: Batches 24-30 (176 journeys, first time run, not historical revalidation)"
+    "runLabel": "Fresh execution: Batches 24-30 (177 journeys, first time run, not historical revalidation; revised from 176 after T-025 was discovered during Batch 24's T-017 and placed into Batch 25, which is now a 26-journey batch)"
   },
   "journeys": [
     { "id": "S-018", "status": "COMPLETE", "classification": "PASS" },

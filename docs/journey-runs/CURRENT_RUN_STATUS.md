@@ -17,7 +17,7 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Continuous run (Batches 24)
 
-> Overall: 25 / 176 complete — 151 remaining.
+> Overall: 25 / 177 complete — 152 remaining.
 
 ## Classification counts
 
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 925a80f
+- **Current HEAD:** f2f56ac
 - **Working tree:** dirty
 - **Latest test checkpoint:** Batch 24 CLOSED, fully evidence-clean: 25/25 journeys, 18 PASS, 1 FIXED+PASS (S-024), 4 permanent PRODUCT_GAP (S-019-022), 2 PRODUCT_GAP_RESOLVED via PD-009 (T-015, T-016, tracked as PASS in this schema per dashboard-compatibility note below), 0 PARTIAL, 0 BLOCKED, 0 open defects, 0 open Product Decisions
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 13:19:27 UTC
+- **Last status update:** 2026-09-27 13:23:08 UTC
