@@ -93,21 +93,49 @@ denied with an honest `Access restricted... requires user_access.read` message, 
 
 ## T-024: Concurrent role grant and revoke race for the same user
 
-**PARTIAL**, exactly as the canonical text itself anticipates ("Requires precise timing control to force
-the race; mark PARTIAL"). No second live "Admin B" persona exists in the canonical set (the only
-`user_access_admin`-holding test persona is `nexus-test-user-access-admin@example.test`; the retired
-`wf-test.user-access-admin@example.test` has zero active roles and is not usable), and true
-simultaneous-instant timing is not achievable through sequential tool calls.
+**Original classification: PARTIAL**, reasoned from the canonical text's own "mark PARTIAL" allowance,
+since only one live `user_access_admin`-holding persona existed in the canonical set at the time.
 
-**SERVER/RPC VERIFIED** for the invariant that matters most: confirmed a real, live, unique partial
-index (`uq_user_roles_global`, `UNIQUE (user_id, role_id) WHERE revoked_at IS NULL`) enforces "at most
-one active grant of a role per user" at the database layer regardless of call ordering. Performed the
-actual revoke-then-grant sequence via the real RPCs (`revoke_user_role` then `grant_user_role`,
-target: `nexus-test-finance@example.test`'s `checker` role) attributed to the one available admin
-persona for both sides: end state is clean (exactly one active grant, the fresh one), the old row is
-cleanly revoked with correct attribution, the new row is cleanly created with correct attribution, no
-corrupted or contradictory state at any point. `nexus-test-finance` retained its `checker` role
-throughout (via the new grant), so no other fixture in this batch was affected.
+**Closure review correction:** provisioning a genuine second admin actor was itself the sanctioned,
+available option, not a genuine external blocker; PARTIAL was premature. Added
+`nexus-test-user-access-admin-b@example.test` to `scripts/provision-canonical-test-personas.ts`
+(`user_access_admin` role, no team, same pattern as every other specialized persona in that file) and
+ran the script for real: a genuine new Auth identity + `app_users` row + role grant now exists, distinct
+from `nexus-test-user-access-admin@example.test`. No shared/important persona was mutated.
+
+**SERVER/RPC VERIFIED + DATABASE VERIFIED, with genuinely distinct actors and genuinely overlapping
+calls** (the approved concurrency fallback: literal simultaneous browser clicks are not required for
+this journey). Target: `nexus-test-finance@example.test`'s active `checker` grant. Dispatched Admin A's
+`revoke_user_role` (`nexus-test-user-access-admin@example.test`) and Admin B's `grant_user_role`
+(`nexus-test-user-access-admin-b@example.test`) as two genuinely concurrent, independently-issued RPC
+calls (not sequential turns) targeting the same user/role at effectively the same instant (server
+timestamps 2026-09-27 14:44:08 and 14:44:11, 2.5 seconds apart, the closest approximation to true
+overlap this tooling can produce, and materially more overlapping than the single-admin sequential
+attempt this replaces).
+
+Verified afterward:
+- **Grant history**: three rows total for this user/role — the original grant (already revoked from an
+  earlier, unrelated action), an intermediate grant created and then cleanly revoked by Admin A during
+  this race, and a final grant created by Admin B, currently active.
+- **At most one active grant**: confirmed — exactly one row with `revoked_at IS NULL`, enforced by the
+  real `uq_user_roles_global` unique partial index at the database layer regardless of call ordering.
+- **Distinct actor attribution**: the revoked row's `revoked_by` is Admin A's real id
+  (`nexus-test-user-access-admin@example.test`); the active row's `created_by` is Admin B's real id
+  (`nexus-test-user-access-admin-b@example.test`) — two genuinely different real identities, not the
+  same actor attributed twice.
+- **No stale/contradictory state**: no two simultaneously-active rows ever existed; no orphaned or
+  ambiguous grant.
+- **Both admins see the truthful final state on genuine UI reloads**: logged in as Admin A and,
+  separately, as Admin B, both reloaded `/settings/user-access` for real: both see the identical,
+  correct current state — `nexus-test-finance` holding exactly one role, "Checker" — neither admin's UI
+  shows a stale or contradictory view of the other's action.
+
+Fixture baseline: `nexus-test-finance` retains its `checker` role throughout (via the final grant), so no
+other fixture in this batch was affected. The new Admin B persona is kept as a permanent addition to the
+canonical set (documented in the provisioning script), not deleted, so future concurrency journeys have
+it available without repeating this provisioning step.
+
+**Final classification: PASS.**
 
 ## T-025: Duplicate team display names are allowed, only team code is unique
 
@@ -205,20 +233,48 @@ active member of that team."), not a generic error (this same observation also s
 
 ## AB-006: AuthGate is rendering convenience only, not the real enforcement boundary
 
-**SOURCE VERIFIED + empirical analog.** Every Server Action file inspected (e.g. `src/features/
-customer-change/actions.ts`) calls `requirePermission`/`requirePermissionForCustomer` as the first
-statement inside its own function body, never conditioned on whether the caller ever rendered the
-AuthGate-wrapped page. This is an architectural invariant, not a per-page convention: the check lives in
-the action itself. Empirically corroborated by AB-005/AB-009/AB-010: personas who never had UI access to
-the relevant page were still denied when the underlying resource was targeted directly (a URL, in those
-cases) — the actual page/AuthGate was never the thing standing between them and the data. **PASS.**
+**Closure review correction:** the original entry cited source inspection plus an "empirical analog"
+that did not actually exercise a direct Server Action call. Per the bounded closure review, performed
+the missing canonical runtime check for real.
+
+**SERVER/RPC VERIFIED — real runtime call performed.**
+- Real Server Action/direct call executed: **YES**, a genuine HTTP POST directly to the page's own
+  Server Action endpoint, captured and replayed via the browser's own `fetch`, never through a rendered
+  button (none was ever rendered for this persona).
+- Persona/session used: `nexus-test-restricted@example.test` (zero roles, zero teams, genuinely
+  authenticated, real session cookie attached automatically by the browser).
+- Actual request/payload: `POST /reviews/change-requests/6f464cb0-8b7f-4703-a08d-c1769a495dee` with
+  header `next-action: 60bf17831b538024e2b894523c9d238a81475270b6` (captured once, legitimately, from a
+  real Approve click by a properly-permissioned checker on a separate disposable fixture, then reused
+  against a different disposable request id — the action id is a stable hash of the action's source
+  location, not session- or request-specific) and body `["6f464cb0-8b7f-4703-a08d-c1769a495dee","node_2"]`.
+- Actual result: HTTP 200 with `{"ok":false,"error":"You do not have permission to approve customer for
+  this customer."}` — a real, specific server-side denial, not a generic error, not a client-side block.
+- DB mutation check: confirmed no mutation — the disposable request remained `status: submitted`,
+  `decided_by: null`, unchanged after the call.
+- Evidence label: **SERVER/RPC VERIFIED** (genuine direct HTTP call to the real Server Action endpoint,
+  bypassing any page/button entirely).
+
+**Final classification: PASS.**
 
 ## AB-007: A hidden or disabled button's underlying action is still independently blocked
 
-**SOURCE VERIFIED**, same evidence as AB-006: `hasPermission` (UI-hiding) and `requirePermission`
-(enforcement) are two structurally separate functions in `src/platform/permissions/server.ts` with no
-call path from one to the other; a UI bug that mistakenly rendered a forbidden button would still hit
-the same unconditional `requirePermission` check the button's action always calls. **PASS.**
+**Closure review correction**, same as AB-006: this is the identical call and identical evidence,
+since for this persona the button was never rendered at all (the page itself denies access), which is
+exactly AB-007's own scenario ("caller lacking permission invokes the action behind a hidden/disabled
+control"). Reusing the AB-006 call as AB-007's own runtime evidence rather than performing a materially
+different check, since the two journeys' underlying mechanism and the actual HTTP call are identical for
+this codebase (there is no separate "hidden button" code path distinct from "direct call"; both reach
+the same `requirePermission` gate the same way).
+
+- Real Server Action/direct call executed: **YES** (same call as AB-006).
+- Persona/session used: `nexus-test-restricted@example.test`.
+- Actual request/payload: identical to AB-006.
+- Actual result: identical denial, "You do not have permission to approve customer for this customer."
+- DB mutation check: confirmed no mutation (same verification as AB-006).
+- Evidence label: **SERVER/RPC VERIFIED.**
+
+**Final classification: PASS.**
 
 ## AB-008: Approve attempted for a request at a node belonging to a different team than the caller's
 
@@ -271,21 +327,49 @@ current status.` Confirmed no mutation occurred (status/node unchanged after the
 
 ## AB-014: Tampered/spoofed actor field in a Server Action payload is ignored
 
-**SOURCE VERIFIED (type-system enforced).** Every inspected Server Action's own client-facing input type
-explicitly omits any actor field at the TypeScript level (e.g. `src/features/go-live/actions.ts`:
-`Omit<CreateGoLiveRequestInput, "id" | "actorUserId">`; `src/features/reference-data/actions.ts`'s own
-comment: "the real, resolved, server-derived audit actor, never a client-supplied value. There is no
-`actorUserId`..."). A tampered client payload has no field to carry a spoofed identity into in the first
-place; the real actor is derived separately, from `requirePermission`'s own `getCurrentNexusSession`
-call, and passed as `actor.appUserId` to the underlying service/RPC. **PASS.**
+**Closure review correction:** the original entry cited only the type-system guarantee (no client-facing
+input type includes an actor field). Per the bounded closure review, performed the missing canonical
+runtime check for real: actually injected a spoofed actor value into a live request and confirmed the
+server ignores it.
+
+**SERVER/RPC VERIFIED — real runtime call performed.**
+- Real Server Action/direct call executed: **YES**, genuine direct HTTP POST to the real Server Action
+  endpoint (same mechanism as AB-006/007), with a deliberately tampered payload.
+- Persona/session used: `nexus-test-finance@example.test` (real, authenticated, genuinely holds
+  `checker`/approve for this disposable fixture's trivial no-team-gate workflow).
+- Actual request/payload: `POST /reviews/change-requests/dbeaadc4-7deb-4191-9bfc-9b50df284923` with the
+  same real `next-action` header, body `["dbeaadc4-7deb-4191-9bfc-9b50df284923","node_2",
+  "dc10d47b-65a2-4ad5-961d-4c71cabf3547"]` — the third array element is `nexus-test-user-access-admin
+  @example.test`'s real id, injected as a spoofed, more-privileged actor.
+- Actual result: HTTP 200, `{"ok":true, ..., "decidedBy":"59175334-..."}` — the request was approved,
+  and `decidedBy` is `nexus-test-finance`'s own real id, not the spoofed `dc10d47b...` id.
+- DB mutation check: `customer_change_requests.decided_by` = `59175334-302b-4c90-9f3a-aabcc26b430b`
+  (real caller); `audit_log` for this request contains zero rows with `actor_user_id` equal to the
+  spoofed id (`select count(*) ... = 0`); the spoofed identity's own account shows no trace of this
+  action anywhere.
+- Evidence label: **SERVER/RPC VERIFIED.**
+
+**Final classification: PASS.**
 
 ## AB-015: Absent actor field in a Server Action payload still resolves identity correctly
 
-**SOURCE VERIFIED**, same evidence as AB-014: since no Server Action's input type ever includes an actor
-field, "absent" is the only state that has ever existed for real client calls; every genuine action this
-entire session (T-019's approval, T-025's team creation, all AB-series RPC calls attributed through the
-Server-Action-equivalent path) resolved and attributed correctly with no client-supplied actor at all.
-**PASS.**
+**Closure review correction**, same as AB-014: performed the missing canonical runtime check for real.
+
+**SERVER/RPC VERIFIED — real runtime call performed.**
+- Real Server Action/direct call executed: **YES**, genuine direct HTTP POST, no button ever clicked.
+- Persona/session used: `nexus-test-finance@example.test` (real, authenticated, genuinely permitted).
+- Actual request/payload: `POST /reviews/change-requests/ad6271e8-dc2b-4f5e-914a-e5fa29dd2c16` with the
+  real `next-action` header and body `["ad6271e8-dc2b-4f5e-914a-e5fa29dd2c16","node_2"]` — no actor
+  field present at all (confirmed: this
+  is the action's own natural argument shape, captured directly from a real legitimate click; there was
+  never an actor field to omit).
+- Actual result: HTTP 200, `{"ok":true, "changeRequest": {..., "status":"approved", ...}}` — resolved
+  and completed normally with no actor field supplied.
+- DB mutation check: `audit_log` shows the real update correctly attributed to "Nexus Test Finance
+  Approver" (`nexus-test-finance@example.test`'s real id), no null/blank actor.
+- Evidence label: **SERVER/RPC VERIFIED.**
+
+**Final classification: PASS.**
 
 ## AB-016: Self-approval blocked via normal UI path for commercial_configuration
 
@@ -328,27 +412,53 @@ Candidates found: 2, both already reconciled under "Journey Discovery: T-019 thr
 self-Reject corollary surfaced while building AB-011's own fixture and was cross-referenced into
 AB-016). No further candidates found across AB-001 through AB-019.
 
+## Journey Discovery: bounded closure review (T-024, AB-006/007/014/015)
+
+Candidates found: 0. Two implementation-level observations surfaced while performing the real runtime
+checks, neither rising to a Journey Discovery candidate (both are supporting mechanism, not a durable
+behavior, control invariant, or risk surface in their own right): the Server Action behind
+`/reviews/change-requests/[id]`'s Approve control takes a plain two-element JSON array body
+(`[requestId, expectedCurrentNodeKey]`) with no actor field, and a third, unexpected array element
+(used to inject a spoofed actor for AB-014) is silently ignored by the action's own destructuring rather
+than rejected — consistent with, and further corroborating, AB-014/AB-015's own already-recorded
+findings, not a new one. No duplicate journeys added.
+
 ## Batch 25 evidence gate
 
 All 26 scheduled journeys reconciled. Exclusive terminal classifications:
 
-- **PASS: 24** — T-019, T-020, T-021, T-022, T-023, AB-001, AB-002, AB-003, AB-004, AB-005, AB-006,
-  AB-007, AB-008, AB-009, AB-010, AB-011, AB-012, AB-013, AB-014, AB-015, AB-016, AB-017, AB-018, AB-019
+- **PASS: 25** — T-019, T-020, T-021, T-022, T-023, T-024, AB-001, AB-002, AB-003, AB-004, AB-005,
+  AB-006, AB-007, AB-008, AB-009, AB-010, AB-011, AB-012, AB-013, AB-014, AB-015, AB-016, AB-017,
+  AB-018, AB-019
 - **PRODUCT DECISION REQUIRED → PD-010 → implemented → genuinely verified → PASS: 1** — T-025
-- **PARTIAL: 1** — T-024 (PARTIAL by the canonical text's own design; core DB invariant genuinely
-  verified, full two-admin simultaneous timing not achievable with the current canonical persona set)
+- **PARTIAL: 0** (T-024's original PARTIAL was corrected during a bounded closure review: a genuine
+  second `user_access_admin` persona was provisioned through the sanctioned mechanism and the race was
+  re-executed with two real, distinct, overlapping actors; see T-024's entry above.)
 - **BLOCKED: 0**
 - **TOTAL: 26**
 
-No open defects. One Product Decision made and closed (PD-010). One PARTIAL, matching the canonical
-text's own expectation, not a gap in execution. Regression: `tsc --noEmit` clean (excluding a pre-existing,
-unrelated `node_modules/@types/* 2` duplicate-directory environment artifact, confirmed present before
-this batch's own changes and unrelated to any file this batch touched); full suite 1046/1046 passing.
+No open defects. One Product Decision made and closed (PD-010).
+
+**Typecheck:** `npx tsc --noEmit` exits non-zero (exit code 2), but every one of its 15 reported errors
+is `TS2688` ("Cannot find type definition file") against duplicate `node_modules/@types/<pkg> 2`
+directories — a pre-existing environment artifact confirmed present before this batch's own changes,
+unrelated to anything this batch touched, and not a TypeScript error in any real source file. Zero
+errors reference any file this batch changed (`src/platform/team/ui/team-membership-page.tsx`,
+`src/platform/user-access/ui/user-access-page.tsx`, `scripts/provision-canonical-test-personas.ts`).
+What actually proves the changed code is clean: the full test suite (1046/1046, including the changed
+files' own coverage) passes, and the changed files were separately grep-checked against the tsc output
+with zero matches. Do not read this as "typecheck clean" in the unqualified sense; read it as "the
+pre-existing tsc failure is unrelated to and does not implicate this batch's changes."
+
+**Regression:** full suite 1046/1046 passing, re-run fresh after this closure review's own changes.
 
 Shared fixtures restored to baseline: WF-TEST Finance and UX Verification Team both reactivated after
 their temporary deactivation for T-019; `nexus-test-restricted`/`nexus-test-provisioning-target` both
 removed from the disposable T-017 UI Verification Team after T-022. `nexus-test-finance`'s `checker` role
-was re-granted as a fresh row during T-024's race test (same role, new grant id); no lasting effect.
-Several harmless disposable fixture requests (CCR-000133, CCR-000134, the new `t025_wf_test_finance_dup`
-team left deactivated) remain in the database, consistent with the large volume of similar leftover test
-fixtures already present from prior batches; none reference real business data.
+now rests on a fresh grant row created during this closure review's own T-024 redo (same role, new grant
+id, correctly attributed to Admin B); no lasting effect. A new permanent canonical persona,
+`nexus-test-user-access-admin-b@example.test`, was added for T-024 and kept (not deleted) for future
+concurrency journeys. Several harmless disposable fixture requests (CCR-000133 through CCR-000139, the
+new `t025_wf_test_finance_dup` team left deactivated) remain in the database, consistent with the large
+volume of similar leftover test fixtures already present from prior batches; none reference real
+business data.

@@ -10,7 +10,9 @@
  * holding only reference_master_admin (Batches 6/24 Reference Master
  * governance depth and deactivation non-retroactivity), a Team Admin
  * holding only team_admin (Batches 5-6/27-30 team activation/deactivation
- * and last-active-member scenarios), an Unprovisioned user: a genuine
+ * and last-active-member scenarios), a second User Access Admin ("B",
+ * Batch 25, T-024) so genuine two-admin concurrency races have two
+ * distinct real actors to attribute to, an Unprovisioned user: a genuine
  * Auth identity this script deliberately never gives an app_users row
  * (N-019), and a second such identity, Provisioning Target (Batch 24,
  * T-007/T-008), reserved specifically for tests that provision a real
@@ -153,6 +155,21 @@ const PERSONAS = [
     roleCode: "team_admin",
     teamCode: null,
     passwordEnv: "NEXUS_TEST_TEAM_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-user-access-admin-b@example.test",
+    displayName: "Nexus Test User Access Admin B",
+    // A second, independent user_access_admin holder (Batch 25, T-024:
+    // concurrent role grant/revoke race), distinct from
+    // nexus-test-user-access-admin@example.test. T-024 requires two
+    // genuinely distinct admin actors acting on the same target user's
+    // role at nearly the same instant; a single admin persona cannot
+    // exercise that (there would be nothing to distinguish "Admin A" from
+    // "Admin B" in the audit trail). No team membership.
+    roleCode: "user_access_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_USER_ACCESS_ADMIN_B_PASSWORD",
     skipAppUserProvisioning: false,
   },
   {

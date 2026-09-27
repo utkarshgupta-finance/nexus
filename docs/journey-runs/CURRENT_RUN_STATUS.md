@@ -21,14 +21,14 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Classification counts
 
-- **PASS:** 25
+- **PASS:** 26
 - **FAILED THEN FIXED + PASS:** 0
 - **EXPECTED BEHAVIOUR:** 0
 - **PRODUCT GAP:** 0
 - **PRODUCT DECISION REQUIRED:** 0
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
-- **PARTIAL:** 1
+- **PARTIAL:** 0
 
 ## Current activity
 
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** e9a2828
+- **Current HEAD:** ce62b26
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batch 25 CLOSED, fully evidence-clean: 26/26 journeys, 25 PASS (including T-025 via PD-010), 1 PARTIAL (T-024, PARTIAL by the canonical text's own design), 0 open defects, 0 open Product Decisions
+- **Latest test checkpoint:** Batch 25 CLOSED, fully evidence-clean: 26/26 journeys, 25 PASS (including T-025 via PD-010, and T-024 upgraded from PARTIAL to PASS via a bounded closure review), 0 PARTIAL, 0 open defects, 0 open Product Decisions
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 14:24:19 UTC
+- **Last status update:** 2026-09-27 14:52:38 UTC
