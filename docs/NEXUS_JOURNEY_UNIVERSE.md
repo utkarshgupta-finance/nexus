@@ -14066,7 +14066,16 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: T-007
-- Notes: N/A
+- Notes: [EXPANDED, Batch 24, 2026-09-27] This scenario is structurally unreachable through the real UI: the
+  "Provision Access" button is rendered only for rows sourced from `supabase.auth.admin.listUsers()`, so a
+  button can never exist for an email/id with no backing Auth identity (confirmed via source inspection,
+  `src/platform/user-access/ui/user-access-page.tsx` and `domain/user-access.ts`). The underlying invariant
+  (no orphaned `app_users` row) was independently confirmed by calling `provision_app_user` directly with a
+  fabricated uuid: rejected with a Postgres foreign-key violation (`app_users_id_fkey`, SQLSTATE 23503), zero
+  orphan rows created. If this RPC is ever called from a future direct API/integration path outside this UI,
+  the raw Postgres/PostgREST error message would surface unfiltered (no designed "not found" response
+  exists at that layer); harmless today since no such caller exists, worth a friendlier guard if one is ever
+  added. Full detail in docs/journey-runs/BATCH_24_RESULTS.md's T-008 entry.
 
 ### T-009: Edit a user's display name
 - Pack: T - Settings
@@ -14467,6 +14476,48 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Dependencies: N/A
 - Related Journeys: T-011, T-012
 - Notes: Requires precise timing control to force the race; mark PARTIAL.
+
+### T-025: Duplicate team display names are allowed, only team code is unique
+- Pack: T - Settings
+- Business Objective: Confirm whether Team Master intentionally allows two teams to share an identical
+  display name (distinguished only by their internal code), or whether this is an oversight worth a UX
+  safeguard, since a name-based picker cannot distinguish them for a human user.
+- Domain: Team Master
+- Object / Record Type: Team row
+- Starting State: A team named "West Region Finance" already exists (any active team with a chosen name).
+- Personas: Admin with team.write
+- Preconditions: N/A
+- Regular Path: N/A
+- Stress Variant: Attempt to create a second team with the identical display name but a different, unique
+  code; confirm whether creation succeeds or is rejected.
+- Authorization Variant: N/A
+- Concurrency Variant: N/A
+- Idempotency Variant: N/A
+- Audit/Data Integrity Checks: If creation succeeds, confirm both teams remain independently queryable and
+  independently manageable (activate/deactivate/assign-membership) despite the shared display name.
+- Recovery/Resilience Variant: N/A
+- UX Checks: If two teams can share a name, confirm whether any team picker (the Team Membership
+  "Assign a team..." combobox, a workflow-node team-binding control, or similar) gives an admin any way to
+  tell them apart beyond the identical label, or whether this creates a genuine selection-ambiguity risk.
+- Historical Variant: N/A
+- Expected Business Result: N/A (this journey exists to establish whether the current behavior is an
+  intentional design choice or a gap; the business brief has not stated a rule either way).
+- Expected Technical Invariants: N/A
+- Priority: P3
+- Automation Feasibility: FULL
+- Dependencies: N/A
+- Related Journeys: T-017
+- Notes: [NEW JOURNEY REQUIRED, discovered during Batch 24's T-017 execution, allocated 2026-09-27]. Live
+  behavior already observed once during Batch 24 (not a substitute for this journey's own full execution):
+  creating a second team named "West Region Finance" with a different code succeeded without rejection.
+  This journey's own execution should confirm whether that is accepted product behavior or should be
+  raised as a Product Decision, and specifically check the picker-ambiguity UX angle, which Batch 24 did not
+  exercise. Not yet placed into a specific execution batch; the T-pack's remaining scheduled scope (Batch 25:
+  T-019 through T-024) is unchanged by this addition per the Journey Discovery Execution Protocol's own rule
+  (a newly discovered journey never changes the denominator of the batch that discovered it, or of an
+  already-scheduled future batch, without explicit confirmation). Confirm placement (most likely appended to
+  Batch 25 as a 26th journey, or deferred to a later Settings/Team-Master-adjacent batch) before Batch 25
+  begins execution.
 
 ## Pack U: Authentication / Sessions
 

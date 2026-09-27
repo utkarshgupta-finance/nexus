@@ -373,12 +373,29 @@ reappear, which was not done this pass.
 
 ## Journey Discovery Check (mandatory)
 
-Two candidates surfaced during initial execution:
-1. **T-008** (raw FK-violation error message if `provision_app_user`/`provisionAppUserAction` is ever
-   called outside the real UI) -> **EXPAND EXISTING JOURNEY**, noted above; no live path exists today, not
-   filed as Tech Debt.
-2. **T-017** (duplicate team display names are allowed, only `code` is unique) -> **NEW JOURNEY REQUIRED**
-   (low priority), noted above.
+Two candidates surfaced during initial execution, classified using the mandatory six-way taxonomy (these two
+are distinct dispositions, not both "already covered"; see the reconciliation note below for why):
+
+1. **Finding: a raw Postgres FK-violation error message would surface if `provision_app_user`/
+   `provisionAppUserAction` is ever called outside the real UI (T-008's own scenario).**
+   Disposition: **EXPAND EXISTING JOURNEY** -> T-008.
+   Action taken: T-008's own canonical entry in `docs/NEXUS_JOURNEY_UNIVERSE.md` has been expanded with this
+   finding (its Notes field, dated 2026-09-27). Completed, not merely noted.
+2. **Finding: duplicate team display names are allowed, only `code` is unique (surfaced while executing
+   T-017).**
+   Disposition: **NEW JOURNEY REQUIRED** (low priority) -> a new journey, not T-017 itself.
+   Action taken: allocated **T-025** (the next valid id in the T pack), added in full to
+   `docs/NEXUS_JOURNEY_UNIVERSE.md` immediately after T-024. Not inserted into Batch 24 (already closed) or
+   silently added to Batch 25's scope; its batch placement is called out explicitly for confirmation before
+   Batch 25 begins, per the protocol's rule that a newly discovered journey never changes an already-
+   scheduled batch's denominator without that explicit confirmation.
+
+Reconciliation note (corrects an earlier, ambiguous chat summary of this section): "T-008, T-017" in an
+earlier verbal recap of this batch was worded as if both findings were simply "pre-existing" with nothing
+further to do. That was imprecise. The correct, exclusive six-way accounting for these two original findings
+is **EXPAND EXISTING JOURNEY: 1, NEW JOURNEY REQUIRED: 1, ALREADY COVERED: 0** for this pair; neither is
+"already covered." Both required, and have now received, real follow-through in the Journey Universe itself,
+not just a mention in this ledger.
 
 ### Journey Discovery: PD-009 implementation (Team Membership surface)
 
