@@ -105,6 +105,70 @@ Unexecuted current-executable journeys: <N>
 ```
 The overnight programme is fully evidence-complete only when `Unexecuted current-executable journeys = 0`, excluding explicitly disclosed Product Decision / external-dependency residuals.
 
+## Overnight Stall-Escape Protocol (added 2026-09-27, before Batches 26-33)
+
+The overnight objective is **maximum safe coverage, not perfection on every single journey**. No single
+journey may unnecessarily stop the run.
+
+**Per-journey escalation ladder.** For every journey:
+1. Attempt the canonical path normally.
+2. If blocked by tooling, browser instability, fixture setup, persona setup, or an isolated technical
+   problem: diagnose it, then make up to 3 materially different bounded attempts. Do not repeatedly
+   retry the same failing action.
+3. If still unresolved after those bounded attempts, classify the journey honestly as one of: `PARTIAL /
+   TOOLING LIMITATION`, `BLOCKED / FIXTURE`, `PRODUCT DECISION REQUIRED`, `BLOCKED / EXTERNAL
+   DEPENDENCY`, or `OPEN DEFECT`, as applicable.
+4. Record exactly: what succeeded, what remains unverified, why it could not close, what evidence
+   exists, and what human action is required, if any.
+5. Add it to the Morning Residual Queue (`docs/journey-runs/MORNING_RESIDUAL_QUEUE.md`).
+6. Immediately continue to the next independent journey.
+
+**Not stop conditions, individually or in combination:** one browser click not working; one persona
+having a local issue; one fixture that cannot be created; one Product Decision being needed; one journey
+staying PARTIAL; one isolated defect that cannot be safely fixed; one network-failure dimension that
+cannot be induced; one newly discovered journey that cannot yet run; one batch having residuals; a batch
+boundary; a commit; a push. A PARTIAL or BLOCKED journey is never a stop condition if later journeys are
+independent of it. A Product Decision is never a stop condition for unrelated journeys.
+
+**Batch cadence.** After completing every scheduled journey in the current batch: reconcile the batch,
+commit, push, immediately begin the next batch. Continue through every remaining batch in sequence, then
+the Overnight Discovery Catch-up phase (running until every executable discovered journey is either
+executed-and-closed or explicitly parked for Product Decision / genuine external dependency / safety
+boundary — never automatically deferred to another day).
+
+**Full-run stop conditions — the only conditions that halt the entire run:**
+1. Continuing risks Production, `main`, real customers, real employees, real approvals, or real business
+   data.
+2. A secret/credential would need to be exposed or handled unsafely.
+3. The dev/test database or repository is corrupted such that further results would be unreliable.
+4. A foundational defect invalidates the evidence basis for most remaining journeys.
+5. Every remaining journey depends on the same unresolved blocker.
+6. A safety/tool policy explicitly prevents further work.
+
+Otherwise: **park the item and continue.**
+
+**Morning Residual Queue.** One durable queue (`docs/journey-runs/MORNING_RESIDUAL_QUEUE.md`) containing
+every non-clean item, one row each: Journey ID, Batch, Classification, Reason, Evidence already
+captured, Exact missing evidence/action, Human input needed (YES/NO), Product Decision needed (YES/NO),
+Can retry independently (YES/NO).
+
+**End-of-run report** must separately state:
+```
+Scheduled journeys attempted: <N>
+Scheduled journeys fully closed: <N>
+Scheduled journeys residual: <N>
+New journeys discovered: <N>
+New journeys executed: <N>
+New journeys residual: <N>
+Open defects: <N>
+Open Product Decisions: <N>
+Tooling residuals: <N>
+Human-action residuals: <N>
+```
+The overnight run is considered useful even if some residuals remain. Priority order: (1) safety, (2)
+honest evidence, (3) maximum journey coverage, (4) full closure where possible. Do not sacrifice many
+executable journeys because one journey cannot close.
+
 ## Manual UX Readiness Gate (mandatory from Batch 24 onward)
 
 Batches 22 and 23 exposed a real methodology gap: manual browser/persona testing had quietly
