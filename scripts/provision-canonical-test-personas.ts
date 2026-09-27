@@ -10,10 +10,13 @@
  * holding only reference_master_admin (Batches 6/24 Reference Master
  * governance depth and deactivation non-retroactivity), a Team Admin
  * holding only team_admin (Batches 5-6/27-30 team activation/deactivation
- * and last-active-member scenarios), and an Unprovisioned user: a genuine
+ * and last-active-member scenarios), an Unprovisioned user: a genuine
  * Auth identity this script deliberately never gives an app_users row
- * (N-019), the one intentional exception in this file to "every persona
- * is a normal, fully provisioned identity."
+ * (N-019), and a second such identity, Provisioning Target (Batch 24,
+ * T-007/T-008), reserved specifically for tests that provision a real
+ * identity live and must not consume the shared Unprovisioned fixture.
+ * These two are the only intentional exceptions in this file to "every
+ * persona is a normal, fully provisioned identity."
  *
  * Every identity is created through the real, supported Supabase Auth
  * Admin API, never a raw insert into auth.users; every role/team grant
@@ -151,6 +154,24 @@ const PERSONAS = [
     teamCode: null,
     passwordEnv: "NEXUS_TEST_TEAM_ADMIN_PASSWORD",
     skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-provisioning-target@example.test",
+    displayName: "Nexus Test Provisioning Target",
+    // A second genuine Auth identity with deliberately no app_users row
+    // (Batch 24, T-007/T-008: Provision Access must only work against a
+    // real pre-existing Auth identity, never create one out of thin air).
+    // This is distinct from nexus-test-unprovisioned@example.test, which
+    // must stay untouched as the shared fixture for N-019/U-series session
+    // state journeys; T-007 itself provisions THIS identity (creating its
+    // app_users row live via the real Provision Access UI), which would
+    // destroy nexus-test-unprovisioned's usefulness if reused instead.
+    // No login is ever required for this identity; its password exists
+    // only because the Auth Admin API requires one to create the account.
+    roleCode: null,
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_PROVISIONING_TARGET_PASSWORD",
+    skipAppUserProvisioning: true,
   },
 ] as const
 

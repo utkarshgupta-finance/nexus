@@ -1,38 +1,38 @@
 # Current Run Status
 
-Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_23_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
+Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_24_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
 
 ## Current run
 
-- **Current Batch:** 23 (Historical UX revalidation: Batch 23 (final historical batch))
+- **Current Batch:** 24 (Fresh execution: Batch 24 (Search/Discovery finish, Settings: Reference Master + User Access + Team Master))
 - **Batch status:** COMPLETE
-- **Scheduled journey count:** 26
-- **Completed journey count:** 26
+- **Scheduled journey count:** 25
+- **Completed journey count:** 25
 - **Remaining journey count:** 0
 - **Percentage complete:** 100%
 - **Current journey ID:** None
 - **Current journey execution state:** COMPLETE
 
-> Batch 23 — COMPLETE — 26 / 26 reconciled
+> Batch 24 — COMPLETE — 25 / 25 reconciled
 
-## Continuous run (Batches 22-23)
+## Continuous run (Batches 24)
 
-> Overall: 51 / 51 complete — 0 remaining.
+> Overall: 25 / 176 complete — 151 remaining.
 
 ## Classification counts
 
-- **PASS:** 22
-- **FAILED THEN FIXED + PASS:** 2
-- **EXPECTED BEHAVIOUR:** 2
-- **PRODUCT GAP:** 0
+- **PASS:** 20
+- **FAILED THEN FIXED + PASS:** 0
+- **EXPECTED BEHAVIOUR:** 0
+- **PRODUCT GAP:** 4
 - **PRODUCT DECISION REQUIRED:** 0
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
-- **PARTIAL:** 0
+- **PARTIAL:** 1
 
 ## Current activity
 
-- **Last journey completed:** S-017
+- **Last journey completed:** T-018
 - **Journey currently executing:** None
 - **Next 3 journeys:** None
 
@@ -44,8 +44,8 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 - **Product Decisions found:** 0
 - **Journey Discovery:**
   - ALREADY COVERED: 0
-  - EXPAND EXISTING JOURNEY: 0
-  - NEW JOURNEY REQUIRED: 0
+  - EXPAND EXISTING JOURNEY: 1
+  - NEW JOURNEY REQUIRED: 1
   - REGRESSION TEST ONLY: 0
   - FUTURE MODULE: 0
   - PRODUCT DECISION REQUIRED: 0
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 79ee947
+- **Current HEAD:** 3e1aa70
 - **Working tree:** dirty
-- **Latest test checkpoint:** S-014 Product Decision closed (PD-008): existence-leak fixed across 4 governed detail routes, tsc clean, full suite 1040/1040, dashboard regenerated
+- **Latest test checkpoint:** Batch 24 complete: 25/25 journeys, 0 defects, 0 Product Decisions, 1 PARTIAL (S-024), 2 Journey Discovery items (T-008, T-017), both tracked in ledger not filed as Tech Debt
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 06:39:29 UTC
+- **Last status update:** 2026-09-27 08:20:55 UTC
