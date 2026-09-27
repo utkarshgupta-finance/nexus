@@ -6,10 +6,14 @@
  * existing teams, reused, never recreated), a Restricted user with no
  * roles or teams at all, a Workflow Admin holding only the workflow_admin
  * role (no team, no other role) for role-isolation testing of the
- * Workflow Builder's own admin lifecycle (K-017), and an Unprovisioned
- * user: a genuine Auth identity this script deliberately never gives an
- * app_users row (N-019), the one intentional exception in this file to
- * "every persona is a normal, fully provisioned identity."
+ * Workflow Builder's own admin lifecycle (K-017), a Reference Master Admin
+ * holding only reference_master_admin (Batches 6/24 Reference Master
+ * governance depth and deactivation non-retroactivity), a Team Admin
+ * holding only team_admin (Batches 5-6/27-30 team activation/deactivation
+ * and last-active-member scenarios), and an Unprovisioned user: a genuine
+ * Auth identity this script deliberately never gives an app_users row
+ * (N-019), the one intentional exception in this file to "every persona
+ * is a normal, fully provisioned identity."
  *
  * Every identity is created through the real, supported Supabase Auth
  * Admin API, never a raw insert into auth.users; every role/team grant
@@ -124,6 +128,28 @@ const PERSONAS = [
     roleCode: "user_access_admin",
     teamCode: null,
     passwordEnv: "NEXUS_TEST_USER_ACCESS_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-reference-master-admin@example.test",
+    displayName: "Nexus Test Reference Master Admin",
+    // Holds reference_master_admin only (Batches 6/24: Reference Master
+    // governance depth, deactivation non-retroactivity). No team membership.
+    roleCode: "reference_master_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_REFERENCE_MASTER_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-team-admin@example.test",
+    displayName: "Nexus Test Team Admin",
+    // Holds team_admin only (Batches 5-6/27-30: team activation/
+    // deactivation, last-active-member-removed scenarios). No team
+    // membership of its own; this persona manages teams, it does not need
+    // to belong to one.
+    roleCode: "team_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_TEAM_ADMIN_PASSWORD",
     skipAppUserProvisioning: false,
   },
 ] as const
