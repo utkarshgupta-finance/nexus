@@ -12,7 +12,15 @@
  * holding only team_admin (Batches 5-6/27-30 team activation/deactivation
  * and last-active-member scenarios), a second User Access Admin ("B",
  * Batch 25, T-024) so genuine two-admin concurrency races have two
- * distinct real actors to attribute to, an Unprovisioned user: a genuine
+ * distinct real actors to attribute to, a second Finance Approver ("B",
+ * same team as the first, Batches 26-33 readiness review) so genuine
+ * same-team, same-node approval races have a second real actor, a second
+ * Workflow Admin ("B", same reasoning as the two "B" personas above), a
+ * Commercial Configuration Viewer, a Reference Master Viewer, a Customer
+ * Lifecycle Admin (the only role holding customer.delete_permanent), a
+ * Go Live Admin, and a Finance Admin (entitlement/settlement/usage) —
+ * these last five hold real, pre-existing roles that had no canonical
+ * persona to exercise them, an Unprovisioned user: a genuine
  * Auth identity this script deliberately never gives an app_users row
  * (N-019), and a second such identity, Provisioning Target (Batch 24,
  * T-007/T-008), reserved specifically for tests that provision a real
@@ -170,6 +178,98 @@ const PERSONAS = [
     roleCode: "user_access_admin",
     teamCode: null,
     passwordEnv: "NEXUS_TEST_USER_ACCESS_ADMIN_B_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-finance-b@example.test",
+    displayName: "Nexus Test Finance Approver B",
+    // A second, independent checker on the SAME team as
+    // nexus-test-finance@example.test (Batches 26-33 readiness review,
+    // pre-flight for the Concurrency/V pack and AB-039/X-006/Z-006/Z-026):
+    // every canonical checker team had exactly one member, which makes a
+    // genuine same-node, same-team, two-real-approver race impossible to
+    // stage (there would be no second real actor to attribute the losing
+    // side of the race to). This persona exists solely to make that class
+    // of journey genuinely executable, not merely approximated.
+    roleCode: "checker",
+    teamCode: "wf_test_finance",
+    passwordEnv: "NEXUS_TEST_FINANCE_B_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-workflow-admin-b@example.test",
+    displayName: "Nexus Test Workflow Admin B",
+    // A second, independent workflow_admin holder (Batches 26-33
+    // readiness review: V-011/V-016 two-admin draft/publish races,
+    // V-030/V-031 "another admin revokes this admin's rights" scenarios),
+    // distinct from nexus-test-workflow-admin@example.test, same reasoning
+    // as user-access-admin-b. No team membership.
+    roleCode: "workflow_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_WORKFLOW_ADMIN_B_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-commercial-viewer@example.test",
+    displayName: "Nexus Test Commercial Configuration Viewer",
+    // Holds the real, pre-existing commercial_configuration_viewer role
+    // (Batches 26-33 readiness review, AB-024: "confirm a viewer-only
+    // permission never grants any write capability"). Read-only by design;
+    // never grant this identity any other role. No team membership.
+    roleCode: "commercial_configuration_viewer",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_COMMERCIAL_VIEWER_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-reference-master-viewer@example.test",
+    displayName: "Nexus Test Reference Master Viewer",
+    // Holds the real, pre-existing reference_master_viewer role (Batches
+    // 26-33 readiness review: read-only Reference Master access, distinct
+    // from nexus-test-reference-master-admin's read+write). No team
+    // membership.
+    roleCode: "reference_master_viewer",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_REFERENCE_MASTER_VIEWER_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-customer-lifecycle-admin@example.test",
+    displayName: "Nexus Test Customer Lifecycle Admin",
+    // Holds the real, pre-existing customer_lifecycle_admin role (Batches
+    // 26-33 readiness review, AA-012: the only role holding
+    // customer.delete_permanent; garbage-data hard-delete journeys need a
+    // genuine holder of this narrowly-granted permission, never granted
+    // broadly per CLAUDE.md). No team membership.
+    roleCode: "customer_lifecycle_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_CUSTOMER_LIFECYCLE_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-go-live-admin@example.test",
+    displayName: "Nexus Test Go Live Admin",
+    // Holds the real, pre-existing go_live_admin role (Batches 26-33
+    // readiness review, AA-001 and others: a single-persona holder of the
+    // full go_live create/read/submit/approve lifecycle, resolving the
+    // "Go Live operator" ambiguity earlier batches' Notes referenced
+    // without a canonical persona to match). No team membership.
+    roleCode: "go_live_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_GO_LIVE_ADMIN_PASSWORD",
+    skipAppUserProvisioning: false,
+  },
+  {
+    email: "nexus-test-finance-admin@example.test",
+    displayName: "Nexus Test Finance Admin",
+    // Holds the real, pre-existing finance_admin role (Batches 26-33
+    // readiness review, AA-001: resolves the "Entitlement administrator"
+    // ambiguity — finance_admin is the actual role bundling
+    // entitlement.read/write, entitlement_settlement.read/write, and
+    // usage.read/write/finalize). No team membership.
+    roleCode: "finance_admin",
+    teamCode: null,
+    passwordEnv: "NEXUS_TEST_FINANCE_ADMIN_PASSWORD",
     skipAppUserProvisioning: false,
   },
   {

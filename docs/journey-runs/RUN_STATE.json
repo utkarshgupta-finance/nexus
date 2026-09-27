@@ -5,9 +5,9 @@
   "scheduled": 26,
   "run": {
     "batches": ["24", "25"],
-    "scheduledTotal": 177,
+    "scheduledTotal": 234,
     "priorBatchesComplete": 25,
-    "runLabel": "Fresh execution: Batches 24-30 (177 journeys, first time run, not historical revalidation)"
+    "runLabel": "Fresh execution: Batches 24-33 (234 journeys, first time run, not historical revalidation; scope corrected 2026-09-27 from an earlier 24-30/177 framing once the user confirmed the run extends through Batch 33, the plan's actual final batch)"
   },
   "journeys": [
     { "id": "T-019", "status": "COMPLETE", "classification": "PASS" },
