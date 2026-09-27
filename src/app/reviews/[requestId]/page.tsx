@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { isValidUuid } from "@/lib/uuid"
-import { AuthGate } from "@/components/product/auth-gate"
+import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer, hasPermissionForBusinessUnit } from "@/platform/permissions/server"
 import { getOnboardingCase, listOnboardingDocumentsWithUploader, loadOnboardingRequestTimeline } from "@/features/customer-onboarding/server"
@@ -44,6 +44,10 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
   const canAccessThisCase = onboardingCase.customerId
     ? await hasPermissionForCustomer("customer", "read", onboardingCase.customerId)
     : await hasPermissionForBusinessUnit("customer", "read", (onboardingCase.currentRevision.data["business_unit"] as string | undefined) ?? null)
+
+  // S-014 Product Decision: a real record the viewer lacks permission for
+  // must be indistinguishable from one that does not exist.
+  if (lacksRecordPermission(session, CUSTOMER_READ, canAccessThisCase)) notFound()
 
   let documents: PersistedOnboardingDocumentView[] = []
   try {

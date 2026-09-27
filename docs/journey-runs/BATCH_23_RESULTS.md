@@ -1858,3 +1858,26 @@ Batch 23: 26/26 reconciled, evidence-clean. PASS 24 (including S-006 and S-014, 
 - **Option A (recommended by the original Batch 23 analysis)**: leave as-is. Low real-world exploitability (UUIDs are not enumerable), and a legitimate user with a mistyped URL gets a more specific, honest message.
 - **Option B**: unify both into one generic response (e.g. both a 404, or both a shared "not found or not accessible" message), fully closing the leak at the cost of a less specific message for legitimate permission-denied users.
 - This is a product/security-posture tradeoff, not a bounded engineering decision; it has not been made by this program and is not made here.
+
+---
+
+## PRODUCT DECISION CLOSURE: S-014 (PD-008, 2026-09-27)
+
+**DECIDED: Option B.** Utkarsh decided: a valid request id the current user is not authorized to view must be observably indistinguishable from a request id that does not exist. Do not disclose whether a governed record exists to a viewer without permission for it; UUID non-enumerability reduces risk but is not a reason to accept an avoidable existence leak in a governed enterprise workflow product. This decision is not rewritten into the original Batch 23 analysis above (which correctly recorded Option A as its own recommendation, now superseded); it is recorded here as additive closure evidence, matching this program's established pattern (Batch 19's I-034/I-035, Batch 20's M-011).
+
+**Implementation**: applied to all four governed request-detail routes sharing the exact same fetch-record-then-`AuthGate` pattern (`/reviews/[requestId]`, `/reviews/change-requests/[requestId]`, `/reviews/commercial-versions/[requestId]`, `/customers/[customerKey]/go-live/[requestId]`). A new `lacksRecordPermission(session, requiredPermission, additionalAccessGranted)` helper (`src/components/product/auth-gate.tsx`) mirrors `AuthGate`'s own permission check, scoped to the `active` session case only (unauthenticated/unprovisioned/inactive/unavailable sessions are account-level states, not record-existence states, and continue through `AuthGate` exactly as before, unaffected). Each route now calls `notFound()` instead of rendering `AuthGate`'s children when an active session lacks access to a record confirmed to exist. Two new `not-found.tsx` boundaries (`src/app/reviews/not-found.tsx`, covering all three `/reviews/*` routes; `src/app/customers/[customerKey]/go-live/[requestId]/not-found.tsx`, scoped to that one segment only) render a new shared component, `RequestUnavailable` (`src/components/product/request-unavailable.tsx`): "Request unavailable / This request is unavailable or you do not have access to it." No record/customer/workflow detail is ever passed to it. The underlying authorization check itself is unchanged, only which UI branch runs on denial.
+
+**Regression coverage**: 4 new tests added to `src/components/product/auth-gate.test.tsx` for `lacksRecordPermission` (active session with permission; active session without permission and no scoped grant; active session with a resolved scoped grant; non-active session deferring to `AuthGate`). `tsc --noEmit` clean. Full suite: 1040/1040 passing (up from 1036, the 4 new tests).
+
+**Manual UX verification, live, real browser**: signed in as `nexus-test-restricted@example.test` (a real, sanctioned test account independently confirmed via direct query to hold zero granted permissions). Confirmed all three cases now render byte-for-byte identical output ("Request unavailable / This request is unavailable or you do not have access to it.") with the same `200 OK` response confirmed via network inspection:
+- A malformed id (`/reviews/not-a-valid-uuid`).
+- A well-formed but nonexistent id (`/reviews/00000000-0000-0000-0000-000000000000`).
+- A real existing record this account lacks permission for (`/reviews/95838de6-...`, and separately the Go Live route on the S-006 fixture `GLR-000044`).
+
+Re-verified authorized-user behavior is unaffected: signed in as `nexus-test-maker@example.test` (the S-006 fixture's own creator, holding `go_live.read`) and confirmed the real Go Live detail page renders in full, exactly as before, with no regression.
+
+**Neighbour check**: `AuthGate` itself was not modified; every other page using it (`/operations/queue`, `/my-work`, `/approvals`, Settings, etc.) is structurally unaffected, confirmed by the full suite passing unchanged and by not touching the component's own exported behavior for any caller other than the four routes that now additionally call `lacksRecordPermission` first.
+
+**Documentation**: `docs/AUTHORIZATION_MODEL.md` §24 (new section, "Governed request-detail existence disclosure: DECIDED [PD-008, IMPLEMENTED, 2026-09-27]"). `docs/NEXUS_JOURNEY_UNIVERSE.md`'s S-014 entry annotated `[PRODUCT DECISION CLOSED, PD-008, 2026-09-27]` with a Notes addendum; the original entry's own text is preserved, not rewritten.
+
+**Closure arithmetic**: Batch 23's own historical classification (S-014 = PASS) is unchanged; this is additive closure evidence for the Product Decision S-014 itself surfaced, not a reclassification of the journey. Open Product Decisions for Batches 1-23: **0** (down from 1).

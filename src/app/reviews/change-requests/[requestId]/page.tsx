@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { isValidUuid } from "@/lib/uuid"
-import { AuthGate } from "@/components/product/auth-gate"
+import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { loadChangeRequest, getCurrentGovernedValues, loadChangeRequestTimeline } from "@/features/customer-change/server"
@@ -35,6 +35,11 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
   const currentValues = await getCurrentGovernedValues(customer.id)
   const canDecide = await hasPermission("customer", "approve")
   const canAccessThisChangeRequest = await hasPermissionForCustomer("customer", "read", customer.id)
+
+  // S-014 Product Decision: a real record the viewer lacks permission for
+  // must be indistinguishable from one that does not exist.
+  if (lacksRecordPermission(session, CUSTOMER_READ, canAccessThisChangeRequest)) notFound()
+
   const timeline = await loadChangeRequestTimeline(requestId)
 
   let snapshot: ReferenceMasterSnapshot

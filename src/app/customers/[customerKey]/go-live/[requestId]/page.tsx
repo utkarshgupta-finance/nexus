@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { isValidUuid } from "@/lib/uuid"
-import { AuthGate } from "@/components/product/auth-gate"
+import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
 import { resolveActorLabels } from "@/platform/audit/server"
@@ -30,6 +30,10 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
 
   const request = await getGoLiveRequestById(requestId)
   if (!request || request.customerId !== customer.id) notFound()
+
+  // S-014 Product Decision: a real record the viewer lacks permission for
+  // must be indistinguishable from one that does not exist.
+  if (lacksRecordPermission(session, GO_LIVE_READ)) notFound()
 
   const [sendBacks, documents, lineItems, canSubmit, canApprove, transitionInputs] = await Promise.all([
     listSendBacksForGoLiveRequest(request.id),

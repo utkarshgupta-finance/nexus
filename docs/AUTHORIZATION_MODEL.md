@@ -728,3 +728,72 @@ Write-side gating is unchanged: `entitlement.write`, `usage.write`,
 own actions exactly as before; this closure only made the two
 previously-inert read permissions do something, it did not touch which
 permission a write requires.
+
+## 24. Governed request-detail existence disclosure: DECIDED [PD-008, IMPLEMENTED, 2026-09-27]
+
+Historical UX Revalidation (S-014) empirically confirmed, live, that a
+nonexistent/malformed request id (a genuine `notFound()`, rendering
+Next's default 404) and a real request id the viewer lacks permission
+for (a normally-rendered 200 page reading "Access restricted... requires
+`<resource>.<action>`") were observably different responses: different
+HTTP status, different page shape, and a message naming the specific
+permission required. A viewer who can tell a 404 apart from a 200
+"Access restricted" page can determine "this id doesn't exist" versus
+"this id exists but I can't see it," for any id they can obtain.
+
+**DECIDED [PD-008]: Option B.** A valid request id the current user is
+not authorized to view must be observably indistinguishable from a
+request id that does not exist. Do not disclose whether a governed
+record exists to a viewer without permission for it; UUID
+non-enumerability reduces real-world risk but is not a reason to accept
+an avoidable existence leak in a governed enterprise workflow product.
+
+**Scope**: the four governed request-detail routes that share this
+exact pattern (fetch-record-then-`AuthGate`): `/reviews/[requestId]`
+(Customer Onboarding), `/reviews/change-requests/[requestId]` (Customer
+Change), `/reviews/commercial-versions/[requestId]` (Commercial
+Configuration Version), `/customers/[customerKey]/go-live/[requestId]`
+(Go Live). Other UUID-keyed routes (e.g. `/commercials/[configId]`,
+`/settings/workflows/[definitionId]`) were already out of S-013's own
+scope for the unrelated malformed-id crash fix and remain out of scope
+here for the same reason: they were not part of what this decision's own
+evidence covered.
+
+**Implementation**: each of the four routes now calls a new
+`lacksRecordPermission(session, requiredPermission, additionalAccessGranted)`
+helper (`src/components/product/auth-gate.tsx`) immediately after
+confirming the record exists. It mirrors exactly the same check
+`AuthGate` itself performs, scoped to the `active` session case only: an
+unauthenticated, unprovisioned, inactive, or session-unavailable viewer
+is an account-level state unrelated to any specific record's existence,
+so those continue through `AuthGate` exactly as before, each with their
+own honest message (§26's distinct-states rule is unaffected). When the
+session is active and genuinely lacks access, the route calls `notFound()`
+instead of letting `AuthGate` render "Access restricted," so it renders
+through the identical mechanism, and now the identical copy, as a
+genuinely nonexistent or malformed id. A new shared `not-found.tsx` per
+affected route segment (`src/app/reviews/not-found.tsx`, covering all
+three `/reviews/*` routes; `src/app/customers/[customerKey]/go-live/
+[requestId]/not-found.tsx`, scoped to only that one segment) renders one
+shared component, `RequestUnavailable`
+(`src/components/product/request-unavailable.tsx`): "Request unavailable
+/ This request is unavailable or you do not have access to it." No
+record, customer, or workflow detail is ever passed to it.
+
+`AuthGate` itself is unchanged: every other page that wraps content in
+it (`/operations/queue`, `/my-work`, `/approvals`, Settings, etc.) still
+renders its own distinct "Access restricted" message exactly as before,
+since existence-of-a-specific-record is not a concern for those pages.
+
+**Verified live** (`nexus-test-restricted@example.test`, a real,
+sanctioned test account independently confirmed to hold zero granted
+permissions): a malformed id, a well-formed but nonexistent id, and a
+real existing id this account lacks permission for all three now render
+byte-for-byte identical output ("Request unavailable / This request is
+unavailable or you do not have access to it.") with the same `200 OK`
+response, confirmed via network inspection, across both the Customer
+Onboarding review route and the Go Live detail route. Re-verified that
+an authorized viewer (the record's own creator, `nexus-test-maker@
+example.test`) is unaffected: the full real detail page renders exactly
+as before. Full detail in `docs/journey-runs/BATCH_23_RESULTS.md`'s
+S-014 entry.

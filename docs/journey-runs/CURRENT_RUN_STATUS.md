@@ -48,16 +48,16 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
   - NEW JOURNEY REQUIRED: 0
   - REGRESSION TEST ONLY: 0
   - FUTURE MODULE: 0
-  - PRODUCT DECISION REQUIRED: 1
+  - PRODUCT DECISION REQUIRED: 0
 
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** ae2eb66
+- **Current HEAD:** 79ee947
 - **Working tree:** dirty
-- **Latest test checkpoint:** Historical Revalidation Residual Closure pass: Q-015/S-006/S-014 all live-confirmed, tsc clean, dashboard regenerated
+- **Latest test checkpoint:** S-014 Product Decision closed (PD-008): existence-leak fixed across 4 governed detail routes, tsc clean, full suite 1040/1040, dashboard regenerated
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 06:25:30 UTC
+- **Last status update:** 2026-09-27 06:39:29 UTC

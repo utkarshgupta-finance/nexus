@@ -13591,7 +13591,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: S-012, S-014
 - Notes: **[EXPANDED, Batch 23, 2026-09-23]** Executed against the four reviewer-facing detail routes (`reviews/[requestId]`, `reviews/change-requests/[requestId]`, `reviews/commercial-versions/[requestId]`, `customers/[customerKey]/go-live/[requestId]`): a malformed (non-UUID) id was found to crash, reproduced live via direct SQL (`22P02`), root-caused (no format validation before the data-layer call, no `error.tsx` anywhere in the app), and fixed via a shared `isValidUuid` guard (`src/lib/uuid.ts`) applied at the top of all four routes before any data-layer call, regression-tested (6 passing tests). **[EVIDENCE STANDARD CORRECTION, 2026-09-23]**: the server-side defect fix itself is genuinely confirmed (`SERVER/DB VERIFIED` + `AUTOMATED VERIFIED`); the final classification is `DEFERRED — MANUAL UX TOOLING-BLOCKED`, not `FAILED THEN FIXED + PASS`, because this journey's own canonical assertion is a rendered page state ("page shows a clear not found state"), which was never confirmed via a genuine authenticated browser session (none existed). See `docs/journey-runs/BATCH_23_RESULTS.md`'s "EVIDENCE STANDARD CORRECTION" section for the full reclassification and reasoning. **Not yet executed** against other UUID-keyed routes with the same shape (`/forms/customer-onboarding/[requestId]`, `/commercials/[configId]`, `/commercials/[configId]/versions/[requestId]`, `/settings/workflows/[definitionId]`, `/settings/workflows/[definitionId]/versions/[versionId]`) — a future execution should widen this journey's Object/Record Type to explicitly enumerate every UUID-keyed route, not only the four reviewer-facing ones, and apply the same `isValidUuid` guard wherever it is found missing.
 
-### S-014: Deep link to a governed request, valid id but no permission
+### S-014: Deep link to a governed request, valid id but no permission [PRODUCT DECISION CLOSED, PD-008, 2026-09-27]
 - Pack: S - Search / Navigation / Discovery
 - Business Objective: Confirm a viewer with no permission to a specific, existing request gets an honest, non-leaking message.
 - Domain: Customer Onboarding (representative)
@@ -13614,7 +13614,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: S-012, S-013
-- Notes: N/A
+- Notes: [PRODUCT DECISION CLOSED, PD-008, 2026-09-27] The open question this journey's own Audit/Data Integrity Check field poses was answered empirically, not assumed: a nonexistent/malformed id (404) and a valid id with no permission (200 "Access restricted, requires <resource.action>") were confirmed observably different, a real existence leak. Utkarsh decided: they must be made indistinguishable (Option B, not the originally-recommended leave-as-is). Implemented across all four governed request-detail routes sharing this pattern (Onboarding, Customer Change, Commercial Configuration Version, Go Live): each now calls a shared `lacksRecordPermission` check and `notFound()` instead of AuthGate's own message when an active session lacks access to an existing record, rendering the same "Request unavailable" copy and the same response as a nonexistent id. Full detail in `docs/AUTHORIZATION_MODEL.md` §24 and `docs/journey-runs/BATCH_23_RESULTS.md`'s S-014 entry.
 
 ### S-015: Browser back/forward through Customer -> Commercial -> Go Live navigation chain
 - Pack: S - Search / Navigation / Discovery

@@ -95,4 +95,27 @@ function AuthGate({
   return <>{children}</>
 }
 
-export { AuthGate }
+/**
+ * S-014 Product Decision (2026-09-27): a governed request-detail route
+ * (one that already confirmed the record exists) must render an
+ * identical 404 for "record exists, viewer lacks permission" as it does
+ * for "record does not exist" (see `not-found.tsx` in the relevant route
+ * segments), rather than `AuthGate`'s own distinct "Access restricted"
+ * message. This mirrors exactly the permission check `AuthGate` itself
+ * performs, scoped to only the active-session case: an unauthenticated,
+ * unprovisioned, inactive, or unavailable session is an account-level
+ * state unrelated to any specific record's existence, so those continue
+ * through `AuthGate` exactly as before.
+ */
+function lacksRecordPermission(
+  session: NexusSession,
+  requiredPermission: { resource: string; action: string } | { resource: string; action: string }[],
+  additionalAccessGranted?: boolean
+): boolean {
+  if (session.status !== "active") return false
+  const requirements = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]
+  const hasAccess = requirements.some((requirement) => sessionHasPermission(session, requirement.resource, requirement.action)) || additionalAccessGranted === true
+  return !hasAccess
+}
+
+export { AuthGate, lacksRecordPermission }

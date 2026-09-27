@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { isValidUuid } from "@/lib/uuid"
-import { AuthGate } from "@/components/product/auth-gate"
+import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { loadVersion, getCommercialVersionDiff, loadCommercialVersionTimeline } from "@/features/customer-onboarding/server"
@@ -37,6 +37,10 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
   // failure.
   const configuration = await commercialConfigurationService.getCommercialConfiguration(version.commercialConfigurationId)
   const canAccessThisVersion = configuration ? await hasPermissionForCustomer("commercial_configuration", "read", configuration.customerId) : false
+
+  // S-014 Product Decision: a real record the viewer lacks permission for
+  // must be indistinguishable from one that does not exist.
+  if (lacksRecordPermission(session, COMMERCIAL_CONFIGURATION_READ, canAccessThisVersion)) notFound()
 
   let customerName = "Commercial Configuration Version Review"
   try {
