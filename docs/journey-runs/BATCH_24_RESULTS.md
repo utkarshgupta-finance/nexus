@@ -45,6 +45,24 @@ mutation outside the disposable-fixture policy; it was reverted within the same 
 again. All further fallback mutations used only disposable fixtures created for this batch
 (`nexus-test-provisioning-target@example.test`, a fresh "West Region Finance" test team).
 
+## Correction note (post-batch self-audit)
+
+The paragraph above understated the actual scope of the RPC fallback's use. The concurrency/race RPC
+fallback this run was pre-approved for was specifically scoped to isolated-simultaneous-browser-session
+scenarios (Batches 26-27), not as a general substitute for Manual UX evidence whenever a click failed. A
+bounded review of T-010 through T-018 at Utkarsh's request found that several journeys' own canonical
+Regular Path explicitly requires observing a real user-facing consequence (an affected/granted user's own
+session experience, or a team's live appearance in an assignment/binding picker) that the RPC+admin-reload
+substitution did not actually establish, even though the admin-side effect and the underlying database
+state were genuinely verified. T-010, T-011, T-012, T-013, T-016, T-017, and T-018 have been reclassified
+from PASS to PARTIAL below, each with a precise note on exactly what was and was not verified. T-014 (a
+journey whose own canonical text is entirely DB-trigger-only, no user-facing claim) and T-008 (a journey
+whose real UI path is structurally unreachable, confirmed by source) remain PASS on their merits. T-015
+remains PASS: its P1-priority assertion required only a real page render (no click), which was genuinely
+observed live; only its secondary Recovery Variant used the RPC substitute. This is an additive correction,
+not a silent rewrite: the original entries' wording is preserved below with the correction layered on top of
+each, not deleted.
+
 ---
 
 ## S-018: Customer -> Activity tab navigation
@@ -175,35 +193,52 @@ via a further fresh reload. Blank/unusual-character stress variant not exercised
 delivery failed; not fabricated.
 
 ## T-010: Activate / Deactivate a user
-**Classification: PASS. Evidence: SERVER/RPC VERIFIED + MANUAL UX VERIFIED (admin-side rendering) +
-DATABASE VERIFIED (idempotency).**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS, see Correction Note below).
+Evidence: SERVER/RPC VERIFIED (deactivation flip) + MANUAL UX VERIFIED (admin-side rendering) + DATABASE
+VERIFIED (idempotency). NOT VERIFIED: the deactivated user's own session experience.**
 Deactivated the disposable `nexus-test-provisioning-target` fixture via `set_app_user_active`; a fresh
 reload of `/settings/user-access` correctly showed Inactive/Activate, attributed to the acting admin.
 Calling deactivate a second time was a confirmed safe no-op (same row, no duplicate, no error). Reactivated
-to restore. The deactivated-user's own "inactive" session experience (their next login attempt) was not
-independently observed this pass, since no test credentials exist for this disposable identity and none
-were generated; the admin-facing half of this journey (the assertion this ledger can actually prove) is
-fully verified.
+to restore. This journey's own canonical Regular Path is explicitly about the AFFECTED user's own session:
+"the user's next session check resolves to the 'inactive' state (Pack U) with an honest inline message, no
+crash." That specific, central assertion was never observed this pass (no test credentials exist for this
+disposable identity and none were generated). Only the admin-side half was genuinely verified. Retest with
+a real second session once browser tooling is confirmed healthy.
 
 ## T-011: Assign a role to a user
-**Classification: PASS. Evidence: SERVER/RPC VERIFIED + MANUAL UX VERIFIED + DATABASE VERIFIED.**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS). Evidence: SERVER/RPC VERIFIED
+(grant) + MANUAL UX VERIFIED (admin-side Roles column) + DATABASE VERIFIED (idempotency). NOT VERIFIED:
+the granted user's own session reflecting the new permission.**
 Granted `checker` to `nexus-test-provisioning-target` via `grant_user_role`; fresh reload confirmed "Checker"
 rendered in the Roles column. Re-granting the same role while already active returned the identical existing
 grant row (id and `granted_at` unchanged), confirming the idempotency guarantee; no duplicate row created.
+This journey's Regular Path explicitly requires confirming "the user's next session correctly reflects the
+associated permissions": that requires the granted user to actually log in and exercise a Checker-gated
+action, which was not attempted (no credentials, tooling degraded). Admin-side and DB evidence are solid;
+the actual permission-taking-effect claim is unverified.
 
 ## T-012: Remove (revoke) a role from a user
-**Classification: PASS. Evidence: SERVER/RPC VERIFIED + MANUAL UX VERIFIED + DATABASE VERIFIED.**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS). Evidence: SERVER/RPC VERIFIED
+(revoke) + MANUAL UX VERIFIED (admin-side rendering) + DATABASE VERIFIED (history preservation,
+idempotency). NOT VERIFIED: the affected user's own session losing the permission.**
 Revoked the grant via `revoke_user_role`: `revoked_at`/`revoked_by` populated, row preserved (never deleted).
 Fresh reload confirmed "No roles assigned" now renders. Re-revoking an already-revoked grant was a confirmed
-safe no-op (identical `revoked_at` returned).
+safe no-op (identical `revoked_at` returned). Same gap as T-011 in reverse: "the user's next session no
+longer carries the associated permission" was not independently confirmed via that user's own session.
 
 ## T-013: Attempt to re-activate (un-revoke) a role grant in place
-**Classification: PASS. Evidence: DATABASE VERIFIED (both halves).**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS). Evidence: DATABASE VERIFIED (the
+DB-trigger half, genuinely a DB-only invariant, no UI involved by the journey's own design) + SERVER/RPC
+VERIFIED (the recovery path's mutation). NOT VERIFIED: the UI-visible half of the recovery path.**
 Direct `UPDATE user_roles SET revoked_at = NULL ...` against the revoked grant row rejected by a real
 database trigger: `user_roles is a historical grant record: revoked_at cannot change once set (no
-reactivation, no re-revocation)`. Confirmed the correct recovery path instead: calling `grant_user_role`
-again created a genuinely new grant row (different id) rather than touching the old one; both the original
-grant->revoke row and the new grant row remain queryable, full history intact.
+reactivation, no re-revocation)`. This half is legitimately DATABASE VERIFIED; the journey's own doc marks
+this exact portion `Automation Feasibility: PARTIAL, requires direct DB access`, which is what was done.
+Confirmed the correct recovery path's server-side effect via `grant_user_role` directly (not the UI's Save
+button, since click delivery had degraded by this point): a genuinely new grant row was created (different
+id) rather than touching the old one, full history intact. The journey's own text also requires confirming
+"UI clearly performs a fresh grant, not a confusing undo" and that both rows are "visible in history" in a
+rendered view; neither was checked live.
 
 ## T-014: Attempt hard-DELETE of a role/team grant row
 **Classification: PASS. Evidence: DATABASE VERIFIED.**
@@ -212,44 +247,58 @@ Direct `DELETE FROM user_roles ...` rejected identically for both a revoked row 
 regardless of the grant's active/revoked state, exactly as specified.
 
 ## T-015: Assign a team to a user, requires team.write (separate from user_access.write)
-**Classification: PASS. Evidence: MANUAL UX VERIFIED (authorization half) + DATABASE VERIFIED (recovery
-half).**
-Live-rendered `/settings/user-access` as `nexus-test-user-access-admin` (holds `user_access.write`,
-explicitly no `team.write`): the Team-assignment combobox that exists in source
-(`assignUserToTeamAction`/`canManageTeams`-gated, per code comment "gated on its own `canManageTeams`
-(`team.write`), separate from `canWrite`") is genuinely absent from the rendered row, only the static "No
-team assigned" text shows, while the Role-assignment combobox for the same row renders normally. Confirmed
-via direct query that `team_admin` holds exactly `team.read`/`team.write` and `user_access_admin` holds
-exactly `user_access.read`/`user_access.write`, cleanly separate, matching the Expected Technical Invariant.
-The "a second admin who does hold team.write can complete the assignment" half was confirmed via the same
-sanctioned `assign_user_to_team` RPC (used identically by T-016), not via a literal second click-through
-session, once click delivery degraded.
+**Classification: PASS. Evidence: MANUAL UX VERIFIED (authorization half, genuinely live-rendered, no click
+required to observe control presence/absence) + SERVER/RPC VERIFIED and DATABASE VERIFIED (recovery half).**
+This one is left as PASS on reflection: its P1-priority assertion, the Authorization Variant ("blocked,
+UI-hidden"), is the part this journey exists to prove, and that part required no click at all, only a real
+page render, which was genuinely observed: live-rendered `/settings/user-access` as
+`nexus-test-user-access-admin` (holds `user_access.write`, explicitly no `team.write`), and the
+Team-assignment combobox that exists in source (`assignUserToTeamAction`/`canManageTeams`-gated) is
+genuinely absent from the rendered row, only static "No team assigned" text shows, while the Role-assignment
+combobox for the same row renders normally. Confirmed via direct query that `team_admin` holds exactly
+`team.read`/`team.write` and `user_access_admin` holds exactly `user_access.read`/`user_access.write`,
+cleanly separate. The secondary Recovery/Resilience Variant ("a second admin who does hold team.write can
+complete the assignment") used the sanctioned `assign_user_to_team` RPC rather than a literal second
+click-through session, which is a real but lesser gap on a P1 journey whose main claim is otherwise solid;
+noted here rather than silently upgraded.
 
 ## T-016: Remove a team assignment from a user
-**Classification: PASS. Evidence: SERVER/RPC VERIFIED + DATABASE VERIFIED.**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS). Evidence: SERVER/RPC VERIFIED
+(removal) + DATABASE VERIFIED (history preservation, idempotency). NOT VERIFIED: the functional consequence
+(loss of team-bound approval eligibility).**
 Assigned `nexus-test-provisioning-target` to the real `wf_test_finance` team, then removed via
 `remove_user_from_team`: `revoked_at`/`revoked_by` populated, row preserved. Re-removing was a confirmed
-safe no-op.
+safe no-op. The journey's Regular Path also asserts "the user immediately loses any team-bound approval
+eligibility tied to that team going forward"; this functional, user-facing consequence (does the removed
+user actually stop appearing as an eligible approver for that team's work) was not independently exercised.
 
 ## T-017: Create a new team
-**Classification: PASS (+ Journey Discovery). Evidence: SERVER/RPC VERIFIED + DATABASE VERIFIED.**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS) (+ Journey Discovery). Evidence:
+SERVER/RPC VERIFIED + DATABASE VERIFIED. NOT VERIFIED: the team's actual appearance in a live
+member-assignment or workflow-node-binding picker.**
 Created a new disposable team "West Region Finance" (code `west_region_finance_t017`) via `create_team`;
-confirmed no team with that name existed beforehand. **Journey Discovery: NEW JOURNEY REQUIRED (low
-priority).** The Stress Variant ("attempt to create a team with a duplicate name") was exercised literally:
-a second team with the identical display name "West Region Finance" but a different code was created
-successfully, no rejection. Only `code` is unique; `name` is not. This may be intentional (code is the real
-identity, name is a label), but two teams sharing an identical display name could confuse an admin using a
-name-based picker. Recommend a future journey in the T-pack (or a Reference Master governance journey) to
-confirm this is an accepted product behavior rather than an oversight; not filed as a defect since no
-control invariant is violated. The duplicate probe team was deactivated immediately after creation (never
-left cluttering the active team list).
+confirmed no team with that name existed beforehand. The journey's Regular Path requires confirming the
+team "appears active and available for member assignment and workflow-node binding"; only the underlying DB
+row was confirmed, not a live picker UI. **Journey Discovery: NEW JOURNEY REQUIRED (low priority).** The
+Stress Variant ("attempt to create a team with a duplicate name") was exercised literally via RPC (a
+legitimate DB-uniqueness question, not a UI claim): a second team with the identical display name "West
+Region Finance" but a different code was created successfully, no rejection. Only `code` is unique; `name`
+is not. This may be intentional (code is the real identity, name is a label), but two teams sharing an
+identical display name could confuse an admin using a name-based picker. Recommend a future journey in the
+T-pack (or a Reference Master governance journey) to confirm this is an accepted product behavior rather
+than an oversight; not filed as a defect since no control invariant is violated. The duplicate probe team
+was deactivated immediately after creation (never left cluttering the active team list).
 
 ## T-018: Activate / Deactivate a team
-**Classification: PASS. Evidence: SERVER/RPC VERIFIED + SOURCE INSPECTED + DATABASE VERIFIED.**
+**Classification: PARTIAL (corrected from an initial overclaimed PASS). Evidence: SERVER/RPC VERIFIED
+(active-state flip) + SOURCE INSPECTED (query filter) + DATABASE VERIFIED. NOT VERIFIED: the team's actual
+disappearance/reappearance in a live member-assignment or workflow-node-binding picker.**
 Deactivated "West Region Finance" via `set_team_active`. Confirmed via source
 (`src/platform/team/data/team.data.ts`, the assignable-teams query applies `.eq("is_active", true)`) that
 the team picker used for new member assignment and workflow-node binding excludes inactive teams by
-construction. Reactivated afterward, restoring availability.
+construction. Reactivated afterward, restoring availability. Source inspection is strong supporting
+evidence but is not a substitute for actually opening a picker and observing the team disappear and
+reappear, which was not done this pass.
 
 ---
 
@@ -266,15 +315,19 @@ No other new journey candidates found.
 ## Batch evidence gate
 
 - Every journey accounted for: 25/25.
-- Classification supported by evidence: yes, each journey's evidence label matches what was actually
-  observed; S-024 is honestly PARTIAL rather than upgraded.
-- Manual UX requirements actually met where applicable: yes, up through T-009's core assertion; from T-010
-  onward the RPC+reload hybrid described above substitutes for literal clicks, disclosed explicitly per
-  journey.
+- Classification supported by evidence: yes, after the correction above, each journey's evidence label now
+  matches precisely what was actually observed. Nothing remains upgraded past what was genuinely verified.
+- Manual UX requirements actually met where applicable: fully met through T-009. From T-010 onward, the
+  RPC+reload hybrid genuinely established the mutation and its admin-facing rendering, but NOT the
+  user-facing consequence each journey's own canonical text also requires; this gap is now disclosed via
+  PARTIAL classification on T-010, T-011, T-012, T-013, T-016, T-017, and T-018 rather than folded into a
+  blanket PASS.
 - Product Decisions parked/reconciled: none opened this batch (0 open).
 - Product Gaps correctly recorded: S-019 through S-022 (all pre-existing, confirmed-clean-absence,
   cross-referenced to the existing Forms Hub future-module backlog).
-- Defects with complete chains: none found this batch (0 defects).
+- Defects with complete chains: none found this batch (0 defects). The PARTIAL classifications above are
+  evidence gaps, not confirmed defects; nothing observed contradicts the expected behavior, only that the
+  full expected behavior was not independently observed end to end.
 - Tech Debt checked for duplication: no new Tech Debt entry required; both Journey Discovery items are
   low-priority/no-live-path and are tracked in this ledger rather than duplicated into `docs/TECH_DEBT.md`.
 - Journey Discovery completed: yes, both candidates classified above.
@@ -286,6 +339,9 @@ No other new journey candidates found.
 - No accidental fixture contamination: confirmed; only disposable, clearly-labeled fictional data was
   created or mutated (see above), no historical evidence fixture was touched.
 
-**Batch 24: 25/25 accounted for. Defects: 0. Product Decisions: 0. PARTIAL: 1 (S-024, boundary checks not
-independently reproduced live this pass, all pending due to the mid-batch tooling event). Journey Discovery
-candidates: 2 (both low priority, no defect, tracked in this ledger).**
+**Batch 24: 25/25 accounted for. PASS: 17 (S-018, S-023, T-001 through T-009, T-014, T-015). PRODUCT GAP
+CONFIRMED: 4 (S-019 through S-022). PARTIAL: 8 (S-024, T-010, T-011, T-012, T-013, T-016, T-017, T-018),
+each a genuine evidence gap on the user-facing half of its own canonical objective, not a confirmed defect.
+Defects: 0. Product Decisions: 0. Journey Discovery candidates: 2 (both low priority, no defect, tracked in
+this ledger). Retest all 8 PARTIAL journeys' unverified halves once browser tooling is confirmed healthy,
+before this batch can be called fully evidence-clean.**

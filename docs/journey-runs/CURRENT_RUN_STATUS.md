@@ -21,14 +21,14 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Classification counts
 
-- **PASS:** 20
+- **PASS:** 13
 - **FAILED THEN FIXED + PASS:** 0
 - **EXPECTED BEHAVIOUR:** 0
 - **PRODUCT GAP:** 4
 - **PRODUCT DECISION REQUIRED:** 0
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
-- **PARTIAL:** 1
+- **PARTIAL:** 8
 
 ## Current activity
 
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 3e1aa70
+- **Current HEAD:** e5e6d2c
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batch 24 complete: 25/25 journeys, 0 defects, 0 Product Decisions, 1 PARTIAL (S-024), 2 Journey Discovery items (T-008, T-017), both tracked in ledger not filed as Tech Debt
+- **Latest test checkpoint:** Batch 24 complete + self-corrected: 25/25 journeys, 0 defects, 0 Product Decisions, 8 PARTIAL (S-024, T-010, T-011, T-012, T-013, T-016, T-017, T-018), 2 Journey Discovery items (T-008, T-017), both tracked in ledger not filed as Tech Debt
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 08:20:55 UTC
+- **Last status update:** 2026-09-27 11:20:45 UTC
