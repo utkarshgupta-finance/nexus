@@ -386,3 +386,18 @@ Verified, live, against `65ec12f` (the exact commit this reconciliation pass pro
 - Page header independently confirms: status badge **Live**, "Live from , approved 21 Sept 2026, 4:35 pm" (matching the finalizing transition's own timestamp exactly).
 
 Both required manual UX checks now pass live against the deployed Preview. The automated regression test in `transition-events.test.ts` reproduces the same scenario and passes; `tsc`, `eslint`, `vitest`, and the production build are all clean against the deployed commit.
+
+---
+
+## EVIDENCE RECONCILIATION PASS (2026-09-27)
+
+Bounded revalidation of this already-closed batch against the stricter Manual UX Standard. This is the strongest-evidenced of Batches 13-15: nearly every journey (H-001 through H-023, G-025, G-026) was executed live end to end against a real signed-in session or the deployed Preview, including live diff review, live database audit reads, and, for the one real defect found (H-020), a full reproduce, root-cause, fix, regression-test, and already-completed live post-fix reverification chain against the redeployed Preview.
+
+Audit findings:
+- No journey in this batch relies on source-inspection-only evidence for a user-visible or runtime-behavior claim. The few places direct RPC calls substitute for UI clicks (H-002, H-017, H-018, H-019, H-022's third cycle) are each explicitly disclosed and justified: the UI has no reachable path to the scenario at all (by correct design, e.g. the Approve control does not render for a draft or cancelled request), so a direct call is the only way to exercise the underlying guard, and each case is labeled as such rather than silently presented as a UI test.
+- H-020's defect chain is exemplary: found live, root-caused, fixed, regression-tested, and already reverified live against the redeployed Preview with a specific before/after Timeline transcript. No further action needed.
+- G-025 and G-026's multiple rejected-and-redone submission attempts are correctly documented as real validation guards being exercised for the first time live, not defects, each with its own specific error token.
+
+Spot-check performed this pass: confirmed H-020's fix is genuinely present in current code (`transition-events.ts`'s `isRequestFinalized` parameter gating `isFinalEvent`), verifying the ledger's defect-fix narrative matches actual current repository state.
+
+**No bounded live verification was required for this batch.** No classification changed. No new Tech Debt entries needed (zero PRODUCT GAP CONFIRMED findings this batch; the one real defect was already fixed, tested, and live-reverified within the original batch execution itself, not deferred).

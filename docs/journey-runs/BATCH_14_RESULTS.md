@@ -457,3 +457,19 @@ journey in this batch.
 - DEFERRED: 0
 
 18 + 1 + 6 = 25. No journey missing from the denominator.
+
+---
+
+## EVIDENCE RECONCILIATION PASS (2026-09-27)
+
+Bounded revalidation of this already-closed batch against the stricter Manual UX Standard. Unlike Batch 13, this ledger's own original evidence is already dense with live editor interaction, live diff review, and full defect chains (reproduce, root cause, fix, regression test, live retest against deployed code) rather than source-inspection-only claims.
+
+Audit findings per journey group:
+- F-022, G-004/G-009/G-012, G-005/G-006/G-018, G-010/G-013, G-014/G-017/G-021, G-015/G-016, G-019, G-022, G-023: already MANUAL UX VERIFIED and/or DATABASE VERIFIED / SERVER-RPC VERIFIED via real live editor sessions, real submitted/approved versions, and real diff reviews. No gap.
+- G-001/G-002/G-003, G-007: EXPECTED BEHAVIOUR, evidenced by SOURCE INSPECTED confirmation that no usage-engine or spend-commitment code path exists at all. These are structural-absence claims (nothing to run, since the capability does not exist), the same evidentiary category already accepted for D-017/F-012/F-020 in prior reconciliations. No gap.
+- G-008: PASS via pre-existing AUTOMATED VERIFIED test coverage plus DATABASE VERIFIED evidence reused from this same batch's own G-005/G-006 version-boundary data and Batch 12's E-018 live-proved commitment-conditionality mechanism. Legitimate evidence reuse, same pattern already accepted for E-028 reusing Batch 9 evidence. No gap.
+- G-011, G-020, G-024: PASS via AUTOMATED VERIFIED/SOURCE INSPECTED plus a partial live spot-check, each honestly caveated in its own text as not separately fully live-tested (all P2, low priority). Honestly disclosed, not overclaimed, consistent with the standard already applied to F-015/F-018 in Batch 13. No gap.
+
+Spot-check performed this pass: confirmed G-019's fix is genuinely present in current code (`commercial-rate.ts`'s continuous-bound comparison, `quantity > row.from - 1`) and all four migrations referenced in the defect chain (`20260930160000` through `20260930190000`) exist in `supabase/migrations/`, verifying the ledger's defect-fix narrative matches actual current repository state, not just its own prose.
+
+**No bounded live verification was required for this batch.** No classification changed. No new Tech Debt entries needed (no new PRODUCT GAP CONFIRMED findings in this batch; G-021's duplicate-designation UX risk was already correctly recorded as a disclosed characterization, not escalated, consistent with this program's UX/Workflow Improvement observation category rather than a defect or gap).
