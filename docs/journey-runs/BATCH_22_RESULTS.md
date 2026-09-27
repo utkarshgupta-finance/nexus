@@ -1513,3 +1513,24 @@ absence or infrastructure-delegation checks (Q-009 TTL, Q-013/Q-014 now closed a
 concurrency) with little or no further live-rendering evidence to obtain, or require a signed-URL/
 network-panel check (Q-008, Q-016) not yet performed. See the session's final report for the
 current outstanding list.
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 22-23 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard, retroactively applying Batch 23's own "Evidence Standard Correction" rule to this batch (never applied here at the time, per the session-interruption note above). That rule: a user-visible rendering claim requires genuine browser evidence; a claim that is specifically about a DB constraint, RPC authorization, uniqueness, locking, concurrency, schema, audit persistence, immutable history, migration behaviour, server-side trust boundary, or server-side document validation does not.
+
+Re-triaged all 17 journeys still at SOURCE/SERVER/AUTOMATED level against this exact rule, rather than accepting Batch 23's own generic sweep at face value:
+
+- **Q-008, Q-010, Q-011, Q-012, Q-016, Q-017, Q-018, Q-020**: each journey's own canonical intent is fundamentally a server-side trust-boundary, schema-scoping, or data-integrity claim (private bucket ACL, no-info-disclosure, code-reuse of a validation policy, DB foreign-key scoping, DB-level historical resolution, server-side authorization, metadata completeness). The "TOOLING-BLOCKED" notes on these were for a secondary visual confirmation, not the central assertion. Legitimate server/control exceptions; ACCEPT EXISTING EVIDENCE.
+- **Q-009**: infrastructure-delegation exception (Supabase Storage's own TTL enforcement), correctly PARTIAL by its own canonical definition. ACCEPT.
+- **Q-019**: concurrency/data-integrity exception, explicit in the rule; full defect chain already live-verified via direct SQL. ACCEPT.
+- **R-007, R-008, R-009**: structural-absence claims (no live example exists to render differently; a capability that does not exist; no permission-check code path exists). Source inspection is the correct, sufficient evidence type for a true absence. ACCEPT.
+- **R-010**: correctly PARTIAL by its own canonical definition (the two-version side-by-side scenario was not freshly constructed). ACCEPT.
+- **R-011**: core claim (event isolation per version, never merged) is DB/schema-scoping, confirmed at real 24-version depth; the back-navigation-link sub-check is a minor, disclosed, unexercised polish check, not the central assertion. ACCEPT.
+- **R-012**: PD-007 independently verified present in `docs/CUSTOMER_LIFECYCLE.md` §19b ("Customer names in Timeline/page display resolve live, never a snapshot: DECIDED [PD-007, IMPLEMENTED, 2026-09-23]"). Product Decision confirmed genuinely closed.
+- **Q-015 remains genuinely open**: this is squarely a "what does a user see" claim (the Documents tab's own copy never claiming to be real evidence), not a schema/trust-boundary exception. Attempted a fresh browser session this pass to close it; blocked by the safety classifier as a direct, self-inflicted consequence of printing the test-credential file via `cat` instead of the Read tool. Not retried, per this program's standing rule. Remains **EXPECTED BEHAVIOUR with the specific UI-copy claim still unconfirmed by browser evidence**, not silently converted to a fully-closed PASS.
+
+**Revalidation action: ACCEPT EXISTING EVIDENCE for 24 of 25 journeys (1 as Product Decision Reconciliation); NEEDS INVESTIGATION for Q-015 (genuinely still open, not closed this pass).** No classification changed for any journey; Q-015's own EXPECTED BEHAVIOUR label is unchanged, only its evidence-completeness note is added.
+
+Batch 22: 25/25 reconciled. PASS 20, FIXED + PASS 1 (Q-019), EXPECTED BEHAVIOUR 4 (one, Q-015, with an honestly disclosed residual gap). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0.
