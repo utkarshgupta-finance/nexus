@@ -268,6 +268,12 @@ All frontend implementation must comply with `docs/UI_SYSTEM.md`.
 Do not build ahead of the current step. Features are added one at a time,
 each proven end-to-end (data → domain → UI) before the next one starts.
 
+## Journey execution
+
+During Nexus journey execution, the Journey Discovery Execution Protocol
+in `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md` is mandatory for every journey
+and every batch closure.
+
 ## Writing style
 
 Never use em dashes anywhere in the project.

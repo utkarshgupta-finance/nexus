@@ -41,6 +41,39 @@ The batch's own ledger must record the result of this check even when nothing is
 
 This requirement itself does not apply retroactively to Batches 1 through 16; those closed under the rules that existed at the time, and their own incidental findings were instead swept up in the one-time Stage A Journey Universe Expansion Audit.
 
+### Journey Discovery Execution Protocol (added 2026-09-27, after Batch 24)
+
+Journey Discovery is not merely a batch-end checklist. It must happen continuously during execution, not only when a batch closes.
+
+**A. Mandatory check after every journey.** Before marking any journey terminal (`PASS`, `FIXED + PASS`, `EXPECTED BEHAVIOUR`, `PRODUCT GAP`, `PARTIAL`, `BLOCKED`, `PRODUCT DECISION REQUIRED`), explicitly ask: did executing this journey reveal any durable behaviour, missing coverage, permission boundary, state transition, control invariant, recovery case, concurrency case, idempotency case, historical-truth requirement, cross-domain interaction, UX behaviour, or regression risk that is not adequately represented in the Journey Universe? Record one of `Journey Discovery: NONE` or `Journey Discovery: CANDIDATE FOUND` for that journey. Do not silently omit this field.
+
+**B. Mandatory trigger on findings.** A Journey Discovery check is especially mandatory whenever execution reveals: a defect; a Product Gap; a Product Decision; an architecture mismatch; an unexpected permission interaction; an unexpected state transition; an RPC/UI mismatch; a browser/UI behaviour not predicted by the journey; a recovery behaviour; a concurrency/race behaviour; a security boundary; a historical/audit consequence; or a new operational risk. These findings trigger discovery analysis immediately, before moving to the next journey, not deferred to batch close.
+
+**C. Candidate reconciliation.** For every candidate, search the existing Journey Universe first, then classify using the same six-way taxonomy above:
+1. **ALREADY COVERED**: name the existing journey ID(s); explain why coverage is sufficient.
+2. **EXPAND EXISTING JOURNEY**: name the journey ID; add the missing variant to the canonical journey text.
+3. **NEW JOURNEY REQUIRED**: allocate the next valid ID in the relevant pack; add it to `NEXUS_JOURNEY_UNIVERSE.md`; place it into a future execution batch using dependency ordering; never add it retroactively to the batch that discovered it.
+4. **REGRESSION TEST ONLY**: identify the automated regression test/location; do not create a permanent business journey.
+5. **FUTURE MODULE**: add to the appropriate future backlog; do not opportunistically implement it.
+6. **PRODUCT DECISION REQUIRED**: record the exact unresolved business question; do not invent the decision.
+
+**D. No duplicate journeys.** Never create a new journey merely because the wording differs. Compare business objective, persona, state transition, invariant, failure mode, and evidence target against existing journeys. If an existing journey substantively covers the finding, use ALREADY COVERED instead of allocating a new ID.
+
+**E. Discovery caused by fixes.** Whenever a defect or Product Gap causes code/product behaviour to change, perform Journey Discovery again after the fix: does the newly implemented behaviour itself introduce a coverage requirement that did not exist before? For example, a new admin surface (like a membership-management page) itself needs checking for: positive permission path, negative permission path, direct-action bypass, historical preservation, idempotency, concurrency, permission revocation mid-action, and deactivated-state behaviour. Never assume the journey that discovered the original issue automatically covers the new behaviour the fix introduced.
+
+**F. Batch closure gate.** A batch cannot close until its ledger contains a Journey Discovery reconciliation block:
+```
+Journey Discovery: COMPLETE
+Candidates found: <N>
+```
+followed by, for every candidate, a row of `| Finding | Disposition | Existing/New Journey | Action |`. If none were found: `Journey Discovery: COMPLETE` / `New journey candidates found: 0`.
+
+**G. RUN_STATE/dashboard.** Where the current `RUN_STATE.json`/dashboard structure supports it, retain: Journey Discovery complete (YES/NO), candidates found, new journeys added, existing journeys expanded, Product Decisions created. Do not invent a new dashboard schema if it would require unnecessary restructuring.
+
+**H. Journey counts.** A newly discovered journey never changes the denominator of the batch currently executing. It belongs in a future batch/backlog. The overall executable Journey Universe count is updated only when a NEW JOURNEY REQUIRED candidate is actually added to the canonical Journey Universe.
+
+**I. Manual UX.** Journey Discovery applies equally to Manual UX. Specifically watch for: confusing or misleading copy; controls inaccessible to the intended persona; missing actions; navigation dead ends; inconsistent page behaviour; poor empty/error states; actions available under the wrong permission; and technically-correct flows that cannot actually be performed by the intended persona (exactly the class of gap T-015/T-016 found in Batch 24: the server-side invariant was already correct, but no real persona could reach the UI that exercised it). Do not dismiss these merely because the underlying server-side invariant works.
+
 ## Manual UX Readiness Gate (mandatory from Batch 24 onward)
 
 Batches 22 and 23 exposed a real methodology gap: manual browser/persona testing had quietly
