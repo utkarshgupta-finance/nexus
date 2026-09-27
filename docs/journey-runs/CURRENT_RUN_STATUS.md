@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 2512cab
+- **Current HEAD:** ae2eb66
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batches 22-23 evidence reconciliation close: final historical revalidation batch, tsc clean, dashboard regenerated
+- **Latest test checkpoint:** Historical Revalidation Residual Closure pass: Q-015/S-006/S-014 all live-confirmed, tsc clean, dashboard regenerated
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 06:10:38 UTC
+- **Last status update:** 2026-09-27 06:25:30 UTC

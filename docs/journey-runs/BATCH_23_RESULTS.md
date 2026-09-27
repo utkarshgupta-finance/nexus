@@ -634,6 +634,37 @@ None new.
 ### Permanent ledger updated
 Yes.
 
+## BEGIN UX REVALIDATION S-006 (2026-09-27, Historical Revalidation Residual Closure, populated case)
+
+### Persona
+`nexus-test-maker@example.test` (real, sanctioned test account).
+
+### Fixture
+A real, disposable Go Live request created via sanctioned RPCs on the existing Batch 12 test customer `batch12-e021-routing-co` (`stable_component_key 233c38f5-...`, a real approved recurring component with zero prior go_live_requests): `create_go_live_request` and `submit_go_live_request` as `nexus-test-maker`, then `send_back_go_live_request` as `nexus-test-legal@example.test` (a real, active WF-TEST Legal team member, the correct responsible team for the active go-live workflow's fallback node) with the real reason "Fictional S-006 revalidation fixture: please double-check the go-live date before resubmitting."
+
+### Starting page/state
+`/my-work`, freshly navigated.
+
+### Actions performed
+Read the fully rendered page; clicked through to the fixture's own detail page.
+
+### Actual rendered result
+**"SENT BACK TO ME (1)"** section renders the real fixture: Type "Go Live", Reference "GLR-000044", Customer "Batch12 E021 Routing Co (TEST)", "What I need to do: Address reviewer feedback and resubmit this Go Live", Age "0 days", Status "Sent Back", a working "Open" link. Clicking through: the detail page renders correctly, Timeline shows "Go Live request created" / "Submitted for review" (both Nexus Test Maker) / "Legal Approval sent back" (Nexus Test Legal Approver) with the exact reason quoted verbatim, and Save Draft/Submit/Cancel Draft controls are present (correctly editable in `sent_back` status).
+
+### Expected result
+Matches exactly.
+
+### UX outcome
+PASS. **S-006 upgraded to full MANUAL UX VERIFIED for both the empty-case and populated-case dimensions.**
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION S-006
+
 ## END S-006
 
 ## BEGIN S-007
@@ -968,6 +999,34 @@ Recorded as a PRODUCT DECISION REQUIRED candidate (see Journey Discovery / Produ
 
 ### Permanent ledger updated
 Yes.
+
+## BEGIN UX REVALIDATION S-014 (2026-09-27, Historical Revalidation Residual Closure)
+
+### Persona
+`nexus-test-restricted@example.test`, a real, sanctioned test account independently confirmed via direct query to hold zero granted permissions of any kind (no role assignments with active, unrevoked grants).
+
+### Starting page/state
+The application home page, then a real existing request's review page (`/reviews/95838de6-57f9-4493-b378-d9f472bfa7ae`).
+
+### Actions performed
+Signed in as this persona; read the fully rendered home page; navigated directly to the real request URL; inspected the network response status.
+
+### Actual rendered result
+Both pages render **"Access restricted: You do not have permission to view this page (requires customer.read). Contact your administrator."** The request page's response is confirmed via network inspection to be a genuine `200 OK`, observably distinct from the `404` already confirmed live for a malformed/nonexistent id (this batch's own S-013 UX revalidation).
+
+### Expected result
+Matches exactly: the existence-leak (404 vs 200 "Access restricted" are different, observable responses) is confirmed live, not merely by source comparison.
+
+### UX outcome
+PASS. **S-014's visual behavior upgraded to genuine MANUAL UX VERIFIED.** The underlying policy question (should this be closed) is unaffected and remains open; see the Product Decision recorded in the REVALIDATION PASS section below.
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION S-014
 
 ## END S-014
 
@@ -1786,9 +1845,16 @@ Bounded revalidation against the current Manual UX Standard. Rather than accepti
 - **R-017**: a fresh grep across the entire source tree (already performed, re-confirmed this pass) plus a re-query of an already-frozen `audit_log` row. No persona of any kind is involved. Reclassified: **PASS, ACCEPT EXISTING EVIDENCE**.
 - **R-019**: its remaining gap ("the specific visual side-by-side comparison across all four domains") is substantively satisfied by evidence already gathered elsewhere in this same program: Batch 22's R-001 (onboarding), R-002 (commercial), R-003 (customer change), R-004 (go live), and this batch's own R-018 each individually rendered the shared `RequestTimeline` component live, sequentially covering all four domains. Reclassified: **PASS, MANUAL UX VERIFIED via legitimate evidence reuse**.
 - **R-020**: its remaining gap ("both entries render correctly side by side in the same rendered cycle") is directly satisfied by Batch 22's own R-003 live view of request `1ba55311-...` (this exact journey's own fixture), which rendered "APPROVAL CYCLE 2 (Finance/Legal/Leadership all approved)" — multiple distinct actors correctly attributed within the same rendered cycle. Combined with R-020's own already-completed real, reversible DB-level rename/revert mutation, this closes the claim. Reclassified: **PASS, MANUAL UX VERIFIED via legitimate evidence reuse**.
-- **S-006**: genuinely still open. The available admin account has zero items ever sent back to it, so only the empty-bucket state was observable; the populated-bucket rendering remains unconfirmed for lack of a qualifying real fixture for this account. Attempted a fresh persona this pass to close it; blocked by the safety classifier as a direct, self-inflicted consequence of printing the test-credential file via `cat` instead of the Read tool. Not retried. Remains **PASS for the empty-case dimension only; the populated-case dimension stays honestly unconfirmed**, not converted to a false full closure.
-- **S-014**: genuinely still open, for the same reason. The available admin account holds every permission and cannot represent a denied viewer. Attempted a fresh persona this pass; blocked identically. Remains **PASS for the determination itself** (the existence-leak mechanism was genuinely identified via direct source comparison, satisfying this journey's own scope), **with the visual side-by-side rendering still unconfirmed**. Its own Product Decision (S-014: should the leak be closed) independently re-verified as still genuinely open: no entry exists in `docs/TECH_DEBT.md` or `docs/AUTHORIZATION_MODEL.md` recording a decision either way, confirmed by direct search, not assumed.
+- **S-006 closed this pass (Historical Revalidation Residual Closure, 2026-09-27)**: created a real, disposable fixture via sanctioned RPCs (a genuine Go Live request on the existing Batch 12 test customer `batch12-e021-routing-co`, created and submitted as `nexus-test-maker@example.test`, sent back with a real reason by `nexus-test-legal@example.test`, the correct WF-TEST Legal team member for the active go-live workflow's fallback node), then logged in as `nexus-test-maker@example.test` and confirmed live: `/my-work` renders **"SENT BACK TO ME (1)"** with the real fixture (`GLR-000044`, "Batch12 E021 Routing Co (TEST)," "Address reviewer feedback and resubmit this Go Live"). Clicked through: the detail page renders correctly, Timeline shows both real actors and the exact reason quoted verbatim, Save Draft/Submit/Cancel Draft controls are present (editable in `sent_back` status). **S-006 upgraded to full PASS, MANUAL UX VERIFIED for both the empty-case and populated-case dimensions.**
+- **S-014 closed this pass (same session)**: logged in as `nexus-test-restricted@example.test`, a real, sanctioned test account independently confirmed via direct query to hold zero granted permissions. Confirmed live: the home page and a real existing request's review page (`/reviews/95838de6-...`) both render **"Access restricted: You do not have permission to view this page (requires customer.read)."**, confirmed via network inspection to be a genuine `200 OK` response, observably distinct from the `404` already confirmed for a malformed/nonexistent id (Batch 23's own S-013 UX revalidation). **S-014's visual behavior upgraded to MANUAL UX VERIFIED.** Its own Product Decision (should the 404-vs-Access-Restricted existence leak be closed) was independently re-verified as still genuinely open: no entry exists in `docs/TECH_DEBT.md` or `docs/AUTHORIZATION_MODEL.md` recording a decision either way. Not resolved unilaterally; **S-014 remains PRODUCT DECISION REQUIRED for that question**, while its own determination-and-behavior scope is now fully closed.
 
-**Revalidation action: ACCEPT EXISTING EVIDENCE for 24 of 26 journeys (reclassifying R-013, R-014, R-017, R-019, R-020 from "persona-blocked" to their correct, already-adequate evidence type); NEEDS INVESTIGATION for S-006 and S-014 (genuinely still open, not closed this pass, honestly disclosed).** No classification changed for any journey's final PASS/FAIL disposition; only the "persona required" framing was corrected for five journeys that did not actually need one.
+**Revalidation action: ACCEPT EXISTING EVIDENCE for 24 of 26 journeys (reclassifying R-013, R-014, R-017, R-019, R-020 from "persona-blocked" to their correct, already-adequate evidence type); BOUNDED UX RECHECK for S-006 and S-014 (both closed this pass with genuine MANUAL UX VERIFIED evidence, using safely-obtained sanctioned test personas).** No classification changed for any journey's final PASS/FAIL disposition. S-014's own open Product Decision remains open, correctly not resolved unilaterally.
 
-Batch 23: 26/26 reconciled. PASS 24 (including Q-021's and S-013's own FIXED+PASS folded separately below), FIXED + PASS 2 (Q-021, S-013), EXPECTED BEHAVIOUR 2 (R-013, R-014), PRODUCT DECISION open 1 (S-014, correctly not resolved unilaterally). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0.
+Batch 23: 26/26 reconciled, evidence-clean. PASS 24 (including S-006 and S-014, both now fully MANUAL UX VERIFIED), FIXED + PASS 2 (Q-021, S-013), EXPECTED BEHAVIOUR 2 (R-013, R-014). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0. Open Product Decisions: 1 (S-014's own underlying policy question, correctly left for Utkarsh to decide — see below).
+
+### Product Decision awaiting Utkarsh (S-014, still open)
+
+**Question**: should a nonexistent/malformed request id (currently a clean 404) and a valid id with no permission (currently a 200 "Access restricted") be made observably indistinguishable, closing the confirmed existence-leak, or is the current distinguishable behavior an acceptable tradeoff?
+- **Option A (recommended by the original Batch 23 analysis)**: leave as-is. Low real-world exploitability (UUIDs are not enumerable), and a legitimate user with a mistyped URL gets a more specific, honest message.
+- **Option B**: unify both into one generic response (e.g. both a 404, or both a shared "not found or not accessible" message), fully closing the leak at the cost of a less specific message for legitimate permission-denied users.
+- This is a product/security-posture tradeoff, not a bounded engineering decision; it has not been made by this program and is not made here.

@@ -329,10 +329,38 @@ Matches canonical expectation exactly: a known, already-documented "looks real b
 No.
 
 ### Final residual state
-CLOSED.
+CLOSED (originally on source inspection alone).
 
 ### Ledger updated
 Yes.
+
+## BEGIN UX REVALIDATION Q-015 (2026-09-27, Historical Revalidation Residual Closure)
+
+### Persona
+`nexus-test-maker@example.test` (real, sanctioned test account; already-authenticated session in this pass).
+
+### Starting page/state
+`/customers/demo-northstar-consumer-products`, Documents tab.
+
+### Actions performed
+Clicked the Documents tab; read the fully rendered page text.
+
+### Actual rendered result
+Section header reads **"DOCUMENTS — Generated on demand. Not stored."** Every one of the 7 rows shows Status **"Demo / Fixture"** and Source **"DEMO"** in its own column (GST Registration Certificate, PAN Document, TAN Document, Demo Commercial Proposal, Demo Purchase Order, Demo Proforma Invoice, Demo SaaS Agreement). No copy anywhere on the page claims this is real evidence.
+
+### Expected result
+Matches exactly.
+
+### UX outcome
+PASS. **Q-015 upgraded from SOURCE INSPECTED to genuine MANUAL UX VERIFIED.**
+
+### Defect?
+No.
+
+### Permanent ledger updated
+Yes (this section).
+
+## END UX REVALIDATION Q-015
 
 ## END Q-015
 
@@ -1529,8 +1557,8 @@ Re-triaged all 17 journeys still at SOURCE/SERVER/AUTOMATED level against this e
 - **R-010**: correctly PARTIAL by its own canonical definition (the two-version side-by-side scenario was not freshly constructed). ACCEPT.
 - **R-011**: core claim (event isolation per version, never merged) is DB/schema-scoping, confirmed at real 24-version depth; the back-navigation-link sub-check is a minor, disclosed, unexercised polish check, not the central assertion. ACCEPT.
 - **R-012**: PD-007 independently verified present in `docs/CUSTOMER_LIFECYCLE.md` §19b ("Customer names in Timeline/page display resolve live, never a snapshot: DECIDED [PD-007, IMPLEMENTED, 2026-09-23]"). Product Decision confirmed genuinely closed.
-- **Q-015 remains genuinely open**: this is squarely a "what does a user see" claim (the Documents tab's own copy never claiming to be real evidence), not a schema/trust-boundary exception. Attempted a fresh browser session this pass to close it; blocked by the safety classifier as a direct, self-inflicted consequence of printing the test-credential file via `cat` instead of the Read tool. Not retried, per this program's standing rule. Remains **EXPECTED BEHAVIOUR with the specific UI-copy claim still unconfirmed by browser evidence**, not silently converted to a fully-closed PASS.
+- **Q-015 closed this pass (Historical Revalidation Residual Closure, 2026-09-27)**: after the safety classifier correctly blocked a fresh browser session earlier in this program (a self-inflicted consequence of printing the test-credential file via `cat` instead of the Read tool), a safe browser session was restored using the Read tool only, never printing the credential value. Logged in as `nexus-test-maker@example.test` and confirmed live: the Documents tab reads "Generated on demand. Not stored." with every row showing Status "Demo / Fixture" and Source "DEMO." Q-015 upgraded from SOURCE INSPECTED to genuine MANUAL UX VERIFIED (see its own UX REVALIDATION block above). No longer a residual.
 
-**Revalidation action: ACCEPT EXISTING EVIDENCE for 24 of 25 journeys (1 as Product Decision Reconciliation); NEEDS INVESTIGATION for Q-015 (genuinely still open, not closed this pass).** No classification changed for any journey; Q-015's own EXPECTED BEHAVIOUR label is unchanged, only its evidence-completeness note is added.
+**Revalidation action: ACCEPT EXISTING EVIDENCE for 24 of 25 journeys (1 as Product Decision Reconciliation); BOUNDED UX RECHECK for Q-015 (closed this pass, genuine MANUAL UX VERIFIED).** No classification changed for any journey.
 
-Batch 22: 25/25 reconciled. PASS 20, FIXED + PASS 1 (Q-019), EXPECTED BEHAVIOUR 4 (one, Q-015, with an honestly disclosed residual gap). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0.
+Batch 22: 25/25 reconciled, evidence-clean. PASS 20, FIXED + PASS 1 (Q-019), EXPECTED BEHAVIOUR 4 (Q-013, Q-014, Q-015 now MANUAL UX VERIFIED, R-008). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0.
