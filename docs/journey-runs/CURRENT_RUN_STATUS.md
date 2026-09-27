@@ -1,30 +1,30 @@
 # Current Run Status
 
-Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_18_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
+Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_21_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
 
 ## Current run
 
-- **Current Batch:** 18 (Historical UX revalidation: Batch 18)
+- **Current Batch:** 21 (Historical UX revalidation: Batch 21)
 - **Batch status:** COMPLETE
-- **Scheduled journey count:** 8
-- **Completed journey count:** 8
+- **Scheduled journey count:** 25
+- **Completed journey count:** 25
 - **Remaining journey count:** 0
 - **Percentage complete:** 100%
 - **Current journey ID:** None
 - **Current journey execution state:** COMPLETE
 
-> Batch 18 — COMPLETE — 8 / 8 reconciled
+> Batch 21 — COMPLETE — 25 / 25 reconciled
 
-## Continuous run (Batches 16-17-18)
+## Continuous run (Batches 19-20-21)
 
-> Overall: 58 / 58 complete — 0 remaining.
+> Overall: 75 / 75 complete — 0 remaining.
 
 ## Classification counts
 
-- **PASS:** 7
-- **FAILED THEN FIXED + PASS:** 1
+- **PASS:** 24
+- **FAILED THEN FIXED + PASS:** 0
 - **EXPECTED BEHAVIOUR:** 0
-- **PRODUCT GAP:** 0
+- **PRODUCT GAP:** 1
 - **PRODUCT DECISION REQUIRED:** 0
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
@@ -32,14 +32,14 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Current activity
 
-- **Last journey completed:** ACC-002
+- **Last journey completed:** Q-007
 - **Journey currently executing:** None
 - **Next 3 journeys:** None
 
 ## Findings
 
-- **Defects found:** 1
-- **Defects fixed:** 1
+- **Defects found:** 0
+- **Defects fixed:** 0
 - **Open defects:** 0
 - **Product Decisions found:** 0
 - **Journey Discovery:**
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** e091ac5
+- **Current HEAD:** b11ba21
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batches 16-18 evidence reconciliation close: tsc clean, dashboard regenerated
+- **Latest test checkpoint:** Batches 19-21 evidence reconciliation close: tsc clean, dashboard regenerated
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-27 05:53:36 UTC
+- **Last status update:** 2026-09-27 05:59:34 UTC

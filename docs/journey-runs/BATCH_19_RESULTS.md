@@ -602,3 +602,18 @@ prove the I-034 gap existed), not real or sensitive data. No other row was mutat
 - Production build: succeeds.
 - Manual UX verification: real browser, `wf-test.maker@example.test`, real "Add Invoice Entitlement" form, both
   error paths (duplicate reference, metric mismatch) and the valid-creation path all confirmed live.
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 19-21 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard. This ledger already contains its own thorough closure evidence (J-014's full defect chain, I-034/I-035's Product Gap Closure); every claim was independently verified against current repo/DB state rather than trusted:
+
+- Confirmed migrations `20261005000000_fix_submit_rpcs_missing_dead_end_guard.sql` and `20261006000000_entitlement_source_duplicate_invoice_and_metric_checks.sql` both genuinely exist.
+- Confirmed `docs/NEXUS_JOURNEY_UNIVERSE.md` genuinely carries the J-007/J-008 `[PREMISE CORRECTED]`, J-010 `[MECHANISM CLARIFIED]`, and J-014 `[EXPANDED + DEFECT FIXED]` annotations claimed by this ledger.
+- Confirmed `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` genuinely carries the `pricingUnit` finding and the `measurement_definitions` "PRODUCT DECISION CLOSED" block I-035's closure references.
+- All 25 journeys reviewed against their own stated objective: SOURCE INSPECTED-only items (I-032, I-036, J-022's counterpart pattern, J-029) are each structural-absence or structural-corollary claims where source inspection is the correct evidence type, not overclaimed runtime evidence.
+
+**Revalidation action: ACCEPT EXISTING EVIDENCE for all 25 journeys; PRODUCT GAP RECONFIRMATION for I-034 and I-035 (both independently confirmed genuinely implemented).** No bounded rechecks were required. No classification changed. No new Tech Debt entries needed for this batch.
+
+Batch 19: 25/25 reconciled. PASS 22, FIXED + PASS 1 (J-014), PRODUCT GAP → DECIDED/IMPLEMENTED 2 (I-034, I-035). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0.

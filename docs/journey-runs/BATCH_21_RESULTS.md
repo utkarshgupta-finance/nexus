@@ -531,3 +531,17 @@ M-014, M-019 (positive/negative access split), M-020, M-021, M-023 through M-026
 not re-attempted this pass. M-019's negative case (a narrow-permission user denied `/operations/queue`)
 remains PERSONA REQUIRED; its positive case (this account, holding `customer.read`, can reach the
 page) is incidentally reconfirmed by every navigation performed this pass.
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 19-21 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard. This ledger already contains a documented Manual UX Re-Verification pass (M-013/M-016/M-017 upgraded to genuine MANUAL UX VERIFIED); this was independently verified rather than trusted.
+
+**Tech Debt gap found and closed this pass (M-021)**: the original entry stated "no existing entry covers this specific `canApprove` cross-domain imprecision." This was not quite accurate: `docs/TECH_DEBT.md` already had an entry on the general `canApprove` OR-imprecision, just at a more generic level, without M-021's own specific empirical contribution (a concrete cross-domain leak reproduced with a real test persona, and the explicit ruling that this is confirmed cosmetic, never an authorization bypass, since the RPC layer's permission check is independent and precise). This is a documentation/evidence reconciliation gap, not a product defect: no code behavior was ever wrong, and M-021's own finding already correctly identified there was no bypass. Enriched the existing entry with M-021's empirical confirmation rather than creating a duplicate second entry for the same underlying gap.
+
+All other 24 journeys reviewed against their own stated objective: SOURCE INSPECTED-only items (M-014, M-015, M-029) are each honestly justified by code-level proof or a stated persona/volume constraint, not overclaimed runtime evidence.
+
+**Revalidation action: BOUNDED SERVER/DB RECHECK for M-021 (Tech Debt enrichment, now closed); ACCEPT EXISTING EVIDENCE for the remaining 24 journeys.** No classification changed.
+
+Batch 21: 25/25 reconciled. PASS 24, PRODUCT GAP 1 (M-021, confirmed cosmetic, Tech Debt now precisely reflects the empirical finding). New defects found this revalidation: 0 (M-021's finding is a documentation gap, not a product defect: the underlying behavior was already correctly understood and no code was wrong). New defects fixed this revalidation: 0. Open defects: 0.

@@ -264,6 +264,21 @@ into a second backlog.
   "Pending my approval" is still an approximation across every request
   type until per-type routing exists; not made worse by Go Live, just
   extended to it.
+  **Empirically confirmed, not just theorized (M-021, Batch 21,
+  2026-09-22).** A real test persona holding only `customer.approve` (no
+  `go_live`/`commercial_configuration` permission of any kind) was added
+  to a team responsible for a real, live go_live approval node. The My
+  Work classifier genuinely listed that go_live item as "Pending My
+  Approval" for this user, a concrete cross-domain leak, not a
+  hypothetical one. Ruled out as an authorization bypass: the real
+  approve action independently calls `requirePermission("go_live",
+  "approve")`, which rejected this exact user deterministically,
+  uninfluenced by the list's own imprecision. The gap is confirmed
+  cosmetic (a misleading list entry), never a security issue. Fixing it
+  correctly requires threading each item's own domain through the
+  classifier's permission check (today one caller-supplied boolean for
+  the whole list), a real design change, not a bounded fix; not built
+  here.
 - **Entitlement scheduling has no formal "Entitlement Period" table.**
   `ADD_TO_EXISTING_ENTITLEMENT_PERIOD` and `CREATE_NEW_ENTITLEMENT_PERIOD`
   are both just "insert more `entitlement_schedule_months` rows"; there is

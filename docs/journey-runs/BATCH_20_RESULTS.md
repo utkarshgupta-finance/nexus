@@ -689,3 +689,18 @@ otherwise normal), not a Nexus application defect. This matches the same pattern
 Batch 23 (S-010's stale-tab `/approvals` hang). Classification: **REGRESSION TEST ONLY** (tooling
 note). Practical mitigation adopted for the rest of this audit: open a fresh tab before any action
 that mutates state, rather than reusing a long-lived tab.
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 19-21 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard. This ledger already contains two of its own prior reconciliation passes (Pre-Batch-21 Closure, Overnight Run Closure) plus a documented Manual UX Re-Verification pass (M-006/M-008 upgraded to genuine MANUAL UX VERIFIED); every claim was independently verified rather than trusted:
+
+- Confirmed `isSelfCreated` logic genuinely present in `src/platform/approvals/domain/my-work.ts`, matching M-011's fix exactly as described.
+- Confirmed `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` and `docs/TECH_DEBT.md` both genuinely carry the `measurement_definitions` product decision this ledger's Pre-Batch-21 closure references.
+- M-011's two independent live re-verifications (the original same-team fixture and the later different-team fixture) were both reviewed and found genuinely distinct, not a repeated claim.
+- All 25 journeys reviewed against their own stated objective: SOURCE INSPECTED-only items (J-022, J-029, M-006 prior to its own upgrade) are each honestly justified by the absence of a live fixture or a direct structural corollary to already-proven code, not overclaimed runtime evidence.
+
+**Revalidation action: ACCEPT EXISTING EVIDENCE for all 25 journeys; PRODUCT GAP RECONFIRMATION for M-011 (independently confirmed genuinely implemented and doubly live-verified).** No bounded rechecks were required. No classification changed. No new Tech Debt entries needed for this batch.
+
+Batch 20: 25/25 reconciled. PASS 24, PRODUCT GAP → DECIDED/IMPLEMENTED 1 (M-011). New defects found this revalidation: 0. New defects fixed this revalidation: 0. Open defects: 0.
