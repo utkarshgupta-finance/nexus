@@ -74,6 +74,37 @@ followed by, for every candidate, a row of `| Finding | Disposition | Existing/N
 
 **I. Manual UX.** Journey Discovery applies equally to Manual UX. Specifically watch for: confusing or misleading copy; controls inaccessible to the intended persona; missing actions; navigation dead ends; inconsistent page behaviour; poor empty/error states; actions available under the wrong permission; and technically-correct flows that cannot actually be performed by the intended persona (exactly the class of gap T-015/T-016 found in Batch 24: the server-side invariant was already correct, but no real persona could reach the UI that exercised it). Do not dismiss these merely because the underlying server-side invariant works.
 
+**J. Overnight Discovered Journey Queue (added 2026-09-27, after Batch 25).** A `NEW JOURNEY REQUIRED` finding must never be silently deferred to a later, unscheduled testing programme. When it occurs, in the same turn that discovers it:
+1. Allocate the next canonical Journey ID in the relevant pack.
+2. Add the journey to `NEXUS_JOURNEY_UNIVERSE.md` in full: business objective, personas, starting state, expected result, technical/business invariants, variants (stress/authorization/concurrency/idempotency/historical as applicable), evidence requirements, dependencies, priority.
+3. Update the overall executable Journey Universe denominator (the count in `NEXUS_JOURNEY_UNIVERSE.md`'s own pack-index summary and in `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`'s own Summary section), never the denominator of the batch that discovered it (per H above).
+4. Add it to `docs/journey-runs/OVERNIGHT_DISCOVERED_JOURNEY_QUEUE.md` (the Overnight Discovered Journey Queue), the durable log of every journey discovered mid-run, its dependency reasoning, and its disposition.
+5. Determine the earliest dependency-safe execution point:
+   - If its dependency is already satisfied by work already closed, it may execute immediately after the current batch closes.
+   - If it depends on a not-yet-executed but already-scheduled later batch, execute it immediately once that dependency batch closes.
+   - If it naturally belongs at the very end (no earlier dependency-safe point exists), it executes during the Overnight Discovery Catch-up phase, after the last originally-scheduled batch in the run closes.
+
+A newly discovered journey does not change any scheduled batch's own denominator (per H); it changes only the **overall run-level denominator** (`run.scheduledTotal` in `RUN_STATE.json`, and the executable Journey Universe total). Execute newly discovered journeys during the same overnight run wherever safely possible, holding them to the exact same standard as originally scheduled journeys: canonical Journey Universe entry, required persona verification, Manual UX evidence where applicable, server/RPC/DB evidence where applicable, stress/authorization/idempotency/concurrency variants where applicable, its own Journey Discovery check, defect handling, regression testing, a ledger entry, and an honest terminal classification. A discovered journey may be **parked** (left un-executed, with an honest, explicit reason recorded) only when one of these genuinely holds:
+- `PRODUCT DECISION REQUIRED` and the decision has not yet been made.
+- A genuinely unavailable external dependency (a fixture, environment, or capability that cannot be safely created).
+- Executing it would violate the approved overnight safety envelope (e.g. it would require touching Production or real data).
+- Its prerequisite capability does not yet exist in the product.
+
+One parked discovered journey never stops independent work on the rest of the run.
+
+Every overnight-run closure report (not merely each batch's own closure) must separately state:
+```
+Scheduled journeys at launch: <N>
+New journeys discovered: <N>
+New journeys executed during same run: <N>
+New journeys passed: <N>
+New journeys failed then fixed: <N>
+New journeys parked: <N>
+Final Journey Universe denominator: <N>
+Unexecuted current-executable journeys: <N>
+```
+The overnight programme is fully evidence-complete only when `Unexecuted current-executable journeys = 0`, excluding explicitly disclosed Product Decision / external-dependency residuals.
+
 ## Manual UX Readiness Gate (mandatory from Batch 24 onward)
 
 Batches 22 and 23 exposed a real methodology gap: manual browser/persona testing had quietly

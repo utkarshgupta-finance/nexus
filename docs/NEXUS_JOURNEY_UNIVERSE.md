@@ -56,7 +56,7 @@ Packs A through AB (including ACC, added during gap analysis) are the CURRENT, e
 | Q | Documents / Evidence | 20 |
 | R | Audit / Timeline | 20 |
 | S | Search / Navigation / Discovery | 24 |
-| T | Settings | 24 |
+| T | Settings | 25 |
 | U | Authentication / Sessions | 20 |
 | V | Concurrency (incl. Permission-Change and State-Mutation sub-sections) | 47 |
 | W | Idempotency / Retry | 21 |
@@ -66,7 +66,7 @@ Packs A through AB (including ACC, added during gap analysis) are the CURRENT, e
 | ACC | Accessibility (added during gap analysis) | 2 |
 | AA | Cross-Domain Customer Lifecycle | 23 |
 | AB | Security / Direct Action / Server Enforcement | 42 |
-| **Total, current executable** | | **793** |
+| **Total, current executable** | | **794** |
 | FH | FUTURE: Forms Hub (planned only) | 22 |
 | MRR | FUTURE: MRR Recognition (planned only) | 22 |
 | **Total, including future** | | **837** |
