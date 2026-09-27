@@ -239,15 +239,18 @@ function UserAccessPage({
                                 value={teamDraft}
                                 onValueChange={(value) => setTeamDraftByUser((current) => ({ ...current, [entry.authUserId]: String(value) }))}
                               >
-                                <SelectTrigger size="sm" className="h-7 w-40 text-xs">
+                                <SelectTrigger size="sm" className="h-7 w-52 text-xs">
                                   <SelectValue placeholder="Assign a team...">
-                                    {() => assignableTeamsForRow.find((team) => team.id === teamDraft)?.name ?? "Assign a team..."}
+                                    {() => {
+                                      const selected = assignableTeamsForRow.find((team) => team.id === teamDraft)
+                                      return selected ? `${selected.name} (${selected.code})` : "Assign a team..."
+                                    }}
                                   </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                   {assignableTeamsForRow.map((team) => (
                                     <SelectItem key={team.id} value={team.id}>
-                                      {team.name}
+                                      {team.name} <span className="text-muted-foreground">({team.code})</span>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>

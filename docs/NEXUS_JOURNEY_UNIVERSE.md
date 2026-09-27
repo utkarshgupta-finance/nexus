@@ -19272,7 +19272,12 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: AB-012, AB-013
-- Notes: N/A
+- Notes: [EXPANDED, Batch 25, 2026-09-27] This codebase's real `cancel_*_request` RPCs (e.g.
+  `cancel_customer_change_request`) only permit cancelling a `draft`; a `submitted` request's real
+  terminal-after-submission path is `reject_*_request` instead (`*_NOT_CANCELLABLE` is raised otherwise).
+  Executed against `reject_customer_change_request` as the real terminal analog: `approve_*_request`
+  against the resulting `rejected` request correctly raised `*_NOT_APPROVABLE`, confirming the underlying
+  invariant this journey tests. Full detail in `docs/journey-runs/BATCH_25_RESULTS.md`'s AB-011 entry.
 
 ### AB-012: Attempt to approve a request that is already fully approved/completed
 - Pack: AB - Security / Direct Action / Server Enforcement
@@ -19397,7 +19402,11 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: AB-017, N-012
-- Notes: N/A
+- Notes: [EXPANDED, Batch 25, 2026-09-27] Confirmed the same `SELF_APPROVAL_NOT_ALLOWED` RPC-level guard
+  also blocks self-Reject, not only self-Approve, discovered incidentally while building AB-011's fixture
+  (`reject_customer_change_request` raised the identical error for the request's own creator). Not
+  separately re-verified end to end as its own journey; recorded here as a corollary of the same
+  maker-checker invariant. Full detail in `docs/journey-runs/BATCH_25_RESULTS.md`'s AB-016 entry.
 
 ### AB-017: Self-approval blocked even when bypassing the Server Action layer and calling the RPC directly
 - Pack: AB - Security / Direct Action / Server Enforcement
