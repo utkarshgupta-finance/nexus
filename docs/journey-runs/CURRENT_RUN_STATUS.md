@@ -1,10 +1,10 @@
 # Current Run Status
 
-Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_12_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
+Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_13_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
 
 ## Current run
 
-- **Current Batch:** 12 (Historical UX revalidation: Batch 12)
+- **Current Batch:** 13 (Historical UX revalidation: Batch 13)
 - **Batch status:** COMPLETE
 - **Scheduled journey count:** 25
 - **Completed journey count:** 25
@@ -13,11 +13,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 - **Current journey ID:** None
 - **Current journey execution state:** COMPLETE
 
-> Batch 12 — COMPLETE — 25 / 25 reconciled
+> Batch 13 — COMPLETE — 25 / 25 reconciled
 
-## Continuous run (Batches 10-11-12)
+## Continuous run (Batches 13-14-15)
 
-> Overall: 75 / 75 complete — 0 remaining.
+> Overall: 25 / 75 complete — 50 remaining.
 
 ## Classification counts
 
@@ -32,7 +32,7 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Current activity
 
-- **Last journey completed:** E-024
+- **Last journey completed:** F-021
 - **Journey currently executing:** None
 - **Next 3 journeys:** None
 
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 6e073c0
+- **Current HEAD:** 8dd0bb0
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batches 10-12 second evidence reconciliation close: tsc clean, dashboard regenerated
+- **Latest test checkpoint:** Batch 13 evidence reconciliation close: tsc clean, dashboard regenerated
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-26 13:44:24 UTC
+- **Last status update:** 2026-09-27 05:36:14 UTC

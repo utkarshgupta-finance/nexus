@@ -8,6 +8,28 @@ into a second backlog.
 
 ## Now (worth doing soon, not urgent)
 
+- **`pricing_rule_parameters` has no DB-level numeric validation (F-014,
+  Batch 13 evidence reconciliation, 2026-09-27).** The column is untyped
+  `jsonb`; non-negative rate/amount enforcement lives only in the
+  TypeScript service layer, checked once at version-approval time. Live
+  confirmed: with every other constraint on `commercial_components`
+  satisfied, a direct insert bypassing the TS layer persists cleanly
+  regardless of a negative or zero rate value, since no CHECK constraint
+  singles out numeric sign or magnitude anywhere in `pricing_rule_parameters`.
+  This is a documented, deliberate architectural deferral (the migration
+  comment explicitly defers "deeper pricing-parameter semantics... to the
+  domain service / Pricing Kernel"), not a silent oversight, but it is a
+  real trust-boundary gap: a compromised service-role credential or a
+  future integration reaching the RPC layer directly has zero backstop.
+  Close when a Pricing Kernel validation layer or a per-kind set of CHECK
+  constraints is actually built.
+- **No support/debug surface exposes the raw `pricing_rule_kind` DB value
+  (F-020, Batch 13 evidence reconciliation, 2026-09-27).** Every UI surface
+  renders only the friendly pricing model label; confirmed via exhaustive
+  grep that no admin/debug directory or API route exposes the raw kind
+  value alongside it. Low priority (P3, does not affect correctness, only
+  investigability); add a simple debug affordance if support/ops ever need
+  to map a friendly name back to its DB value.
 - **No admin UI screen for granting a scoped role (PD-005, Batches 1-13
   Ledger Audit product decision closure).** `grant_scoped_user_role`
   (`supabase/migrations/20260930110000_scoped_authorization_foundation.sql`)

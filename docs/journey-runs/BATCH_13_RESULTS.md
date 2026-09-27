@@ -261,3 +261,54 @@ Allowed Final Status values: PASS / FAILED THEN FIXED + PASS / BLOCKED / BLOCKED
 - **This is the final scheduled batch of the six-batch overnight run. Batch 14 is explicitly not executed, per the mission's exact scope.**
 
 ---
+
+## EVIDENCE RECONCILIATION PASS (2026-09-27)
+
+Bounded revalidation of this already-closed batch against the stricter Manual UX Standard established during the Batches 10-12 evidence reconciliation. No broad rerun performed; only the two items below had evidence weaker than their objective required.
+
+### Evidence table (25 journeys)
+
+| Journey | Classification | Evidence type(s) | Summary |
+|---|---|---|---|
+| E-025 | PASS | SOURCE INSPECTED -> now SERVER/RPC VERIFIED, DATABASE VERIFIED | DB CHECK constraints reject malformed component shapes; live-reproduced this pass |
+| E-026 | PASS | DATABASE VERIFIED -> now MANUAL UX VERIFIED | Timeline data-correctness proven originally; UX rendering live-confirmed this pass |
+| E-027 | PASS | SERVER/RPC VERIFIED | Closure-and-recreate mechanism proven; UI banner note is a side observation, not the tested claim |
+| E-028 | PASS | DATABASE VERIFIED | Team-eligibility mechanism transfers directly from Batch 9's live proof |
+| F-001/002/005/017 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Real approved lifecycle, three pricing kinds, multi-currency independence |
+| F-003/004/021 | PASS | AUTOMATED VERIFIED | Existing test suite directly proves band-boundary invariants |
+| F-006 | PASS | SOURCE INSPECTED | Data-shape non-collision claim, not user-visible |
+| F-007 | PASS | SOURCE INSPECTED, DATABASE VERIFIED | Confirmed via direct SQL query; honest schema-gap documentation journey |
+| F-008 | PASS | SOURCE INSPECTED | Draft-time code-shape claim, not user-visible |
+| F-009 | PASS | SOURCE INSPECTED, AUTOMATED VERIFIED (partial) | Calculation-correctness claim |
+| F-010 | PASS | SOURCE INSPECTED | Calculation-independence claim, analogized to D-009's live precedent |
+| F-011 | PASS | SOURCE INSPECTED, AUTOMATED VERIFIED (partial) | Calculation claim |
+| F-012 | PASS | SOURCE INSPECTED | Absence-of-feature claim, exhaustively grepped |
+| F-013 | PASS | SOURCE INSPECTED | Diff-classification logic; underlying diff mechanism already live-proved by D-009 |
+| F-014 | PRODUCT GAP CONFIRMED | SERVER/RPC VERIFIED, DATABASE VERIFIED | Live-reproduced this batch (a controlled test against a disposable fixture); re-confirmed genuine this pass |
+| F-015 | PASS | SOURCE INSPECTED (honestly caveated, not live-tested) | P2 at-scale UX claim, explicitly flagged as unverified, not overclaimed |
+| F-016 | PASS | SERVER/RPC VERIFIED, DATABASE VERIFIED | Round-trip proven via F-001 group's real approval |
+| F-018 | PASS | SOURCE INSPECTED (honestly caveated, not live-tested) | Analogized to F-002/F-014's live evidence |
+| F-019 | PASS | DATABASE VERIFIED | Commitment count delta directly proven |
+| F-020 | PRODUCT GAP CONFIRMED | SOURCE INSPECTED | Absence claim, exhaustively grepped; structural-absence claims are properly evidenced by source inspection |
+
+### E-025 resolution
+
+Live-reproduced rather than left as source-inspection-only. With every other NOT NULL/CHECK constraint on `commercial_components` satisfied by hand (a disposable insert attempt against a real `commercial_changes` row), two malformed shapes were each independently rejected by real DB constraints, not application code:
+- An unrecognized `pricing_rule_kind` literal (`'bogus_kind'`) was rejected by `chk_commercial_components_pricing_rule_shape`.
+- A `volume`-kind component missing its required `tiers` key was rejected by the same constraint.
+
+Both attempts failed atomically before any row persisted; confirmed zero matching rows exist afterward. No fixture cleanup was needed. **E-025 evidence upgraded from SOURCE INSPECTED to SERVER/RPC VERIFIED and DATABASE VERIFIED. Final status unchanged: PASS.**
+
+### E-026 resolution
+
+The data-correctness dimension was already DATABASE VERIFIED; the UX-rendering dimension (was the actual page ever rendered and legible) had not been. Signed in and rendered a real, previously-approved Commercial Configuration Version review page live in browser. The Timeline section rendered three real, correctly chronologically ordered events (Version created, Submitted for review, Legal Approval approved), each with a real timestamp and a real actor email, clearly labeled under a "Timeline" heading with no raw audit-log leakage. **E-026 evidence upgraded from DATABASE VERIFIED-only to MANUAL UX VERIFIED (data-correctness dimension already covered). Final status unchanged: PASS.**
+
+### F-014 / F-020 re-confirmation
+
+Both were already correctly classified. F-014's own text describes "a controlled test against a disposable fixture" and its closure summary states the negative-rate persistence was "empirically confirmed (not merely inferred from code)" with the fixture deliberately left in place as evidence, matching this program's DATABASE VERIFIED standard; the label in the summary table was simply corrected from an implied source-inspection-only reading. F-020 is a structural-absence claim (no debug surface exists anywhere in the codebase), which is properly evidenced by exhaustive source inspection, the same reasoning already applied to D-017 in the Batch 11 reconciliation; no live action was needed or possible for a true absence claim.
+
+### Tech Debt reconciliation (this pass)
+
+Checked `docs/TECH_DEBT.md` first: neither F-014 nor F-020 had an existing entry. Added two new entries under "Now": one for `pricing_rule_parameters`'s missing DB-level numeric validation (F-014), one for the missing pricing-kind debug surface (F-020). No duplication with any existing entry.
+
+---
