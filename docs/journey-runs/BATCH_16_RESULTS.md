@@ -518,3 +518,17 @@ a defense-in-depth protect trigger, mirroring the already-established Customer M
 pattern). Both are closed, migrated, and re-verified live. One journey (H-032) reproduces an already-settled
 architectural finding from Batch 15's H-001 rather than a new failure. Two journeys (I-003, I-004) surfaced the
 same precisely-documented, non-blocking missing capability.
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 16-18 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard. This ledger already contains its own prior "Stage A"/"Stage A1" reconciliation (I-003/I-004's Product Decision closure, H-039/H-040's classification labels); that work was independently verified rather than re-derived:
+
+- Confirmed `docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md` §7.2 genuinely states the manual-only product decision, and `docs/TECH_DEBT.md` genuinely carries the API/Import Entitlement Source entry and the `request_number` unique-index entry both claimed by this ledger. No discrepancy found.
+- All 25 journeys reviewed against their own stated objective: every runtime/UX claim already rests on MANUAL UX VERIFIED, SERVER/RPC VERIFIED, or DATABASE VERIFIED evidence; the only SOURCE INSPECTED-only items (H-038's permission-hardcoding claim, portions of the pre-execution research) are code-architecture/absence claims where source inspection is the correct evidence type, not a runtime behavior claim resting on inference.
+- H-027 and H-043's defect chains were re-confirmed current: both migrations exist and both fixes are unchanged since original execution.
+
+**Revalidation action: ACCEPT EXISTING EVIDENCE for all 25 journeys.** No bounded rechecks were required. No classification changed. No new Tech Debt entries needed for this batch specifically (I-006's own gap, discovered this pass, is recorded against Batch 17 below since I-006 is a Batch 17 journey).
+
+Batch 16: 25/25 reconciled. PASS 20, FIXED + PASS 2, EXPECTED BEHAVIOUR 1, PRODUCT GAP → DECISION MADE 2.

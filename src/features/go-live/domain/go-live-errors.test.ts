@@ -55,6 +55,19 @@ describe("parseGoLiveError", () => {
     )
   })
 
+  it("maps GO_LIVE_ACTIVE_REQUEST_ALREADY_EXISTS to its own kind instead of the generic unknown fallback (Batch 16-18 revalidation, H-044 fix)", () => {
+    const parsed = parseGoLiveError({
+      message:
+        "GO_LIVE_ACTIVE_REQUEST_ALREADY_EXISTS: an active Go Live request already exists for this commercial line item; cancel it first or continue with the existing one",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("go_live_active_request_already_exists")
+    expect(parsed.message).toBe(
+      "an active Go Live request already exists for this commercial line item; cancel it first or continue with the existing one"
+    )
+  })
+
   it("still falls back to unknown for a genuinely unrecognized token", () => {
     const parsed = parseGoLiveError({ message: "SOME_FUTURE_TOKEN_NOT_YET_MAPPED: detail" })
     expect(parsed.kind).toBe("unknown")

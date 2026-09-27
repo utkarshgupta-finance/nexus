@@ -242,3 +242,18 @@ represented, against the same taxonomy above.
   that falls outside what D-003/D-004/D-015/D-021, I-015, and I-024 already enumerate.
 
 **Conclusion: No new journey candidates found. Zero product decisions remain open.**
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 16-18 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard. This ledger already contains two of its own prior reconciliation passes ("Product Decision Closure," "Pre-Batch-19 Reconciliation"); both were independently verified rather than re-derived:
+
+- I-015: confirmed migrations `20261002000000` and `20261004000000` both exist and are applied, matching the two-stage correction described (the final, currently-implemented state is that cancellation is a pure administrative marker with zero schedule-data effect, past or future). Verified current, not merely claimed.
+- I-024: confirmed the `settlement_adjustments` table and `reverse_settlement` RPC (migration `20261002010000_add_settlement_reversal.sql`) genuinely exist, and `docs/NEXUS_JOURNEY_UNIVERSE.md` §I-024 is genuinely rewritten to reflect it.
+- **I-006 evidence gap found and closed this pass**: the original entry claimed its incidental finding (`generate_allocation_schedule` has no RPC-level Go Live gate) was "Recorded in `docs/TECH_DEBT.md`," but no such entry existed. Added one, mirroring H-039's existing style (architecture-hardening debt, not an open defect, since the RPC is `service_role`-only and unreachable by any external caller). No duplicate entry created.
+- All other 24 journeys reviewed against their own stated objective: SOURCE INSPECTED-only items (I-010, I-016, I-028, I-030) are each either a direct reuse of a live-verified code path exercised elsewhere in this same batch, or a structural-absence/design claim, both legitimate uses of source inspection under the current standard, not overclaimed runtime evidence.
+
+**Revalidation action: BOUNDED SERVER/DB RECHECK for I-006 (Tech Debt gap, now closed); PRODUCT GAP RECONFIRMATION for I-015 and I-024 (both confirmed genuinely implemented, current); ACCEPT EXISTING EVIDENCE for the remaining 22 journeys.** No classification changed for any journey.
+
+Batch 17: 25/25 reconciled. PASS 20, FIXED + PASS 3, PRODUCT GAP → DECIDED/IMPLEMENTED 2.

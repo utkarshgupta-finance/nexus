@@ -223,3 +223,17 @@ ACC-002 entry and Summary reconciliation table above (this file) for the full de
   reconciliation.
 
 **Conclusion: No new journey candidates found. Zero product decisions remain open.**
+
+---
+
+## REVALIDATION PASS (2026-09-27, Batches 16-18 evidence reconciliation)
+
+Bounded revalidation against the current Manual UX Standard. This ledger already contains its own prior "Pre-Batch-19 Reconciliation" (ACC-002's classification self-correction); verified rather than re-derived: `docs/journey-runs/BATCH_08_RESULTS.md`'s ACC-001 entry remains unedited, confirming the correction did not disturb the original historical finding it distinguishes itself from.
+
+**H-044 evidence gap found and closed this pass**: `GO_LIVE_ACTIVE_REQUEST_ALREADY_EXISTS` was confirmed correctly raised by the fix's own migration, but had no entry in `src/features/go-live/domain/go-live-errors.ts`'s `NAMED_TOKEN_KINDS`, so it fell through to the generic "unknown" fallback message instead of surfacing its own specific, already-written detail text. This is a pure UI-message gap, not a defect in the guard itself (the guard was already confirmed live-rejecting a duplicate creation attempt). Fixed: added the mapping, mirroring every other token in the same file, plus a regression test. `tsc --noEmit` clean; `go-live-errors.test.ts` 7/7 passing.
+
+E-030 and E-031's SOURCE INSPECTED-only evidence (citing historical live verification from PD-006 and Batch 14 respectively) was reviewed: both are genuine regression-confirmation journeys whose underlying mechanism was already live-verified elsewhere, and re-triggering the identical scenario a third/second time would duplicate evidence rather than add to it, consistent with this program's standing "accept it, do not rerun for ceremony" rule.
+
+**Revalidation action: BOUNDED SERVER/DB RECHECK for H-044 (UI-message gap, now closed); ACCEPT EXISTING EVIDENCE for the remaining 7 journeys.** No classification changed.
+
+Batch 18: 8/8 reconciled. PASS 7, FIXED + PASS 1.

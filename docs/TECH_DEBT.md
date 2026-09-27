@@ -279,6 +279,8 @@ into a second backlog.
   scoped out of this program; revisit once MRR Recognition itself is
   designed.
 
+- **`generate_allocation_schedule` has no RPC-level check against `go_live_requests` at all (found live during Batch 16's I-006, formally recorded during the Batches 16-18 evidence reconciliation, 2026-09-27).** The "an approved Go Live request is required before a schedule can be generated" rule is enforced only in the React form component (`GenerateScheduleForm`); the RPC itself only checks that the entitlement source exists and is active. Not a live exploit: `generate_allocation_schedule` is revoked from `anon`/`authenticated` and granted only to `service_role`, matching the same defense-in-depth pattern already established for other governed Entitlement/Go Live RPCs, so no external caller or ordinary user session can reach the ungated path; only Nexus's own server-side code (the one existing caller, which does check) could exploit it, and no other caller exists today. Architecture-hardening debt analogous to H-039, not an open defect. Close the next time this RPC's own migration file is touched for an unrelated reason.
+
 - **`go_live_requests.request_number` has no explicit unique index (found live during Batch 16's H-039), unlike
   the sibling `customer_change_requests.request_number` (`create unique index
   idx_customer_change_requests_request_number`).** Not an open defect: the backing sequence
