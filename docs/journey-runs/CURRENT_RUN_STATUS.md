@@ -21,8 +21,8 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Classification counts
 
-- **PASS:** 21
-- **FAILED THEN FIXED + PASS:** 0
+- **PASS:** 20
+- **FAILED THEN FIXED + PASS:** 1
 - **EXPECTED BEHAVIOUR:** 0
 - **PRODUCT GAP:** 2
 - **PRODUCT DECISION REQUIRED:** 0
@@ -38,8 +38,8 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Findings
 
-- **Defects found:** 0
-- **Defects fixed:** 0
+- **Defects found:** 1
+- **Defects fixed:** 1
 - **Open defects:** 0
 - **Product Decisions found:** 2
 - **Journey Discovery:**
@@ -53,11 +53,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 5bf45bd
+- **Current HEAD:** 49831af
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batch 26 CLOSED after explicit user reconciliation: 26/26 scheduled journeys genuinely executed, 20 PASS, 2 PRODUCT_GAP_CONFIRMED (AB-020, AB-039), 3 PARTIAL/tooling-limited (AB-030, AB-036, AB-037, individually traceable), 1 discovered journey (AB-043) executed same-run, 2 open Product Decisions (AB-020's reference_master gap, AB-043's loser-experience-consistency question which also covers AB-039)
+- **Latest test checkpoint:** Batch 26 CLOSED after two explicit user reconciliation passes: 26/26 scheduled journeys genuinely executed, 20 PASS, 1 FAILED_THEN_FIXED_PASS (V-003, a real row_version double-bump defect found via audit_log evidence, fixed, reran clean), 2 PRODUCT_GAP (AB-020, AB-039), 3 PARTIAL/tooling-limited (AB-030, AB-036, AB-037, individually traceable), 1 discovered journey (AB-043, PRODUCT_GAP_CONFIRMED, execution closed) executed same-run, 2 open Product Decisions (AB-020's reference_master gap, AB-043's loser-experience-consistency question which also covers AB-039, not double-counted)
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-28 01:24:34 UTC
+- **Last status update:** 2026-09-28 01:45:13 UTC

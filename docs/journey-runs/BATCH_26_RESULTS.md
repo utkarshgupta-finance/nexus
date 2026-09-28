@@ -261,6 +261,20 @@ immediately using this evidence, and logged to the Morning Residual Queue as a g
 idempotent return the accepted, simpler behavior). **Not a defect**: audit/data integrity holds in all
 three domains tested (customer_change, customer_onboarding_case, commercial_configuration_version).
 
+**RECONCILED 2026-09-28, terminal status:**
+- **Classification: PRODUCT GAP CONFIRMED.** Execution closed: YES (root-caused via DB/audit evidence,
+  independently re-confirmed in three domains via V-002, V-003, V-004; nothing further to test).
+- **Product Decision still open: YES**, tracked once here (not duplicated at AB-039): *should the
+  final-approval loser also receive an explicit "already actioned" denial, or is the current silent
+  idempotent-success return the accepted, simpler behavior?* Not decided by this run; requires the
+  user/product owner.
+- The bounded fix applied to V-003's separate row_version defect (below) is orthogonal to this Product
+  Decision: it corrects how many times `customers.row_version` increments per approval, not what the
+  loser sees. AB-043's own finding (silent success for the loser) is unchanged by that fix and remains
+  exactly as originally observed.
+- Discovered residual: **0** (fully executed; the open item is a Product Decision, tracked under "Open
+  Product Decisions" in the final tally, not as unexecuted/pending work).
+
 ## V-001: Two draft editors race on the same draft record, stale writer is rejected (regression)
 
 **SERVER/RPC VERIFIED + DATABASE VERIFIED.** Created a disposable Customer Change draft (`b9820909-...`,
@@ -297,31 +311,83 @@ Dispatched `approve_customer_change_request` from `nexus-test-ux-approver` and `
 (both real, distinct `app_users`, both genuine active members of `wf_test_leadership`, added via the real
 `assign_user_to_team` RPC) together, genuinely overlapping.
 
-**Verified, all six required assertions**:
+**First attempt, all six required assertions checked**:
 - Two distinct eligible approvers: yes (`nexus-test-ux-approver`, `nexus-test-finance-b`), neither is
   `created_by`.
 - Genuinely overlapping calls: yes, dispatched together against the same `node_4`.
 - Exactly one Customer Master mutation: yes, exactly one `customer_field_history` row
   (`industry: fmcg -> logistics`, `approved_by = nexus-test-ux-approver`, the winner).
-- `customers.row_version` increments: went from 3 to 5 (delta of 2 per single successful approval, not
-  per race). Source-confirmed: a single
-  successful approval issues two sequential `UPDATE customers` statements (one per-field update, then one
-  explicit `row_version = row_version + 1`), so +2 is this RPC's own normal, single-approval behavior,
-  not a race artifact. The loser's call never reached either statement (see below), so there is no
-  double-mutation; recorded honestly here to avoid the literal "+1" wording implying something the RPC's
-  own design does not do.
+- `customers.row_version` increments: went from 3 to 5, a delta of **2**, contradicting the canonical
+  invariant ("row_version increments by exactly 1"). **Not smoothed over or reclassified as intended
+  behavior** on this first pass, unresolved pending investigation below.
 - Exactly one workflow transition: yes, exactly one `node_4 -> node_5` row in
-  `workflow_node_transitions` (4 rows total for the whole request: submit, `node_2->3`, `node_3->4`,
-  `node_4->5`), despite two racing calls at the final step.
+  `workflow_node_transitions` (4 rows total: submit, `node_2->3`, `node_3->4`, `node_4->5`), despite two
+  racing calls at the final step.
 - Loser behavior recorded honestly: the losing call (`nexus-test-finance-b`) received the identical
-  success-shaped row as the winner, with no error and no distinguishing signal, because it hit the RPC's
-  `status = 'approved' -> return` short-circuit ahead of the node-key check (see AB-043, corrected via
-  this exact race: the dividing line is finality of the approval, not node topology). **This is reported
-  as observed, not smoothed over**: it does not match a literal "friendly already-actioned message"
-  expectation, but it does not corrupt data either. See AB-043 for the Product Decision this raises.
+  success-shaped row as the winner, with no error and no distinguishing signal (see AB-043).
 
-**PASS** on the core concurrency-safety guarantee (exactly one winner, no corruption, no duplicate
-mutation); the loser-experience nuance is tracked once, at AB-043, not duplicated here.
+### Row_version investigation (2026-09-28 reconciliation)
+
+Investigated via **DB/audit evidence**, not source inspection alone: `audit_log` records every INSERT/
+UPDATE/DELETE against `customers` (generic `trg_audit_customers` trigger, `fn_audit_row`), ordered by a
+monotonic `audit_sequence`, letting individual statements within the same transaction be told apart even
+when their timestamps are identical.
+
+- **Starting `customers.row_version`: 3**
+- **Ending `customers.row_version`: 5**
+
+Two, and only two, `audit_log` rows exist for this customer at the winning approval's timestamp, both
+attributed to the winner (`nexus-test-ux-approver`):
+
+- **Operation 1** (`audit_sequence 7910`): the field-application loop's own per-changed-field `UPDATE
+  customers SET industry = ...`. Business purpose: apply the approved `industry` change.
+  Fields changed: `industry` (`fmcg -> logistics`). Did it increment row_version? **YES**, automatically,
+  via the table's generic `trg_customers_row_version` trigger (`fn_bump_row_version`:
+  `new.row_version := old.row_version + 1`, unconditional on every UPDATE) — not because this statement's
+  own SQL touched `row_version` at all.
+- **Operation 2** (`audit_sequence 7911`, same transaction, same actor): the RPC's own separate, explicit
+  closing statement, `UPDATE customers SET row_version = row_version + 1, updated_by = ..., updated_at =
+  now()`. Business purpose: stamp the real approving actor onto the customer row. Fields changed:
+  `updated_by`, `updated_at` (`industry` unchanged in this operation). Did it increment row_version?
+  **YES**, again via the same generic trigger; the RPC's own explicit `row_version + 1` in this statement
+  is redundant given the trigger already does this unconditionally on any UPDATE.
+
+**Determination: B — the implementation performs an unnecessary second UPDATE, and this is a genuine
+defect**, not (A) two intended business mutations or (C) fixture contamination. Ruled out C directly:
+`audit_log` shows no other row touching this customer between the prior event and this one, and the
+losing racer produced zero `audit_log` rows at all (confirmed: no row attributes `actor_user_id` to the
+loser for this table), so nothing external contaminated the fixture. Ruled out A on inspection of intent:
+the second statement's only real effect (stamping `updated_by`/`updated_at`) is not a second business
+mutation, it is bookkeeping that could have been folded into the same statement as the field change; there
+is no scenario where "row_version jumps by more than 1 for a single approval" is an intended semantic, and
+the delta is not even fixed at 2, it scales with the number of changed governed fields (N changed fields
+= N per-field UPDATEs + 1 closing UPDATE = N+1 total, confirmed by design reading of the per-field-branch
+loop), which would silently break any consumer relying on the stated optimistic-locking contract.
+
+**Bounded fix applied** (`supabase/migrations/20261010000000_fix_approve_customer_change_request_row_version_double_bump.sql`,
+applied live to the dev database): consolidated the field-application loop and the actor/timestamp stamp
+into exactly one `UPDATE customers` statement per approval (dynamic `SET` list, built from only the
+fields that actually changed, executed once via `EXECUTE format(...)`; falls back to a single plain
+stamp-only UPDATE when zero fields differ, preserving that existing edge-case behavior). Regression
+coverage: this repository's test suite is unit-level only (mocked Supabase client) with no live-database
+integration-test harness for Postgres RPC invariants like this one; a genuinely equivalent automated
+regression test does not exist to add without building new test infrastructure, which is out of scope for
+a bounded fix. The live re-execution below stands in as the verification; adding a real DB-level
+regression harness for this class of invariant is flagged as a legitimate follow-up, not done here.
+
+**V-003 rerun after the fix**, fresh disposable fixture, deliberately with **two** changed governed
+fields (`industry`, `business_unit`) to prove the fix handles the general N-field case, not just N=1:
+raced `nexus-test-ux-approver` vs. `nexus-test-finance-b` at the request's real final node (`node_4`).
+Result: `customers.row_version` went from **4 to 5, a clean delta of exactly 1**, despite two fields
+changing and two racing calls. `audit_log` confirms exactly **one** UPDATE row against the customer for
+this approval (`audit_sequence 7970`, one row, not two). Both fields correctly recorded in
+`customer_field_history` (2 rows, one per changed field, unaffected by this fix). Exactly one
+`node_4 -> node_5` `workflow_node_transitions` row despite two racing calls. Loser behavior unchanged
+(still the silent idempotent success AB-043 tracks; this fix was never meant to touch that).
+
+**FAILED THEN FIXED + PASS.** All six required assertions now hold cleanly, verified from DB evidence,
+including the previously-contradicting one. The loser-experience nuance remains tracked once, at AB-043,
+not duplicated here.
 
 ## Journey Discovery (final, batch closure)
 
@@ -374,12 +440,34 @@ Dispatched `approve_commercial_configuration_version` from `nexus-test-finance` 
 distinctly-valued component (`amount: 7000` vs `amount: 9999`) so a double-application would be
 unmistakable.
 
-**Verified**: exactly one `commercial_components` row created for this configuration/effective-date
-(`amount: 7000`, the winner `nexus-test-finance`'s value; the loser's `9999` never landed), exactly one
-`node_3 -> node_5` `workflow_node_transitions` row despite two racing calls. Loser behavior: identical
-silent idempotent success as V-002/V-003/AB-039 (AB-043's finding now independently confirmed in a
-**third** domain: customer_change, customer_onboarding_case, and commercial_configuration_version all
-share the exact same mechanism). **PASS** on the core concurrency guarantee.
+**Verified, assertion by assertion (2026-09-28 evidence check, no rerun needed):**
+- Two distinct eligible approvers genuinely raced: **YES**, `nexus-test-finance` and
+  `nexus-test-finance-b`, both real, distinct `app_users`, both genuine `wf_test_finance` checkers,
+  dispatched together at the same `node_3`.
+- Exactly one commercial version became active: **YES**, the version (`fdc2d975-...`) transitioned to
+  `approved`, `current_workflow_node_key -> node_5`, `decided_by` = the single winner.
+- Previously active version superseded exactly once: **YES, confirmed via direct query** of
+  `commercial_components` for this `commercial_configuration_id`: the prior open component
+  (`1dd0094f-...`, `amount: 5000`, `effective_from: 2027-08-01`) now has `effective_to: 2027-08-31` set
+  (closed by an earlier version in the same real approval chain used to establish this fixture), and
+  exactly one row currently has `effective_to IS NULL` (`8542c92c-...`, the winner's `amount: 7000`
+  component) — no duplicate open period.
+- `fx_snapshot_rate` values written/frozen exactly once: **partially exercised**. Both components show
+  `fx_snapshot_rate: null`, correct for a same-currency (INR-to-INR) component with no conversion needed;
+  the RPC's `nullif(...)::numeric` write-once-at-creation mechanism was not deeply exercised with a real
+  non-null cross-currency value in this run. Disclosed honestly as a narrower-than-ideal test of this
+  specific sub-assertion, not a gap in the concurrency guarantee itself.
+- No duplicate activation: **YES**, confirmed by the same direct query above (exactly one row with
+  `effective_to IS NULL`).
+- Loser outcome recorded honestly: **YES**, identical silent idempotent success as V-002/V-003/AB-039
+  (the loser's distinctly-valued `amount: 9999` component was never created; confirmed by direct lookup
+  at execution time).
+- Audit/history correct: **YES**, exactly one `node_3 -> node_5` `workflow_node_transitions` row despite
+  two racing calls.
+
+**PASS** on the core concurrency guarantee (all assertions now have direct evidence); AB-043's finding is
+independently confirmed in a **third** domain (customer_change, customer_onboarding_case,
+commercial_configuration_version all share the exact same final-approval-loser mechanism).
 
 ## Batch 26 status after reconciliation
 
