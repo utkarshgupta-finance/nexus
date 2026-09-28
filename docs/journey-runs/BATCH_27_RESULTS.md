@@ -1,4 +1,4 @@
-# Batch 27 Results (IN PROGRESS)
+# Batch 27 Results (CLOSED)
 
 Scheduled journeys: V-005 through V-029 (25). Depends on Batch 26 (CLOSED, fully reconciled 2026-09-28,
 including a real defect found/fixed/verified in `approve_customer_change_request`).
@@ -6,17 +6,20 @@ This is FRESH EXECUTION, continuing the approved Batches 24-33 unattended overni
 Overnight Stall-Escape Protocol and Pre-Authorization Manifest, strictly batch-by-batch per explicit
 user instruction (do not start Batch 28 until this batch is closed and accepted).
 
-Status as of this update: **15 of 25 executed and evidenced** after a mid-batch reconciliation pass
-(2026-09-28): V-010 redone as its full canonical scenario (not just the immutability precondition), V-016
-reclassified EXPECTED BEHAVIOR with its natural alternate framing resolved via Journey Discovery (EXPAND
-EXISTING JOURNEY, L-015, not a duplicate), V-013 confirmed complete (one missing assertion, recovery
-after reload, executed), and V-019's Journey Discovery follow-up resolved (ALREADY COVERED, a wrong-route
-testing artifact, not a product gap). Batch not yet closed: V-020 through V-029 remain.
+**Status: CLOSED 2026-09-28. 25 of 25 executed and evidenced**, after two explicit user reconciliation
+passes: a mid-batch pass (before V-020: V-010 redone as its full canonical scenario, V-016 reclassified
+EXPECTED BEHAVIOR via Journey Discovery into L-015 rather than a duplicate, V-013's one missing
+assertion executed, V-019 resolved ALREADY COVERED as a wrong-route testing artifact), and a final pass
+after V-005 through V-029 completed (V-027 reclassified from PASS to PRODUCT GAP CONFIRMED, cross-
+referencing the already-closed Batch 6 decision O-018 rather than opening a duplicate Product Decision).
 
-Journey Discovery running tally (updated this reconciliation): Candidates assessed: 2 (V-016's alternate
-framing; the V-019 UI-visibility observation). ALREADY COVERED: 1 (V-019's follow-up). EXPAND EXISTING
-JOURNEY: 1 (L-015, strengthened with a publish-specific race). NEW JOURNEY REQUIRED: 0. REGRESSION TEST
-ONLY: 0. FUTURE MODULE: 0. PRODUCT DECISION REQUIRED: 0 (the earlier provisional PRODUCT DECISION REQUIRED
+**Final classifications (25/25):** 20 PASS, 1 EXPECTED BEHAVIOR (V-016), 2 PRODUCT GAP CONFIRMED (V-027,
+V-028), 2 PARTIAL/tooling-limited (V-020, V-029).
+
+Journey Discovery running tally (this batch): Candidates assessed: 2 (V-016's alternate framing; the
+V-019 UI-visibility observation). ALREADY COVERED: 1 (V-019's follow-up). EXPAND EXISTING JOURNEY: 1
+(L-015, strengthened with a publish-specific race). NEW JOURNEY REQUIRED: 0. REGRESSION TEST ONLY: 0.
+FUTURE MODULE: 0. PRODUCT DECISION REQUIRED: 0 (the earlier provisional PRODUCT DECISION REQUIRED
 framing for the V-019 observation is withdrawn now that it is resolved).
 
 ## V-005: Two eligible approvers race to approve a Go Live request
@@ -332,9 +335,30 @@ unchanged) while genuinely stuck, exactly matching the canonical's own framing o
 confirmed unhandled gap." **Recovery**: re-added `nexus-test-ux-approver` to `wf_test_leadership` via
 `assign_user_to_team`. Retried the identical approve call as the same persona: succeeded cleanly
 (`node_4 -> node_5`), no residual "recently stuck" artifact, no corruption, correct actor attribution.
-**PASS**, with the confirmed gap flagged per the canonical's own instruction to treat it as worth product
-attention, not merely a test to pass: there is no fallback/escalation path when a workflow team is
-reduced to zero active members, only manual admin recovery (confirmed working here).
+**RECONCILED 2026-09-28: reclassified PRODUCT GAP CONFIRMED (not plain PASS).** The canonical journey's
+own text is explicit that this is "a real, confirmed unhandled gap" to be "treat[ed] as a confirmed
+defect worth product attention, not merely a test to pass"; a plain PASS undersold that framing. No rerun
+was required: the execution evidence above already fully establishes the mechanism (genuine stuck state,
+no silent transition, clean recovery once membership is restored).
+
+**Not a new open Product Decision.** This exact gap already has a tracked, closed decision from Batch 6:
+**O-018** ("Last remaining active member of a team removed while a request waits at that team's node",
+`docs/journey-runs/PRODUCT_GAP_TRIAGE_BATCHES_03_06.md` Gap 5, `docs/NEXUS_JOURNEY_UNIVERSE.md` L11472).
+O-018 was formally triaged (disposition C, USER PRODUCT DECISION REQUIRED, three options analyzed) and
+was subsequently **CLOSED 2026-09-24** with a real, implemented decision: Option 2, "warn but allow." The
+live UI removal flow (`/settings/user-access`, `handleRemoveTeam` in
+`src/platform/user-access/ui/user-access-page.tsx`) calls `checkTeamRemovalImpactAction` before
+`removeUserFromTeamAction`, and the Operations Queue surfaces a "N items have no eligible approver"
+banner for any request left stranded, both confirmed via genuine live evidence in Batch 6.
+
+V-027's execution here used direct `remove_user_from_team`/`assign_user_to_team` RPC calls, which sit
+underneath that UI warning layer entirely, so it could not and did not exercise O-018's actual
+"warn but allow" control (a raw RPC or future API caller still gets no proactive warning, only the same
+downstream `WORKFLOW_TEAM_REQUIRED` safety net). This does not reopen O-018 or create a new question: it
+reconfirms, once more and in a fresh Customer Change fixture, the same underlying mechanism this project
+has now proven independently at least five times (A-027, C-025, E-028, J-011, O-018). **Classification:
+PRODUCT GAP CONFIRMED, cross-referencing the already-closed O-018 decision, no new Product Decision
+opened.**
 
 ## V-028: User changes team between approval levels (multi-step workflow)
 
@@ -378,3 +402,7 @@ client dispatch and server processing, which is not directly observable without 
 Morning Residual Queue individually. **Can retry independently: NO** (needs new tooling).
 
 ## Batch 27 complete: V-005 through V-029 (25 journeys), all executed and evidenced.
+
+Final tally: 20 PASS, 1 EXPECTED BEHAVIOR (V-016), 2 PRODUCT GAP CONFIRMED (V-027, V-028), 2 PARTIAL
+(V-020, V-029). V-027's gap cross-references the already-closed Batch 6 decision O-018; V-028 opens one
+new Product Decision.
