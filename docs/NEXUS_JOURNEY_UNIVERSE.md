@@ -65,11 +65,11 @@ Packs A through AB (including ACC, added during gap analysis) are the CURRENT, e
 | Z | Failure / Recovery / Chaos | 30 |
 | ACC | Accessibility (added during gap analysis) | 2 |
 | AA | Cross-Domain Customer Lifecycle | 23 |
-| AB | Security / Direct Action / Server Enforcement | 42 |
-| **Total, current executable** | | **794** |
+| AB | Security / Direct Action / Server Enforcement | 43 |
+| **Total, current executable** | | **795** |
 | FH | FUTURE: Forms Hub (planned only) | 22 |
 | MRR | FUTURE: MRR Recognition (planned only) | 22 |
-| **Total, including future** | | **837** |
+| **Total, including future** | | **838** |
 
 ## A note on pack V
 
@@ -20057,6 +20057,31 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Dependencies: N/A
 - Related Journeys: N-010, N-022, H-040
 - Notes: N-010 (Batch 4, user_roles), N-022 (Batch 4, role_permissions), and H-040 (Batch 16, user_teams) each independently discovered this identical mechanism on a different table in a different batch. Added as a single named cross-cutting journey by the Stage A Journey Universe Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`), post-Batch 16, so a future table sharing this shape is checked against a stated invariant rather than rediscovered piecemeal a fourth time.
+
+### AB-043: Losing racer's experience in a concurrent approval differs by whether the winner's approval was the FINAL decision, not by node topology
+- Pack: AB - Security / Direct Action / Server Enforcement
+- Business Objective: Confirm concurrent-approval safety (exactly one winner, no double-approval, no corrupted state) holds regardless of how many approval steps a workflow has, and surface that the losing racer's own experience is not currently consistent: an explicit "someone else already actioned this" error when the race is for a non-final approval step vs. a silent idempotent success-shaped return when the race is for the step that finalizes the request (`status` becomes `approved`).
+- Domain: Cross-domain (any workflow-governed approval RPC using the shared `status = 'approved' -> return early` plus `expected_current_node_key` pattern; confirmed directly in `approve_customer_change_request`)
+- Object / Record Type: Any workflow-governed request (customer change request, go-live request, etc.)
+- Starting State: A request sits at an approval node two legitimate checkers can both action.
+- Personas: checker 1, checker 2 (both eligible, same team, real distinct `app_users`)
+- Preconditions: N/A
+- Regular Path: Both checkers call the approve RPC with the same `expected_current_node_key`. The RPC's `select ... for update` genuinely serializes the two calls at the database level. The first to acquire the row lock wins. If this approval is NOT the final one (the request stays `submitted`, `current_workflow_node_key` advances to the next approval node), the second call's own re-check correctly hits the `expected_current_node_key` mismatch branch (`WORKFLOW_NODE_ALREADY_ADVANCED`) since `status` is still not `'approved'` when its check runs. If this approval IS the final one (the request becomes `approved`), the second call instead hits the earlier, unconditional `if v_change_request.status = 'approved' then return v_change_request; end if;` branch, which runs *before* the node-key check regardless of topology, so it returns the current (already-approved) row with no error at all. The dividing line is "was this the terminal approval," not "is this node type `end`": corrected 2026-09-28 after a genuine multi-node race (V-003, Batch 26 reconciliation) showed the exact same silent-success behavior at a real intermediate-turned-final node in a 5-node graph (node_4, the last approval step before an `end` node), contradicting the original, narrower "end node vs mid-graph node" framing this journey shipped with.
+- Stress Variant: More than two simultaneous checkers racing, same scenario.
+- Authorization Variant: N/A
+- Concurrency Variant: This IS the concurrency variant; this journey exists specifically to name the finality-dependent UX difference AB-039 (its sibling, same underlying race) did not surface, since AB-039's own canonical fixture happened to have its race land on the request's only (and therefore final) approval step.
+- Idempotency Variant: The final-approval loser's call is genuinely idempotent (safe to call twice, no side effect, no error), which is arguably a *better* API property than an error, just an inconsistent one relative to the non-final case.
+- Audit/Data Integrity Checks: Exactly one approval event recorded in both cases; no double-approval, no corrupted state, in either case (re-confirmed via V-003: exactly one `customer_field_history` row, exactly one `node_4->node_5` `workflow_node_transitions` row, despite two racing calls). This journey is about the loser's own return value/UX, not about audit correctness, which already holds.
+- Recovery/Resilience Variant: N/A
+- UX Checks: A UI built against this RPC would need to treat a "success" response as ambiguous (did I just approve it, or did someone else already?) when racing for the final decision, whereas racing for a non-final step, an error unambiguously means "someone else already acted."
+- Historical Variant: N/A
+- Expected Business Result: A consistent, unambiguous signal to the losing racer regardless of which approval step in the graph the race happens to land on.
+- Expected Technical Invariants: To be decided: either (a) the early `status = 'approved'` return should also raise the same `WORKFLOW_NODE_ALREADY_ADVANCED`-style error when the caller supplied an `expected_current_node_key` and lost a race for the final approval, for consistency across all approval steps, or (b) the silent idempotent return is the intentionally simpler, accepted behavior specifically for the finalizing step, and only the non-final case's error is considered the "informative" exception, not the baseline every step must match.
+- Priority: P2
+- Automation Feasibility: FULL
+- Dependencies: N/A
+- Related Journeys: AB-039, AB-013, V-003
+- Notes: Discovered live during Batch 26's AB-039 execution (2026-09-27), via a genuinely dispatched two-actor overlapping RPC race against a disposable 2-node (start/end) customer change request fixture. Source-confirmed against `supabase/migrations/20261009000000_fix_approve_rpcs_dead_end_at_zero_approval_graph.sql` lines 60-70. Re-verified and corrected 2026-09-28 during V-003's genuine 5-node-graph race (Batch 26 reconciliation): the true mechanism is "was the winning approval the final one," not "is the node type `end`," since a mid-graph node reached last in the chain behaves identically to a literal `end` node here. Not a defect (no data corruption, no double-approval); a genuine Product Decision on whether the loser-experience should be made consistent across final vs. non-final approvals. See `docs/journey-runs/MORNING_RESIDUAL_QUEUE.md`.
 
 ---
 

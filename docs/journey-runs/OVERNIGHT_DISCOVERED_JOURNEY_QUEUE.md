@@ -32,19 +32,39 @@ executable Journey Universe total in `NEXUS_JOURNEY_UNIVERSE.md`).
   a team" picker by showing team code alongside name) before it could close.
 - **Status: EXECUTED, PASSED** (`docs/journey-runs/BATCH_25_RESULTS.md`, T-025 entry).
 
-## Overnight-run running totals (as of the Batches 26-33 pre-flight readiness review)
+### AB-043: Losing racer's experience in a concurrent approval differs by workflow topology (end node vs mid-graph node)
+
+- **Discovered:** Batch 26, during AB-039's live execution (2026-09-27). A genuinely dispatched two-actor
+  overlapping RPC race (real distinct `app_users`, real `select ... for update` serialization at the DB)
+  surfaced a topology-dependent inconsistency in the losing racer's return value: a silent idempotent
+  success at an `end` node vs. an explicit `WORKFLOW_NODE_ALREADY_ADVANCED` error at a mid-graph node.
+- **Disposition:** NEW JOURNEY REQUIRED (not a defect: no double-approval, no data corruption in either
+  topology; a genuine Product Decision on whether the loser's experience should be made consistent).
+- **Canonical entry added:** `docs/NEXUS_JOURNEY_UNIVERSE.md`, Pack AB, immediately after AB-042.
+- **Denominator update:** did not change Batch 26's own denominator (stays 26/26). Changed the overall
+  executable Journey Universe total from 794 to 795.
+- **Dependency reasoning:** no execution dependency on any other batch; belongs to Pack AB, the same pack
+  Batch 26 is already closing.
+- **Placement:** executed immediately, in the same batch that discovered it (dependency-safe, no blocker).
+- **Execution:** executed in full during Batch 26, using the same real race evidence that surfaced it
+  (this is a same-mechanism, different-lens finding from AB-039, not requiring a separate fresh race).
+- **Status: EXECUTED, PASSED (as a Product Decision Required finding, not a defect)**
+  (`docs/journey-runs/BATCH_26_RESULTS.md`, AB-043 entry; `docs/journey-runs/MORNING_RESIDUAL_QUEUE.md`
+  carries the actual product question).
+
+## Overnight-run running totals (as of Batch 26, mid-execution)
 
 ```
 Scheduled journeys at launch: 233 (Batches 24-33, before any mid-run discovery: 25+25+26+25+25+25+25+25+25+7)
-New journeys discovered: 1 (T-025)
-New journeys executed during same run: 1 (T-025)
-New journeys passed: 1 (T-025, via PD-010)
+New journeys discovered: 2 (T-025, AB-043)
+New journeys executed during same run: 2 (T-025, AB-043)
+New journeys passed: 2 (T-025 via PD-010; AB-043 as a Product-Decision-Required finding, not a defect)
 New journeys failed then fixed: 0
 New journeys parked: 0
-Final Journey Universe denominator: 794 (current-executable), 234 (this overnight run's own scheduled total, 233 + T-025)
-Unexecuted current-executable journeys: 0 discovered-and-unexecuted (T-025 is executed and closed); the
-  overnight run's own originally-scheduled journeys not yet executed (Batches 26-33) are tracked
-  separately in RUN_STATE.json/CURRENT_RUN_STATUS.md, not counted here.
+Final Journey Universe denominator: 795 (current-executable), 235 (this overnight run's own scheduled total, 233 + T-025 + AB-043)
+Unexecuted current-executable journeys: 0 discovered-and-unexecuted (both T-025 and AB-043 are executed
+  and closed); the overnight run's own originally-scheduled journeys not yet executed (rest of Batch 26,
+  Batches 27-33) are tracked separately in RUN_STATE.json/CURRENT_RUN_STATUS.md, not counted here.
 ```
 
 Scope correction note (2026-09-27): this file's "at launch" figure and `RUN_STATE.json`'s
