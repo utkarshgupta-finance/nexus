@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { parseGoLiveError, GoLiveOperationError } from "./go-live-errors"
+import { defaultMessageForCode } from "@/platform/errors"
 
 describe("parseGoLiveError", () => {
   it("maps GO_LIVE_REQUEST_CANCEL_NOT_OWNER to its own kind with the RPC's safe message", () => {
@@ -91,5 +92,17 @@ describe("parseGoLiveError", () => {
 
     expect(parsed.kind).toBe("workflow_segregation_of_duties_violation")
     expect(parsed.message).toBe("you already approved an earlier step of this request. A different approver must decide this step.")
+  })
+
+  it("maps WORKFLOW_TEAM_INACTIVE to its own kind with the standardized cross-domain message, not the RPC's own per-node detail (PG-056)", () => {
+    const parsed = parseGoLiveError({
+      message:
+        'WORKFLOW_TEAM_INACTIVE: this request cannot be routed to its next step ("node_3"), whose responsible team has been deactivated. Ask a Workflow Admin to reassign that node to an active team before this request can advance.',
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_team_inactive")
+    expect(parsed.message).toBe(defaultMessageForCode("WORKFLOW_TEAM_INACTIVE"))
+    expect(parsed.message).not.toContain("node_3")
   })
 })

@@ -31,6 +31,7 @@ type GoLiveErrorKind =
   | "workflow_no_active_definition"
   | "workflow_request_already_decided"
   | "workflow_segregation_of_duties_violation"
+  | "workflow_team_inactive"
   | "go_live_draft_stale"
   | "invalid_input"
   | "conflict"
@@ -67,6 +68,7 @@ const NAMED_TOKEN_KINDS: Record<string, GoLiveErrorKind> = {
   WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
   WORKFLOW_REQUEST_ALREADY_DECIDED: "workflow_request_already_decided",
   WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: "workflow_segregation_of_duties_violation",
+  WORKFLOW_TEAM_INACTIVE: "workflow_team_inactive",
   GO_LIVE_DRAFT_STALE: "go_live_draft_stale",
 }
 
@@ -93,7 +95,12 @@ function parseGoLiveError(error: PostgrestLikeError): GoLiveError {
     const [, token, detail] = tokenMatch
     const kind = NAMED_TOKEN_KINDS[token]
     if (kind) {
-      return { kind, message: detail || rawMessage, sqlState, cause: rawMessage }
+      // PG-056: a consistent, domain-agnostic message across all four
+      // governed approve RPCs, rather than the RPC's own per-node detail
+      // (which names the specific node key), so a reviewer sees the same
+      // wording regardless of which domain or which node they hit.
+      const message = token === "WORKFLOW_TEAM_INACTIVE" ? defaultMessageForCode("WORKFLOW_TEAM_INACTIVE") : detail || rawMessage
+      return { kind, message, sqlState, cause: rawMessage }
     }
   }
 

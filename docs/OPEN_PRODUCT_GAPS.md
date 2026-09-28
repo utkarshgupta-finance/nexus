@@ -30,74 +30,12 @@ bottom). Not from memory or `RUN_STATE.json` summaries alone.
 
 ## A. ACTIVE PRODUCT GAPS
 
-The 8 confirmed gaps that stood here (PG-035, PG-036, PG-037, PG-038,
-PG-040, PG-044, PG-045, PG-053) were all decided and closed on 2026-09-28;
-see their entries in **D. CLOSED HISTORY** below for the decision,
-implementation, and verification evidence for each. One new gap was found
-via the mandatory post-fix Journey Discovery re-check on PG-040 (below),
-confirmed via source inspection, not yet implemented.
-
-### PG-056: `WORKFLOW_TEAM_INACTIVE` token unmapped in all four approve-RPC client error parsers
-
-Status: CONFIRMED, implementation not yet authorized
-First discovered: 2026-09-28, via the mandatory Journey Discovery re-check
-required after the PG-040 runtime-routing fix (`docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`
-point E: "perform Journey Discovery again after the fix... does the newly
-implemented behaviour itself introduce a coverage requirement that did not
-exist before?").
-Related journeys: O-005, T-019 (same underlying fix, new corner not yet
-covered by any journey)
-Domain: cross-cutting (all four governed approve RPCs' client-side error
-mapping)
-
-Gap: PG-040's runtime-routing fix added `WORKFLOW_TEAM_INACTIVE` as a new
-token all four approve RPCs can raise
-(`approve_customer_onboarding_case`, `approve_customer_change_request`,
-`approve_commercial_configuration_version`, `approve_go_live_request`).
-Confirmed via source inspection (`grep -rn "WORKFLOW_TEAM_INACTIVE" src/`
-returns zero matches anywhere in application code): none of the four
-client-side error-mapping files (`case-errors.ts`, `change-errors.ts`,
-`commercial-version-errors.ts`, `go-live-errors.ts`) have a
-`NAMED_TOKEN_KINDS` entry for it. Each of these four parsers is a strict
-whitelist (an unmapped token falls through to the generic `"unknown"` kind
-and a sanitized `defaultMessageForCode("UNEXPECTED")` message, deliberately
-discarding the raw RPC message so nothing unrecognized leaks to the user).
-The Workflow Builder domain's own save/publish error handling
-(`src/platform/workflow-builder/actions.ts`) uses a different, permissive
-strategy (`stripErrorToken`, strips only the leading `TOKEN:` prefix and
-shows the rest of the RPC's own message), so `WORKFLOW_TEAM_INACTIVE`
-already surfaces correctly there; this gap is scoped only to the four
-approve-RPC domains.
-
-Current behaviour: a real approver who legitimately gets blocked by
-PG-040's runtime-routing guard (their approval would have newly routed the
-request into an inactive team's node) sees a generic "An unexpected error
-occurred" message instead of the specific, actionable text the RPC already
-composes (naming the node and instructing the caller to ask a Workflow
-Admin to reassign it or reactivate the team).
-
-Business/control consequence: low severity, narrow window (only occurs
-when a team is deactivated between a request's creation and its approach
-to that team's node), but a real, confusing dead end for the approver who
-hits it: the correct, governed rejection is happening, but with no
-information about why.
-
-Decision question: none. This is not a product ambiguity; it is a plain
-completeness gap with an unambiguous fix, mirroring the exact pattern
-already used earlier the same day for `WORKFLOW_REQUEST_ALREADY_DECIDED`
-and `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION` (add one `NAMED_TOKEN_KINDS`
-entry and one union member per file, plus a parser test, in all four
-files).
-
-Decision: N/A (no decision needed; implementation authorization pending).
-Implementation required: YES, small and bounded, not yet authorized this
-turn (explicit instruction: "Do not change any implementation").
-Journey rerun required: none strictly required; confirm the specific
-message surfaces correctly (rather than the generic fallback) the next
-time PG-040's runtime-routing guard is live-exercised through the actual
-application UI (all prior PG-040 verification was via direct RPC calls,
-not through the client error-parsing layer, which is exactly how this gap
-went undetected until this Journey Discovery pass).
+None currently open. The 8 confirmed gaps that stood here (PG-035,
+PG-036, PG-037, PG-038, PG-040, PG-044, PG-045, PG-053) were decided and
+closed on 2026-09-28. PG-056, found the same day via the mandatory
+post-fix Journey Discovery re-check on PG-040, was closed the same day
+under the Immediate-Closure Protocol; see **D. CLOSED HISTORY** below for
+every entry's decision, implementation, and verification evidence.
 
 ---
 
@@ -276,6 +214,7 @@ compact summary is kept here.
 | PG-044 | D-006, D-019 | 11 | Duplicate Commercial Component scope silently allowed, no dedup warning | DECIDED (2026-09-28: warn, don't block; legitimate duplicate scopes can exist) + FIXED | new `commercial-duplicate-scope.ts` (`findDuplicateScopeMatches`), warning banner added to `commercial-version-review-page.tsx` before both the diff-view and plain-table-fallback render paths. 6 new unit tests passing. D-019's canonical text rewritten; D-006 cross-referenced. |
 | PG-045 | G-021 | 14 | Duplicate designation row names silently allowed within one component | DECIDED (2026-09-28: block outright; no plausible legitimate reason for duplicate names) + FIXED | `validateDesignationRowIssues` now rejects case/whitespace-insensitive duplicate names (severity `invalid`). Migration `20261012000000_fix_designation_rate_names_must_be_unique.sql` adds `fn_designation_rates_have_unique_names` as a defense-in-depth DB constraint (`NOT VALID`, preserving the pre-existing evidence row). Verified live: the DB function rejects a duplicate pair and accepts distinct names; an UPDATE against the pre-existing evidence row is correctly rejected. New unit test in `commercial-rate.test.ts`. G-021 rewritten. |
 | PG-053 | B-007 | 8 | Former-name search result label may show the most-recent, not most-specific, historical match | DECIDED (2026-09-28: show the best-matching historical name, not always-most-recent) + FIXED | `searchFormerCustomerNames` rewritten with a new `matchSpecificity` helper (`change-request.service.ts`); dedup now keeps the most-specific match per customer instead of the most-recent. New test file `change-request.service.test.ts`, 5 tests passing. B-007's canonical text updated with a Notes line. |
+| PG-056 | O-005, T-019 | (found via post-fix Journey Discovery, same day as PG-040) | `WORKFLOW_TEAM_INACTIVE` token unmapped in all four approve-RPC client error parsers, falling through to a generic "unexpected error" message | CONFIRMED (no product decision needed, unambiguous completeness gap) + FIXED (2026-09-28, closed same day under the Immediate-Closure Protocol) | Added `WORKFLOW_TEAM_INACTIVE` to `NAMED_TOKEN_KINDS` and its `*ErrorKind` union in all four client error parsers (`case-errors.ts`, `change-errors.ts`, `commercial-version-errors.ts`, `go-live-errors.ts`). A new shared `WORKFLOW_TEAM_INACTIVE` code and standardized message added to `src/platform/errors/domain/codes.ts` ("this request cannot move to the next approval step because that step's responsible team is inactive. Ask a Workflow Admin to update or reactivate the team."), used identically across all four domains rather than the RPC's own per-node detail (which would otherwise leak the raw node key and vary in wording by domain). Server-side PG-040 invariant and already-assigned-team behavior both explicitly unchanged; this is a client-parser-only fix. 4 new parser regression tests (one per domain), all passing. Verified live: reproduced the exact PG-040 runtime-routing rejection against a real in-flight Go Live request (`859d7124-...`, team temporarily deactivated then restored), captured the genuine raw RPC error text, and fed it through the real `parseGoLiveError` function, confirming it now maps to the standardized message with no leaked node key. Journey Discovery re-run after this fix found zero new candidates. O-005's canonical text updated with the message-surfacing detail. |
 
 ---
 
@@ -369,6 +308,35 @@ compact summary is kept here.
     pending, no decision needed): 1 (PG-056). To Verify: 1. Deferred /
     Accepted For Now: 9. Closed History: 45 (unchanged; PG-037/PG-040's
     entries were revised in place, not re-closed as new rows).**
+- **Fourth pass, same day (2026-09-28): PG-056 closed under the
+  Immediate-Closure Protocol.** Implemented exactly as specified: added
+  `WORKFLOW_TEAM_INACTIVE` to all four client error parsers'
+  `NAMED_TOKEN_KINDS`, backed by one new shared `NexusErrorCode` and
+  standardized message in `src/platform/errors/domain/codes.ts` (reused
+  across all four domains rather than duplicating the literal string per
+  file). Server-side PG-040 invariant and already-assigned-team behavior
+  both untouched, confirmed by diff scope (only the four `*-errors.ts`
+  parser files, their four test files, and `codes.ts` changed). 4 new
+  parser regression tests added and passing. Verified live: reproduced the
+  same real Go Live request's runtime-routing rejection used to verify
+  PG-040 itself (`859d7124-...`), captured the genuine raw RPC error text,
+  and fed it through the real `parseGoLiveError` function, confirming the
+  standardized message surfaces with no leaked node key. **Journey
+  Discovery re-run after this fix:** the new shared `NexusErrorCode` has
+  no explicit case in `src/platform/api/domain/status.ts`'s
+  `httpStatusForCode` switch (falls through to its default 500); checked
+  and found this exactly matches the existing, accepted pattern for
+  `COMMERCIAL_EFFECTIVE_DATE_CONFLICT` (also added to the shared code
+  vocabulary without ever being wired into that switch, since neither code
+  is reached through that path from any live caller today). Disposition:
+  ALREADY_COVERED by established precedent, not a new gap. New journey
+  candidates found: 0. Classified **PRODUCT GAP RESOLVED + PASS**. Moved
+  to Closed History (see PG-056's row above, revised in place, original
+  PRODUCT GAP CONFIRMED history preserved in full above it in this same
+  entry).
+  - After this pass: **Active (Decision Required): 0. Active
+    (implementation pending): 0. To Verify: 1. Deferred / Accepted For
+    Now: 9. Closed History: 46 (PG-056 added).**
 - The zero-active-team-members mechanism (PG-005) remains the single
   most-reconfirmed gap in the project's history (O-018, A-027, C-025,
   E-028, J-011, M-025, V-027, anticipated again as Z-007/Z-009); the

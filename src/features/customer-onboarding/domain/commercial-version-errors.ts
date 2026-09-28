@@ -29,6 +29,7 @@ type CommercialVersionErrorKind =
   | "workflow_no_active_definition"
   | "workflow_request_already_decided"
   | "workflow_segregation_of_duties_violation"
+  | "workflow_team_inactive"
   | "commercial_version_draft_stale"
   | "commercial_version_effective_date_out_of_order"
   | "commercial_version_effective_date_adjacent_to_open_component_start"
@@ -64,6 +65,7 @@ const NAMED_TOKEN_KINDS: Record<string, CommercialVersionErrorKind> = {
   WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
   WORKFLOW_REQUEST_ALREADY_DECIDED: "workflow_request_already_decided",
   WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: "workflow_segregation_of_duties_violation",
+  WORKFLOW_TEAM_INACTIVE: "workflow_team_inactive",
   COMMERCIAL_VERSION_DRAFT_STALE: "commercial_version_draft_stale",
   COMMERCIAL_VERSION_CUSTOMER_INACTIVE: "commercial_version_customer_inactive",
   // PD-006 final business decision (Product Decision Closure): found
@@ -111,7 +113,12 @@ function parseCommercialVersionError(error: PostgrestLikeError): CommercialVersi
     const [, token, detail] = tokenMatch
     const kind = NAMED_TOKEN_KINDS[token]
     if (kind) {
-      return { kind, message: detail || rawMessage, sqlState, cause: rawMessage }
+      // PG-056: a consistent, domain-agnostic message across all four
+      // governed approve RPCs, rather than the RPC's own per-node detail
+      // (which names the specific node key), so a reviewer sees the same
+      // wording regardless of which domain or which node they hit.
+      const message = token === "WORKFLOW_TEAM_INACTIVE" ? defaultMessageForCode("WORKFLOW_TEAM_INACTIVE") : detail || rawMessage
+      return { kind, message, sqlState, cause: rawMessage }
     }
   }
 

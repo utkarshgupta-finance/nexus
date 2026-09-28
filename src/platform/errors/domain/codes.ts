@@ -28,6 +28,7 @@ type NexusErrorCode =
   | "DOCUMENT_UPLOAD_FAILED"
   | "DATABASE_UNAVAILABLE"
   | "COMMERCIAL_EFFECTIVE_DATE_CONFLICT"
+  | "WORKFLOW_TEAM_INACTIVE"
   | "UNEXPECTED"
 
 /**
@@ -49,6 +50,8 @@ const DEFAULT_ERROR_MESSAGES: Record<NexusErrorCode, string> = {
   DOCUMENT_UPLOAD_FAILED: "The document could not be uploaded. Try again.",
   DATABASE_UNAVAILABLE: "Nexus cannot reach the database right now. Try again shortly.",
   COMMERCIAL_EFFECTIVE_DATE_CONFLICT: "This effective date conflicts with an existing commercial period.",
+  WORKFLOW_TEAM_INACTIVE:
+    "this request cannot move to the next approval step because that step's responsible team is inactive. Ask a Workflow Admin to update or reactivate the team.",
   UNEXPECTED: "An unexpected error occurred.",
 }
 

@@ -28,6 +28,7 @@ type CaseErrorKind =
   | "workflow_no_active_definition"
   | "workflow_request_already_decided"
   | "workflow_segregation_of_duties_violation"
+  | "workflow_team_inactive"
   | "onboarding_draft_stale"
   | "onboarding_effective_date_exception_pending"
   | "onboarding_exception_invalid_role"
@@ -65,6 +66,7 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
   WORKFLOW_REQUEST_ALREADY_DECIDED: "workflow_request_already_decided",
   WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: "workflow_segregation_of_duties_violation",
+  WORKFLOW_TEAM_INACTIVE: "workflow_team_inactive",
   ONBOARDING_DRAFT_STALE: "onboarding_draft_stale",
   ONBOARDING_EFFECTIVE_DATE_EXCEPTION_PENDING: "onboarding_effective_date_exception_pending",
   ONBOARDING_EXCEPTION_INVALID_ROLE: "onboarding_exception_invalid_role",
@@ -95,7 +97,12 @@ function parseCaseError(error: PostgrestLikeError): CaseError {
     const [, token, detail] = tokenMatch
     const kind = NAMED_TOKEN_KINDS[token]
     if (kind) {
-      return { kind, message: detail || rawMessage, sqlState, cause: rawMessage }
+      // PG-056: a consistent, domain-agnostic message across all four
+      // governed approve RPCs, rather than the RPC's own per-node detail
+      // (which names the specific node key), so a reviewer sees the same
+      // wording regardless of which domain or which node they hit.
+      const message = token === "WORKFLOW_TEAM_INACTIVE" ? defaultMessageForCode("WORKFLOW_TEAM_INACTIVE") : detail || rawMessage
+      return { kind, message, sqlState, cause: rawMessage }
     }
   }
 
