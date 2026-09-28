@@ -72,37 +72,18 @@ async function createCommercialConfigurationWithChange(
 /**
  * Mints a real `requests` row for a Commercial Change to extend
  * (supabase/migrations/20260912210000_commercial_configuration_persistence.sql).
- * Called once before either `createCommercialConfigurationWithChange`
- * (the first, initial_setup change) or `createCommercialChangeForConfiguration`
- * (every later change).
+ * Called once before `createCommercialConfigurationWithChange` (the first,
+ * initial_setup change). PG-038 (2026-09-28): the legacy, ungoverned
+ * `create_commercial_change_for_configuration` RPC that used to handle
+ * every later change was deleted (zero real callers); later changes now
+ * go through the governed Commercial Configuration Version workflow
+ * (`approve_commercial_configuration_version`) instead.
  */
 async function createSystemCommercialRequest(input: { newRequestId: string; actorUserId: string }): Promise<RequestRow> {
   const supabase = getSupabaseServiceRoleClient()
   return callSingleRowRpc<RequestRow>(supabase, "create_system_commercial_request", {
     p_new_request_id: input.newRequestId,
     p_actor_user_id: input.actorUserId,
-  })
-}
-
-type CreateCommercialChangeInput = {
-  commercialConfigurationId: string
-  requestId: string
-  changeCategory: "renewal" | "amendment" | "correction" | "other"
-  effectiveDate: string
-  actorUserId: string
-  reason?: string | null
-}
-
-/** The renewal/amendment/correction/other sibling of createCommercialConfigurationWithChange: creates a new Commercial Change against an EXISTING configuration, closing every currently-open component under it. */
-async function createCommercialChangeForConfiguration(input: CreateCommercialChangeInput): Promise<CommercialChangeRow> {
-  const supabase = getSupabaseServiceRoleClient()
-  return callSingleRowRpc<CommercialChangeRow>(supabase, "create_commercial_change_for_configuration", {
-    p_commercial_configuration_id: input.commercialConfigurationId,
-    p_request_id: input.requestId,
-    p_change_category: input.changeCategory,
-    p_effective_date: input.effectiveDate,
-    p_actor_user_id: input.actorUserId,
-    p_reason: input.reason ?? null,
   })
 }
 
@@ -333,7 +314,6 @@ async function listMeasurementDefinitionsByIds(ids: string[]): Promise<Measureme
 export {
   createCommercialConfigurationWithChange,
   createSystemCommercialRequest,
-  createCommercialChangeForConfiguration,
   addCommercialComponent,
   addCommercialCommitment,
   getCommercialConfigurationById,
@@ -353,7 +333,6 @@ export type {
   CreateCommercialConfigurationInput,
   CreateCommercialConfigurationResult,
   RequestRow,
-  CreateCommercialChangeInput,
   AddCommercialComponentInput,
   AddCommercialCommitmentInput,
 }

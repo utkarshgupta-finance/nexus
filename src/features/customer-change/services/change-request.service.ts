@@ -208,18 +208,44 @@ async function listCustomerFieldHistory(customerId: string): Promise<CustomerFie
   return rows.map(toFieldHistoryEntry)
 }
 
-/** Customer Search's former-name lookup (task Phase B): one most-recent match per customer, so a customer renamed twice does not show up twice in a search result. */
+/**
+ * How closely a historical name matches the search term: 0 for an exact
+ * (case-insensitive) match, otherwise the length difference (closer length
+ * to the term = more specific, since the term is a substring of oldValue
+ * per the `ilike %term%` query). Lower is more specific.
+ */
+function matchSpecificity(oldValue: string, term: string): number {
+  return oldValue.toLowerCase() === term.toLowerCase() ? 0 : Math.abs(oldValue.length - term.length)
+}
+
+/**
+ * Customer Search's former-name lookup (task Phase B): one match per
+ * customer, so a customer renamed twice does not show up twice in a search
+ * result. PG-053 (2026-09-28, DECIDED: best-match, not always-most-recent):
+ * when a customer's historical names share overlapping substrings (e.g.
+ * "Acme" -> "Acme Global" -> "Acme Global India"), the displayed label is
+ * now the historical name that most specifically matches the search term,
+ * not simply the most-recently-changed one. Ties (equal specificity) keep
+ * the more recent match, preserving the prior tiebreak behavior.
+ */
 async function searchFormerCustomerNames(term: string): Promise<FormerNameMatch[]> {
   const trimmed = term.trim()
   if (!trimmed) return []
   const rows = await changeData.searchFieldHistoryByOldValue(trimmed)
   const matches = rows.map(toFormerNameMatch).filter((match): match is FormerNameMatch => match !== null)
-  const seen = new Set<string>()
-  return matches.filter((match) => {
-    if (seen.has(match.customerId)) return false
-    seen.add(match.customerId)
-    return true
+  const bestByCustomerId = new Map<string, FormerNameMatch>()
+  for (const match of matches) {
+    const current = bestByCustomerId.get(match.customerId)
+    if (!current || matchSpecificity(match.oldValue, trimmed) < matchSpecificity(current.oldValue, trimmed)) {
+      bestByCustomerId.set(match.customerId, match)
+    }
+  }
+  // Preserve the original most-recent-first ordering of first appearance.
+  const order = new Map<string, number>()
+  matches.forEach((match, index) => {
+    if (!order.has(match.customerId)) order.set(match.customerId, index)
   })
+  return [...bestByCustomerId.values()].sort((a, b) => (order.get(a.customerId) ?? 0) - (order.get(b.customerId) ?? 0))
 }
 
 export {

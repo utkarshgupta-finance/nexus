@@ -28,8 +28,7 @@ import "server-only"
  * `commercial_configuration`/read+write permissions, see
  * docs/AUTHORIZATION_MODEL.md): every call site that reaches a write
  * function here (createCommercialConfiguration, addCommercialComponent,
- * addCommercialCommitment, createSystemCommercialRequest,
- * createCommercialChangeForConfiguration) must call
+ * addCommercialCommitment, createSystemCommercialRequest) must call
  * `requirePermission("commercial_configuration", "write")`
  * (`src/platform/permissions/server.ts`) first, and pass the resolved
  * session's real `appUserId` as `actorUserId`, never a client-supplied

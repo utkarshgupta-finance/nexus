@@ -69,6 +69,11 @@ function OperationalQueueTable({ entries }: { entries: OperationalQueueEntry[] }
                   {entry.responsibleTeamName ? (
                     <div className="flex flex-col gap-1">
                       <span className="text-muted-foreground">{entry.responsibleTeamName}</span>
+                      {entry.isResponsibleTeamInactive ? (
+                        <Badge variant="ghost" className="w-fit bg-muted text-muted-foreground">
+                          Team inactive
+                        </Badge>
+                      ) : null}
                       {!entry.hasEligibleApprover ? (
                         <Badge variant="ghost" className="w-fit bg-destructive/10 text-destructive">
                           No eligible approver

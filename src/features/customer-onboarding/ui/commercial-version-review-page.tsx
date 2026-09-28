@@ -24,6 +24,7 @@ import type { CommercialRateDiff } from "../domain/commercial-rate-diff"
 import { ColumnValue, COLUMN_LABELS, NON_RECURRING_COLUMNS, ON_DEMAND_COLUMNS, RECURRING_COLUMNS } from "./commercial-rate-section"
 import type { ColumnKey } from "./commercial-rate-section"
 import { CommercialRateDiffView } from "./commercial-rate-diff-view"
+import { findDuplicateScopeMatches } from "../domain/commercial-duplicate-scope"
 
 /**
  * Reviewer surface for one Commercial Configuration Version (Customer
@@ -70,6 +71,9 @@ function CommercialVersionReviewPage({
 
   const currencyCode = version.commercialRate?.billingCurrency ?? null
   const isDecidable = canDecide && version.status === "submitted"
+  // PG-044 (D-006/D-019, DECIDED: warn, don't block): surfaced to the
+  // reviewer before they decide, never prevents Approve.
+  const duplicateScopeMatches = findDuplicateScopeMatches(version.commercialRate?.components ?? [])
 
   async function handleApprove() {
     setActionError(null)
@@ -135,6 +139,17 @@ function CommercialVersionReviewPage({
           <p className="text-sm text-foreground">{version.reason || "No reason recorded."}</p>
           {version.effectiveDate ? <p className="text-xs text-muted-foreground">Effective Date: {version.effectiveDate}</p> : null}
         </section>
+
+        {duplicateScopeMatches.length > 0 ? (
+          <section className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/5 p-4 shadow-sm sm:p-6">
+            <h2 className="text-xs font-medium tracking-wide text-warning uppercase">Possible Duplicate Components</h2>
+            {duplicateScopeMatches.map((match, index) => (
+              <p key={index} className="text-sm text-foreground">
+                These proposed components appear to price the same thing (identical scope and rate): {match.componentDescriptions.join(", ")}. Confirm this is intentional before approving.
+              </p>
+            ))}
+          </section>
+        ) : null}
 
         {diff ? (
           <CommercialRateDiffView diff={diff} currencyCode={currencyCode} />

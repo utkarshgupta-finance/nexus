@@ -17,6 +17,8 @@ type OperationalQueueEntry = {
   responsibleTeamName: string | null
   /** False when responsibleTeamName is set but that team currently has zero active members (Product Gap Closure, O-018): this item cannot be acted on by anyone until an admin restores an eligible member. True whenever no specific team is required at all. */
   hasEligibleApprover: boolean
+  /** True when responsibleTeamName is set and that team has since been deactivated (Product Gap Closure, PG-040): the item stays actionable by any currently eligible member already on the team, this only surfaces that the responsible team itself is no longer active. False whenever no specific team is required at all. */
+  isResponsibleTeamInactive: boolean
 }
 
 /**
@@ -41,12 +43,20 @@ type OperationalQueueEntry = {
  * already exists for, rather than a new dashboard: a team dropping to
  * zero active members while work is pending was previously invisible
  * anywhere in the product.
+ *
+ * `teamActiveById` (Product Gap Closure, PG-040) surfaces the same idea
+ * one step earlier: the responsible team itself has been deactivated.
+ * This never changes who can act (existing in-flight work stays
+ * actionable by any currently eligible member, see
+ * `fn_require_workflow_team_membership`), it only makes the already-
+ * inactive team visible instead of silent.
  */
 function buildOperationalQueue(
   items: ApprovalInboxItem[],
   sentBackCountsByRequestId: Map<string, number>,
   activeMemberCountsByTeamId: Map<string, number>,
   teamNamesById: Map<string, string>,
+  teamActiveById: Map<string, boolean>,
   now: Date
 ): OperationalQueueEntry[] {
   return items
@@ -63,6 +73,7 @@ function buildOperationalQueue(
       href: item.href,
       responsibleTeamName: item.responsibleTeamId ? (teamNamesById.get(item.responsibleTeamId) ?? null) : null,
       hasEligibleApprover: !item.responsibleTeamId || (activeMemberCountsByTeamId.get(item.responsibleTeamId) ?? 0) > 0,
+      isResponsibleTeamInactive: item.responsibleTeamId ? teamActiveById.get(item.responsibleTeamId) === false : false,
     }))
     .sort((a, b) => b.ageDays - a.ageDays)
 }

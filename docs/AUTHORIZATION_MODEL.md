@@ -885,3 +885,167 @@ gated on `user_access.read`, which `team_admin` does not hold), and
 explicitly no `team.write`) was reconfirmed still unable to see any
 team-assignment control anywhere. Full detail in
 `docs/journey-runs/BATCH_24_RESULTS.md`'s T-015/T-016 closure entries.
+
+## 26. Reference Master has no maker-checker: DECIDED [PG-035, ACCEPTED AS-IS, 2026-09-28]
+
+**Found during Batch 26 (AB-020), Fresh Execution program.** AB-020's own
+canonical text assumed Reference Master has the same maker-checker /
+self-approval-blocked shape as the other three domains with an explicit
+`SELF_APPROVAL_NOT_ALLOWED`-equivalent guard (AB-016, AB-018, AB-019).
+Live source inspection of `src/features/reference-data/actions.ts` and
+`data/reference-master.data.ts` found no such mechanism exists: every
+mutating action (add/activate/deactivate a reference value, update an FX
+rate or invoice cadence) is gated solely by
+`requirePermission("reference_master","write")` and applies directly,
+with no draft, no submit, no separate checker sign-off step, no
+self-approval guard of any kind, since there is no approval step to
+self-approve.
+
+**DECIDED [PG-035]:** Reference Master remains single-permission,
+direct-apply. It will not gain a maker-checker/draft-review-approve
+pipeline. §14 above already correctly documents the real, current
+enforcement shape (`reference_master.read`/`write`, Server-Action-level
+checks, actor-aware audit); this decision only closes the gap between
+that reality and AB-020's own outdated premise. Reference data (segment,
+business unit, pricing model, and similar option lists) is
+low-transaction-volume, low-blast-radius configuration, not a financial
+transaction; every write remains fully attributed and auditable after the
+fact (§14's "Actor-aware audit"), so the control model is detection, not
+prevention, for this domain specifically. Revisit only if a real incident
+or a material increase in Reference Master write volume/risk profile
+changes this calculus.
+
+**Documentation:** AB-020's canonical text in `docs/NEXUS_JOURNEY_UNIVERSE.md`
+rewritten to test the real invariant (no maker-checker exists, confirmed
+via source, not a self-approval scenario) rather than the stale premise.
+No code change.
+
+## 27. Deactivated-team routing: new assignments blocked, in-flight work unaffected: DECIDED [PG-040, IMPLEMENTED, 2026-09-28]
+
+**Found during the Fresh Execution program (O-005, T-019).** A team's
+`is_active` flag was previously only cosmetic once a workflow node
+already named that team as responsible:
+`fn_require_workflow_team_membership` (the actual runtime
+approval-eligibility gate) checks only `user_teams.revoked_at`, never
+`teams.is_active`, so a deactivated team's still-active members kept
+approving normally, with no warning shown anywhere that the team itself
+was inactive. Separately, nothing stopped a workflow-builder admin from
+newly binding a node to an already-inactive team, draft or published.
+
+**DECIDED [PG-040]:** a deliberate split, not a single on/off switch:
+
+1. Deactivated teams must not receive new workflow assignments.
+2. Existing in-flight requests already assigned to the team may still be
+   actioned by currently eligible members. `fn_require_workflow_team_membership`
+   is deliberately left unchanged: a save/publish-time check is the
+   correct control point, not a runtime approval-time one, since
+   published workflow versions are immutable and never re-validated
+   against a team's later status.
+3. The Operational Queue shows a clear, non-blocking "Team inactive"
+   warning wherever a pending item's responsible team has been
+   deactivated, so the fact is visible instead of silent.
+4. Removing a user's own team membership or permission still blocks that
+   user immediately (unchanged, already correct: this was never gated on
+   team-level status in the first place).
+
+**Implementation:**
+- `save_workflow_version_graph` now raises `WORKFLOW_TEAM_INACTIVE` if any
+  node in the submitted graph names an inactive team as responsible
+  (`supabase/migrations/20261014000000_workflow_node_team_must_be_active.sql`).
+  Draft versions are the only thing this RPC ever writes, so this cannot
+  retroactively affect any already-published, in-flight request.
+- `publish_workflow_definition_version` re-checks the same invariant as
+  defense in depth, immediately after its existing draft-status guard,
+  before any of its other structural validation.
+- `OperationalQueueEntry.isResponsibleTeamInactive`
+  (`src/platform/approvals/domain/operational-queue.ts`) is computed from
+  the same `teams.is_active` already read for team-name resolution, no
+  new query. Rendered as a muted "Team inactive" badge in
+  `src/components/product/operational-queue-table.tsx`, visually distinct
+  from the existing destructive "No eligible approver" badge (O-018),
+  since the two conditions are independent: a deactivated team can still
+  have active members, and an active team can still have zero.
+- Bullet 4 required no change: user-level membership/permission removal
+  was already the only real block on a specific user, independent of
+  team-level status.
+
+**Verified:** live against real RPC calls (not just unit tests): a save
+attempt binding a node to a genuinely inactive team (`West Region
+Finance`) was rejected with `WORKFLOW_TEAM_INACTIVE`; an otherwise
+identical save with an active/unassigned team succeeded normally, on the
+same draft version, confirming the check does not over-block legitimate
+saves.
+
+**Documentation:** O-005 and T-019's canonical text in
+`docs/NEXUS_JOURNEY_UNIVERSE.md` rewritten from "known inconsistency" to
+the decided, accepted shape, cross-referencing this section.
+
+## 28. Approve RPC family: consistent already-decided error, cross-node segregation of duties: DECIDED [PG-036, PG-037, IMPLEMENTED, 2026-09-28]
+
+**Found during the Fresh Execution program (AB-039, AB-043, V-028).** All
+four governed approve RPCs (`approve_customer_onboarding_case`,
+`approve_customer_change_request`,
+`approve_commercial_configuration_version`, `approve_go_live_request`)
+shared two gaps:
+
+1. A concurrent-approval loser's experience differed by graph position: a
+   non-final race correctly raised `WORKFLOW_NODE_ALREADY_ADVANCED`; a
+   race for the request's FINAL decision instead hit an unconditional
+   `if status = 'approved' then return <row>` short-circuit and got a
+   silent, success-shaped response, with no signal anyone else had
+   already decided it (PG-036).
+2. None of the four checked a request's own `workflow_node_transitions`
+   history for a prior approver before allowing the current actor to
+   decide it: a user who held a different node's required team
+   membership at each point in time could legitimately decide two or
+   more sequential levels of the same request (PG-037).
+
+**DECIDED [PG-036]:** the final-approval loser now also sees an explicit
+error, for consistency, without weakening the existing idempotent-replay
+guarantee that protects a caller's own accidental double-click or
+duplicate network request (documented in
+`docs/API_INTEGRATION_ARCHITECTURE.md`, exercised by a dedicated
+idempotency journey). The `status = 'approved'` short-circuit in each RPC
+now compares the calling actor against whichever actor actually finalized
+the decision (`decided_by` for Customer Change/Commercial Configuration,
+`approved_by` for Onboarding/Go Live):
+- Same actor: unchanged, safe idempotent no-op.
+- Different actor: new named token `WORKFLOW_REQUEST_ALREADY_DECIDED`.
+
+**DECIDED [PG-037]:** a cross-node distinct-approver control, scoped
+across every `workflow_cycle_number` ever recorded for the resource, not
+only the current cycle. A send-back/resubmit cycle is still the same
+underlying request being decided; a narrower same-cycle-only scope would
+let a user approve a level, have the request sent back, and approve it
+again in the next cycle, defeating the control it exists to provide. Each
+approve RPC now checks, before any other domain-specific work, whether
+`workflow_node_transitions` already has an `approve` row for this
+resource by the same actor (any node, any cycle); if so, it raises the
+new named token `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`.
+
+**Implementation:**
+`supabase/migrations/20261015000000_approve_rpcs_already_decided_and_segregation_of_duties.sql`
+replaces all four RPCs with both checks added in the same relative
+position (immediately after the existing `SELF_APPROVAL_NOT_ALLOWED`
+and `WORKFLOW_NODE_ALREADY_ADVANCED` checks, before any team-membership
+or domain-specific work). Both new tokens are added to all four
+client-side error-mapping files
+(`case-errors.ts`, `change-errors.ts`, `commercial-version-errors.ts`,
+`go-live-errors.ts`), each with its own parser test.
+
+**Verified live against real, pre-existing data** (not only unit tests):
+- PG-036: `customer_change_requests` row `c6ed40bb-...` (already approved,
+  `decided_by = b2a12ef2-...`). A same-actor replay returned the row
+  silently, no error. A different-actor call was rejected with
+  `WORKFLOW_REQUEST_ALREADY_DECIDED`.
+- PG-037: `customer_change_requests` row `c579a77c-...` (in-flight,
+  status `submitted`, already approved at an earlier node by actor
+  `99f44f93-...`, exactly the V-028 scenario the real historical data had
+  already reproduced organically). A second approve call by that same
+  actor at the request's current node was rejected with
+  `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`.
+
+**Documentation:** AB-039, AB-043 (PG-036) and V-028 (PG-037)'s canonical
+text in `docs/NEXUS_JOURNEY_UNIVERSE.md` rewritten from "decision
+pending"/"potential gap" to the decided, implemented, and live-verified
+shape.

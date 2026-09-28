@@ -337,8 +337,9 @@ async function loadOperationalQueue(): Promise<OperationalQueueEntry[]> {
   ])
   const sentBackCountsByRequestId = new Map([...onboardingSendBackCounts, ...changeRequestSendBackCounts])
   const teamNamesById = new Map(teams.map((team) => [team.id, team.name]))
+  const teamActiveById = new Map(teams.map((team) => [team.id, team.isActive]))
 
-  return buildOperationalQueue(items, sentBackCountsByRequestId, activeMemberCountsByTeamId, teamNamesById, new Date())
+  return buildOperationalQueue(items, sentBackCountsByRequestId, activeMemberCountsByTeamId, teamNamesById, teamActiveById, new Date())
 }
 
 type TeamRemovalImpact = {

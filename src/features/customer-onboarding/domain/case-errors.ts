@@ -26,6 +26,8 @@ type CaseErrorKind =
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
   | "workflow_no_active_definition"
+  | "workflow_request_already_decided"
+  | "workflow_segregation_of_duties_violation"
   | "onboarding_draft_stale"
   | "onboarding_effective_date_exception_pending"
   | "onboarding_exception_invalid_role"
@@ -61,6 +63,8 @@ const NAMED_TOKEN_KINDS: Record<string, CaseErrorKind> = {
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
   WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
+  WORKFLOW_REQUEST_ALREADY_DECIDED: "workflow_request_already_decided",
+  WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: "workflow_segregation_of_duties_violation",
   ONBOARDING_DRAFT_STALE: "onboarding_draft_stale",
   ONBOARDING_EFFECTIVE_DATE_EXCEPTION_PENDING: "onboarding_effective_date_exception_pending",
   ONBOARDING_EXCEPTION_INVALID_ROLE: "onboarding_exception_invalid_role",

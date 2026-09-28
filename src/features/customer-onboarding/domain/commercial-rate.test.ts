@@ -474,6 +474,23 @@ describe("isComponentComplete", () => {
     expect(isComponentComplete(withRow)).toBe(true)
   })
 
+  it("Designation Based: rejects two rows sharing the same name, case/whitespace-insensitive (PG-045)", () => {
+    const component = { ...withDescription(createComponent("recurring", "designation_based"), "Field Team"), invoiceTerms: COMPLETE_TERMS }
+    const duplicate = {
+      ...component,
+      designationRows: [
+        { id: "1", designation: "Manager", rate: 50, per: "USER" },
+        { id: "2", designation: " manager ", rate: 75, per: "USER" },
+      ],
+    }
+    expect(isComponentComplete(duplicate)).toBe(false)
+    expect(isComponentValid(duplicate)).toBe(false)
+
+    const renamed = { ...duplicate, designationRows: [duplicate.designationRows[0], { ...duplicate.designationRows[1], designation: "Director" }] }
+    expect(isComponentComplete(renamed)).toBe(true)
+    expect(isComponentValid(renamed)).toBe(true)
+  })
+
   it("Non-Recurring: requires name, pricing fields, invoice terms, and a complete Revenue Recognition", () => {
     const component = withDescription(createComponent("non_recurring", "flat_fee"), "Implementation")
     expect(isComponentComplete(component)).toBe(false)

@@ -29,6 +29,8 @@ type GoLiveErrorKind =
   | "workflow_decision_no_match"
   | "workflow_node_already_advanced"
   | "workflow_no_active_definition"
+  | "workflow_request_already_decided"
+  | "workflow_segregation_of_duties_violation"
   | "go_live_draft_stale"
   | "invalid_input"
   | "conflict"
@@ -63,6 +65,8 @@ const NAMED_TOKEN_KINDS: Record<string, GoLiveErrorKind> = {
   WORKFLOW_DECISION_NO_MATCH: "workflow_decision_no_match",
   WORKFLOW_NODE_ALREADY_ADVANCED: "workflow_node_already_advanced",
   WORKFLOW_NO_ACTIVE_DEFINITION: "workflow_no_active_definition",
+  WORKFLOW_REQUEST_ALREADY_DECIDED: "workflow_request_already_decided",
+  WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: "workflow_segregation_of_duties_violation",
   GO_LIVE_DRAFT_STALE: "go_live_draft_stale",
 }
 

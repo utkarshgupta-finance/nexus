@@ -72,4 +72,24 @@ describe("parseGoLiveError", () => {
     const parsed = parseGoLiveError({ message: "SOME_FUTURE_TOKEN_NOT_YET_MAPPED: detail" })
     expect(parsed.kind).toBe("unknown")
   })
+
+  it("maps WORKFLOW_REQUEST_ALREADY_DECIDED to its own kind (PG-036, concurrent-approval loser consistency)", () => {
+    const parsed = parseGoLiveError({
+      message: "WORKFLOW_REQUEST_ALREADY_DECIDED: this request was already approved by someone else. Refresh to see the current status.",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_request_already_decided")
+    expect(parsed.message).toBe("this request was already approved by someone else. Refresh to see the current status.")
+  })
+
+  it("maps WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION to its own kind (PG-037, cross-node distinct-approver control)", () => {
+    const parsed = parseGoLiveError({
+      message: "WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: you already approved an earlier step of this request. A different approver must decide this step.",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("workflow_segregation_of_duties_violation")
+    expect(parsed.message).toBe("you already approved an earlier step of this request. A different approver must decide this step.")
+  })
 })

@@ -26,12 +26,12 @@ function item(overrides: Partial<ApprovalInboxItem>): ApprovalInboxItem {
 
 describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
   it("excludes completed items entirely: this is a stuck-work view, not a history report", () => {
-    const entries = buildOperationalQueue([item({ bucket: "completed", status: "approved" })], new Map(), new Map(), new Map(), NOW)
+    const entries = buildOperationalQueue([item({ bucket: "completed", status: "approved" })], new Map(), new Map(), new Map(), new Map(), NOW)
     expect(entries).toHaveLength(0)
   })
 
   it("names a role, never a fabricated person, for current responsibility", () => {
-    const entries = buildOperationalQueue([item({ status: "submitted" })], new Map(), new Map(), new Map(), NOW)
+    const entries = buildOperationalQueue([item({ status: "submitted" })], new Map(), new Map(), new Map(), new Map(), NOW)
     expect(entries[0].currentResponsibility).toBe("Pending Approval")
   })
 
@@ -52,6 +52,7 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
         ["team-2", "WF-TEST Leadership"],
         ["team-3", "WF-TEST Finance"],
       ]),
+      new Map(),
       NOW
     )
     for (const entry of entries) {
@@ -65,12 +66,12 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
   })
 
   it("falls back to zero sent-back count when the request has no entry in the lookup, rather than throwing", () => {
-    const entries = buildOperationalQueue([item({ requestId: "req-unknown" })], new Map(), new Map(), new Map(), NOW)
+    const entries = buildOperationalQueue([item({ requestId: "req-unknown" })], new Map(), new Map(), new Map(), new Map(), NOW)
     expect(entries[0].sentBackCount).toBe(0)
   })
 
   it("carries through a real sent-back count when one exists", () => {
-    const entries = buildOperationalQueue([item({ requestId: "req-1" })], new Map([["req-1", 3]]), new Map(), new Map(), NOW)
+    const entries = buildOperationalQueue([item({ requestId: "req-1" })], new Map([["req-1", 3]]), new Map(), new Map(), new Map(), NOW)
     expect(entries[0].sentBackCount).toBe(3)
   })
 
@@ -83,13 +84,14 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
       new Map(),
       new Map(),
       new Map(),
+      new Map(),
       NOW
     )
     expect(entries.map((entry) => entry.requestId)).toEqual(["older", "newer"])
   })
 
   it("has an eligible approver when the item names no responsible team at all", () => {
-    const entries = buildOperationalQueue([item({ responsibleTeamId: null })], new Map(), new Map(), new Map(), NOW)
+    const entries = buildOperationalQueue([item({ responsibleTeamId: null })], new Map(), new Map(), new Map(), new Map(), NOW)
     expect(entries[0].hasEligibleApprover).toBe(true)
     expect(entries[0].responsibleTeamName).toBeNull()
   })
@@ -100,6 +102,7 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
       new Map(),
       new Map([["team-1", 2]]),
       new Map([["team-1", "Legal"]]),
+      new Map(),
       NOW
     )
     expect(entries[0].hasEligibleApprover).toBe(true)
@@ -112,6 +115,7 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
       new Map(),
       new Map([["team-1", 0]]),
       new Map([["team-1", "Legal"]]),
+      new Map(),
       NOW
     )
     expect(entries[0].hasEligibleApprover).toBe(false)
@@ -119,7 +123,42 @@ describe("buildOperationalQueue (Platform Scale Closure, Phase L)", () => {
   })
 
   it("has no eligible approver when the responsible team is entirely absent from the active-member-count map (never had a member, not merely emptied)", () => {
-    const entries = buildOperationalQueue([item({ responsibleTeamId: "team-1" })], new Map(), new Map(), new Map(), NOW)
+    const entries = buildOperationalQueue([item({ responsibleTeamId: "team-1" })], new Map(), new Map(), new Map(), new Map(), NOW)
     expect(entries[0].hasEligibleApprover).toBe(false)
+  })
+
+  it("is not marked team-inactive when the item names no responsible team at all", () => {
+    const entries = buildOperationalQueue([item({ responsibleTeamId: null })], new Map(), new Map(), new Map(), new Map(), NOW)
+    expect(entries[0].isResponsibleTeamInactive).toBe(false)
+  })
+
+  it("is not marked team-inactive when the responsible team is active (Product Gap Closure, PG-040)", () => {
+    const entries = buildOperationalQueue(
+      [item({ responsibleTeamId: "team-1" })],
+      new Map(),
+      new Map(),
+      new Map([["team-1", "Legal"]]),
+      new Map([["team-1", true]]),
+      NOW
+    )
+    expect(entries[0].isResponsibleTeamInactive).toBe(false)
+  })
+
+  it("is marked team-inactive when the responsible team has since been deactivated, without changing who can still act (Product Gap Closure, PG-040)", () => {
+    // This flag is purely informational: it never feeds hasEligibleApprover,
+    // matching the decision that existing in-flight work stays actionable
+    // by any currently eligible member regardless of the team's own
+    // active/inactive status (see fn_require_workflow_team_membership,
+    // which this deliberately does not touch).
+    const entries = buildOperationalQueue(
+      [item({ responsibleTeamId: "team-1" })],
+      new Map(),
+      new Map([["team-1", 1]]),
+      new Map([["team-1", "West Region Finance"]]),
+      new Map([["team-1", false]]),
+      NOW
+    )
+    expect(entries[0].isResponsibleTeamInactive).toBe(true)
+    expect(entries[0].hasEligibleApprover).toBe(true)
   })
 })

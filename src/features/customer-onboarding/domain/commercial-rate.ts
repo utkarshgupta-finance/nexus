@@ -802,15 +802,34 @@ function validateSlabMugIssues(mug: MugOverlay, rows: SlabRow[], issues: Compone
   })
 }
 
-/** Every designation row needs its own name, Rate, and Unit (task correction §7's same "every rate required" principle applied to Designation Based). */
+/**
+ * Every designation row needs its own name, Rate, and Unit (task correction
+ * §7's same "every rate required" principle applied to Designation Based).
+ * Two rows sharing the same name (case/whitespace-insensitive) are blocked
+ * outright as `invalid` (PG-045, 2026-09-28, DECIDED: block): an analyst
+ * could otherwise mistake adding a duplicate-named row for editing the
+ * existing one, inadvertently doubling a MUG/designation guarantee. There is
+ * no plausible legitimate reason for two identically-named rows within one
+ * component's own pricing table, unlike duplicate Commercial Component scope
+ * across components (PG-044, DECIDED: warn only, see validateCommercialComponent's caller).
+ */
 function validateDesignationRowIssues(rows: DesignationRow[], issues: ComponentValidationIssue[]): void {
   if (rows.length === 0) {
     issues.push({ field: "designationRows", message: "At least one designation row required", severity: "incomplete" })
     return
   }
+  const nameCounts = new Map<string, number>()
+  rows.forEach((row) => {
+    const key = row.designation.trim().toLowerCase()
+    if (key.length === 0) return
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1)
+  })
   rows.forEach((row, index) => {
     const label = row.designation.trim() || `Designation ${index + 1}`
     if (row.designation.trim().length === 0) issues.push({ field: `designation-${index}`, message: `Designation ${index + 1} name required`, severity: "incomplete" })
+    else if ((nameCounts.get(row.designation.trim().toLowerCase()) ?? 0) > 1) {
+      issues.push({ field: `designation-${index}`, message: `${label}: duplicate designation name, each row must have a unique name`, severity: "invalid" })
+    }
     if (!isPositive(row.rate)) issues.push({ field: `designation-${index}`, message: `${label} Rate required`, severity: "incomplete" })
     if (row.per === null) issues.push({ field: `designation-${index}`, message: `${label} Unit required`, severity: "incomplete" })
   })

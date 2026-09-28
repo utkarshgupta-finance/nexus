@@ -106,10 +106,11 @@ function groupCommitmentSummaries(commitments: CommercialCommitment[]): {
  * approved but is not yet the customer's real current terms; 'active'
  * means open AND its effective date has already arrived, at most one
  * version at a time. A new Change always closes the entire prior open
- * set in one transaction (`create_commercial_change_for_configuration`
- * for the legacy path, `approve_commercial_configuration_version` for
- * the governed path), so a version can only ever be fully open or fully
- * closed, never a mix; approving a future-dated version does not by
+ * set in one transaction (`approve_commercial_configuration_version`,
+ * PG-038: the legacy, ungoverned `create_commercial_change_for_configuration`
+ * RPC was deleted 2026-09-28, it had zero real callers), so a version can
+ * only ever be fully open or fully closed, never a mix; approving a
+ * future-dated version does not by
  * itself make it "active" here, only "scheduled", until `today` catches
  * up to its `effectiveDate`. `billingCurrency`/`fxSnapshotRate` are read
  * straight from this version's own Components, never the current

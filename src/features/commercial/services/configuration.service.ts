@@ -17,12 +17,7 @@ import type {
   MeasurementDefinition,
   PricingRuleKind,
 } from "../domain/types"
-import type {
-  AddCommercialCommitmentInput,
-  CreateCommercialChangeInput,
-  CreateCommercialConfigurationInput,
-  RequestRow,
-} from "../data/configuration.data"
+import type { AddCommercialCommitmentInput, CreateCommercialConfigurationInput, RequestRow } from "../data/configuration.data"
 
 /**
  * Application service for Commercial Configuration setup. Thin
@@ -74,12 +69,6 @@ async function listCommercialConfigurationsByCustomer(customerId: string): Promi
 /** Mints a real requests row for a Commercial Change to extend. See create_system_commercial_request's own migration comment. */
 async function createSystemCommercialRequest(input: { newRequestId: string; actorUserId: string }): Promise<RequestRow> {
   return configurationData.createSystemCommercialRequest(input)
-}
-
-/** The renewal/amendment/correction/other sibling of createCommercialConfiguration: a new Commercial Change against an EXISTING configuration. */
-async function createCommercialChangeForConfiguration(input: CreateCommercialChangeInput): Promise<CommercialChange> {
-  const row = await configurationData.createCommercialChangeForConfiguration(input)
-  return toCommercialChange(row)
 }
 
 type AddCommercialComponentServiceInput = {
@@ -181,7 +170,6 @@ export {
   createCommercialConfiguration,
   listCommercialConfigurationsByCustomer,
   createSystemCommercialRequest,
-  createCommercialChangeForConfiguration,
   addCommercialComponent,
   addCommercialCommitment,
   getCommercialConfiguration,

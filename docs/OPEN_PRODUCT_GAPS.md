@@ -30,252 +30,10 @@ bottom). Not from memory or `RUN_STATE.json` summaries alone.
 
 ## A. ACTIVE PRODUCT GAPS
 
-All 8 below are confirmed via genuine reproduction (live UX, real DB
-evidence, or direct source inspection of the exact enforcement point), and
-all 8 involve a genuine decision (block vs. warn vs. leave-as-is, or
-build vs. delete vs. keep): none are "not yet asked" placeholders; per this
-reconciliation's own rule, a real choice between legitimate options IS a
-Product Decision, whether or not it was formally posed before today.
-
-### PG-035: Reference Master has no maker-checker / self-approval protection
-
-Status: DECISION REQUIRED
-First discovered: AB-020, Batch 26
-Related journeys: AB-020
-Domain: Reference Master (Settings)
-
-Gap: every mutating action in `src/features/reference-data/actions.ts` and
-`data/reference-master.data.ts` is gated solely by
-`requirePermission("reference_master","write")`. No approve/send-back RPC,
-no checker sign-off, no `SELF_APPROVAL_NOT_ALLOWED`-equivalent check exists
-in this domain, unlike other governed domains.
-
-Current behaviour: any single holder of `reference_master.write` can
-create, edit, or deactivate a reference value with no second person ever
-reviewing it.
-
-Business/control consequence: reference data (segments, business units,
-pricing model options) that every downstream governed workflow depends on
-can be silently changed by one actor, with no independent review.
-
-Decision question: should Reference Master gain maker-checker approval, or
-should the canonical expectation be amended to match the current
-single-permission direct-apply design?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: YES, once decided.
-Journey rerun required: AB-020, once decided.
-
----
-
-### PG-036: Concurrent-approval loser's experience differs by whether the winning approval was final
-
-Status: DECISION REQUIRED
-First discovered: AB-039, Batch 26
-Related journeys: AB-039, AB-043 (one decision, not two)
-Domain: cross-cutting (all four governed approve RPCs)
-
-Gap: two genuinely overlapping approve calls are correctly serialized (one
-winner, no corruption), but an early `if status = 'approved' then return`
-short-circuit runs ahead of the node-key mismatch check whenever the winning
-approval was the request's FINAL decision, so the loser gets a silent,
-success-shaped, idempotent response with no error. At a non-final node, the
-loser instead gets an explicit `WORKFLOW_NODE_ALREADY_ADVANCED` error.
-
-Current behaviour: inconsistent loser experience depending on graph
-position of the winning approval.
-
-Business/control consequence: a checker who lost a race at a request's
-final step has no signal someone else already decided it.
-
-Decision question: should the final-approval loser also see an explicit
-"already actioned" error for consistency, or is the current silent
-idempotent-success return the accepted, simpler behaviour?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: YES, once decided (small, bounded RPC change).
-Journey rerun required: AB-039, AB-043, once decided.
-
----
-
-### PG-037: Same approver can decide two sequential levels of one workflow request
-
-Status: DECISION REQUIRED
-First discovered: V-028, Batch 27
-Related journeys: V-028
-Domain: cross-cutting (all four governed approve RPCs)
-
-Gap: `approve_customer_change_request`'s only identity check compares the
-actor to `created_by` (the original submitter); it never checks the
-request's own `workflow_node_transitions` history for prior approvers. A
-user who approves node 3 as a Team A member, then is moved to Team B before
-the request reaches node 4, can legitimately approve node 4 too.
-
-Current behaviour: the same individual can decide 2+ sequential levels of
-one request, provided they hold each node's required team membership at
-the moment they act.
-
-Business/control consequence: a real segregation-of-duties gap for
-finance-sensitive multi-level approvals.
-
-Decision question: should Nexus add a cross-node distinct-approver control
-for multi-level workflows, or accept single-approver-across-levels given
-team membership is itself admin-governed?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: YES, once decided (small, bounded RPC change).
-Journey rerun required: V-028, once decided.
-
----
-
-### PG-038: Legacy ungoverned RPC `create_commercial_change_for_configuration` remains live
-
-Status: DECISION REQUIRED
-First discovered: D-017, Batch 11
-Related journeys: D-017, E-020
-Domain: Commercial Configuration / Commercial Change
-
-Gap: a legacy RPC performs a synchronous, unconditional live mutation
-(closes every open component, inserts a `commercial_changes` row) with no
-draft, submit, approver, self-approval check, or workflow routing.
-`service_role`-only, orphaned (no application caller), but still callable at
-the DB level.
-
-Current behaviour: exists, unused, unwired. Reproduced genuinely in E-020:
-racing the legacy RPC against a real governed draft left the governed
-draft's snapshot stale, producing a real business-data gap once the
-governed change later approved.
-
-Business/control consequence: bypasses every governance control the rest
-of Commercial Configuration enforces, though only reachable via
-`service_role` credentials.
-
-Decision question: keep the legacy RPC for emergency use, delete it
-outright, or bring it under governed workflow control?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: YES, once decided.
-Journey rerun required: D-017, E-020, once decided.
-
----
-
-### PG-040: Deactivated team still allows its still-assigned members to approve, with no warning
-
-Status: DECISION REQUIRED
-First discovered: O-005, Batch 5
-Related journeys: O-005, T-019 (anticipated to resurface as V-036)
-Domain: Teams / workflow routing (cross-cutting)
-
-Gap: `fn_require_workflow_team_membership` checks only
-`user_teams.revoked_at`, never `teams.is_active`. A still-active member of a
-now-deactivated team can still approve requests routed to that team's node,
-with no warning to the approver or the admin who deactivated the team.
-Reproduced live twice (Batch 5, Batch 25), never formally decided.
-
-Current behaviour: deactivating a team has no effect on its existing
-members' ability to act on in-flight requests.
-
-Business/control consequence: a team marked inactive (disbanded,
-reorganized) can still silently approve real requests via any member never
-explicitly removed; "deactivate the team" does not mean "stop this team
-from acting," unlike removing an individual member.
-
-Decision question: should deactivating a team block its members from
-acting on in-flight approvals (hard block), warn but allow, or is
-member-level removal the only supported lever, with team deactivation
-being cosmetic to the routing layer?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: depends on decision.
-Journey rerun required: O-005, T-019, anticipated V-036, once decided.
-
-Notes: distinct from PG-005 (zero-active-members, closed history below);
-this is about a team with members still active but the TEAM itself
-deactivated.
-
----
-
-### PG-044: Duplicate Commercial Component scope silently allowed, no dedup warning
-
-Status: DECISION REQUIRED
-First discovered: D-006 / D-019, Batch 11
-Related journeys: D-006, D-019
-Domain: Commercial Configuration
-
-Gap: two components with byte-for-byte identical scope, rate, and currency
-are both accepted and persisted as independently open rows; no exclusion
-constraint, no dedup, no "possible duplicate" warning before approval.
-Confirmed live (not merely inferred).
-
-Business/control consequence: a reviewer could approve an accidental
-duplicate with no system prompt; low-likelihood but real risk of
-double-billing a duplicated commercial term.
-
-Decision question: should a "possible duplicate scope" warning be shown to
-a reviewer before approving a component that duplicates an existing open
-component's scope, should it be blocked outright, or left as-is (legitimate
-business reasons for two identical-looking components may exist, e.g.
-separate contractual lines)?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: depends on decision.
-Journey rerun required: D-006, D-019, once decided.
-
----
-
-### PG-045: Duplicate designation row names silently allowed within one component
-
-Status: DECISION REQUIRED
-First discovered: G-021, Batch 14
-Related journeys: G-021
-Domain: Commercial Configuration (Designation pricing)
-
-Gap: two designation rows can share the same display name (e.g. two
-"Consultant" rows); rows are keyed by row id, not name, so both
-independently contribute to the total. Confirmed live.
-
-Business/control consequence: an analyst could mistake adding a
-duplicate-named row for editing the existing one, inadvertently doubling a
-MUG/designation guarantee.
-
-Decision question: should a duplicate designation row name within one
-component be blocked, warned against, or left as-is?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: depends on decision.
-Journey rerun required: G-021, once decided.
-
-Notes: same shape as PG-044 but within one component rather than across
-components; unlike PG-044, there is no plausible legitimate reason for two
-identically-named rows in one pricing table, so a hard block is the more
-obviously-safe default here if a quick decision is wanted.
-
----
-
-### PG-053: Former-name search result label may show the most-recent, not most-specific, historical match
-
-Status: DECISION REQUIRED
-First discovered: B-007, Batch 8
-Related journeys: B-007
-Domain: Customer Master
-
-Gap: `searchFormerCustomerNames`'s dedup logic keeps only the first row per
-customer in most-recent-first order. When a customer's historical names
-share overlapping substrings, the displayed "Former legal name: X" label can
-show the most-recently-changed matching value rather than the one most
-specifically matching the search term. The customer is always found
-correctly; only the specific label shown can differ. Confirmed reproducible.
-
-Business/control consequence: minor label-accuracy issue, no functional
-impact, low severity.
-
-Decision question: should the search show the best-matching historical
-name (the one that actually matched the search term), all matching names,
-or is always-most-recent an acceptable simplification?
-
-Decision: (blank, awaiting Utkarsh)
-Implementation required: small, once decided.
-Journey rerun required: B-007, once decided.
+None currently open. The 8 confirmed gaps that stood here (PG-035, PG-036,
+PG-037, PG-038, PG-040, PG-044, PG-045, PG-053) were all decided and closed
+on 2026-09-28; see their entries in **D. CLOSED HISTORY** below for the
+decision, implementation, and verification evidence for each.
 
 ---
 
@@ -446,6 +204,14 @@ compact summary is kept here.
 | PG-039 | E-022 | 12 | Designation-based Commercial Component could be approved with zero rate rows | FIXED (2026-09-28) | TS gate: `case.service.ts`'s `approveOnboardingCase` now calls `isCommercialRateDraftComplete` (previously only checked `components.length === 0`). DB gate (defense-in-depth): migration `20261011000000_fix_designation_component_requires_at_least_one_rate.sql`, `chk_commercial_components_pricing_rule_shape` now requires `jsonb_array_length(rates) > 0` for `dimension` kind, added `NOT VALID` (the one pre-existing E-022 evidence row is deliberately preserved, not retroactively rejected). Verified live: an UPDATE against that evidence row is now correctly rejected by the constraint. New regression test in `case.service.test.ts`. Full suite 1049/1049 passing, `tsc` clean. |
 | PG-041 | S-013 (expansion) | 23 | 5 named routes still crashed on malformed UUID | FIXED (2026-09-28) | Added the identical `isValidUuid`/`notFound()` guard already proven by S-013's own 4 routes, to: `/forms/customer-onboarding/[requestId]`, `/commercials/[configId]`, `/commercials/[configId]/versions/[requestId]` (both ids), `/settings/workflows/[definitionId]`, `/settings/workflows/[definitionId]/versions/[versionId]` (only `versionId`, the one actually used in a DB lookup). `tsc` clean; the shared `isValidUuid` unit test suite (`src/lib/uuid.test.ts`) already covers the helper all 5 new call sites use, matching S-013's own original test-coverage precedent (no per-route tests exist for any of the 9 routes now using this guard). **Evidence caveat, disclosed honestly:** live HTTP-status re-verification (expecting 404) was attempted but blocked by an apparent long-running dev-server-process artifact affecting `notFound()`-based routing generally in this environment right now, confirmed NOT specific to this fix: even the already-shipped, previously-verified S-013 routes (e.g. `/reviews/[requestId]`) currently return 200 instead of 404 for a malformed id on this same server process. Restarting the dev server would very likely resolve this (not attempted, since killing a long-running shared process this session did not start requires the user's own authorization per this project's standing rule) but was not required to close this item given the code is verified identical to the already-proven, already-shipped S-013 pattern. |
 | PG-043 | ACC-001, ACC-002 | 8 | `aria-required` not consistently exposed across required form fields | FIXED (2026-09-28) | Root cause (verified against the running app, not just source): `aria-required={question.isRequired}` was hand-set only on `ComboboxTrigger`; Base UI's `Combobox.Input` (the popup's own search box, a second independent `role="combobox"` element) reads `aria-required` from the Combobox Root's own `required` state instead, which was never set, so the Input never carried the attribute at all (confirmed live: `document.querySelector('[data-slot="combobox-input"]')` had no `aria-required`, while the Trigger correctly showed `true`). Fixed in `geography-combobox-question.tsx`: pass `required={question.isRequired}` to the `<Combobox>` root instead of hand-patching only the Trigger, so Base UI's own logic applies consistently to both elements (Trigger's own manual `aria-required` prop removed as redundant). Blast radius: 1 file, 3 fields (Country, State, City), confirmed the only consumer of this shared combobox wrapper in the app. New regression test `src/components/ui/combobox.test.tsx` guards the Trigger half (the part `renderToStaticMarkup` can exercise, since the popup is portal-rendered and not present in a static server render, and this repo has no jsdom/testing-library harness to open the popup in a unit test). The Input half (the actual originally-broken part) was verified live in a real browser instead: after the fix, both Trigger and popup Input on Country now correctly show `aria-required="true"`. |
+| PG-035 | AB-020 | 26 | Reference Master has no maker-checker / self-approval protection | DECIDED (2026-09-28: accept as-is, single-permission direct-apply; no maker-checker built) | `docs/AUTHORIZATION_MODEL.md` section 26; AB-020's canonical text rewritten to test the real invariant. No code change. |
+| PG-036 | AB-039, AB-043 | 26 | Concurrent-approval loser's experience differed by whether the winning approval was final | DECIDED (2026-09-28: explicit error for consistency, idempotent replay preserved for the same actor) + FIXED | migration `20261015000000_approve_rpcs_already_decided_and_segregation_of_duties.sql`; all four approve RPCs' `status = 'approved'` short-circuit now compares actor identity (`decided_by`/`approved_by`) before returning silently; new token `WORKFLOW_REQUEST_ALREADY_DECIDED` added to all four client error-mapping files with parser tests. Verified live against real historical data (`customer_change_requests` row `c6ed40bb-...`): same-actor replay returned silently, different-actor call rejected with the new token. `docs/AUTHORIZATION_MODEL.md` section 28; AB-039/AB-043 rewritten. |
+| PG-037 | V-028 | 27 | Same approver could decide two sequential levels of one workflow request | DECIDED (2026-09-28: cross-node distinct-approver control, scoped across all cycles for the resource) + FIXED | same migration as PG-036; each approve RPC now checks `workflow_node_transitions` for a prior `approve` row by the same actor on the same resource (any node, any cycle) before allowing the decision, raising new token `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`. Verified live against real historical data (`customer_change_requests` row `c579a77c-...`, an in-flight request where the same actor had already approved an earlier node): the second approve attempt by that actor was correctly rejected. `docs/AUTHORIZATION_MODEL.md` section 28; V-028 rewritten. |
+| PG-038 | D-017, E-020 | 11, 12 | Legacy ungoverned RPC `create_commercial_change_for_configuration` remained live | DECIDED (2026-09-28: delete outright) + FIXED | migration `20261013000000_drop_legacy_create_commercial_change_for_configuration.sql`; removed all application-layer references (`configuration.data.ts`, `configuration.service.ts`, `server.ts` doc comments). Verified: `select count(*) from pg_proc where proname = 'create_commercial_change_for_configuration'` returns 0. `tsc` clean, full suite passing. D-017/E-020 rewritten. |
+| PG-040 | O-005, T-019 | 5, 24 | Deactivated team still allowed its still-assigned members to approve, with no warning | DECIDED (2026-09-28, custom spec: block new assignments, keep existing in-flight work actionable, warn in the Operational Queue, member-level removal still blocks immediately) + FIXED | migration `20261014000000_workflow_node_team_must_be_active.sql` adds `WORKFLOW_TEAM_INACTIVE` to both `save_workflow_version_graph` and `publish_workflow_definition_version`; `fn_require_workflow_team_membership` deliberately left unchanged (runtime approval eligibility for existing work is not the control point). New `OperationalQueueEntry.isResponsibleTeamInactive` field renders a muted "Team inactive" badge in `operational-queue-table.tsx`, distinct from the destructive "No eligible approver" badge. Verified live: a save binding a node to a genuinely inactive team (`West Region Finance`) was rejected; an otherwise identical save with an active team succeeded. 15 unit tests (13 pre-existing + 2 new) passing. `docs/AUTHORIZATION_MODEL.md` section 27; O-005/T-019 rewritten. |
+| PG-044 | D-006, D-019 | 11 | Duplicate Commercial Component scope silently allowed, no dedup warning | DECIDED (2026-09-28: warn, don't block; legitimate duplicate scopes can exist) + FIXED | new `commercial-duplicate-scope.ts` (`findDuplicateScopeMatches`), warning banner added to `commercial-version-review-page.tsx` before both the diff-view and plain-table-fallback render paths. 6 new unit tests passing. D-019's canonical text rewritten; D-006 cross-referenced. |
+| PG-045 | G-021 | 14 | Duplicate designation row names silently allowed within one component | DECIDED (2026-09-28: block outright; no plausible legitimate reason for duplicate names) + FIXED | `validateDesignationRowIssues` now rejects case/whitespace-insensitive duplicate names (severity `invalid`). Migration `20261012000000_fix_designation_rate_names_must_be_unique.sql` adds `fn_designation_rates_have_unique_names` as a defense-in-depth DB constraint (`NOT VALID`, preserving the pre-existing evidence row). Verified live: the DB function rejects a duplicate pair and accepts distinct names; an UPDATE against the pre-existing evidence row is correctly rejected. New unit test in `commercial-rate.test.ts`. G-021 rewritten. |
+| PG-053 | B-007 | 8 | Former-name search result label may show the most-recent, not most-specific, historical match | DECIDED (2026-09-28: show the best-matching historical name, not always-most-recent) + FIXED | `searchFormerCustomerNames` rewritten with a new `matchSpecificity` helper (`change-request.service.ts`); dedup now keeps the most-specific match per customer instead of the most-recent. New test file `change-request.service.test.ts`, 5 tests passing. B-007's canonical text updated with a Notes line. |
 
 ---
 
@@ -487,9 +253,16 @@ compact summary is kept here.
     `aria-required` from the Root's `required` state, never set), fixed at
     the actual root, verified live in the browser for both the Trigger and
     the previously-broken popup Input.
-- After this pass: **Active (Decision Required): 8. To Verify: 1. Deferred /
-  Accepted For Now: 9. Closed (this session): 3 (PG-039, PG-041, PG-043,
-  bringing total Closed History to 37).**
+- **Second-pass update, same day (2026-09-28):** all 8 Product Decisions
+  (PG-035, PG-036, PG-037, PG-038, PG-040, PG-044, PG-045, PG-053) were
+  received from Utkarsh and implemented, verified (live where the RPC/DB
+  layer allowed it, unit-tested throughout), and closed in the same session.
+  PG-040 used a custom 4-bullet decision rather than a plain A/B/C choice;
+  see its Closed History entry for the exact spec implemented.
+- After this pass: **Active (Decision Required): 0. To Verify: 1. Deferred /
+  Accepted For Now: 9. Closed (this session): 11 (PG-039, PG-041, PG-043
+  from the first pass, plus PG-035, PG-036, PG-037, PG-038, PG-040, PG-044,
+  PG-045, PG-053 from the second, bringing total Closed History to 45).**
 - The zero-active-team-members mechanism (PG-005) remains the single
   most-reconfirmed gap in the project's history (O-018, A-027, C-025,
   E-028, J-011, M-025, V-027, anticipated again as Z-007/Z-009); the

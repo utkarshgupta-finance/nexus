@@ -1158,7 +1158,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: C-017 (an approved change request that changed name), C-033
 - Related Journeys: AA-004, AA-013
-- Notes: N/A
+- Notes: PG-053 (2026-09-28, DECIDED: best-match label): when a customer's historical names share overlapping substrings (e.g. "Acme" -> "Acme Global" -> "Acme Global India"), `searchFormerCustomerNames` (`src/features/customer-change/services/change-request.service.ts`) now shows the historical name that most specifically matches the search term (closest length, or exact), not always the most-recently-changed one; ties keep the more recent match. The customer itself was never lost either way; this only corrects which of its own real historical names is displayed. See `docs/OPEN_PRODUCT_GAPS.md` PG-053 (Closed History).
 
 ### B-008: Deactivate customer with reason
 - Pack: B - Customer Master
@@ -2636,8 +2636,8 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Priority: P1
 - Automation Feasibility: PARTIAL
 - Dependencies: N/A
-- Related Journeys: F-001, D-009
-- Notes: This is a genuine current-product risk area per the grounding brief; treat as P1 audit/data-integrity concern, not a bug to "fix" in this planning doc.
+- Related Journeys: F-001, D-009, D-019 (which now carries the reviewer-facing fix)
+- Notes: This is a genuine current-product risk area per the grounding brief; treat as P1 audit/data-integrity concern, not a bug to "fix" in this planning doc. PG-044 (2026-09-28, DECIDED: warn, don't block) added a proactive "Possible Duplicate Components" reviewer warning at approval time, addressing the UX visibility gap this journey itself flagged; see D-019 and `docs/OPEN_PRODUCT_GAPS.md` PG-044 (Closed History).
 
 ### D-007: Derived Active vs Superseded view correctness across three chained versions
 - Pack: D - Commercial Configuration
@@ -2889,30 +2889,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: D-007
 - Notes: N/A
 
-### D-017: Old ungoverned create_commercial_change_for_configuration path bypasses review entirely
+### D-017: Legacy ungoverned create_commercial_change_for_configuration path (deleted)
 - Pack: D - Commercial Configuration
-- Business Objective: Document and verify the real, currently-coexisting risk that the older "interactive promotion panel" RPC can mutate commercial terms live with zero draft/review/approval cycle, directly contradicting the governed path's controls.
+- Business Objective: Confirm the older, ungoverned RPC that could mutate commercial terms live with zero draft/review/approval cycle no longer exists.
 - Domain: Commercial Configuration, Commercial Change
-- Object / Record Type: commercial_changes (created via legacy path), commercial_components
+- Object / Record Type: commercial_changes, commercial_components
 - Starting State: Active configuration with a stable set of components under the governed lifecycle.
-- Personas: Any user with access to the legacy interactive promotion panel (if still reachable in the UI), System/API caller
-- Preconditions: Legacy RPC create_commercial_change_for_configuration remains callable.
-- Regular Path: User (or API caller) invokes the legacy RPC directly; a new commercial_changes row and components are created immediately live, with no draft, no submit, no approver, no self-approval check, no workflow routing.
-- Stress Variant: Legacy path invoked immediately after (or concurrently with) a governed Commercial Change approval on the same configuration, to see whether the two interact badly (e.g. closing components the governed flow just opened).
-- Authorization Variant: Confirm whether this legacy RPC has any permission gate at all, or is reachable by a broader set of roles than the governed commercial_configuration.approve permission.
+- Personas: N/A (no caller can reach this path any longer)
+- Preconditions: N/A
+- Regular Path: A direct call to `create_commercial_change_for_configuration` now fails outright: the function no longer exists (`DROP FUNCTION`, migration `20261013000000_drop_legacy_create_commercial_change_for_configuration.sql`).
+- Stress Variant: N/A
+- Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Resulting commercial_changes row's change_category and audit metadata (created_by) are checked to see whether it's distinguishable in history from a properly governed change, since a reviewer/auditor scanning history should be able to tell an unreviewed mutation occurred.
+- Audit/Data Integrity Checks: Confirmed zero remaining references in `pg_proc` after the drop.
 - Recovery/Resilience Variant: N/A
-- UX Checks: If this panel is still exposed in the current UI, flag it clearly as a live, unreviewed mutation surface for product follow-up.
+- UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: Ideally this path should not exist in a governed financial system; this journey exists to make the risk visible and testable, not to certify it as acceptable.
-- Expected Technical Invariants: N/A (this is precisely the invariant that is currently missing)
+- Expected Business Result: PG-038 (2026-09-28, DECIDED: delete outright). Zero current callers were confirmed (source-wide grep across the whole app, both the TS data-layer wrapper and its own service-layer re-export), zero current value; every real later-change path already goes through the governed `approve_commercial_configuration_version` workflow.
+- Expected Technical Invariants: `create_commercial_change_for_configuration` cannot be called by anything, since it no longer exists.
 - Priority: P0
-- Automation Feasibility: MANUAL
+- Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: E-020
-- Notes: Per the grounding brief this is a REAL currently-existing gap, not a hypothetical; treat findings from executing this journey as a priority product-risk item, and also log it under PRODUCT GAP NOTES.
+- Notes: Originally an open risk-documentation journey ("this path should not exist in a governed financial system"); superseded once the Product Decision was to remove the path entirely rather than merely document its risk. See `docs/OPEN_PRODUCT_GAPS.md` PG-038 (Closed History).
 
 ### D-018: No attachment/document support for Commercial Configuration (confirmed absence)
 - Pack: D - Commercial Configuration
@@ -2939,30 +2939,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: N/A
 - Notes: Confirmed absence per grounding brief (zero matches in code); log as a PRODUCT GAP NOTE as well since finance teams commonly expect this.
 
-### D-019: Component uniqueness deliberately unenforced, tested against a data-entry mistake scenario
+### D-019: Component uniqueness deliberately unenforced; reviewer now sees a duplicate-scope warning
 - Pack: D - Commercial Configuration
-- Business Objective: Simulate a realistic mistake, an analyst accidentally submitting two components for the identical scope and rate in the same version, and confirm the system's behavior (accepts both, no dedup) is at least visible/reviewable before approval.
+- Business Objective: Simulate a realistic mistake, an analyst accidentally submitting two components for the identical scope and rate in the same version, and confirm the reviewer is now proactively warned before approving, not merely able to notice it themselves in the diff.
 - Domain: Commercial Configuration
 - Object / Record Type: commercial_components
 - Starting State: Draft Commercial Change version being built.
 - Personas: Finance Analyst (drafting), Finance Manager (reviewing)
 - Preconditions: Analyst adds two components with identical scope/rate/currency by mistake.
-- Regular Path: Draft saves both without error; submit proceeds; reviewer sees both listed distinctly in the diff/review screen (not merged) so a careful reviewer could catch the duplication before approval.
-- Stress Variant: Duplication across ten or more components (bulk import scenario) to see if any near-duplicate warning surfaces at all.
+- Regular Path: Draft saves both without error; submit proceeds; the reviewer's approval screen (`commercial-version-review-page.tsx`) now renders a "Possible Duplicate Components" warning banner naming both components by description, computed by `findDuplicateScopeMatches` (`src/features/customer-onboarding/domain/commercial-duplicate-scope.ts`) comparing every proposed component in this draft against every other (nature + pricing model + pricing-specific fields; currency is already constant across one draft). Approval is never blocked; the reviewer decides.
+- Stress Variant: Duplication across ten or more components (bulk import scenario) groups into one match per distinct scope, not one warning per pair.
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: If approved as-is, both components become simultaneously open with the same scope, matching the deliberate no-exclusion-constraint design; confirm nothing downstream (e.g. entitlement) silently picks one and drops the other without surfacing an error.
+- Audit/Data Integrity Checks: If approved as-is, both components become simultaneously open with the same scope, matching the deliberate no-exclusion-constraint design; this is unchanged, only visibility improved.
 - Recovery/Resilience Variant: N/A
-- UX Checks: Absence of a "possible duplicate" warning is itself a UX gap worth flagging even though schema-legal.
+- UX Checks: The warning banner is visible above both the diff view and the plain-table fallback (both branches read from the same draft component array), so it always renders regardless of which one the page shows for this version.
 - Historical Variant: N/A
-- Expected Business Result: Reviewer has enough visibility to catch human error even though the DB will not stop it.
-- Expected Technical Invariants: No exclusion constraint blocks the duplicate insert.
+- Expected Business Result: PG-044 (2026-09-28, DECIDED: warn, don't block, since legitimate business reasons for two identical-looking components may exist, e.g. separate contractual lines). Reviewer now has proactive visibility, not merely the ability to notice it themselves.
+- Expected Technical Invariants: No exclusion constraint blocks the duplicate insert (deliberate); the warning is a pure, same-draft comparison, never a DB write.
 - Priority: P1
-- Automation Feasibility: PARTIAL
+- Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: D-006
-- Notes: N/A
+- Related Journeys: D-006, PG-045 (the sibling decision for duplicate designation row NAMES within one component, decided block, not warn)
+- Notes: See `docs/OPEN_PRODUCT_GAPS.md` PG-044 (Closed History) for the full decision record. Regression test: `src/features/customer-onboarding/domain/commercial-duplicate-scope.test.ts`.
 
 ### D-020: Commercial Configuration detail page performance/rendering with a long version chain
 - Pack: D - Commercial Configuration
@@ -3566,30 +3566,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: F-006
 - Notes: If the UI's wording implies real revenue recognition is happening, that mismatch between UI copy and actual behavior is worth flagging as a usability/trust gap.
 
-### E-020: Commercial Change created via legacy ungoverned RPC coexists with a governed draft in progress
+### E-020: Legacy ungoverned RPC coexistence risk with a governed draft (resolved by deleting the legacy path)
 - Pack: E - Commercial Change
-- Business Objective: Probe the real risk of the older create_commercial_change_for_configuration RPC firing while a governed commercial_configuration_versions draft is independently being worked on for the same configuration, to see whether the two paths corrupt each other's state.
+- Business Objective: Confirm the coexistence risk between the legacy `create_commercial_change_for_configuration` RPC and a governed draft can no longer occur, since the legacy path no longer exists.
 - Domain: Commercial Change
-- Object / Record Type: commercial_configuration_versions, commercial_changes (legacy path), commercial_components
+- Object / Record Type: commercial_configuration_versions, commercial_components
 - Starting State: Configuration has an in-progress governed draft (status = draft or submitted) seeded from the currently active components.
-- Personas: A user (or integration) invoking the legacy panel/RPC, Finance Analyst working the governed draft
-- Preconditions: Legacy RPC remains callable independent of the governed version's existence.
-- Regular Path: Legacy RPC fires immediately, closing current components and creating new ones live, completely bypassing and unaware of the governed draft's in-progress edits.
-- Stress Variant: The governed draft is then submitted/approved afterward; confirm whether its seeded "currently active" component snapshot (captured before the legacy change fired) is now stale, and what happens when that stale draft is approved, does it incorrectly re-close components the legacy path just created, or silently ignore the legacy path's changes.
+- Personas: Finance Analyst working the governed draft
+- Preconditions: N/A
+- Regular Path: There is no longer any second mutation path capable of firing independently; `approve_commercial_configuration_version` is the only way a Commercial Change is ever applied.
+- Stress Variant: N/A
 - Authorization Variant: N/A
-- Concurrency Variant: This entire journey is a real concurrency/consistency risk between two coexisting mutation paths.
+- Concurrency Variant: N/A (the specific two-path collision this journey characterized is now structurally impossible, since only one path exists)
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Determine whether the resulting component/version state after both paths fire is internally consistent or corrupted (e.g. two competing "current" states, orphaned components, incorrect effective_to values).
+- Audit/Data Integrity Checks: N/A
 - Recovery/Resilience Variant: N/A
-- UX Checks: Neither path warns the user that the other path exists or has fired.
+- UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: Ideally the platform would prevent this collision; today it likely does not, per the grounding brief's explicit callout of this coexistence as a real risk.
-- Expected Technical Invariants: N/A (this journey exists specifically to characterize an area with no confirmed protective invariant)
+- Expected Business Result: PG-038 (2026-09-28, DECIDED: delete the legacy RPC outright). This journey's own genuine live reproduction (a governed change left pending while the legacy path independently closed the same open component with an earlier effective date, producing a real business-data gap once the governed change later approved) was the evidence that justified the deletion decision, not merely a hypothetical.
+- Expected Technical Invariants: Only one mutation path exists for Commercial Change going forward.
 - Priority: P0
-- Automation Feasibility: MANUAL
+- Automation Feasibility: FULL
 - Dependencies: D-017
 - Related Journeys: D-017
-- Notes: Findings here should go into PRODUCT GAP NOTES regardless of outcome, since this dual-path risk is explicitly called out as real and current.
+- Notes: Originally an open risk-characterization journey; superseded once the Product Decision was to remove the collision's cause entirely rather than manage the collision. See `docs/OPEN_PRODUCT_GAPS.md` PG-038 (Closed History).
 
 ### E-021: Draft version's decision-node segment context resolved once, then customer segment changes before submission
 - Pack: E - Commercial Change
@@ -4945,30 +4945,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: F-015
 - Notes: N/A
 
-### G-021: Duplicate designation entries within one dimension component resolved (or not) at calculation time
+### G-021: Duplicate designation entries within one dimension component now blocked outright
 - Pack: G - MUG / Slab / Progressive / Designation Pricing
-- Business Objective: Follow-through on F-005's stress variant, if the system does allow two rows with the identical designation value in the same component (unvalidated), determine what the ACTUAL billing calculation does, uses the first match, the last match, sums both, or errors, since this is a real ambiguity risk for customer billing accuracy.
+- Business Objective: Confirm two rows sharing the same designation name (case/whitespace-insensitive) within one component are rejected outright, not silently resolved at billing-calculation time.
 - Domain: Pricing Models, Designation
 - Object / Record Type: commercial_components (dimension)
-- Starting State: A dimension component persisted (via direct data setup if the UI blocks it, to still be able to test the downstream calculation) with two rows both for designation "Consultant" at different rates (100 and 150).
-- Personas: Billing/Entitlement consumer
+- Starting State: A designation-based component draft with two rows sharing the same name (e.g. two "Manager" rows at different rates).
+- Personas: Maker (editing the draft), Checker (approving)
 - Preconditions: N/A
-- Regular Path: Actual usage calculation for "Consultant" headcount is run against this component; the real resolution behavior (first row wins, last row wins, both summed, or a runtime error) is observed and documented precisely.
+- Regular Path: Attempting to save/submit/approve the draft, or a direct RPC bypass, is rejected: `validateDesignationRowIssues` (`src/features/customer-onboarding/domain/commercial-rate.ts`) raises an `invalid` issue naming the duplicate; the DB's own `chk_commercial_components_pricing_rule_shape` constraint (`fn_designation_rates_have_unique_names`) independently rejects the same shape at the RPC layer, defense-in-depth.
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Whatever the real behavior is, it must be deterministic and repeatable (not randomly picking either row on different runs).
-- Recovery/Resilience Variant: N/A
-- UX Checks: If this state is even reachable via the UI at all (per F-005's stress variant, confirm reachability first), it represents a real customer-billing ambiguity risk worth flagging regardless of which deterministic behavior is found.
-- Historical Variant: N/A
-- Expected Business Result: N/A (this is an investigative journey to characterize actual behavior, not to assert a "correct" expected outcome the product may not implement)
-- Expected Technical Invariants: N/A
+- Audit/Data Integrity Checks: no ambiguous/duplicate-named row can ever reach a persisted, approved component.
+- Recovery/Resilience Variant: renaming one of the two rows to a distinct name resolves the block.
+- UX Checks: the editor surfaces which row is the duplicate, not merely "invalid."
+- Historical Variant: one pre-existing violating row (this journey's own original defect evidence, two "Manager" rows) is preserved, not retroactively rejected (the DB constraint was added `NOT VALID`).
+- Expected Business Result: PG-045 (2026-09-28, DECIDED: block, not warn, since there is no plausible legitimate reason for two identically-named rows in one pricing table).
+- Expected Technical Invariants: `fn_designation_rates_have_unique_names` holds for every `dimension`-kind component going forward.
 - Priority: P1
-- Automation Feasibility: PARTIAL
-- Dependencies: F-005
-- Related Journeys: F-005
-- Notes: Findings here should be recorded plainly; if duplicate designations are reachable and produce a nondeterministic or clearly wrong result, log this as a product-risk finding.
+- Automation Feasibility: FULL
+- Dependencies: N/A
+- Related Journeys: F-005, PG-044 (the sibling decision for duplicate scope ACROSS components, which was decided warn-only, not block)
+- Notes: Originally an open-ended investigative journey ("what does the calculation actually do with an ambiguous duplicate"); superseded once the Product Decision was to prevent the ambiguity from ever being persisted at all, rather than define calculation behavior for an ambiguous state. See `docs/OPEN_PRODUCT_GAPS.md` PG-045 (Closed History).
 
 ### G-022: MUG threshold combined with a Non-Recurring component (applicability boundary check)
 - Pack: G - MUG / Slab / Progressive / Designation Pricing
@@ -11144,30 +11144,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: O-003, O-005
 - Notes: N/A
 
-### O-005: Deactivating a team does NOT block its existing members from approving in-flight requests
+### O-005: Deactivating a team does NOT block its existing members from approving in-flight requests (DECIDED, PG-040)
 - Pack: O - Teams
-- Business Objective: Surface the real, confirmed inconsistency where fn_require_workflow_team_membership checks only user_teams.revoked_at, never teams.is_active, so a deactivated team's members can still approve.
+- Business Objective: Confirm the decided, accepted shape: existing in-flight requests already assigned to a since-deactivated team stay actionable by its currently eligible members (no orphaned work), while new workflow assignments to an inactive team are blocked outright and the acting member sees a clear warning.
 - Domain: Team, Workflow
-- Object / Record Type: teams, user_teams, workflow request
+- Object / Record Type: teams, user_teams, workflow request, workflow_nodes
 - Starting State: A request is sitting at an Approval node whose responsible team is Team X; Team X has an active member M; a request awaits approval.
 - Personas: team_admin (deactivates the team), M (still-active member, e.g. checker)
 - Preconditions: Team X is deactivated (is_active = false) while M's own user_teams membership remains unrevoked.
-- Regular Path: Admin deactivates Team X entirely; M, still an unrevoked member of Team X, opens the pending request and successfully approves it; the approval succeeds because fn_require_workflow_team_membership only checks M's own revoked_at, not Team X's is_active flag.
+- Regular Path: Admin deactivates Team X entirely; M, still an unrevoked member of Team X, opens the pending request, sees a "Team inactive" indicator against the responsible team in the Operational Queue, and successfully approves it; the approval succeeds because fn_require_workflow_team_membership only checks M's own revoked_at, not Team X's is_active flag, exactly as decided.
 - Stress Variant: N/A
-- Authorization Variant: N/A
+- Authorization Variant: A workflow-builder admin tries to save or publish a NEW node assignment to Team X (inactive): save_workflow_version_graph and publish_workflow_definition_version both reject it with WORKFLOW_TEAM_INACTIVE, so an inactive team can never become newly responsible for any node, draft or published (see docs/AUTHORIZATION_MODEL.md's PG-040 section).
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Approval is recorded normally, attributed to M, with no error or warning that the responsible team was deactivated at approval time.
+- Audit/Data Integrity Checks: Approval is recorded normally, attributed to M, with no error blocking the approval itself; the Operational Queue's inactive-team indicator is read-only and does not affect the audit trail.
 - Recovery/Resilience Variant: N/A
-- UX Checks: No warning is shown to M that their team is deactivated org-wide.
+- UX Checks: The Operational Queue's Team column shows a "Team inactive" badge (muted, non-blocking) alongside the team name whenever the responsible team has been deactivated, distinct from the existing destructive "No eligible approver" badge, which continues to reflect zero active members rather than team-level status.
 - Historical Variant: N/A
-- Expected Business Result: This is a real, likely-unintended-looking inconsistency: an admin who believes deactivating a team fully "locks it down" is wrong; only individually revoking each member's own team membership actually blocks approval.
-- Expected Technical Invariants: fn_require_workflow_team_membership's WHERE clause references user_teams.revoked_at IS NULL only; it never joins/filters on teams.is_active.
-- Priority: P1
+- Expected Business Result: Decided as intentional (2026-09-28): removing a user's own team membership or permission is still the only way to immediately block that specific user; deactivating the team itself is a routing control (no new assignments), not a kill switch for members already eligible.
+- Expected Technical Invariants: fn_require_workflow_team_membership's WHERE clause references user_teams.revoked_at IS NULL only; it never joins/filters on teams.is_active (unchanged, by design). save_workflow_version_graph and publish_workflow_definition_version both now raise WORKFLOW_TEAM_INACTIVE for any node bound to an inactive team.
+- Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: O-004, O-009, O-015
-- Notes: Catalogued as a confirmed real behavior per the grounding brief, not an invented defect; recommend flagging to product owners regardless of whether it is deemed "working as intended."
+- Related Journeys: O-004, O-009, O-015, T-019
+- Notes: Previously catalogued as an unresolved inconsistency; closed via PG-040 (docs/OPEN_PRODUCT_GAPS.md). The runtime approval-eligibility behavior is unchanged by design (bullet 2 of the decision); what changed is new-assignment blocking (bullet 1) plus the UX warning (bullet 3). Bullet 4 (membership/permission revocation still blocks the user immediately) was already true beforehand and required no code change.
 
 ### O-006: No edit-name/description control exists for a team
 - Pack: O - Teams
@@ -14339,30 +14339,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: T-019
 - Notes: N/A
 
-### T-019: Deactivated team still allows its still-assigned members to approve (known inconsistency)
+### T-019: Deactivated team still allows its still-assigned members to approve in-flight work; new assignments are blocked (DECIDED, PG-040)
 - Pack: T - Settings
-- Business Objective: Confirm and document the real, known inconsistency: deactivating a TEAM does not block its still-assigned members from approving at a workflow node bound to that team, since the approval check only reads user_teams.revoked_at, never teams.is_active.
+- Business Objective: Confirm the decided, accepted shape: deactivating a TEAM does not block its still-assigned members from approving in-flight work at a workflow node bound to that team (the approval check only reads user_teams.revoked_at, never teams.is_active, by design), while any NEW assignment of a node to that inactive team is now blocked outright at save and publish time, and the member sees a clear warning in the Operational Queue.
 - Domain: Team Master, Workflow Builder, Customer Onboarding (representative consumer of a team-bound node)
 - Object / Record Type: Team row, user_teams grant row, workflow node binding
 - Starting State: Team "APAC Finance" is active, has Member M as an active (non-revoked) member, and is bound to a workflow node that a request is currently sitting at.
 - Personas: Admin who deactivates the team, Member M
 - Preconditions: Admin holds team.write; Member M's own user_teams membership is NOT revoked.
-- Regular Path: Admin deactivates the "APAC Finance" team itself (teams.is_active=false). Member M, still an active (non-revoked) member per user_teams, opens the pending request and successfully approves it at the team-bound node, exactly as if the team were still active.
+- Regular Path: Admin deactivates the "APAC Finance" team itself (teams.is_active=false). Member M, still an active (non-revoked) member per user_teams, opens the pending request from the Operational Queue (which now shows a "Team inactive" badge against APAC Finance) and successfully approves it at the team-bound node, exactly as decided: deactivation is a routing control, not a block on already-eligible members.
 - Stress Variant: N/A
-- Authorization Variant: This journey confirms the actual (surprising) authorization outcome rather than the naively-expected one.
+- Authorization Variant: Admin separately attempts to save a workflow draft binding a NEW node to the now-inactive "APAC Finance" team: save_workflow_version_graph rejects it with WORKFLOW_TEAM_INACTIVE. Attempting to publish a draft version with such a binding is rejected the same way by publish_workflow_definition_version, as defense in depth.
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
 - Audit/Data Integrity Checks: The approval succeeds and is fully recorded in the Timeline as normal, attributed to Member M and the team-bound node.
-- Recovery/Resilience Variant: To actually block Member M, an admin must separately revoke Member M's user_teams membership (per T-016), not merely deactivate the team.
-- UX Checks: No warning is shown to Member M or to the admin that the team is inactive, which may itself be considered a secondary UX gap worth flagging alongside the core inconsistency.
+- Recovery/Resilience Variant: To actually block Member M specifically, an admin must separately revoke Member M's user_teams membership (per T-016), not merely deactivate the team; this was already true and needed no change.
+- UX Checks: The Operational Queue's Team column shows a "Team inactive" badge (muted, non-blocking, distinct from the destructive "No eligible approver" badge) whenever the responsible team has been deactivated.
 - Historical Variant: N/A
-- Expected Business Result: N/A (this documents a real, confirmed-in-code inconsistency, not an expected-to-pass business outcome)
-- Expected Technical Invariants: The workflow-approval eligibility check reads only user_teams.revoked_at; it does not join against or check teams.is_active at all, per the grounding brief.
-- Priority: P1
+- Expected Business Result: Decided as intentional (2026-09-28): this is no longer flagged as an unresolved inconsistency; it is the accepted design (see docs/OPEN_PRODUCT_GAPS.md, PG-040 and docs/AUTHORIZATION_MODEL.md).
+- Expected Technical Invariants: The workflow-approval eligibility check (fn_require_workflow_team_membership) reads only user_teams.revoked_at; it does not join against or check teams.is_active at all, by design. save_workflow_version_graph and publish_workflow_definition_version both now raise WORKFLOW_TEAM_INACTIVE for any node newly bound to an inactive team.
+- Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: T-016, T-018, S-007
-- Notes: This is a KNOWN REAL INCONSISTENCY explicitly flagged in the grounding brief, not a hypothesis; write the journey to confirm it reproduces exactly as described, since "deactivating a team" intuitively (but incorrectly) suggests it should block approvals.
+- Related Journeys: T-016, T-018, S-007, O-005
+- Notes: Previously catalogued as a known real inconsistency; closed via PG-040. The runtime approval-eligibility behavior for existing work is unchanged by design; what changed is new-assignment blocking plus the Operational Queue warning.
 
 ### T-020: Confirm no edit name/description control exists for a team
 - Pack: T - Settings
@@ -15698,30 +15698,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: V-023, V-026
 - Notes: This is explicitly called out in the grounding brief as "a real unhandled gap." Treat as a confirmed defect worth product attention, not merely a test to pass.
 
-### V-028: User changes team between approval levels (multi-step workflow)
+### V-028: User changes team between approval levels (multi-step workflow) (DECIDED, PG-037)
 - Pack: V - Concurrency (Permission-Change)
-- Business Objective: Confirm a user who approves at one node, then moves to a different team before the request reaches a later node they'd now also be eligible for, does not create a self-approval or double-approval bypass.
+- Business Objective: Confirm a user who approves at one node, then moves to a different team before the request reaches a later node they'd now also be eligible for, is blocked by a cross-node segregation-of-duties control, not left to create a double-approval bypass.
 - Domain: Customer Onboarding, Customer Change, Commercial Configuration, Go Live
-- Object / Record Type: workflow team membership, multi-node request
+- Object / Record Type: workflow team membership, multi-node request, workflow_node_transitions
 - Starting State: Request has at least two sequential approval nodes; User approves node 1 as a member of Team A, then is moved to Team B (which is responsible for node 2) before the request reaches node 2.
 - Personas: User, Team Admin
 - Preconditions: N/A
-- Regular Path: User attempts to approve node 2 as well.
+- Regular Path: User attempts to approve node 2 as well; all four approve RPCs now check the request's own `workflow_node_transitions` history for a prior `approve` row by the same actor (any domain, any cycle) before allowing the decision, and reject with `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION` when one is found.
 - Stress Variant: N/A
-- Authorization Variant: Confirm whether the system blocks the same user from approving twice on the same request across different nodes/teams, or whether only strict self-approval (same node, same created_by check) is blocked. This is a distinct question from simple self-approval and should be explicitly verified.
+- Authorization Variant: Confirmed live against real pre-existing data: request `c579a77c-7a3c-4c9e-ac4b-bc61b420f342` had already been approved at an earlier node by actor `99f44f93-...`; a second approve call by that same actor at the request's current node was rejected with `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`, confirming the control closes exactly the gap this journey originally surfaced.
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Two distinct workflow_node_transitions rows if both approvals are allowed, correctly attributed.
+- Audit/Data Integrity Checks: The rejected attempt writes no new `workflow_node_transitions` row (the check runs before any mutation); a legitimately distinct second approver still produces its own correctly attributed row.
 - Recovery/Resilience Variant: N/A
-- UX Checks: N/A
+- UX Checks: The rejection surfaces via `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`'s own client-side kind (`workflow_segregation_of_duties_violation`) in each domain's error-mapping file, not a generic error.
 - Historical Variant: N/A
-- Expected Business Result: Document actual behavior precisely; if the same individual can approve a request twice at two different levels, flag as a potential segregation-of-duties gap for product review even if not technically a self-approval bug per the narrow server-side definition.
-- Expected Technical Invariants: N/A
-- Priority: P1
+- Expected Business Result: Decided (2026-09-28): the same individual may never decide two or more sequential levels of one request, closing the segregation-of-duties gap for finance-sensitive multi-level approvals.
+- Expected Technical Invariants: The check is scoped across every `workflow_cycle_number` ever recorded for the resource, not only the current cycle: a send-back/resubmit cycle is still the same underlying request, so a narrower same-cycle scope would let a user approve a level, have the request sent back, and approve it again in the new cycle, defeating the control.
+- Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: N/A
-- Notes: The grounding brief confirms self-approval blocking compares actor to created_by only; it does not mention any same-actor-across-different-nodes restriction, so this journey may surface a genuine gap.
+- Notes: Closed via PG-037 (`docs/OPEN_PRODUCT_GAPS.md`, `docs/AUTHORIZATION_MODEL.md`). Previously catalogued as a potential gap pending product review; now a decided, implemented, and live-verified control.
 
 ### V-029: Permission change while the Server Action / API call is already in flight
 - Pack: V - Concurrency (Permission-Change)
@@ -19495,30 +19495,30 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Related Journeys: AB-016, AB-018
 - Notes: N/A
 
-### AB-020: Self-approval blocked for a reference_master change
+### AB-020: Reference Master has no maker-checker (accepted, single-permission direct-apply)
 - Pack: AB - Security / Direct Action / Server Enforcement
-- Business Objective: Confirm self-approval enforcement covers reference_master maker-checker flows despite the domain's permission strings only listing read/write, since the two-person control is a workflow-level guarantee.
+- Business Objective: Confirm Reference Master's actual authorization shape (single-permission direct-apply, no draft/review/approve pipeline), and that every write remains fully attributed for after-the-fact audit even though no self-approval concept applies here.
 - Domain: Reference Master
-- Object / Record Type: reference_master change request
-- Starting State: A reference_master change created_by user M, who also holds reference_master_admin (write) and is a valid checker on this workflow's approval node.
-- Personas: M (maker and checker, same person)
+- Object / Record Type: reference_options row (add/activate/deactivate/rate update)
+- Starting State: A user M holds `reference_master.write`.
+- Personas: M
 - Preconditions: N/A
-- Regular Path: M attempts to approve/checker-sign-off their own reference_master change; the underlying approve/send-back RPC raises SELF_APPROVAL_NOT_ALLOWED; rejected.
+- Regular Path: M adds, activates, deactivates, or edits a governed rate directly via the Settings UI; the Server Action requires `reference_master.write` and applies the change immediately, with no draft, no submit, no separate checker step.
 - Stress Variant: N/A
-- Authorization Variant: This IS the authorization variant.
+- Authorization Variant: Confirmed via source (`src/features/reference-data/actions.ts`, `data/reference-master.data.ts`): no approve/send-back RPC exists anywhere in this domain, and no `SELF_APPROVAL_NOT_ALLOWED`-equivalent guard exists, since there is no approval step to self-approve. This is a deliberate, decided design (PG-035, `docs/AUTHORIZATION_MODEL.md` section 26, 2026-09-28), not an oversight or an open question.
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: No approval row created.
-- Recovery/Resilience Variant: A different checker can approve normally.
+- Audit/Data Integrity Checks: every write is attributed to the real, resolved actor via the actor-aware audit RPC pattern (`docs/AUTHORIZATION_MODEL.md` section 14); the control model here is detection (a fully auditable trail), not two-person prevention.
+- Recovery/Resilience Variant: N/A
 - UX Checks: N/A
 - Historical Variant: N/A
-- Expected Business Result: Two-person control holds even in the domain whose permission model looks like plain read/write.
+- Expected Business Result: Reference Master stays single-permission, direct-apply; this is accepted, not a gap.
 - Expected Technical Invariants: N/A
-- Priority: P0
+- Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: AB-016, AB-018, AB-019
-- Notes: Included for completeness alongside the other three self-approval journeys; verify the exact RPC name/mechanism against code before automating, since reference_master's approve concept is workflow-level rather than a listed permission string.
+- Related Journeys: AB-016, AB-018, AB-019 (the three domains that DO have maker-checker; Reference Master is the deliberate exception)
+- Notes: Originally written assuming a maker-checker shape identical to AB-016/018/019; corrected 2026-09-28 (PG-035) after live source inspection found no such mechanism exists and Utkarsh decided to keep it that way rather than build one. See `docs/OPEN_PRODUCT_GAPS.md` PG-035 (Closed History) for the full decision record.
 
 ### AB-021: user_access.write self-grant gap viewed as a security/direct-action risk
 - Pack: AB - Security / Direct Action / Server Enforcement
@@ -19978,7 +19978,7 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Starting State: A request sits at an Approval node responsible to Team X; two different active Team X members, both holding valid checker permission, have the review page open simultaneously.
 - Personas: checker 1, checker 2 (both eligible, same team)
 - Preconditions: N/A
-- Regular Path: Both checkers click Approve at nearly the same instant; the server processes both calls, but the expected_current_node_key / status check ensures only the first to actually commit succeeds in transitioning the request; the second call's expected_current_node_key no longer matches (the node has already moved), so it is rejected with a clear "already actioned" style error, not a duplicate approval.
+- Regular Path: Both checkers click Approve at nearly the same instant; the server processes both calls, but the expected_current_node_key / status check ensures only the first to actually commit succeeds in transitioning the request; the second call's expected_current_node_key no longer matches (the node has already moved), so it is rejected with a clear "already actioned" style error, not a duplicate approval. This now holds consistently whether or not the winning approval was the request's final decision (see AB-043, PG-036): a final-step race loser gets an explicit `WORKFLOW_REQUEST_ALREADY_DECIDED` error instead of a silent success.
 - Stress Variant: More than two simultaneous checkers racing.
 - Authorization Variant: N/A
 - Concurrency Variant: This IS the concurrency variant.
@@ -20070,30 +20070,30 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Related Journeys: N-010, N-022, H-040
 - Notes: N-010 (Batch 4, user_roles), N-022 (Batch 4, role_permissions), and H-040 (Batch 16, user_teams) each independently discovered this identical mechanism on a different table in a different batch. Added as a single named cross-cutting journey by the Stage A Journey Universe Expansion Audit (`docs/journey-runs/JOURNEY_UNIVERSE_EXPANSION_AUDIT.md`), post-Batch 16, so a future table sharing this shape is checked against a stated invariant rather than rediscovered piecemeal a fourth time.
 
-### AB-043: Losing racer's experience in a concurrent approval differs by whether the winner's approval was the FINAL decision, not by node topology
+### AB-043: Losing racer's experience in a concurrent approval is now consistent regardless of node topology (DECIDED, PG-036)
 - Pack: AB - Security / Direct Action / Server Enforcement
-- Business Objective: Confirm concurrent-approval safety (exactly one winner, no double-approval, no corrupted state) holds regardless of how many approval steps a workflow has, and surface that the losing racer's own experience is not currently consistent: an explicit "someone else already actioned this" error when the race is for a non-final approval step vs. a silent idempotent success-shaped return when the race is for the step that finalizes the request (`status` becomes `approved`).
+- Business Objective: Confirm concurrent-approval safety (exactly one winner, no double-approval, no corrupted state) holds regardless of how many approval steps a workflow has, and confirm the losing racer's own experience is now consistent: an explicit "someone else already actioned this" error whether the race is for a non-final approval step or for the step that finalizes the request (`status` becomes `approved`), while a caller's own accidental double-click/retry against a request they themselves already decided remains a safe, silent idempotent no-op.
 - Domain: Cross-domain (any workflow-governed approval RPC using the shared `status = 'approved' -> return early` plus `expected_current_node_key` pattern; confirmed directly in `approve_customer_change_request`)
 - Object / Record Type: Any workflow-governed request (customer change request, go-live request, etc.)
 - Starting State: A request sits at an approval node two legitimate checkers can both action.
 - Personas: checker 1, checker 2 (both eligible, same team, real distinct `app_users`)
 - Preconditions: N/A
-- Regular Path: Both checkers call the approve RPC with the same `expected_current_node_key`. The RPC's `select ... for update` genuinely serializes the two calls at the database level. The first to acquire the row lock wins. If this approval is NOT the final one (the request stays `submitted`, `current_workflow_node_key` advances to the next approval node), the second call's own re-check correctly hits the `expected_current_node_key` mismatch branch (`WORKFLOW_NODE_ALREADY_ADVANCED`) since `status` is still not `'approved'` when its check runs. If this approval IS the final one (the request becomes `approved`), the second call instead hits the earlier, unconditional `if v_change_request.status = 'approved' then return v_change_request; end if;` branch, which runs *before* the node-key check regardless of topology, so it returns the current (already-approved) row with no error at all. The dividing line is "was this the terminal approval," not "is this node type `end`": corrected 2026-09-28 after a genuine multi-node race (V-003, Batch 26 reconciliation) showed the exact same silent-success behavior at a real intermediate-turned-final node in a 5-node graph (node_4, the last approval step before an `end` node), contradicting the original, narrower "end node vs mid-graph node" framing this journey shipped with.
+- Regular Path: Both checkers call the approve RPC with the same `expected_current_node_key`. The RPC's `select ... for update` genuinely serializes the two calls at the database level. The first to acquire the row lock wins. If this approval is NOT the final one (the request stays `submitted`, `current_workflow_node_key` advances to the next approval node), the second call's own re-check correctly hits the `expected_current_node_key` mismatch branch (`WORKFLOW_NODE_ALREADY_ADVANCED`) since `status` is still not `'approved'` when its check runs. If this approval IS the final one (the request becomes `approved`), the second call now compares itself against `decided_by`/`approved_by` (whichever column the domain uses): a different actor gets an explicit `WORKFLOW_REQUEST_ALREADY_DECIDED` error; the same actor calling again (a genuine accidental double-click/retry) still gets the safe, silent idempotent row back, exactly as before.
 - Stress Variant: More than two simultaneous checkers racing, same scenario.
 - Authorization Variant: N/A
-- Concurrency Variant: This IS the concurrency variant; this journey exists specifically to name the finality-dependent UX difference AB-039 (its sibling, same underlying race) did not surface, since AB-039's own canonical fixture happened to have its race land on the request's only (and therefore final) approval step.
-- Idempotency Variant: The final-approval loser's call is genuinely idempotent (safe to call twice, no side effect, no error), which is arguably a *better* API property than an error, just an inconsistent one relative to the non-final case.
-- Audit/Data Integrity Checks: Exactly one approval event recorded in both cases; no double-approval, no corrupted state, in either case (re-confirmed via V-003: exactly one `customer_field_history` row, exactly one `node_4->node_5` `workflow_node_transitions` row, despite two racing calls). This journey is about the loser's own return value/UX, not about audit correctness, which already holds.
+- Concurrency Variant: This IS the concurrency variant; this journey exists specifically to name the finality-dependent UX difference AB-039 (its sibling, same underlying race) did not originally surface, since AB-039's own canonical fixture happened to have its race land on the request's only (and therefore final) approval step.
+- Idempotency Variant: The final-approval loser's call is idempotent only when it is the SAME actor who already decided it (a genuine double-click/retry, unchanged, no error); a genuinely DIFFERENT actor racing for the final decision now gets the same explicit error shape as the non-final case.
+- Audit/Data Integrity Checks: Exactly one approval event recorded in both cases; no double-approval, no corrupted state, in either case (re-confirmed via V-003: exactly one `customer_field_history` row, exactly one `node_4->node_5` `workflow_node_transitions` row, despite two racing calls). Re-verified live post-fix (2026-09-28) against real historical data (`customer_change_requests` row `c6ed40bb-...`, already approved by actor `b2a12ef2-...`): a same-actor replay returned the row silently; a different-actor call was rejected with `WORKFLOW_REQUEST_ALREADY_DECIDED`.
 - Recovery/Resilience Variant: N/A
-- UX Checks: A UI built against this RPC would need to treat a "success" response as ambiguous (did I just approve it, or did someone else already?) when racing for the final decision, whereas racing for a non-final step, an error unambiguously means "someone else already acted."
+- UX Checks: A UI built against this RPC now gets an unambiguous signal in every case: silent success only ever means "this is genuinely your own already-completed action," any other loser gets a named error.
 - Historical Variant: N/A
 - Expected Business Result: A consistent, unambiguous signal to the losing racer regardless of which approval step in the graph the race happens to land on.
-- Expected Technical Invariants: To be decided: either (a) the early `status = 'approved'` return should also raise the same `WORKFLOW_NODE_ALREADY_ADVANCED`-style error when the caller supplied an `expected_current_node_key` and lost a race for the final approval, for consistency across all approval steps, or (b) the silent idempotent return is the intentionally simpler, accepted behavior specifically for the finalizing step, and only the non-final case's error is considered the "informative" exception, not the baseline every step must match.
+- Expected Technical Invariants: Decided (2026-09-28): the final-approval short-circuit now branches on actor identity (`decided_by`/`approved_by` vs `p_actor_user_id`), not merely on status, so it remains a true idempotency guarantee (same actor, safe no-op) while also giving a genuine race loser (different actor) the same explicit signal the non-final case already gave.
 - Priority: P2
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: AB-039, AB-013, V-003
-- Notes: Discovered live during Batch 26's AB-039 execution (2026-09-27), via a genuinely dispatched two-actor overlapping RPC race against a disposable 2-node (start/end) customer change request fixture. Source-confirmed against the shared approve-RPC pattern used across the governed workflow domains. Re-verified and corrected 2026-09-28 during V-003's genuine 5-node-graph race (Batch 26 reconciliation): the true mechanism is "was the winning approval the final one," not "is the node type `end`," since a mid-graph node reached last in the chain behaves identically to a literal `end` node here. Not a defect (no data corruption, no double-approval); a genuine Product Decision on whether the loser-experience should be made consistent across final vs. non-final approvals. See `docs/journey-runs/MORNING_RESIDUAL_QUEUE.md`.
+- Notes: Discovered live during Batch 26's AB-039 execution (2026-09-27), via a genuinely dispatched two-actor overlapping RPC race against a disposable 2-node (start/end) customer change request fixture. Source-confirmed against the shared approve-RPC pattern used across the governed workflow domains. Re-verified and corrected 2026-09-28 during V-003's genuine 5-node-graph race (Batch 26 reconciliation): the true mechanism is "was the winning approval the final one," not "is the node type `end`," since a mid-graph node reached last in the chain behaves identically to a literal `end` node here. Closed via PG-036 (`docs/OPEN_PRODUCT_GAPS.md`): implemented and live-verified against real data the same day. See `docs/journey-runs/MORNING_RESIDUAL_QUEUE.md`.
 
 ---
 
