@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
 import { PendingButton } from "@/components/product/pending-button"
+import { ResponsibleTeamInactiveBanner } from "@/components/product/responsible-team-inactive-banner"
+import type { ResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -36,6 +38,7 @@ function ChangeRequestReviewPage({
   canDecide,
   timeline = [],
   sentBackByLabel = null,
+  responsibleTeamStatus = null,
 }: {
   requestId: string
   customerName: string
@@ -46,6 +49,7 @@ function ChangeRequestReviewPage({
   timeline?: RequestTimelineEvent[]
   /** Task Phase M: resolved display label for `changeRequest.sentBack.sentBackBy`, never a raw actor id. Null when this request has never been sent back, or the actor could not be resolved. */
   sentBackByLabel?: string | null
+  responsibleTeamStatus?: ResponsibleTeamStatus | null
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<"idle" | "send_back" | "reject">("idle")
@@ -136,6 +140,8 @@ function ChangeRequestReviewPage({
       />
 
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6">
+        <ResponsibleTeamInactiveBanner responsibleTeamStatus={responsibleTeamStatus} />
+
         <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Reason</h2>
           <p className="text-sm text-foreground">{changeRequest.reason || "No reason recorded."}</p>

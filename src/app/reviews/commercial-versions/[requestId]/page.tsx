@@ -5,6 +5,7 @@ import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { loadVersion, getCommercialVersionDiff, loadCommercialVersionTimeline } from "@/features/customer-onboarding/server"
+import { getCurrentNodeResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { CommercialVersionReviewPage } from "@/features/customer-onboarding/ui/commercial-version-review-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
@@ -65,6 +66,7 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
   }
 
   const timeline = await loadCommercialVersionTimeline(requestId)
+  const responsibleTeamStatus = await getCurrentNodeResponsibleTeamStatus(version.workflowVersionId, version.currentWorkflowNodeKey)
 
   return (
     <AuthGate
@@ -82,6 +84,7 @@ export default async function CommercialVersionReviewRoute({ params }: { params:
           canDecide={canDecide}
           diff={diff}
           timeline={timeline}
+          responsibleTeamStatus={responsibleTeamStatus}
         />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>

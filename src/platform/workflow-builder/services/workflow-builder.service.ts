@@ -61,6 +61,28 @@ async function getResponsibleTeamIdsByNode(versionIds: string[]): Promise<Map<st
   return new Map(nodeRows.map((row) => [`${row.workflow_version_id}::${row.node_key}`, row.responsible_team_id]))
 }
 
+type ResponsibleTeamStatus = { teamId: string; teamName: string; isActive: boolean }
+
+/**
+ * The single request/case detail page's own equivalent of
+ * `getResponsibleTeamIdsByNode` (Product Gap Closure, PG-040): a review
+ * page shows exactly one request, so it resolves one node's team rather
+ * than batching across many. Null whenever no workflow is bound, the
+ * current node names no team, or the team no longer exists. Reviewer
+ * pages use this to warn when the responsible team has been deactivated,
+ * the same fact the Operational Queue's own badge already surfaces for
+ * the cross-request list view.
+ */
+async function getCurrentNodeResponsibleTeamStatus(workflowVersionId: string | null, nodeKey: string | null): Promise<ResponsibleTeamStatus | null> {
+  if (!workflowVersionId || !nodeKey) return null
+  const [nodeRows, teams] = await Promise.all([workflowData.listNodesForVersion(workflowVersionId), listTeams()])
+  const node = nodeRows.find((row) => row.node_key === nodeKey)
+  if (!node?.responsible_team_id) return null
+  const team = teams.find((candidate) => candidate.id === node.responsible_team_id)
+  if (!team) return null
+  return { teamId: team.id, teamName: team.name, isActive: team.isActive }
+}
+
 type WorkflowTransitionTimelineInputs = {
   transitions: WorkflowTransitionRecord[]
   nodeDisplayByKey: Map<string, WorkflowNodeDisplay>
@@ -211,6 +233,7 @@ export {
   listVersionsForDefinition,
   loadWorkflowGraph,
   getResponsibleTeamIdsByNode,
+  getCurrentNodeResponsibleTeamStatus,
   getWorkflowTransitionTimelineInputs,
   createDefinition,
   setDefinitionActive,
@@ -221,4 +244,4 @@ export {
   publishVersion,
   discardVersion,
 }
-export type { WorkflowGraph }
+export type { WorkflowGraph, ResponsibleTeamStatus }

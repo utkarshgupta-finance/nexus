@@ -5,6 +5,7 @@ import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
 import { loadChangeRequest, getCurrentGovernedValues, loadChangeRequestTimeline } from "@/features/customer-change/server"
+import { getCurrentNodeResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { ChangeRequestReviewPage } from "@/features/customer-change/ui/change-request-review-page"
 import { getCustomerById } from "@/features/customers/server"
 import { resolveActorLabels } from "@/platform/audit/server"
@@ -52,6 +53,7 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
   /** Task Phase M: the "Previously sent back" banner needs its own resolved actor label, independent of the Timeline's own resolution. */
   const sentBackByLabels = await resolveActorLabels([changeRequest.sentBack?.sentBackBy ?? null])
   const sentBackByLabel = changeRequest.sentBack?.sentBackBy ? (sentBackByLabels.get(changeRequest.sentBack.sentBackBy) ?? null) : null
+  const responsibleTeamStatus = await getCurrentNodeResponsibleTeamStatus(changeRequest.workflowVersionId, changeRequest.currentWorkflowNodeKey)
 
   return (
     <AuthGate
@@ -70,6 +72,7 @@ export default async function ChangeRequestReviewRoute({ params }: { params: Pro
           canDecide={canDecide}
           timeline={timeline}
           sentBackByLabel={sentBackByLabel}
+          responsibleTeamStatus={responsibleTeamStatus}
         />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>

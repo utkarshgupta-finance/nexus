@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
 import { PendingButton } from "@/components/product/pending-button"
+import { ResponsibleTeamInactiveBanner } from "@/components/product/responsible-team-inactive-banner"
+import type { ResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -50,6 +52,7 @@ function CommercialVersionReviewPage({
   canDecide,
   diff,
   timeline = [],
+  responsibleTeamStatus = null,
 }: {
   requestId: string
   configId: string
@@ -60,6 +63,7 @@ function CommercialVersionReviewPage({
   /** Current vs Proposed (task Phase G); null only when there is nothing yet to compare (no active prior Commercial Components, or no draft saved). */
   diff: CommercialRateDiff | null
   timeline?: RequestTimelineEvent[]
+  responsibleTeamStatus?: ResponsibleTeamStatus | null
 }) {
   const router = useRouter()
   const snapshot = useReferenceMasterSnapshot()
@@ -134,6 +138,8 @@ function CommercialVersionReviewPage({
       />
 
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6">
+        <ResponsibleTeamInactiveBanner responsibleTeamStatus={responsibleTeamStatus} />
+
         <section className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Reason</h2>
           <p className="text-sm text-foreground">{version.reason || "No reason recorded."}</p>

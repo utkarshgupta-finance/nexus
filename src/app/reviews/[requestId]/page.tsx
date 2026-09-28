@@ -5,6 +5,7 @@ import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer, hasPermissionForBusinessUnit } from "@/platform/permissions/server"
 import { getOnboardingCase, listOnboardingDocumentsWithUploader, loadOnboardingRequestTimeline } from "@/features/customer-onboarding/server"
+import { getCurrentNodeResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { ReviewDetailPage } from "@/features/customer-onboarding/ui/review-detail-page"
 import { emptySnapshot, loadReferenceMasterSnapshot } from "@/features/reference-data/server"
 import { ReferenceMasterSnapshotProvider } from "@/features/reference-data/ui/snapshot-context"
@@ -57,11 +58,19 @@ export default async function ReviewDetailRoute({ params }: { params: Promise<{ 
   }
 
   const timeline = await loadOnboardingRequestTimeline(requestId, actorUserId)
+  const responsibleTeamStatus = await getCurrentNodeResponsibleTeamStatus(onboardingCase.workflowVersionId, onboardingCase.currentWorkflowNodeKey)
 
   return (
     <AuthGate session={session} requiredPermission={CUSTOMER_READ} loginRedirectTo={`/reviews/${requestId}`} additionalAccessGranted={canAccessThisCase}>
       <ReferenceMasterSnapshotProvider snapshot={snapshot}>
-        <ReviewDetailPage requestId={requestId} onboardingCase={onboardingCase} canApprove={canApprove} documents={documents} timeline={timeline} />
+        <ReviewDetailPage
+          requestId={requestId}
+          onboardingCase={onboardingCase}
+          canApprove={canApprove}
+          documents={documents}
+          timeline={timeline}
+          responsibleTeamStatus={responsibleTeamStatus}
+        />
       </ReferenceMasterSnapshotProvider>
     </AuthGate>
   )

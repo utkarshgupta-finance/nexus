@@ -937,16 +937,29 @@ newly binding a node to an already-inactive team, draft or published.
 1. Deactivated teams must not receive new workflow assignments.
 2. Existing in-flight requests already assigned to the team may still be
    actioned by currently eligible members. `fn_require_workflow_team_membership`
-   is deliberately left unchanged: a save/publish-time check is the
-   correct control point, not a runtime approval-time one, since
-   published workflow versions are immutable and never re-validated
-   against a team's later status.
-3. The Operational Queue shows a clear, non-blocking "Team inactive"
-   warning wherever a pending item's responsible team has been
+   is deliberately left unchanged: this is the correct runtime
+   approval-eligibility gate, and it is never re-validated against a
+   team's later status.
+3. Every review surface (the Operational Queue's cross-request list AND
+   each individual request's own review page) shows a clear, non-blocking
+   "Team inactive" warning wherever the responsible team has been
    deactivated, so the fact is visible instead of silent.
 4. Removing a user's own team membership or permission still blocks that
    user immediately (unchanged, already correct: this was never gated on
    team-level status in the first place).
+
+**Regression found and closed, same day (2026-09-28):** the initial
+implementation only stopped a workflow-builder ADMIN from newly authoring
+a save/publish-time binding to an inactive team. It did NOT stop an
+ALREADY-PUBLISHED, already-in-flight request from being newly routed
+FORWARD into a node whose responsible team had since been deactivated,
+since published workflow versions are immutable and their node-team
+bindings are resolved once at publish time, never re-validated at
+approval time. This is the actual "new work" routing gap bullet 1 exists
+to close; the save/publish guard alone cannot close it. Fixed by checking
+the NEXT node's team status inside each approve RPC itself, at the exact
+point a request would be newly assigned to that node (see Implementation
+below).
 
 **Implementation:**
 - `save_workflow_version_graph` now raises `WORKFLOW_TEAM_INACTIVE` if any
@@ -957,6 +970,15 @@ newly binding a node to an already-inactive team, draft or published.
 - `publish_workflow_definition_version` re-checks the same invariant as
   defense in depth, immediately after its existing draft-status guard,
   before any of its other structural validation.
+- All four approve RPCs now also check the team status of the NEXT node
+  a request would advance to, using `fn_resolve_workflow_next_approval`'s
+  own `team_id` column (already returned, no new query): if that team is
+  inactive, the RPC raises `WORKFLOW_TEAM_INACTIVE` before any mutation
+  (`supabase/migrations/20261016000000_pg037_scope_to_node_level_pg040_runtime_routing_guard.sql`).
+  A rejection is always a full transaction rollback: no partial state, no
+  orphaned request, no team change. This is the real "new work" routing
+  control; the save/publish guard is defense in depth for the authoring
+  step only.
 - `OperationalQueueEntry.isResponsibleTeamInactive`
   (`src/platform/approvals/domain/operational-queue.ts`) is computed from
   the same `teams.is_active` already read for team-name resolution, no
@@ -965,16 +987,36 @@ newly binding a node to an already-inactive team, draft or published.
   from the existing destructive "No eligible approver" badge (O-018),
   since the two conditions are independent: a deactivated team can still
   have active members, and an active team can still have zero.
+- `getCurrentNodeResponsibleTeamStatus` (`src/platform/workflow-builder/services/workflow-builder.service.ts`)
+  is the single-request equivalent of the Operational Queue's batched
+  team resolution, used by all four review-page routes (onboarding
+  case, change request, commercial version, go-live). A shared
+  `ResponsibleTeamInactiveBanner` component
+  (`src/components/product/responsible-team-inactive-banner.tsx`) renders
+  the same warning directly on the page a reviewer is actually deciding
+  the request from, not only in the cross-request queue list.
 - Bullet 4 required no change: user-level membership/permission removal
   was already the only real block on a specific user, independent of
   team-level status.
 
-**Verified:** live against real RPC calls (not just unit tests): a save
-attempt binding a node to a genuinely inactive team (`West Region
-Finance`) was rejected with `WORKFLOW_TEAM_INACTIVE`; an otherwise
-identical save with an active/unassigned team succeeded normally, on the
-same draft version, confirming the check does not over-block legitimate
-saves.
+**Verified live against real, in-flight data** (not just unit tests):
+- Save/publish guard: a save attempt binding a node to a genuinely
+  inactive team (`West Region Finance`) was rejected with
+  `WORKFLOW_TEAM_INACTIVE`; an otherwise identical save with an
+  active/unassigned team succeeded normally, on the same draft version.
+- Runtime routing guard (bullet 1, the actual gap): a real, in-flight Go
+  Live request (`go_live_requests` row `859d7124-...`) sitting at its
+  Start node, whose next Approval node's team ("UX Verification Team")
+  was temporarily deactivated for this test. Approving was rejected with
+  `WORKFLOW_TEAM_INACTIVE`; confirmed zero mutation (no new
+  `workflow_node_transitions` row, request row unchanged); team restored
+  active afterward.
+- Existing work stays actionable (bullet 2): a second real, in-flight Go
+  Live request (`go_live_requests` row `6936e419-...`) sitting at an
+  Approval node whose responsible team ("WF-TEST Legal") was temporarily
+  deactivated. An eligible member of that team still approved
+  successfully, finalizing the request normally; team restored active
+  afterward.
 
 **Documentation:** O-005 and T-019's canonical text in
 `docs/NEXUS_JOURNEY_UNIVERSE.md` rewritten from "known inconsistency" to
@@ -1020,32 +1062,71 @@ let a user approve a level, have the request sent back, and approve it
 again in the next cycle, defeating the control it exists to provide. Each
 approve RPC now checks, before any other domain-specific work, whether
 `workflow_node_transitions` already has an `approve` row for this
-resource by the same actor (any node, any cycle); if so, it raises the
-new named token `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`.
+resource by the same actor at a DIFFERENT node than the one currently
+being decided (any cycle); if so, it raises the new named token
+`WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`.
+
+**Regression correction, same day (2026-09-28):** the first implementation
+compared only actor and resource, blocking ANY second approval by the
+same actor, including the legitimate case of the same actor re-deciding
+the SAME node again after a send-back and resubmission (a cycle
+boundary, not a different level). Narrowed to compare the prior
+approval's own `from_node_key` (the level it was decided at) against
+`current_workflow_node_key` (the level currently being decided): a prior
+approval of a DIFFERENT node blocks; a prior approval of THIS SAME node,
+however many cycles ago, is a legitimate reapproval and stays allowed.
+Migration
+`supabase/migrations/20261016000000_pg037_scope_to_node_level_pg040_runtime_routing_guard.sql`.
 
 **Implementation:**
 `supabase/migrations/20261015000000_approve_rpcs_already_decided_and_segregation_of_duties.sql`
-replaces all four RPCs with both checks added in the same relative
-position (immediately after the existing `SELF_APPROVAL_NOT_ALLOWED`
-and `WORKFLOW_NODE_ALREADY_ADVANCED` checks, before any team-membership
-or domain-specific work). Both new tokens are added to all four
-client-side error-mapping files
-(`case-errors.ts`, `change-errors.ts`, `commercial-version-errors.ts`,
-`go-live-errors.ts`), each with its own parser test.
+(original) and `20261016000000_...` (node-level narrowing) replace all
+four RPCs with both checks added in the same relative position
+(immediately after the existing `SELF_APPROVAL_NOT_ALLOWED` and
+`WORKFLOW_NODE_ALREADY_ADVANCED` checks, before any team-membership or
+domain-specific work). Both new tokens are added to all four client-side
+error-mapping files (`case-errors.ts`, `change-errors.ts`,
+`commercial-version-errors.ts`, `go-live-errors.ts`), each with its own
+parser test.
 
 **Verified live against real, pre-existing data** (not only unit tests):
 - PG-036: `customer_change_requests` row `c6ed40bb-...` (already approved,
   `decided_by = b2a12ef2-...`). A same-actor replay returned the row
   silently, no error. A different-actor call was rejected with
   `WORKFLOW_REQUEST_ALREADY_DECIDED`.
-- PG-037: `customer_change_requests` row `c579a77c-...` (in-flight,
-  status `submitted`, already approved at an earlier node by actor
-  `99f44f93-...`, exactly the V-028 scenario the real historical data had
-  already reproduced organically). A second approve call by that same
-  actor at the request's current node was rejected with
-  `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION`.
+- PG-037 (cross-node block, re-verified after narrowing):
+  `customer_change_requests` row `c579a77c-...` (in-flight, status
+  `submitted`, already approved at an earlier node by actor `99f44f93-...`,
+  exactly the V-028 scenario the real historical data had already
+  reproduced organically). A second approve call by that same actor at
+  the request's current (different) node was still rejected with
+  `WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION` after the node-level
+  narrowing, confirming the fix did not weaken the actual control.
+- PG-037 (same-node reapproval after resubmission, allowed): real
+  historical data (`customer_change_requests` row `1ba55311-...`) already
+  contains a genuine send-back/resubmit cycle where actor `cbfb7860-...`
+  legitimately approved the SAME node (`node_2`) twice, once per cycle,
+  before this control existed. Verified directly: the OLD (unnarrowed)
+  predicate would have wrongly blocked this real, already-happened
+  reapproval (`exists(...) = true`, ignoring node); the NEW (narrowed)
+  predicate correctly allows it (`exists(...) = false`, comparing
+  `from_node_key`).
+- PG-040 (runtime routing, new work blocked): a real, in-flight Go Live
+  request (`go_live_requests` row `859d7124-...`) sitting at its Start
+  node, whose next Approval node's team ("UX Verification Team") was
+  temporarily deactivated for this test. Approving was rejected with
+  `WORKFLOW_TEAM_INACTIVE`, confirmed zero mutation (`workflow_node_transitions`
+  count unchanged at 0, request row unchanged), before the team was
+  restored active.
+- PG-040 (existing work stays actionable): a second real, in-flight Go
+  Live request (`go_live_requests` row `6936e419-...`) sitting at an
+  Approval node whose responsible team ("WF-TEST Legal") was temporarily
+  deactivated. An eligible member of that team still approved
+  successfully, finalizing the request normally, confirming a
+  deactivated team never blocks work already routed to it. Team restored
+  active afterward.
 
-**Documentation:** AB-039, AB-043 (PG-036) and V-028 (PG-037)'s canonical
-text in `docs/NEXUS_JOURNEY_UNIVERSE.md` rewritten from "decision
-pending"/"potential gap" to the decided, implemented, and live-verified
-shape.
+**Documentation:** AB-039, AB-043 (PG-036), V-028 (PG-037), and O-005/
+T-019 (PG-040)'s canonical text in `docs/NEXUS_JOURNEY_UNIVERSE.md`
+rewritten from "decision pending"/"potential gap" to the decided,
+implemented, and live-verified shape.

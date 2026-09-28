@@ -8,6 +8,8 @@ import { CheckCircle2Icon } from "lucide-react"
 import { PageHeader } from "@/components/product/page-header"
 import { KeyValueGrid } from "@/components/product/key-value-grid"
 import { PendingButton } from "@/components/product/pending-button"
+import { ResponsibleTeamInactiveBanner } from "@/components/product/responsible-team-inactive-banner"
+import type { ResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,12 +57,14 @@ function ReviewDetailPage({
   canApprove,
   documents,
   timeline = [],
+  responsibleTeamStatus = null,
 }: {
   requestId: string
   onboardingCase: CustomerOnboardingCase
   canApprove: boolean
   documents: PersistedOnboardingDocumentView[]
   timeline?: OnboardingTimelineEvent[]
+  responsibleTeamStatus?: ResponsibleTeamStatus | null
 }) {
   const router = useRouter()
   const snapshot = useReferenceMasterSnapshot()
@@ -152,6 +156,8 @@ function ReviewDetailPage({
       />
 
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6">
+        <ResponsibleTeamInactiveBanner responsibleTeamStatus={responsibleTeamStatus} />
+
         <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Customer Details</h2>
           <KeyValueGrid

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 
 import { PageHeader } from "@/components/product/page-header"
 import { PendingButton } from "@/components/product/pending-button"
+import { ResponsibleTeamInactiveBanner } from "@/components/product/responsible-team-inactive-banner"
+import type { ResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +50,7 @@ function GoLiveDetailPage({
   canSubmit,
   canApprove,
   isCreator,
+  responsibleTeamStatus = null,
 }: {
   customerKey: string
   request: GoLiveRequest
@@ -57,6 +60,7 @@ function GoLiveDetailPage({
   canSubmit: boolean
   canApprove: boolean
   isCreator: boolean
+  responsibleTeamStatus?: ResponsibleTeamStatus | null
 }) {
   const router = useRouter()
   const [goLiveDate, setGoLiveDate] = useState(request.goLiveDate)
@@ -159,6 +163,8 @@ function GoLiveDetailPage({
       />
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6">
+        <ResponsibleTeamInactiveBanner responsibleTeamStatus={responsibleTeamStatus} />
+
         {error ? (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-destructive">{error}</p>

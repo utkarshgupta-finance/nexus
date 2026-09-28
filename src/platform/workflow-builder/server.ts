@@ -14,6 +14,7 @@ export {
   listVersionsForDefinition,
   loadWorkflowGraph,
   getResponsibleTeamIdsByNode,
+  getCurrentNodeResponsibleTeamStatus,
   getWorkflowTransitionTimelineInputs,
   createDefinition,
   setDefinitionActive,
@@ -24,7 +25,7 @@ export {
   publishVersion,
   discardVersion,
 } from "./services/workflow-builder.service"
-export type { WorkflowGraph } from "./services/workflow-builder.service"
+export type { WorkflowGraph, ResponsibleTeamStatus } from "./services/workflow-builder.service"
 export type {
   WorkflowDefinition,
   WorkflowDefinitionVersion,

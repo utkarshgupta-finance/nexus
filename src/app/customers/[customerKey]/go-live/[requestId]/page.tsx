@@ -5,7 +5,7 @@ import { AuthGate, lacksRecordPermission } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
 import { resolveActorLabels } from "@/platform/audit/server"
-import { getWorkflowTransitionTimelineInputs, buildWorkflowTransitionEvents } from "@/platform/workflow-builder/server"
+import { getWorkflowTransitionTimelineInputs, buildWorkflowTransitionEvents, getCurrentNodeResponsibleTeamStatus } from "@/platform/workflow-builder/server"
 import { getCustomerByKey } from "@/features/customers/server"
 import {
   getGoLiveRequestById,
@@ -61,6 +61,7 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
   const timelineEvents = buildGoLiveTimeline(request, sendBacks, actorLabels, workflowTransitionEvents)
   const lineItem = lineItems.find((item) => item.stableComponentKey === request.stableComponentKey) ?? null
   const isCreator = session.status === "active" && session.appUserId === request.createdBy
+  const responsibleTeamStatus = await getCurrentNodeResponsibleTeamStatus(request.workflowVersionId, request.currentWorkflowNodeKey)
 
   return (
     <AuthGate session={session} requiredPermission={GO_LIVE_READ} loginRedirectTo={`/customers/${customerKey}/go-live/${requestId}`}>
@@ -73,6 +74,7 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
         canSubmit={canSubmit}
         canApprove={canApprove}
         isCreator={isCreator}
+        responsibleTeamStatus={responsibleTeamStatus}
       />
     </AuthGate>
   )
