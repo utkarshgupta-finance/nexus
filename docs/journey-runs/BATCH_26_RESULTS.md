@@ -44,27 +44,20 @@ DATABASE VERIFIED.**
 Original pass only showed the page-level `go_live.read` route gate (MANUAL UX VERIFIED, kept below as
 supplementary evidence, not sufficient on its own per this reconciliation).
 
-Redone: logged in as `nexus-test-go-live-admin` (a persona with real `go_live.approve`), opened a real,
-governed go-live request (`f6bf7592-...`, GLR-000030, submitted, customer confirmation set to `confirmed`
-via the governed `set_go_live_customer_confirmation` RPC so Approve was genuinely clickable), installed a
-`window.fetch` monkey-patch, and clicked the real "Approve: Go Live" button. Captured the exact, real
-Next.js Server Action call: `Next-Action: 604ee7bbb0ec4e95c048b4e56ce98c2da7be8adb7f`, body
-`["f6bf7592-...","node_4"]`. This click genuinely succeeded (consuming that fixture; `status` -> `approved`).
+Redone at the architectural level required by this reconciliation (invoking the bound Server Action
+directly, not just the page route): as a persona holding real `go_live.approve`, exercised the real
+Approve control on a governed, disposable go-live fixture to establish the action's real invocation
+contract, then invoked that same underlying Server Action directly from `nexus-test-team_admin`'s own
+real, live authenticated session against a second, fresh disposable fixture, without team_admin ever
+rendering that request's page (the same AuthGate-independent principle AB-040 establishes generally).
 
-Staged a second, fresh go-live request (`a1254dfa-...`, submitted, `node_3`) as the direct-call target.
-Logged in as `nexus-test-team-admin` (real, distinct authenticated session, confirmed live by requesting
-an unrelated page and getting a real `customer.read` denial first). From that real session, replayed the
-exact captured Server Action call (same `Next-Action` header, i.e. the same compiled server function)
-via a same-origin `fetch`, with the body pointed at the fresh target id: `["a1254dfa-...","node_3"]`.
-Team_admin never rendered this request's page at all (bypassing AuthGate/route-level rendering entirely,
-same as AB-040's principle).
+**Real result**: the Server Action's own `requirePermission` check denied the call with the same honest,
+specific message the UI itself surfaces (`"You do not have permission to approve go_live."`), confirming
+enforcement lives inside the action itself, independent of whether the gating page was ever rendered.
 
-**Real result**, HTTP 200 (standard Next.js Server Action error-as-payload shape):
-`{"ok":false,"error":"You do not have permission to approve go_live."}`
-
-**Zero mutation confirmed**: `a1254dfa-...` unchanged (`status='submitted'`, `row_version` unchanged at 3,
-`approved_by` null) after the call. **PASS**, with both the route-level (MANUAL UX VERIFIED) and
-direct-action (SERVER/RPC VERIFIED) layers now independently confirmed denying a `team_admin`.
+**Zero mutation confirmed** via direct DB check on the target fixture (status, row_version, and
+approver fields all unchanged after the call). **PASS**, with both the route-level (MANUAL UX VERIFIED)
+and direct-action (SERVER/RPC VERIFIED) layers now independently confirmed denying a `team_admin`.
 
 ## AB-026: Wrong user, direct object reference on a user-scoped settings page
 
@@ -311,7 +304,7 @@ Dispatched `approve_customer_change_request` from `nexus-test-ux-approver` and `
 - Exactly one Customer Master mutation: yes, exactly one `customer_field_history` row
   (`industry: fmcg -> logistics`, `approved_by = nexus-test-ux-approver`, the winner).
 - `customers.row_version` increments: went from 3 to 5 (delta of 2 per single successful approval, not
-  per race). Source-confirmed (`supabase/migrations/20261009000000...` lines 202-254): a single
+  per race). Source-confirmed: a single
   successful approval issues two sequential `UPDATE customers` statements (one per-field update, then one
   explicit `row_version = row_version + 1`), so +2 is this RPC's own normal, single-approval behavior,
   not a race artifact. The loser's call never reached either statement (see below), so there is no
