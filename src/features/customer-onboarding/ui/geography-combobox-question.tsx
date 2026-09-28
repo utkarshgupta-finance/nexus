@@ -89,10 +89,11 @@ function ChoiceGeographyCombobox({
       onValueChange={handleValueChange}
       isItemEqualToValue={isSameOption}
       disabled={disabled}
+      required={question.isRequired}
       open={isOpen}
       onOpenChange={setIsOpen}
     >
-      <ComboboxTrigger id={question.inputId} aria-required={question.isRequired}>
+      <ComboboxTrigger id={question.inputId}>
         <ComboboxValue placeholder={question.placeholder || "Select..."}>
           {(item: ComboboxOption | null) => item?.label}
         </ComboboxValue>
@@ -263,10 +264,11 @@ function CityGeographyCombobox({
       filter={null}
       isItemEqualToValue={isSameOption}
       disabled={disabled}
+      required={question.isRequired}
       open={isOpen}
       onOpenChange={handleOpenChange}
     >
-      <ComboboxTrigger id={question.inputId} aria-required={question.isRequired}>
+      <ComboboxTrigger id={question.inputId}>
         <ComboboxValue placeholder={placeholder}>{(item: ComboboxOption | null) => item?.label}</ComboboxValue>
         <ComboboxIcon />
       </ComboboxTrigger>

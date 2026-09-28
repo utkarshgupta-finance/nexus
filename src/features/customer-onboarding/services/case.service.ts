@@ -4,7 +4,7 @@ import * as caseData from "../data/case.data"
 import { toCustomerOnboardingCase, groupRevisionsByRequestId } from "../domain/case-mappers"
 import { countSendBacksByRequestId } from "../domain/my-requests"
 import { withLoggedOperation } from "@/platform/observability/server"
-import { newId } from "../domain/commercial-rate"
+import { newId, isCommercialRateDraftComplete } from "../domain/commercial-rate"
 import { mapOnboardingComponentToCommercialComponentInsert } from "../domain/commercial-configuration-promotion"
 import { extractGovernedCustomerFieldsFromOnboarding } from "../domain/onboarding-customer-field-mapping"
 import { getBusinessDateYear } from "@/lib/date"
@@ -408,7 +408,7 @@ async function approveOnboardingCase(
       }
 
       const commercialRate = values[COMMERCIAL_RATE_FIELD] as CommercialRateDraft | undefined
-      if (!commercialRate || !commercialRate.billingCurrency || commercialRate.components.length === 0) {
+      if (!commercialRate || !isCommercialRateDraftComplete(snapshot, commercialRate)) {
         throw new Error("Cannot approve a case with no complete Commercial Rate recorded.")
       }
 

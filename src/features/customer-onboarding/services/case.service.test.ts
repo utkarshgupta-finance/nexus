@@ -294,7 +294,20 @@ describe("approveOnboardingCase calls ensureOnboardingEffectiveDateException bef
     effective_data: {
       values: {
         customer_legal_entity_name: "PD-002 Regression Co",
-        commercial_rate: { billingCurrency: "INR", components: [{ id: "c-1", nature: "non_recurring", pricingModel: "flat_fee", amount: 1000, invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: null }, revenueRecognition: { method: "full_recognition" } }] },
+        commercial_rate: {
+          billingCurrency: "INR",
+          components: [
+            {
+              id: "c-1",
+              description: "One-time setup fee",
+              nature: "non_recurring",
+              pricingModel: "flat_fee",
+              amount: 1000,
+              invoiceTerms: { invoiceFrequency: "one_time", invoiceTiming: "advance" },
+              revenueRecognition: { method: "full_recognition" },
+            },
+          ],
+        },
       },
     },
   }
@@ -320,5 +333,53 @@ describe("approveOnboardingCase calls ensureOnboardingEffectiveDateException bef
 
     expect(ensureOnboardingEffectiveDateException).toHaveBeenCalledWith("req-1", "2099-01-01", "checker-1")
     expect(approveCase).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * PG-039 (E-022, Batch 12): a Designation Based component with zero rate
+ * rows priced nothing, but `approveOnboardingCase`'s own completeness gate
+ * only checked `commercialRate.components.length === 0`, never each
+ * component's own completeness, so it let a zero-row designation component
+ * straight through to approval (live-verified against a disposable
+ * fixture). commercial-version.service.ts's `approveVersion` already
+ * called `isCommercialRateDraftComplete` for the sibling Commercial
+ * Configuration Version flow; this guards the onboarding approval gate
+ * uses the exact same completeness check.
+ */
+describe("approveOnboardingCase rejects an incomplete Commercial Rate (PG-039)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("throws for a Designation Based component with zero rate rows", async () => {
+    getLatestRevisionForRequest.mockResolvedValue({
+      ...SUBMITTED_REVISION_ROW,
+      effective_data: {
+        values: {
+          customer_legal_entity_name: "PG-039 Regression Co",
+          commercial_rate: {
+            billingCurrency: "INR",
+            components: [
+              {
+                id: "c-1",
+                description: "Designation fee",
+                nature: "recurring",
+                pricingModel: "designation_based",
+                designationRows: [],
+                mug: { enabled: false },
+                invoiceTerms: { invoiceFrequency: "monthly", invoiceTiming: "advance" },
+                revenueRecognition: { method: "full_recognition", milestones: [] },
+              },
+            ],
+          },
+        },
+      },
+    })
+
+    await expect(approveOnboardingCase("req-1", "checker-1", {} as never, "2026-01-01")).rejects.toThrow(
+      "Cannot approve a case with no complete Commercial Rate recorded."
+    )
+    expect(approveCase).not.toHaveBeenCalled()
   })
 })

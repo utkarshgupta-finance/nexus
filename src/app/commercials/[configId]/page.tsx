@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
@@ -32,6 +33,7 @@ const COMMERCIAL_CONFIGURATION_READ = { resource: "commercial_configuration", ac
 
 export default async function CommercialConfigurationPage({ params }: { params: Promise<{ configId: string }> }) {
   const { configId } = await params
+  if (!isValidUuid(configId)) notFound()
   const session = await getCurrentNexusSession()
 
   let configuration: Awaited<ReturnType<typeof commercialConfigurationService.getCommercialConfiguration>> = null

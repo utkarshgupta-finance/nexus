@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import type { Edge } from "@xyflow/react"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { sessionHasPermission } from "@/platform/permissions"
@@ -19,6 +20,7 @@ export default async function WorkflowCanvasRoute({
   params: Promise<{ definitionId: string; versionId: string }>
 }) {
   const { definitionId, versionId } = await params
+  if (!isValidUuid(versionId)) notFound()
   const session = await getCurrentNexusSession()
 
   const [graph, teams] = await Promise.all([loadWorkflowGraph(versionId), listActiveTeams()])

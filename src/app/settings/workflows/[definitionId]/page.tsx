@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
@@ -14,6 +15,7 @@ const WORKFLOW_READ = { resource: "workflow_definition", action: "read" }
 
 export default async function WorkflowVersionHistoryRoute({ params }: { params: Promise<{ definitionId: string }> }) {
   const { definitionId } = await params
+  if (!isValidUuid(definitionId)) notFound()
   const session = await getCurrentNexusSession()
 
   const definition = await getDefinition(definitionId)

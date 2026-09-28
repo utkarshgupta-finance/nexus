@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermissionForCustomer } from "@/platform/permissions/server"
@@ -22,6 +23,7 @@ const COMMERCIAL_CONFIGURATION_WRITE = { resource: "commercial_configuration", a
 
 export default async function CommercialConfigurationVersionRoute({ params }: { params: Promise<{ configId: string; requestId: string }> }) {
   const { configId, requestId } = await params
+  if (!isValidUuid(configId) || !isValidUuid(requestId)) notFound()
   const session = await getCurrentNexusSession()
 
   const version = await loadVersion(requestId)

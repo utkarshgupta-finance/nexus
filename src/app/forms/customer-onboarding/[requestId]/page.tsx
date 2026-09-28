@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 
+import { isValidUuid } from "@/lib/uuid"
 import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { hasPermission } from "@/platform/permissions/server"
@@ -27,6 +28,7 @@ const CUSTOMER_CREATE = { resource: "customer", action: "create" }
 
 export default async function CustomerOnboardingCaseRoute({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
+  if (!isValidUuid(requestId)) notFound()
   const session = await getCurrentNexusSession()
 
   // PD-001 (A-036): while the case is in draft, only its own creator may
