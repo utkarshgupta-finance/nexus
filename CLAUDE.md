@@ -272,7 +272,10 @@ each proven end-to-end (data → domain → UI) before the next one starts.
 
 During Nexus journey execution, the Journey Discovery Execution Protocol
 in `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md` is mandatory for every journey
-and every batch closure.
+and every batch closure. Every confirmed Product Gap must be registered
+in `docs/OPEN_PRODUCT_GAPS.md` (current-state source of truth) per that
+plan's Product Gap Register and Immediate-Closure Protocol; a batch may
+not close with an unregistered gap.
 
 ## Writing style
 

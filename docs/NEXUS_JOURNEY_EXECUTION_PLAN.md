@@ -169,6 +169,72 @@ The overnight run is considered useful even if some residuals remain. Priority o
 honest evidence, (3) maximum journey coverage, (4) full closure where possible. Do not sacrifice many
 executable journeys because one journey cannot close.
 
+## Product Gap Register and Immediate-Closure Protocol (added 2026-09-28, after Batch 27)
+
+Every confirmed Product Gap must live in exactly one place as current-state truth:
+`docs/OPEN_PRODUCT_GAPS.md` (the Product Gap Register). Batch ledgers remain the evidence/history record
+of how a gap was found and verified; the register is the single source of truth for whether it is still
+open. A Product Gap that exists only in a batch ledger's prose, with no register entry, is not considered
+tracked.
+
+**A. Immediate response required.** Whenever a journey results in classification `PRODUCT GAP CONFIRMED`,
+do not silently continue to the next journey. Before moving on:
+
+1. Search the register first. If the same underlying gap already has an entry (same mechanism, not merely
+   a similar-sounding one), link the new journey ID to that existing entry. Never create a duplicate entry
+   for the same underlying gap.
+2. If no existing entry covers it, register it immediately in `docs/OPEN_PRODUCT_GAPS.md`, using the
+   register's standard fields (status, first discovered, related journeys, domain, gap description,
+   current vs. expected behaviour, business/control consequence, whether a Product Decision is required).
+3. Determine whether the gap requires a Product Decision, i.e. whether the expected/desired behaviour is
+   genuinely ambiguous (multiple legitimate product directions exist), or already unambiguous (the correct
+   treatment is clear and bounded).
+
+**B. No Product Decision required.** When the expected behaviour is already unambiguous:
+- preserve the original `PRODUCT GAP CONFIRMED` history in the batch ledger, do not erase it
+- implement the bounded fix immediately
+- add or update automated regression protection for it
+- rerun the affected journey, and rerun any directly affected regression journeys
+- run Journey Discovery again on the fix itself (a fix can introduce its own new coverage requirement)
+- update the register: mark the gap `FIXED`, cite the fix commit
+- reclassify the journey `PRODUCT GAP RESOLVED + PASS` once fully re-verified
+- then continue the batch
+
+**C. Product Decision required.** Ask before implementing anything. Present only: what Nexus does today,
+why this is a gap, the business/control consequence, the realistic options, and a recommended option with
+reasoning. Do not implement before the decision is made. Once decided:
+- record the decision in the register (status moves to `DECIDED`)
+- update the relevant canonical product/journey documentation to match the decision
+- implement the treatment immediately where technically bounded
+- add or update regression tests
+- rerun the journey, run Journey Discovery again
+- close the gap in the register (status moves to `FIXED` or `ACCEPTED AS-IS`, whichever the decision was)
+- then continue the batch
+
+**D. Exceptions: when a gap may stay open and the batch continues anyway.** Only when one of these
+genuinely holds:
+- the person who must make the Product Decision is unavailable
+- the fix depends on a future capability or module that does not yet exist
+- an external dependency prevents closure
+- the required change is architectural enough that implementing it immediately would be unsafe
+- fixing it now would materially expand the batch's agreed scope
+
+When this happens: keep the gap `OPEN` (or `DECISION REQUIRED`) in the register, state the exact blocker,
+state the exact next action, and continue independent journeys. Never leave a gap open merely for
+convenience, and never let one open gap block unrelated journeys.
+
+**E. Batch closure gate.** Before any batch can be declared CLOSED, its ledger must reconcile:
+```
+Product Gaps discovered this batch: <N>
+Product Gaps resolved this batch: <N>
+Product Gaps accepted as-is this batch: <N>
+Product Gaps still open: <N>
+Product Decisions still required: <N>
+```
+Every Product Gap discovered in the batch must exist as an entry (new or linked) in
+`docs/OPEN_PRODUCT_GAPS.md`. A gap that exists only in the batch ledger's prose, with no register entry,
+means the batch is not eligible to close.
+
 ## Manual UX Readiness Gate (mandatory from Batch 24 onward)
 
 Batches 22 and 23 exposed a real methodology gap: manual browser/persona testing had quietly
