@@ -9098,7 +9098,19 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: K-010
-- Notes: N/A
+- Notes: Expanded 2026-09-28 (Batch 27 V-016 Journey Discovery): Batch 2's original execution tested this
+  invariant via the SAVE/edit path only (`save_workflow_version_graph`'s `p_expected_row_version`
+  parameter). The canonical text's own "Admin A publishes (or edits)" framing anticipated the PUBLISH
+  path too, which had not been separately confirmed. Executed now: two real, distinct workflow admins
+  dispatched `publish_workflow_definition_version` against the same disposable draft together, genuinely
+  overlapping. Real, honest result: one succeeded (`published_by`/`published_at` correctly and singularly
+  attributed), the other received a genuine `WORKFLOW_VERSION_NOT_DRAFT` denial (a `select ... for update`
+  row lock plus a plain status guard, not a `p_expected_row_version` comparison, since
+  `publish_workflow_definition_version` takes no such parameter at all, unlike the save RPC). Confirms
+  the identical safety property holds for the actual publish action, via a materially different code path
+  than the one originally exercised. This is also V-016's own natural alternate framing ("two admins
+  concurrently publish the SAME draft"), searched for and found here rather than spun up as a duplicate
+  journey; see `docs/journey-runs/BATCH_27_RESULTS.md`.
 
 ### L-016: Discard Draft Removes It Cleanly, Last Published Version Remains the Resolvable Active One
 - Pack: L - Workflow Versioning
