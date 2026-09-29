@@ -17,7 +17,7 @@ import { signInAction } from "../actions"
  * `redirect()`, which would otherwise redirect before the client has a
  * chance to show a brief loading state.
  */
-function LoginPage({ redirectTo }: { redirectTo: string }) {
+function LoginPage({ redirectTo, sessionExpired }: { redirectTo: string; sessionExpired?: boolean }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -45,6 +45,12 @@ function LoginPage({ redirectTo }: { redirectTo: string }) {
           <span className="text-lg font-semibold tracking-tight text-foreground">Nexus</span>
           <span className="text-xs text-muted-foreground">Sign in to continue.</span>
         </div>
+
+        {sessionExpired ? (
+          <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-foreground">
+            Your session expired. Please sign in again to continue.
+          </p>
+        ) : null}
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-1.5">

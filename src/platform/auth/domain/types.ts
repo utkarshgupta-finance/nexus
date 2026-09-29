@@ -11,7 +11,12 @@
  * (`docs/AUTHORIZATION_MODEL.md`'s "Unauthenticated" is never the same
  * thing as "authenticated but unauthorized", task correction §26):
  *
- * - `unauthenticated`: no valid Supabase Auth session at all.
+ * - `unauthenticated`: no valid Supabase Auth session at all. `expired`
+ *   distinguishes a session that was once valid and has since expired or
+ *   been revoked (a stale `sb-*-auth-token` cookie is still present) from
+ *   a visitor who was never signed in at all (no such cookie); only the
+ *   former shows a "your session expired" message on the login page
+ *   (PG-059).
  * - `unprovisioned`: a real, valid Supabase Auth session, but no
  *   `app_users` row exists for this `auth.users.id` yet. Nexus access
  *   was never granted; this is never auto-provisioned (task correction
@@ -42,7 +47,7 @@ type NexusRole = {
 }
 
 type NexusSession =
-  | { status: "unauthenticated" }
+  | { status: "unauthenticated"; expired?: true }
   | { status: "unprovisioned"; authUserId: string; email: string | null }
   | { status: "inactive"; authUserId: string; email: string | null; appUserId: string }
   | {

@@ -30,13 +30,14 @@ bottom). Not from memory or `RUN_STATE.json` summaries alone.
 
 ## A. ACTIVE PRODUCT GAPS
 
-None currently open. The 8 confirmed gaps that stood here (PG-035,
-PG-036, PG-037, PG-038, PG-040, PG-044, PG-045, PG-053) were decided and
-closed on 2026-09-28. PG-056, found the same day via the mandatory
-post-fix Journey Discovery re-check on PG-040, was closed the same day
-under the Immediate-Closure Protocol. PG-057 and PG-058, found
-2026-09-28/29 during Batch 28's V-033 and V-038 respectively and both
-decided/closed 2026-09-29, are the most recent; see **D. CLOSED HISTORY**
+None currently open. The 8 confirmed gaps that previously stood here
+(PG-035, PG-036, PG-037, PG-038, PG-040, PG-044, PG-045, PG-053) were
+decided and closed on 2026-09-28. PG-056, found the same day via the
+mandatory post-fix Journey Discovery re-check on PG-040, was closed the
+same day under the Immediate-Closure Protocol. PG-057 and PG-058, found
+2026-09-28/29 during Batch 28's V-033 and V-038 respectively, were both
+decided/closed 2026-09-29. PG-059, found 2026-09-29 during Batch 29's
+Z-001, was decided and closed the same day; see **D. CLOSED HISTORY**
 below for every entry's decision, implementation, and verification
 evidence.
 
@@ -220,6 +221,7 @@ compact summary is kept here.
 | PG-056 | O-005, T-019 | (found via post-fix Journey Discovery, same day as PG-040) | `WORKFLOW_TEAM_INACTIVE` token unmapped in all four approve-RPC client error parsers, falling through to a generic "unexpected error" message | CONFIRMED (no product decision needed, unambiguous completeness gap) + FIXED (2026-09-28, closed same day under the Immediate-Closure Protocol) | Added `WORKFLOW_TEAM_INACTIVE` to `NAMED_TOKEN_KINDS` and its `*ErrorKind` union in all four client error parsers (`case-errors.ts`, `change-errors.ts`, `commercial-version-errors.ts`, `go-live-errors.ts`). A new shared `WORKFLOW_TEAM_INACTIVE` code and standardized message added to `src/platform/errors/domain/codes.ts` ("this request cannot move to the next approval step because that step's responsible team is inactive. Ask a Workflow Admin to update or reactivate the team."), used identically across all four domains rather than the RPC's own per-node detail (which would otherwise leak the raw node key and vary in wording by domain). Server-side PG-040 invariant and already-assigned-team behavior both explicitly unchanged; this is a client-parser-only fix. 4 new parser regression tests (one per domain), all passing. Verified live: reproduced the exact PG-040 runtime-routing rejection against a real in-flight Go Live request (`859d7124-...`, team temporarily deactivated then restored), captured the genuine raw RPC error text, and fed it through the real `parseGoLiveError` function, confirming it now maps to the standardized message with no leaked node key. Journey Discovery re-run after this fix found zero new candidates. O-005's canonical text updated with the message-surfacing detail. |
 | PG-057 | V-033 | 28 | Go Live review page labeled "Commercial Context (Locked)" always showed the customer's CURRENT commercial terms, silently tracking whatever version was active at view/approval time instead of the version the request was actually created against; no warning if the two diverged | DECIDED (2026-09-29: truly lock to the creation-time Commercial Version; block approval and require an explicit refresh if superseded, rather than silently tracking current terms) + FIXED | Migration `20261017000000_pg057_go_live_locks_referenced_commercial_version.sql`: `approve_go_live_request` now raises `GO_LIVE_COMMERCIAL_VERSION_SUPERSEDED` if the referenced version's component has been closed by a later one; new governed `refresh_go_live_request_commercial_version` RPC (creator-only) rebinds to the current version, preserving the old reference on new columns `previous_commercial_version_id`/`commercial_version_refreshed_by`/`commercial_version_refreshed_at`. New pure resolver `src/features/go-live/domain/referenced-version.ts` (unit tested, 4 tests) drives both the review page's locked display and its warning banner; `go-live-detail-page.tsx` now shows the referenced version's own terms (not current), a visible warning + "Refresh to Current Commercial Version" control when superseded, and disables Approve until refreshed. Full suite (1092 tests) and tsc pass. Verified live end-to-end: a request referencing V1 was blocked once V2 superseded it (confirmed via direct RPC and the real review page, which showed "Version 6" locked with a "Version 7 is now active" warning and a disabled Approve button); the creator's real "Refresh" click in the browser rebound it to V2 (confirmed in both the UI and the DB, with V1 preserved as `previous_commercial_version_id`), after which approval proceeded normally; a separate fresh Go Live request created directly against the current version approved with no false block. V-033's canonical text updated with the decided behavior. |
 | PG-058 | V-038 | 28 | Customer Master's Activity view and its History tab's Field History table ("Approved By") live-resolved the actor's CURRENT display name for every historical entry, identically to every other Timeline, despite being the one surface expected to be a frozen, point-in-time audit trail; `audit_log`'s own `actor_display_name_snapshot`/`actor_email_snapshot` columns already existed but were never read by this view | DECIDED (2026-09-29: freeze Customer Master Activity/History to the actor's point-in-time identity, sourced from `audit_log`'s existing snapshot columns; keep ordinary Timelines live-resolving, unchanged) + FIXED | `src/features/customers/domain/activity.ts`: new `buildAuditIndex`/`historicalActorLabel` (exact-match correlation on table/row id/actor id/timestamp, reliable because both the domain row's own lifecycle timestamp and `audit_log.occurred_at` are set by the identical `now()` inside the same transaction), used by `fieldChangeEvents`/`changeRequestEvents`/`commercialVersionEvents`/`onboardingOriginEvent` (the four Activity-tab builders that were live-resolving; `statusChangeEvents` already correctly used the snapshot via the pre-existing `auditRowActorLabel`). New `listAuditLogForRows` batch fetch (`src/platform/audit/data/audit-log.data.ts`) avoids an N-query fan-out. New `resolveFieldHistoryActorLabels` (`src/features/customers/server/activity.ts`) gives the separate History-tab Field History table the same point-in-time resolution, now keyed by field history entry id rather than actor id (a label keyed only by actor id could not represent the same actor's identity correctly at two different points in time). 8 new unit tests, full suite (1098 tests) and tsc pass. Verified live end-to-end: renamed a real actor (`nexus-test-legal`) with real historical approvals on a real customer; the ordinary Change Request Timeline correctly showed the new, renamed name (unchanged behavior); the same customer's Activity tab and History tab's Field History "Approved By" column both continued showing the original, pre-rename name for every one of that actor's historical entries. V-038's canonical text updated with the decided behavior; renamed test persona restored afterward. |
+| PG-059 | Z-001 | 29 | An expired/revoked session (`AuthGate`'s `unauthenticated` state) redirected to the exact same generic "Sign in to continue." login form a brand-new, never-authenticated visitor sees, with no messaging distinguishing "your session expired" from an ordinary first-time login; distinct from `AuthGate`'s existing separate "Session unavailable" (backend-unreachable) message, for which no equivalent existed | DECIDED (2026-09-29: redirect to `/login?reason=session-expired` and show a persistent login-page banner; carry the reason through the existing redirect rather than adding a new client-side session watcher; preserve the existing `redirectTo` return-navigation pattern) + FIXED | New `hasSupabaseAuthCookie` (`src/lib/supabase/server-auth-client.ts`) detects a stale `sb-*-auth-token` cookie still present after `getUser()` resolves to no user, distinguishing "was authenticated, now expired" from "never authenticated" without any new client-side detection. `NexusSession`'s `unauthenticated` variant gained an optional `expired` flag (`src/platform/auth/domain/types.ts`); `getCurrentNexusSession` (`src/platform/auth/server.ts`) sets it. `AuthGate` (`src/components/product/auth-gate.tsx`) appends `&reason=session-expired` to its existing `/login` redirect only when `expired` is set. `/login`'s route (`src/app/login/page.tsx`) reads the `reason` param and passes `sessionExpired` to `LoginPage` (`src/features/auth/ui/login-page.tsx`), which renders a `warning`-styled banner ("Your session expired. Please sign in again to continue.") reusing the existing design token, distinct from the destructive-styled sign-in error message. The existing `unavailable`/`inactive`/permission-denied states and the existing `redirectTo` return-navigation mechanism were untouched. 12 new unit tests (`hasSupabaseAuthCookie` cookie-name matching, `getCurrentNexusSession`'s expired branch, `AuthGate`'s two redirect variants plus its unaffected `unavailable`/`inactive` branches, `LoginPage`'s banner rendering); full suite (1110 tests) and tsc pass. Verified live end-to-end: revoked a real fictional persona's `auth.sessions` row mid-edit, attempted a real Save Draft, confirmed the redirect carried `reason=session-expired` and a hard-navigated login page showed the banner (screenshot captured); confirmed the draft's `row_version` and content were unchanged (no partial/corrupted write, no silent success); confirmed a plain `/login` visit (no `reason` param) shows no banner; confirmed re-authenticating from the expired-session redirect correctly returned to the original draft URL with its true, unsaved-edit-lost state, not a false "success" and not an auto-replayed mutation. Unsaved client-side form state is genuinely lost across the redirect (expected and disclosed, not hidden behind the messaging fix, per the canonical's own "ideally preserved" hedge). |
 
 ---
 
@@ -381,6 +383,32 @@ compact summary is kept here.
   - After this pass: **Active (Decision Required): 0. Active
     (implementation pending): 0. To Verify: 1. Deferred / Accepted For
     Now: 9. Closed History: 48 (PG-058 added).**
+- **Seventh pass, 2026-09-29: PG-059 registered, decided, and closed same
+  day under the Immediate-Closure Protocol.** Found during Batch 29's
+  Z-001: an expired/revoked session redirected to the exact same generic
+  "Sign in to continue." login form a brand-new visitor sees, with no
+  messaging distinguishing "your session expired" from an ordinary
+  first-time login, distinct from `AuthGate`'s existing separate "Session
+  unavailable" message. Product Decision requested and received: redirect
+  to `/login?reason=session-expired` and show a persistent login-page
+  banner, carrying the reason through the existing redirect rather than
+  adding a new client-side session watcher; preserve the existing
+  `redirectTo` return-navigation pattern. Implemented (new
+  `hasSupabaseAuthCookie` helper distinguishing "was authenticated, now
+  expired" from "never authenticated" via the existing `sb-*-auth-token`
+  cookie; `NexusSession`'s `unauthenticated` variant gained an optional
+  `expired` flag; `AuthGate` conditionally appends the reason param;
+  `LoginPage` shows a `warning`-styled banner), regression-tested (12 new
+  unit tests, full suite 1110 passing), and verified live end-to-end
+  (revoked a real fictional persona's session mid-edit and mid-approval,
+  confirmed the banner, confirmed zero partial/corrupted write in both
+  cases, confirmed a plain `/login` visit shows no banner, confirmed
+  re-authentication correctly returns to the original URL showing the
+  true persisted state). Classified **PRODUCT GAP RESOLVED + PASS**.
+  Moved to Closed History.
+  - After this pass: **Active (Decision Required): 0. Active
+    (implementation pending): 0. To Verify: 1. Deferred / Accepted For
+    Now: 9. Closed History: 49 (PG-059 added).**
 - The zero-active-team-members mechanism (PG-005) remains the single
   most-reconfirmed gap in the project's history (O-018, A-027, C-025,
   E-028, J-011, M-025, V-027, anticipated again as Z-007/Z-009); the

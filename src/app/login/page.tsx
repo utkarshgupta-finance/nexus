@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic"
 export default async function LoginRoute({
   searchParams,
 }: {
-  searchParams: Promise<{ redirectTo?: string }>
+  searchParams: Promise<{ redirectTo?: string; reason?: string }>
 }) {
   const session = await getCurrentNexusSession()
-  const { redirectTo } = await searchParams
+  const { redirectTo, reason } = await searchParams
   const target = sanitizeRedirectTarget(redirectTo)
 
   // Only redirect away from login for a genuinely resolved authenticated
@@ -23,5 +23,5 @@ export default async function LoginRoute({
     redirect(target)
   }
 
-  return <LoginPage redirectTo={target} />
+  return <LoginPage redirectTo={target} sessionExpired={reason === "session-expired"} />
 }

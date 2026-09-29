@@ -4,6 +4,20 @@ import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
 
 /**
+ * PG-059: true only when the browser sent a cookie matching Supabase's own
+ * `sb-<project-ref>-auth-token` naming convention (`@supabase/ssr`'s cookie
+ * storage), even if the session it names has since expired or been
+ * revoked. Lets `getCurrentNexusSession` distinguish "was authenticated,
+ * session now invalid" from "never authenticated at all" using only a
+ * cookie the server already reads on every request, without adding any
+ * new client-side session-watching mechanism.
+ */
+async function hasSupabaseAuthCookie(): Promise<boolean> {
+  const cookieStore = await cookies()
+  return cookieStore.getAll().some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"))
+}
+
+/**
  * Server-side, session-aware Supabase client: reads the authenticated
  * user from the request's own cookies (set by middleware.ts's session
  * refresh), using the anon key, never the service role key. This is the
@@ -51,4 +65,4 @@ async function getSupabaseServerAuthClient() {
   })
 }
 
-export { getSupabaseServerAuthClient }
+export { getSupabaseServerAuthClient, hasSupabaseAuthCookie }

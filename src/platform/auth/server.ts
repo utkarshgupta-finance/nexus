@@ -1,6 +1,6 @@
 import "server-only"
 
-import { getSupabaseServerAuthClient } from "@/lib/supabase/server-auth-client"
+import { getSupabaseServerAuthClient, hasSupabaseAuthCookie } from "@/lib/supabase/server-auth-client"
 import { getActiveGlobalRolesForUser, getActivePermissionsForRoles, getAppUserById } from "./data/rbac.data"
 import type { NexusSession } from "./domain/types"
 
@@ -103,7 +103,8 @@ async function getCurrentNexusSession(): Promise<NexusSession> {
   }
 
   if (!authUser) {
-    return { status: "unauthenticated" }
+    const expired = await hasSupabaseAuthCookie().catch(() => false)
+    return expired ? { status: "unauthenticated", expired: true } : { status: "unauthenticated" }
   }
 
   try {

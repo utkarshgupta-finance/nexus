@@ -17,6 +17,9 @@ import { PageHeader } from "./page-header"
  *
  * Distinguishes every state task correction §26 requires: unauthenticated
  * redirects to `/login` (never silently renders empty or fake data),
+ * carrying `reason=session-expired` when the session was once valid and
+ * has since expired or been revoked (PG-059) so the login page can show a
+ * distinct message rather than the plain first-time-visitor form;
  * unprovisioned/inactive/missing-permission each show their own honest
  * message, never a generic "access denied" that hides which of the three
  * actually applies.
@@ -45,7 +48,8 @@ function AuthGate({
   children: React.ReactNode
 }) {
   if (session.status === "unauthenticated") {
-    redirect(`/login?redirectTo=${encodeURIComponent(loginRedirectTo)}`)
+    const reasonParam = session.expired ? "&reason=session-expired" : ""
+    redirect(`/login?redirectTo=${encodeURIComponent(loginRedirectTo)}${reasonParam}`)
   }
 
   if (session.status === "unavailable") {

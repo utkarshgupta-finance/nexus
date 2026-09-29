@@ -16,7 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 vi.mock("server-only", () => ({}))
 
 const getSupabaseServerAuthClient = vi.fn()
-vi.mock("@/lib/supabase/server-auth-client", () => ({ getSupabaseServerAuthClient }))
+const hasSupabaseAuthCookie = vi.fn()
+vi.mock("@/lib/supabase/server-auth-client", () => ({ getSupabaseServerAuthClient, hasSupabaseAuthCookie }))
 
 const getAppUserById = vi.fn()
 const getActiveGlobalRolesForUser = vi.fn()
@@ -51,6 +52,25 @@ describe("getCurrentNexusSession", () => {
 
   it("configured env but no session (no auth cookie) resolves to unauthenticated, never unavailable", async () => {
     getSupabaseServerAuthClient.mockResolvedValue(fakeSupabaseClient(async () => ({ data: { user: null } })))
+    hasSupabaseAuthCookie.mockResolvedValue(false)
+
+    const session = await getCurrentNexusSession()
+
+    expect(session).toEqual({ status: "unauthenticated" })
+  })
+
+  it("PG-059: a stale auth cookie present but no resolvable user (expired/revoked session) resolves to unauthenticated with expired: true", async () => {
+    getSupabaseServerAuthClient.mockResolvedValue(fakeSupabaseClient(async () => ({ data: { user: null } })))
+    hasSupabaseAuthCookie.mockResolvedValue(true)
+
+    const session = await getCurrentNexusSession()
+
+    expect(session).toEqual({ status: "unauthenticated", expired: true })
+  })
+
+  it("PG-059: a failure reading cookies defaults to expired: false (unauthenticated) rather than throwing", async () => {
+    getSupabaseServerAuthClient.mockResolvedValue(fakeSupabaseClient(async () => ({ data: { user: null } })))
+    hasSupabaseAuthCookie.mockRejectedValue(new Error("cookies() unavailable in this context"))
 
     const session = await getCurrentNexusSession()
 

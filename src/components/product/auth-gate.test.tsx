@@ -1,8 +1,22 @@
 import { renderToStaticMarkup } from "react-dom/server"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { AuthGate, lacksRecordPermission } from "./auth-gate"
 import type { NexusSession } from "@/platform/auth"
+
+/**
+ * PG-059: `redirect()` throws (the real Next.js behavior, a special digest
+ * error caught by the framework, not returned) so every redirect-branch
+ * test below asserts on the thrown call's argument via this mock rather
+ * than on rendered output. `vi.hoisted` is required because `vi.mock`'s
+ * factory is itself hoisted above any plain top-level `const`.
+ */
+const { redirectMock } = vi.hoisted(() => ({
+  redirectMock: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`)
+  }),
+}))
+vi.mock("next/navigation", () => ({ redirect: redirectMock }))
 
 /**
  * `AuthGate` takes `session` as a plain prop, so every non-redirect branch
@@ -22,6 +36,43 @@ describe("AuthGate", () => {
     expect(html).toContain("Session unavailable")
     expect(html).toContain("Nexus could not verify your session right now")
     expect(html).not.toContain("should not render")
+  })
+
+  it("renders the honest offboarded message for an inactive session, unaffected by PG-059's expired-session change", () => {
+    const session: NexusSession = { status: "inactive", authUserId: "auth-1", email: "x@example.test", appUserId: "app-1" }
+    const html = renderToStaticMarkup(
+      <AuthGate session={session} requiredPermission={{ resource: "customer", action: "read" }} loginRedirectTo="/customers">
+        <div>should not render</div>
+      </AuthGate>
+    )
+    expect(html).toContain("Account inactive")
+    expect(html).not.toContain("should not render")
+  })
+
+  it("PG-059: redirects to /login with no reason param for a genuinely unauthenticated (never signed in) session", () => {
+    redirectMock.mockClear()
+    const session: NexusSession = { status: "unauthenticated" }
+    expect(() =>
+      renderToStaticMarkup(
+        <AuthGate session={session} requiredPermission={{ resource: "customer", action: "read" }} loginRedirectTo="/customers">
+          <div>should not render</div>
+        </AuthGate>
+      )
+    ).toThrow()
+    expect(redirectMock).toHaveBeenCalledWith("/login?redirectTo=%2Fcustomers")
+  })
+
+  it("PG-059: redirects to /login with reason=session-expired for a session that was valid and has since expired", () => {
+    redirectMock.mockClear()
+    const session: NexusSession = { status: "unauthenticated", expired: true }
+    expect(() =>
+      renderToStaticMarkup(
+        <AuthGate session={session} requiredPermission={{ resource: "customer", action: "read" }} loginRedirectTo="/customers">
+          <div>should not render</div>
+        </AuthGate>
+      )
+    ).toThrow()
+    expect(redirectMock).toHaveBeenCalledWith("/login?redirectTo=%2Fcustomers&reason=session-expired")
   })
 })
 

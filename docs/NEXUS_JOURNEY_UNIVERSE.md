@@ -17796,29 +17796,29 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: V-002 through V-008
 - Notes: N/A
 
-### Z-007: Referenced team becomes inactive while a request is in flight
+### Z-007: Referenced team becomes inactive while a request is in flight (PG-040 decided behavior, chaos framing)
 - Pack: Z - Failure / Recovery / Chaos
-- Business Objective: Confirm the product's behavior when a request's current node's responsible team is deactivated while the request is in flight, distinguishing this chaos-recovery framing from V-036's state-mutation framing.
+- Business Objective: Confirm the product's actual, decided behavior when a request's current node's responsible team is deactivated while the request is in flight: existing assigned work stays actionable by remaining eligible members, the review UI visibly warns that the team is inactive, and no NEW routing may enter that team's node, distinguishing this chaos-recovery framing (a stale-page/happens-mid-flight angle) from V-036's state-mutation framing (same mechanism, tested by directly deactivating and reactivating a team around a pending approval).
 - Domain: Customer Onboarding, Customer Change, Commercial Configuration, Go Live
 - Object / Record Type: workflow teams, in-flight request
-- Starting State: Request pending at a node whose team is then deactivated.
-- Personas: Team Admin, remaining team members, stranded request's stakeholders
+- Starting State: Request pending at a node whose team is then deactivated while a remaining active member still has the request's page open or reachable.
+- Personas: Team Admin (deactivates the team), a remaining active team member (still eligible to act), a hypothetical request that would newly route to the same node
 - Preconditions: N/A
-- Regular Path: Attempt to view/act on the request after team deactivation.
+- Regular Path: Team Admin deactivates the request's current-node team. The remaining active member reloads/opens the request: the real review page renders the "Team inactive" warning banner (`ResponsibleTeamInactiveBanner`, present on all four domains' review pages) but the Approve/Reject/Send Back controls remain enabled, and the action succeeds normally when clicked. Separately, confirm the Operational Queue's own list view surfaces the same inactive-team signal for this item.
 - Stress Variant: N/A
-- Recovery/Resilience Variant: Confirm what recovery path (if any) exists: reassigning the node's responsible_team_id, reactivating the team, or manual DB intervention.
-- Audit/Data Integrity Checks: N/A
-- UX Checks: Whoever encounters the stranded request sees an actionable, specific error.
+- Recovery/Resilience Variant: Reactivating the team removes the warning; no recovery action was ever required for the already-assigned member to act, since PG-040's decided behavior never blocked them in the first place.
+- Audit/Data Integrity Checks: The successful approval by the remaining active member produces a normal transition row; no corruption from having acted while the team was inactive.
+- UX Checks: The warning text is specific ("The responsible team for this step, <name>, has been deactivated. Existing eligible members of this team can still act on this request. No new work will be routed to this team going forward.") on the review page; the Operational Queue table shows its own equivalent inactive-team signal for the same item.
 - Historical Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Expected Business Result: A clear, documented recovery path exists or the gap is flagged explicitly as unhandled.
+- Expected Business Result: This is NOT an unhandled gap. PG-040 (decided 2026-09-28, migrations `20261014000000` and `20261016000000`) established: existing assigned work stays actionable by remaining eligible members (member-level removal, not team deactivation, is what blocks an individual); a visible warning renders on both the Operational Queue and every review page; and a runtime-routing guard blocks any NEW routing into the inactive team's node (raising `WORKFLOW_TEAM_INACTIVE`, mapped to a standardized client message by PG-056) before any transition is recorded. Confirm all three hold true in this fresh execution; do not reopen PG-040 unless this run produces genuinely contradictory evidence.
 - Expected Technical Invariants: N/A
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: V-036, V-027
-- Notes: N/A
+- Related Journeys: V-036, V-027, O-005, T-019
+- Notes: Historical note (superseded): this journey's original text (pre-PG-040) asked whether any recovery path existed at all, framing the deactivated-team scenario as a potentially unhandled gap. PG-040 (Batch 26/27 era) resolved this with an explicit, custom-specified behavior (block new routing, keep existing work actionable, warn in two places), verified live against real in-flight requests in both O-005/T-019 and this journey's own Batch 29 execution. Rewritten 2026-09-29 during Batch 29's Step 0A canonical reconciliation to test the current decided behavior rather than rediscover PG-040 as an open question.
 
 ### Z-008: Referenced master value becomes inactive while a draft references it
 - Pack: Z - Failure / Recovery / Chaos
@@ -17844,29 +17844,29 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: V-037, X-003
 - Notes: N/A
 
-### Z-009: Workflow node has no eligible team member (zero active members)
+### Z-009: Workflow node has no eligible team member (zero active members), accepted O-018/V-027 behavior
 - Pack: Z - Failure / Recovery / Chaos
-- Business Objective: Confirm a request arriving at a node whose responsible team has zero active members correctly and clearly fails with WORKFLOW_TEAM_REQUIRED, and stays that way until manually fixed.
+- Business Objective: Confirm a request arriving at a node whose responsible team has zero active members correctly and clearly fails with WORKFLOW_TEAM_REQUIRED, is visibly flagged rather than silently stuck, and recovers cleanly once an admin restores membership, per the accepted O-018 "warn but allow" decision (no code change requested; the stuck-until-fixed condition itself is the accepted design, not an open question).
 - Domain: Customer Onboarding, Customer Change, Commercial Configuration, Go Live
 - Object / Record Type: workflow team membership, in-flight request
-- Starting State: A node's responsible team has zero active members from the outset (or reaches zero as in V-027).
-- Personas: Any actor attempting to act
+- Starting State: A node's responsible team has zero active members from the outset (or reaches zero as in V-027, by removing the last remaining member).
+- Personas: Any actor attempting to act, Team Admin performing recovery
 - Preconditions: N/A
-- Regular Path: Attempt to approve.
+- Regular Path: Attempt to approve while zero active members exist: rejected with `WORKFLOW_TEAM_REQUIRED`. Confirm the Operational Queue's list view (`operational-queue-table.tsx`) surfaces the real "zero active members" banner for this item ("The team responsible has zero active members. To recover: add an active member back to the team, or reassign the item...") rather than a silent stuck state. Admin adds an active member back; confirm the request becomes actionable immediately with no other intervention (no DB surgery, no re-submission).
 - Stress Variant: N/A
 - Recovery/Resilience Variant: Admin adds an active member; confirm the request becomes actionable immediately afterward with no other intervention needed.
 - Audit/Data Integrity Checks: No transition is recorded while stuck; the request resumes cleanly once membership exists.
-- UX Checks: Clear, specific error naming the actual problem (no eligible team member), not a generic failure.
+- UX Checks: Clear, specific error naming the actual problem (no eligible team member) on direct action attempt; a real, visible Operational Queue banner (not merely a theoretical field) confirms the condition is proactively surfaced, not silently invisible.
 - Historical Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Expected Business Result: A real, confirmed, unhandled gap per the grounding brief; document precisely and confirm the only recovery is manual admin action.
+- Expected Business Result: This is the accepted, decided behavior (O-018, Batch 6; reconfirmed V-027, Batch 27), not an open Product Gap: a request with zero eligible members remains genuinely unable to progress by design, with no invalid/silent transition, real Operational Queue and pre-removal-impact-check visibility (`checkTeamRemovalImpactAction`), and manual admin membership restoration as the sole, sufficient recovery mechanism. Do not classify PRODUCT GAP CONFIRMED merely because the accepted stuck-until-admin-fix condition is reproduced; only a genuinely new contradiction (e.g. the Operational Queue banner missing, or restoration failing to unstick the request) would reopen this.
 - Expected Technical Invariants: N/A
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: V-027
-- Notes: This is the chaos-pack framing of the same gap covered from the permission-change angle in V-027; kept as its own journey per the explicit chaos list, cross-referenced rather than duplicated in full.
+- Related Journeys: V-027, O-018
+- Notes: Historical note (superseded): this journey's original text called the zero-active-members condition itself "a real, confirmed, unhandled gap," instructing execution to document it as an open Product Gap. That framing predates O-018's decision (Batch 6: "warn but allow", implemented via `checkTeamRemovalImpactAction` and the Operational Queue's own banner) and V-027's Batch 27 reconfirmation. Rewritten 2026-09-29 during Batch 29's Step 0A canonical reconciliation to test the now-accepted behavior (stuck-by-design, visibly flagged, cleanly recoverable) rather than rediscover the same already-decided gap a third time. This is the chaos-pack framing of the same mechanism covered from the permission-change angle in V-027; kept as its own journey per the explicit chaos list, cross-referenced rather than duplicated in full.
 
 ### Z-010: Storage object missing for a referenced document
 - Pack: Z - Failure / Recovery / Chaos
