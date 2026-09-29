@@ -375,6 +375,48 @@ missing feedback, navigation dead ends) that source/SQL/test review structurally
 Record these the same way as any other Journey Discovery candidate (§ above), reconciled at batch
 close, never left as an unexamined afterthought.
 
+### Test Fixture Safety Gate (mandatory from Batch 31 onward, added 2026-09-29 after INC-001)
+
+Batch 30's Z-027 reconciliation pass accidentally wrote a document metadata row into a real,
+shared customer's (`aurora-consumer-labs`) table and briefly marked it current, bypassing the
+application's own upload service, in order to make a redo more "rigorous." The safety classifier
+correctly caught the follow-on action and it was reverted, but one immutable, harmless residue row
+remains (see `docs/journey-runs/TEST_DATA_INCIDENTS.md`, incident `INC-001`, for the full record).
+This gate exists so that mistake cannot repeat silently.
+
+**Before every mutating action during journey execution** (a direct DB write, an RPC call, a
+storage upload/delete, or a UI action that mutates persisted state), record internally:
+
+```
+TEST FIXTURE CHECK:
+Target:
+Created for this journey? YES/NO
+Canonical approved fixture? YES/NO
+Safe to mutate? YES/NO
+```
+
+If both "created for this journey" and "canonical approved fixture" are **NO**, do not mutate the
+target. Create a fresh, disposable record scoped to the current journey/run instead (the default,
+always-preferred pattern), or use an approved fixture from `docs/TEST_FIXTURE_REGISTER.md`, or stop
+and ask.
+
+This applies to every kind of persisted state a journey might touch: customers, commercial
+versions, go-live requests, documents/storage objects, reference master values, teams, workflow
+definitions, memberships, roles, and any other shared persisted state. It applies equally to
+direct database/RPC/storage access and to browser-driven UI actions: clicking a real button in the
+real UI does not by itself make the target safe to mutate, since the UI has no way of knowing
+whether the record it is currently showing is disposable or load-bearing for other journeys.
+
+**Batch closure gate.** A batch cannot close if it created an undisclosed mutation on a real/shared
+non-fixture customer or object. Any accidental shared-data mutation, however small or fully
+reverted, must be disclosed in `docs/journey-runs/TEST_DATA_INCIDENTS.md` and reconciled (verified
+harmless, or fixed if not) before the next batch starts, exactly as `INC-001` was.
+
+**`docs/TEST_FIXTURE_REGISTER.md`** is the canonical allowlist of fixtures explicitly approved for
+destructive testing. Do not add a real/shared customer to it merely because it has convenient
+existing data; several historical/regression journeys depend on specific shared customers'
+accumulated history staying exactly as it is, precisely because it is never mutated further.
+
 ---
 
 ### BATCH 1

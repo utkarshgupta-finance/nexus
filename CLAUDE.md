@@ -277,6 +277,26 @@ in `docs/OPEN_PRODUCT_GAPS.md` (current-state source of truth) per that
 plan's Product Gap Register and Immediate-Closure Protocol; a batch may
 not close with an unregistered gap.
 
+## Test fixture safety
+
+No destructive, chaos, concurrency, or mutation test (direct DB write, RPC
+call, storage delete/upload, or a UI action that mutates persisted state)
+may operate on a real/shared business customer or object. Before any such
+action, first establish that the target is one of:
+
+1. a record created specifically for the current journey/run, or
+2. an explicitly approved fixture listed in `docs/TEST_FIXTURE_REGISTER.md`.
+
+If neither is true, stop and do not mutate it; create a fresh disposable
+record instead (the default, always-preferred pattern) or ask first. This
+applies equally to direct database/RPC/storage access and to browser-driven
+UI actions: using the normal UI to click a destructive control does not by
+itself make the target safe to mutate. See
+`docs/journey-runs/TEST_DATA_INCIDENTS.md` for the incident that established
+this rule, and `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`'s pre-mutation check
+for the exact gate to apply before every mutating action during journey
+execution.
+
 ## Writing style
 
 Never use em dashes anywhere in the project.
