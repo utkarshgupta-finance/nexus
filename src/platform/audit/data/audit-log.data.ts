@@ -39,5 +39,20 @@ async function listAuditLogForRow(tableName: string, rowId: string): Promise<Aud
   return (data ?? []).reverse()
 }
 
-export { listAuditLogForRow }
+/** Batch form of listAuditLogForRow (PG-058): every audit_log row for a whole set of row ids on one table, in one round trip, so a caller resolving point-in-time actor identity for N historical events (e.g. every Change Request behind one customer's Activity/History) never issues N queries. Same 2000-row ceiling logic as the single-row form, scaled up for the larger batch this is meant to cover. Empty input short-circuits without a query. */
+async function listAuditLogForRows(tableName: string, rowIds: string[]): Promise<AuditLogRow[]> {
+  if (rowIds.length === 0) return []
+  const supabase = getSupabaseServiceRoleClient()
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("*")
+    .eq("table_name", tableName)
+    .in("row_id", rowIds)
+    .order("occurred_at", { ascending: false })
+    .limit(2000)
+  if (error) throw new Error(`Failed to read audit_log for ${tableName} (${rowIds.length} rows): ${error.message}`)
+  return (data ?? []).reverse()
+}
+
+export { listAuditLogForRow, listAuditLogForRows }
 export type { AuditLogRow }

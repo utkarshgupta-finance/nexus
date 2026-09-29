@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { buildCustomerActivityTimeline, collectActorIds } from "./activity"
+import { buildCustomerActivityTimeline, collectActorIds, buildAuditIndex, historicalActorLabel } from "./activity"
 import type { OnboardingOrigin, CommercialConfigurationVersion } from "@/features/customer-onboarding/server"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry } from "@/features/customer-change"
 import type { AuditLogRow } from "@/platform/audit/server"
@@ -114,6 +114,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: STATUS_AUDIT_ROWS,
       actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
 
     expect(timeline.map((event) => event.summary)).toEqual([
@@ -137,6 +138,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [],
       actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline).toEqual([])
   })
@@ -151,6 +153,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [rowWithReason],
       actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline[0].summary).toBe("Customer deactivated: Customer requested account closure")
   })
@@ -165,6 +168,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [snapshotRow],
       actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline[0].actorEmail).toBe("Priya Shah (as of the event)")
   })
@@ -178,6 +182,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [STATUS_AUDIT_ROWS[0]],
       actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline[0].actorEmail).toBe("approver@example.com")
   })
@@ -192,6 +197,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [row],
       actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline[0].actorEmail).toBe("priya@example.com")
   })
@@ -206,6 +212,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [noOpRow],
       actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline).toEqual([])
   })
@@ -220,6 +227,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [],
       actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: snapshot,
+      auditIndex: new Map(),
     })
     expect(timeline[0].summary).toBe('Segment changed from "SMB" to "Enterprise"')
   })
@@ -233,6 +241,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [],
       actorLabels: ACTOR_EMAILS,
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline[0].summary).toBe('Segment changed from "smb" to "enterprise"')
   })
@@ -246,6 +255,7 @@ describe("buildCustomerActivityTimeline", () => {
       statusAuditRows: [],
       actorLabels: new Map(),
       referenceMasterSnapshot: emptySnapshot(),
+      auditIndex: new Map(),
     })
     expect(timeline[0].actorEmail).toBeNull()
   })
@@ -261,5 +271,91 @@ describe("collectActorIds", () => {
       statusAuditRows: STATUS_AUDIT_ROWS,
     })
     expect(new Set(ids)).toEqual(new Set(["actor-approver", "actor-requester"]))
+  })
+})
+
+describe("PG-058: point-in-time actor attribution for Customer Master Activity/History", () => {
+  const APPROVAL_AUDIT_ROW: AuditLogRow = {
+    id: "audit-cr-decided",
+    resource_id: null,
+    table_name: "customer_change_requests",
+    row_id: "req-change-1",
+    action: "UPDATE",
+    before_value: { status: "submitted" },
+    after_value: { status: "approved" },
+    // Matches CHANGE_REQUESTS[0].decidedAt and FIELD_HISTORY[0].changedAt exactly:
+    // both are set by the same `now()` inside the same real approval
+    // transaction (verified against real data before this was built).
+    occurred_at: "2026-02-01T00:00:00.000Z",
+    actor_user_id: "actor-approver",
+    request_id: null,
+    actor_context: null,
+    actor_display_name_snapshot: "Priya Shah (Approver, as of Feb 2026)",
+    actor_email_snapshot: "approver@example.com",
+  }
+
+  describe("historicalActorLabel", () => {
+    it("prefers the audit_log snapshot from the exact correlating row (table, row id, actor, timestamp all match)", () => {
+      const index = buildAuditIndex([APPROVAL_AUDIT_ROW])
+      const label = historicalActorLabel("customer_change_requests", "req-change-1", "actor-approver", "2026-02-01T00:00:00.000Z", index, ACTOR_EMAILS)
+      expect(label).toBe("Priya Shah (Approver, as of Feb 2026)")
+    })
+
+    it("falls back to the actor's current live-resolved label when no correlating audit_log row exists", () => {
+      const label = historicalActorLabel("customer_change_requests", "req-change-1", "actor-approver", "2026-02-01T00:00:00.000Z", new Map(), ACTOR_EMAILS)
+      expect(label).toBe("approver@example.com")
+    })
+
+    it("falls back when the timestamp does not match any indexed row (a different, unrelated mutation on the same row/actor)", () => {
+      const index = buildAuditIndex([APPROVAL_AUDIT_ROW])
+      const label = historicalActorLabel("customer_change_requests", "req-change-1", "actor-approver", "2099-01-01T00:00:00.000Z", index, ACTOR_EMAILS)
+      expect(label).toBe("approver@example.com")
+    })
+
+    it("returns null for a null actor id, never fabricating an attribution", () => {
+      const index = buildAuditIndex([APPROVAL_AUDIT_ROW])
+      expect(historicalActorLabel("customer_change_requests", "req-change-1", null, "2026-02-01T00:00:00.000Z", index, ACTOR_EMAILS)).toBeNull()
+    })
+  })
+
+  describe("buildCustomerActivityTimeline", () => {
+    it("shows the point-in-time snapshot name for 'Customer Change Request approved' and the field-change entry it produced, not the actor's current (renamed) live label", () => {
+      const timeline = buildCustomerActivityTimeline({
+        onboardingOrigin: null,
+        changeRequests: CHANGE_REQUESTS,
+        fieldHistory: FIELD_HISTORY,
+        commercialVersions: [],
+        statusAuditRows: [],
+        // The actor's CURRENT live-resolved name has since changed (e.g. a
+        // real display-name rename after the approval happened); the
+        // historical events must still show the frozen name, not this one.
+        actorLabels: new Map([["actor-approver", "Priya Shah (Renamed, current)"]]),
+        referenceMasterSnapshot: emptySnapshot(),
+        auditIndex: buildAuditIndex([APPROVAL_AUDIT_ROW]),
+      })
+
+      const decided = timeline.find((event) => event.summary === "Customer Change Request approved")
+      const fieldChange = timeline.find((event) => event.summary.startsWith("Segment changed"))
+      expect(decided?.actorEmail).toBe("Priya Shah (Approver, as of Feb 2026)")
+      expect(fieldChange?.actorEmail).toBe("Priya Shah (Approver, as of Feb 2026)")
+    })
+
+    it("still live-resolves 'Customer Change Request created' when its own creation event has no correlating audit_log row in the index", () => {
+      const timeline = buildCustomerActivityTimeline({
+        onboardingOrigin: null,
+        changeRequests: CHANGE_REQUESTS,
+        fieldHistory: [],
+        commercialVersions: [],
+        statusAuditRows: [],
+        actorLabels: ACTOR_EMAILS,
+        referenceMasterSnapshot: emptySnapshot(),
+        // Only the decision's own audit row is indexed; the creation event
+        // (a different timestamp/action) has nothing to correlate against.
+        auditIndex: buildAuditIndex([APPROVAL_AUDIT_ROW]),
+      })
+
+      const created = timeline.find((event) => event.summary === "Customer Change Request created")
+      expect(created?.actorEmail).toBe("requester@example.com")
+    })
   })
 })

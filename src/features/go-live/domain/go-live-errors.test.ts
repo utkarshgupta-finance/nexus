@@ -34,6 +34,26 @@ describe("parseGoLiveError", () => {
     expect(parsed.message).toBe("only the creator of request req-1 may submit it")
   })
 
+  it("maps GO_LIVE_COMMERCIAL_VERSION_SUPERSEDED to its own kind (PG-057)", () => {
+    const parsed = parseGoLiveError({
+      message:
+        "GO_LIVE_COMMERCIAL_VERSION_SUPERSEDED: the commercial version referenced by this Go Live request has been superseded by a newer approved commercial version for this component; the request's creator must refresh it against the current version before it can be approved",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("go_live_commercial_version_superseded")
+    expect(parsed.message).toContain("must refresh it against the current version")
+  })
+
+  it("maps GO_LIVE_COMMERCIAL_VERSION_NOT_STALE to its own kind (PG-057)", () => {
+    const parsed = parseGoLiveError({
+      message: "GO_LIVE_COMMERCIAL_VERSION_NOT_STALE: this request already references the current active commercial version; there is nothing to refresh",
+      code: "P0001",
+    })
+
+    expect(parsed.kind).toBe("go_live_commercial_version_not_stale")
+  })
+
   it("wraps into a GoLiveOperationError whose .message is the safe text a UI can show directly", () => {
     const error = new GoLiveOperationError(
       parseGoLiveError({ message: "GO_LIVE_REQUEST_SUBMIT_NOT_OWNER: only the creator of request req-2 may submit it" })

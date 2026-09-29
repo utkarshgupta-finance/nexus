@@ -80,8 +80,8 @@ function CustomerMasterDetail({
   commercialConfigurationId: string | null
   changeRequests: CustomerChangeRequest[]
   fieldHistory: CustomerFieldHistoryEntry[]
-  /** Task Phase M: requestedBy/approvedBy resolved to display labels, keyed by the raw actor id; never a raw UUID rendered in the Field History table. */
-  fieldHistoryActorLabels?: Map<string, string | null>
+  /** Task Phase M: requestedBy/approvedBy resolved to display labels, keyed by field history entry id (PG-058: point-in-time, not by actor id, since the same actor can appear at different points in time under different display names); never a raw UUID rendered in the Field History table. */
+  fieldHistoryActorLabels?: Map<string, { requestedBy: string | null; approvedBy: string | null }>
   /** Gates the "More Actions -> Permanently Delete Customer" entry point (Customer Lifecycle V1, Phase 14-16); resolved server-side from `customer.delete_permanent`. */
   canDeletePermanently?: boolean
   /** Gates the "More Actions -> Deactivate/Reactivate Customer" entry point (task Phase I); resolved server-side from `customer.approve`. */
@@ -487,8 +487,8 @@ function CustomerMasterDetail({
                           <td className="py-2 pr-3 text-muted-foreground">{entry.oldValue ?? "-"}</td>
                           <td className="py-2 pr-3 text-foreground">{entry.newValue ?? "-"}</td>
                           <td className="py-2 pr-3 text-muted-foreground">{entry.effectiveDate ? formatBusinessDate(entry.effectiveDate) : "-"}</td>
-                          <td className="py-2 pr-3 text-muted-foreground">{entry.requestedBy ? (fieldHistoryActorLabels.get(entry.requestedBy) ?? "-") : "-"}</td>
-                          <td className="py-2 pr-3 text-muted-foreground">{entry.approvedBy ? (fieldHistoryActorLabels.get(entry.approvedBy) ?? "-") : "-"}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{fieldHistoryActorLabels.get(entry.id)?.requestedBy ?? "-"}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{fieldHistoryActorLabels.get(entry.id)?.approvedBy ?? "-"}</td>
                           <td className="py-2 pr-3 text-muted-foreground">{formatTimestampDate(entry.changedAt)}</td>
                         </tr>
                       ))}

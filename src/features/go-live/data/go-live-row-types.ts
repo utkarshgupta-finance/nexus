@@ -4,6 +4,9 @@ type GoLiveRequestRow = {
   customer_id: string
   commercial_configuration_id: string
   commercial_version_id: string | null
+  previous_commercial_version_id: string | null
+  commercial_version_refreshed_by: string | null
+  commercial_version_refreshed_at: string | null
   stable_component_key: string
   go_live_date: string
   prorate_first_month: boolean

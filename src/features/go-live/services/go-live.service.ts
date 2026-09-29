@@ -51,6 +51,11 @@ async function setGoLiveCustomerConfirmation(id: string, confirmed: boolean, act
   return toGoLiveRequest(row)
 }
 
+async function refreshGoLiveRequestCommercialVersion(id: string, actorUserId: string): Promise<GoLiveRequest> {
+  const row = await goLiveData.refreshGoLiveRequestCommercialVersion(id, actorUserId)
+  return toGoLiveRequest(row)
+}
+
 async function getGoLiveRequestById(id: string): Promise<GoLiveRequest | null> {
   const row = await goLiveData.getGoLiveRequestById(id)
   return row ? toGoLiveRequest(row) : null
@@ -119,6 +124,7 @@ export {
   approveGoLiveRequest,
   cancelGoLiveRequest,
   setGoLiveCustomerConfirmation,
+  refreshGoLiveRequestCommercialVersion,
   getGoLiveRequestById,
   listGoLiveRequestsForCustomer,
   listGoLiveRequestsForStableComponentKeys,

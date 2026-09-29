@@ -12,7 +12,7 @@ import {
   listSendBacksForGoLiveRequest,
   listGoLiveDocuments,
   buildGoLiveTimeline,
-  listCurrentLineItemsForCustomer,
+  getReferencedCommercialVersionSnapshot,
 } from "@/features/go-live/server"
 import { GoLiveDetailPage } from "@/features/go-live/ui/go-live-detail-page"
 
@@ -35,10 +35,10 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
   // must be indistinguishable from one that does not exist.
   if (lacksRecordPermission(session, GO_LIVE_READ)) notFound()
 
-  const [sendBacks, documents, lineItems, canSubmit, canApprove, transitionInputs] = await Promise.all([
+  const [sendBacks, documents, referencedVersion, canSubmit, canApprove, transitionInputs] = await Promise.all([
     listSendBacksForGoLiveRequest(request.id),
     listGoLiveDocuments(request.id),
-    listCurrentLineItemsForCustomer(customer.id),
+    getReferencedCommercialVersionSnapshot(request),
     hasPermission("go_live", "submit"),
     hasPermission("go_live", "approve"),
     getWorkflowTransitionTimelineInputs("go_live", request.id),
@@ -59,7 +59,6 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
     request.status === "approved"
   )
   const timelineEvents = buildGoLiveTimeline(request, sendBacks, actorLabels, workflowTransitionEvents)
-  const lineItem = lineItems.find((item) => item.stableComponentKey === request.stableComponentKey) ?? null
   const isCreator = session.status === "active" && session.appUserId === request.createdBy
   const responsibleTeamStatus = await getCurrentNodeResponsibleTeamStatus(request.workflowVersionId, request.currentWorkflowNodeKey)
 
@@ -68,7 +67,7 @@ export default async function GoLiveDetailRoute({ params }: { params: Promise<{ 
       <GoLiveDetailPage
         customerKey={customerKey}
         request={request}
-        lineItem={lineItem}
+        referencedVersion={referencedVersion}
         documents={documents}
         timelineEvents={timelineEvents}
         canSubmit={canSubmit}

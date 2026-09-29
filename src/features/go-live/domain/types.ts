@@ -26,8 +26,12 @@ type GoLiveRequest = {
   requestNumber: number
   customerId: string
   commercialConfigurationId: string
-  /** Null when the line item's commercial terms have never been through a Version 2+ approval cycle (still the original onboarding-created setup, which has no commercial_configuration_versions row at all). */
+  /** Null when the line item's commercial terms have never been through a Version 2+ approval cycle (still the original onboarding-created setup, which has no commercial_configuration_versions row at all). PG-057: this reference is permanently locked once set; it never re-resolves to a later Commercial Version on its own, only through the explicit, governed refreshGoLiveRequestCommercialVersion action. */
   commercialVersionId: string | null
+  /** PG-057: the commercial_version_id this request referenced before its most recent refresh, preserved for audit; null if it has never been refreshed. */
+  previousCommercialVersionId: string | null
+  commercialVersionRefreshedBy: string | null
+  commercialVersionRefreshedAt: string | null
   stableComponentKey: string
   goLiveDate: string
   prorateFirstMonth: boolean

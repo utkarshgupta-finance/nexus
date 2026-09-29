@@ -82,6 +82,11 @@ async function setGoLiveCustomerConfirmation(id: string, confirmed: boolean, act
   return callSingleRowRpc<GoLiveRequestRow>("set_go_live_customer_confirmation", { p_id: id, p_confirmed: confirmed, p_actor_user_id: actorUserId })
 }
 
+/** PG-057: explicit, governed rebind to the customer's current active commercial version for this request's stable component, once the version it was created against has been superseded. Creator-only; the prior reference is preserved, never silently discarded. */
+async function refreshGoLiveRequestCommercialVersion(id: string, actorUserId: string): Promise<GoLiveRequestRow> {
+  return callSingleRowRpc<GoLiveRequestRow>("refresh_go_live_request_commercial_version", { p_id: id, p_actor_user_id: actorUserId })
+}
+
 async function getGoLiveRequestById(id: string): Promise<GoLiveRequestRow | null> {
   const supabase = getSupabaseServiceRoleClient()
   const { data, error } = await supabase.from("go_live_requests").select("*").eq("id", id).maybeSingle()
@@ -162,6 +167,7 @@ export {
   approveGoLiveRequest,
   cancelGoLiveRequest,
   setGoLiveCustomerConfirmation,
+  refreshGoLiveRequestCommercialVersion,
   getGoLiveRequestById,
   listGoLiveRequestsForCustomer,
   listGoLiveRequestsForStableComponentKeys,

@@ -2,9 +2,8 @@ import { AuthGate } from "@/components/product/auth-gate"
 import { getCurrentNexusSession } from "@/platform/auth/server"
 import { PageHeader } from "@/components/product/page-header"
 import { CustomerMasterDetail } from "@/features/customers/ui/customer-master-detail"
-import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext } from "@/features/customers/server"
+import { getCustomerMasterDetailByKey, loadCustomerDetailContext, buildActivityTimelineFromContext, resolveFieldHistoryActorLabels } from "@/features/customers/server"
 import { hasPermission, hasPermissionForCustomer } from "@/platform/permissions/server"
-import { resolveActorLabels } from "@/platform/audit/server"
 import { listCurrentLineItemsForCustomer } from "@/features/go-live/server"
 import type { CustomerActivityEvent } from "@/features/customers/server"
 import type { GoLiveLineItem } from "@/features/go-live/domain/line-items"
@@ -101,10 +100,10 @@ export default async function CustomerMasterDetailRoute({
     activityEvents = []
   }
 
-  /** Task Phase M: the Field History tab's own "Requested By"/"Approved By" columns need resolved labels too, independent of the Activity timeline's own resolution (which only ever surfaces a subset of these as timeline events, never the raw table). */
-  let fieldHistoryActorLabels: Map<string, string | null> = new Map()
+  /** Task Phase M: the Field History tab's own "Requested By"/"Approved By" columns need resolved labels too, independent of the Activity timeline's own resolution (which only ever surfaces a subset of these as timeline events, never the raw table). PG-058: keyed by field history entry id, not actor id (the same actor can appear at different points in time under different display names), and point-in-time via the same audit_log-snapshot mechanism the Activity timeline itself now uses, since this table is exactly the immutable historical evidence PG-058 was about. */
+  let fieldHistoryActorLabels: Map<string, { requestedBy: string | null; approvedBy: string | null }> = new Map()
   try {
-    fieldHistoryActorLabels = await resolveActorLabels(context.fieldHistory.flatMap((entry) => [entry.requestedBy, entry.approvedBy]))
+    fieldHistoryActorLabels = await resolveFieldHistoryActorLabels(context.fieldHistory, context.changeRequests)
   } catch {
     fieldHistoryActorLabels = new Map()
   }

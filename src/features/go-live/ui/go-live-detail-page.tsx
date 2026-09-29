@@ -20,12 +20,13 @@ import {
   approveGoLiveRequestAction,
   cancelGoLiveRequestAction,
   setGoLiveCustomerConfirmationAction,
+  refreshGoLiveRequestCommercialVersionAction,
   uploadGoLiveDocumentAction,
   getGoLiveDocumentDownloadUrlAction,
 } from "../actions"
 import { formatGoLiveRequestId } from "../domain/types"
 import type { GoLiveRequest, GoLiveDocumentType, PersistedGoLiveDocumentMetadata } from "../domain/types"
-import type { GoLiveLineItem } from "../domain/line-items"
+import type { ReferencedCommercialVersionSnapshot } from "../domain/referenced-version"
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
@@ -44,7 +45,7 @@ const DOCUMENT_TYPE_LABEL: Record<GoLiveDocumentType, string> = {
 function GoLiveDetailPage({
   customerKey,
   request,
-  lineItem,
+  referencedVersion,
   documents,
   timelineEvents,
   canSubmit,
@@ -54,7 +55,7 @@ function GoLiveDetailPage({
 }: {
   customerKey: string
   request: GoLiveRequest
-  lineItem: GoLiveLineItem | null
+  referencedVersion: ReferencedCommercialVersionSnapshot | null
   documents: PersistedGoLiveDocumentMetadata[]
   timelineEvents: RequestTimelineEvent[]
   canSubmit: boolean
@@ -128,6 +129,10 @@ function GoLiveDetailPage({
     run(() => cancelGoLiveRequestAction(request.id, null))
   }
 
+  function handleRefreshCommercialVersion() {
+    run(() => refreshGoLiveRequestCommercialVersionAction(request.id))
+  }
+
   function handleToggleConfirmation(confirmed: boolean) {
     run(() => setGoLiveCustomerConfirmationAction(request.id, confirmed))
   }
@@ -185,21 +190,44 @@ function GoLiveDetailPage({
         ) : null}
         {message ? <p className="text-xs text-success">{message}</p> : null}
 
-        {lineItem ? (
+        {referencedVersion ? (
           <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
             <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Commercial Context (locked)</h2>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               <dt className="text-muted-foreground">Commercial Component</dt>
-              <dd className="text-foreground">{lineItem.componentLabel}</dd>
+              <dd className="text-foreground">{referencedVersion.componentLabel}</dd>
               <dt className="text-muted-foreground">Pricing Model</dt>
-              <dd className="text-foreground">{lineItem.pricingModelLabel}</dd>
+              <dd className="text-foreground">{referencedVersion.pricingModelLabel}</dd>
               <dt className="text-muted-foreground">Billing Frequency</dt>
-              <dd className="text-foreground">{lineItem.billingCadenceLabel}</dd>
+              <dd className="text-foreground">{referencedVersion.billingCadenceLabel}</dd>
               <dt className="text-muted-foreground">Minimum Usage Guarantee</dt>
-              <dd className="text-foreground">{lineItem.mugSummary ?? "None"}</dd>
-              <dt className="text-muted-foreground">Version</dt>
-              <dd className="text-foreground">Version {lineItem.versionNumber}</dd>
+              <dd className="text-foreground">{referencedVersion.mugSummary ?? "None"}</dd>
+              <dt className="text-muted-foreground">Referenced Commercial Version</dt>
+              <dd className="text-foreground">Version {referencedVersion.versionNumber}</dd>
             </dl>
+            {referencedVersion.isSuperseded ? (
+              <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+                <p className="text-xs text-destructive">
+                  A newer Commercial Version{referencedVersion.currentVersionNumber ? ` (Version ${referencedVersion.currentVersionNumber})` : ""} is
+                  now active for this customer. This Go Live request still refers to the version above and cannot be approved until it is refreshed
+                  against the current version.
+                </p>
+                {isCreator ? (
+                  <PendingButton
+                    size="sm"
+                    variant="outline"
+                    className="w-fit"
+                    pending={isPending}
+                    pendingLabel="Refreshing..."
+                    onClick={handleRefreshCommercialVersion}
+                  >
+                    Refresh to Current Commercial Version
+                  </PendingButton>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Only this request's creator can refresh it.</p>
+                )}
+              </div>
+            ) : null}
           </section>
         ) : null}
 
@@ -343,13 +371,22 @@ function GoLiveDetailPage({
                 <Button size="sm" variant="outline" onClick={() => setShowSendBackForm(true)}>
                   Send Back
                 </Button>
-                <PendingButton size="sm" pending={isPending} pendingLabel="Approving..." onClick={handleApprove}>
+                <PendingButton
+                  size="sm"
+                  pending={isPending}
+                  pendingLabel="Approving..."
+                  disabled={referencedVersion?.isSuperseded ?? false}
+                  onClick={handleApprove}
+                >
                   Approve: Go Live
                 </PendingButton>
               </div>
             )}
             {request.customerConfirmationStatus !== "confirmed" ? (
               <p className="text-[11px] text-muted-foreground">Approval will be blocked until customer confirmation is marked Confirmed.</p>
+            ) : null}
+            {referencedVersion?.isSuperseded ? (
+              <p className="text-[11px] text-destructive">Approval is blocked until this request is refreshed against the current Commercial Version (see above).</p>
             ) : null}
           </section>
         ) : null}

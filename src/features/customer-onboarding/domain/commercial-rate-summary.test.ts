@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { componentTableCells, dualCurrencyLines, formatAmount, formatCompactAmount, summarizeComponent } from "./commercial-rate-summary"
+import { componentTableCells, dualCurrencyLines, formatAmount, formatCompactAmount, formatQuantity, summarizeComponent } from "./commercial-rate-summary"
 import { createComponent, createMilestone } from "./commercial-rate"
 import { REFERENCE_MASTER_FIXTURES } from "@/features/reference-data/domain/fixtures"
 
@@ -108,6 +108,16 @@ describe("summarizeComponent", () => {
   })
 })
 
+describe("formatAmount", () => {
+  it("is - for null, never a fabricated figure", () => {
+    expect(formatAmount(null, "INR")).toBe("-")
+  })
+
+  it("is - for undefined, same as null, rather than throwing", () => {
+    expect(formatAmount(undefined, "INR")).toBe("-")
+  })
+})
+
 describe("formatCompactAmount (table-cell space saving, never used for the full precise amount)", () => {
   it("abbreviates lakhs", () => {
     expect(formatCompactAmount(250000, "INR")).toBe("INR 2.5L")
@@ -124,6 +134,24 @@ describe("formatCompactAmount (table-cell space saving, never used for the full 
 
   it("is - for null, never a fabricated figure", () => {
     expect(formatCompactAmount(null, "INR")).toBe("-")
+  })
+
+  it("is - for undefined, same as null, rather than throwing", () => {
+    expect(formatCompactAmount(undefined, "INR")).toBe("-")
+  })
+})
+
+describe("formatQuantity", () => {
+  it("is - for null", () => {
+    expect(formatQuantity(null)).toBe("-")
+  })
+
+  it("is - for undefined, e.g. a malformed historical row whose quantity field is missing rather than explicitly null", () => {
+    expect(formatQuantity(undefined)).toBe("-")
+  })
+
+  it("formats a real quantity with en-IN digit grouping", () => {
+    expect(formatQuantity(5000)).toBe("5,000")
   })
 })
 
@@ -142,6 +170,10 @@ describe("dualCurrencyLines (task correction §17-20: transaction currency + INR
 
   it("is an empty array for a null amount", () => {
     expect(dualCurrencyLines(REFERENCE_MASTER_FIXTURES, null, "USD", "", formatAmount)).toEqual([])
+  })
+
+  it("is an empty array for an undefined amount, same as null", () => {
+    expect(dualCurrencyLines(REFERENCE_MASTER_FIXTURES, undefined, "USD", "", formatAmount)).toEqual([])
   })
 })
 

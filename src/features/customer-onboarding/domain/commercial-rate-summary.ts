@@ -29,14 +29,14 @@ import { formatBusinessDate } from "@/lib/date"
  * without this file ever touching Supabase directly.
  */
 
-function formatAmount(value: number | null, currencyCode: string | null): string {
-  if (value === null) return "-"
+function formatAmount(value: number | null | undefined, currencyCode: string | null): string {
+  if (value === null || value === undefined) return "-"
   const formatted = value.toLocaleString("en-IN")
   return currencyCode ? `${currencyCode} ${formatted}` : formatted
 }
 
-function formatQuantity(value: number | null): string {
-  if (value === null) return "-"
+function formatQuantity(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "-"
   return value.toLocaleString("en-IN")
 }
 
@@ -53,8 +53,8 @@ function trimToOneDecimal(value: number): string {
  * digit grouping already used everywhere else in this stage, applied here as
  * a magnitude abbreviation rather than full digits, purely for column width.
  */
-function formatCompactAmount(value: number | null, currencyCode: string | null): string {
-  if (value === null) return "-"
+function formatCompactAmount(value: number | null | undefined, currencyCode: string | null): string {
+  if (value === null || value === undefined) return "-"
   const magnitude = Math.abs(value)
   const compact =
     magnitude >= 100000 ? `${trimToOneDecimal(value / 100000)}L` : magnitude >= 1000 ? `${trimToOneDecimal(value / 1000)}K` : value.toLocaleString("en-IN")
@@ -74,12 +74,12 @@ function formatCompactAmount(value: number | null, currencyCode: string | null):
  */
 function dualCurrencyLines(
   snapshot: ReferenceMasterSnapshot,
-  amount: number | null,
+  amount: number | null | undefined,
   currencyCode: string | null,
   suffix: string,
-  formatter: (value: number | null, currencyCode: string | null) => string
+  formatter: (value: number | null | undefined, currencyCode: string | null) => string
 ): string[] {
-  if (amount === null) return []
+  if (amount === null || amount === undefined) return []
   const primary = `${formatter(amount, currencyCode)}${suffix}`
   if (!isForeignCurrency(currencyCode)) return [primary]
   const inrAmount = toInr(snapshot, amount, currencyCode)

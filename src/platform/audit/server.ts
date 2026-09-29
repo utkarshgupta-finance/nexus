@@ -8,5 +8,5 @@ import "server-only"
  */
 
 export { resolveActorEmails, resolveActorLabels } from "./data/actor-directory.data"
-export { listAuditLogForRow } from "./data/audit-log.data"
+export { listAuditLogForRow, listAuditLogForRows } from "./data/audit-log.data"
 export type { AuditLogRow } from "./data/audit-log.data"

@@ -33,6 +33,11 @@ type GoLiveErrorKind =
   | "workflow_segregation_of_duties_violation"
   | "workflow_team_inactive"
   | "go_live_draft_stale"
+  | "go_live_commercial_version_superseded"
+  | "go_live_request_refresh_not_owner"
+  | "go_live_request_not_refreshable"
+  | "go_live_no_current_commercial_version"
+  | "go_live_commercial_version_not_stale"
   | "invalid_input"
   | "conflict"
   | "not_found"
@@ -70,6 +75,11 @@ const NAMED_TOKEN_KINDS: Record<string, GoLiveErrorKind> = {
   WORKFLOW_SEGREGATION_OF_DUTIES_VIOLATION: "workflow_segregation_of_duties_violation",
   WORKFLOW_TEAM_INACTIVE: "workflow_team_inactive",
   GO_LIVE_DRAFT_STALE: "go_live_draft_stale",
+  GO_LIVE_COMMERCIAL_VERSION_SUPERSEDED: "go_live_commercial_version_superseded",
+  GO_LIVE_REQUEST_REFRESH_NOT_OWNER: "go_live_request_refresh_not_owner",
+  GO_LIVE_REQUEST_NOT_REFRESHABLE: "go_live_request_not_refreshable",
+  GO_LIVE_NO_CURRENT_COMMERCIAL_VERSION: "go_live_no_current_commercial_version",
+  GO_LIVE_COMMERCIAL_VERSION_NOT_STALE: "go_live_commercial_version_not_stale",
 }
 
 const SQLSTATE_KINDS: Record<string, GoLiveErrorKind> = {

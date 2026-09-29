@@ -15835,19 +15835,19 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Preconditions: V2 approval completes before Go Live approval.
 - Regular Path: Go Live approver attempts to approve.
 - Stress Variant: N/A
-- Concurrency Variant: Confirm whether Go Live approval is blocked, auto-rebound to V2, or proceeds referencing the now-superseded V1 (verify actual behavior; the grounding brief does not describe a specific guard here beyond the four-domain workflow engine, so this may surface a genuine gap).
+- Concurrency Variant: PG-057 (Product Decision, 2026-09-29, confirmed via Batch 28): the Go Live request stays permanently bound to the commercial version referenced at creation (V1); it never silently rebinds to a newer version on its own. Approval is BLOCKED server-side (`GO_LIVE_COMMERCIAL_VERSION_SUPERSEDED`) while it still references a superseded version. The request's own creator may explicitly refresh it to the current active version via the governed `refresh_go_live_request_commercial_version` RPC, which preserves the prior reference (`previous_commercial_version_id`) for audit. After a refresh, approval proceeds normally. A fresh Go Live request created directly against the current version is never affected by this guard.
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Whichever commercial version the go-live activation ultimately references should be unambiguous and correctly recorded.
-- Recovery/Resilience Variant: If proceeding against a superseded version is possible, confirm whether this is a business-acceptable outcome or a defect.
-- UX Checks: Approver should ideally be shown which commercial version is currently referenced versus currently active.
+- Audit/Data Integrity Checks: `go_live_requests.commercial_version_id` always names the version this specific request is bound to; `previous_commercial_version_id`/`commercial_version_refreshed_by`/`commercial_version_refreshed_at` record every refresh, never silently overwritten.
+- Recovery/Resilience Variant: The creator refreshes the request against the current active version (explicit, governed action); no other path changes the binding.
+- UX Checks: The review page's "Commercial Context (Locked)" section always shows the terms of the version this request actually references, labeled "Referenced Commercial Version"; if superseded, a visible warning names the newer version now active and the Approve control is disabled until refreshed, matching the "(Locked)" label's own claim (previously a confirmed defect: the page silently showed current terms with no lock and no warning).
 - Historical Variant: N/A
-- Expected Business Result: Document actual behavior; flag if Go Live can activate against a stale/superseded commercial version with no warning.
-- Expected Technical Invariants: N/A
+- Expected Business Result: A Go Live approval always reflects the exact commercial terms it was raised against; no approval can silently apply against terms different from what was reviewed.
+- Expected Technical Invariants: The approve RPC's staleness check and the review page's read model both resolve the referenced version from the same source (the request's own `commercial_version_id` joined through `commercial_configuration_versions`/`commercial_components`), so the UI and the server-side gate can never disagree about whether a request is stale.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
 - Related Journeys: V-004, V-005
-- Notes: This is a candidate gap discovery journey; do not assume a guard exists unless confirmed in code.
+- Notes: PG-057 fix implemented 2026-09-29: `supabase/migrations/20261017000000_pg057_go_live_locks_referenced_commercial_version.sql` (approve guard + `refresh_go_live_request_commercial_version` RPC), `src/features/go-live/domain/referenced-version.ts` (locked-snapshot resolution, unit tested), `src/features/go-live/ui/go-live-detail-page.tsx` (locked display, warning, refresh control). Verified live: V1 request blocked once V2 supersedes it, refresh unblocks it, and a fresh request created directly against the current version is never blocked.
 
 ### V-034: Workflow V2 publishes while a V1-bound request is in flight
 - Pack: V - Concurrency (State-Mutation)
@@ -15898,30 +15898,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: N/A
 - Notes: If a rename control is found to exist after all, this journey should be rewritten with a real Regular Path and reclassified out of the gap notes.
 
-### V-036: Team is deactivated while its members remain approval-eligible
+### V-036: Team is deactivated while its members remain approval-eligible (DECIDED, PG-040)
 - Pack: V - Concurrency (State-Mutation)
-- Business Objective: Confirm and document the real inconsistency: deactivating a team does not itself strip its members' approval eligibility on nodes still pointing at that team's responsible_team_id.
+- Business Objective: Confirm the decided, accepted shape (PG-040, closed 2026-09-28): deactivating a team does not strip its still-active members' approval eligibility on a node they are already sitting at (bullet 2 of the decision), a since-deactivated team can never receive a NEW routing assignment (bullet 1, enforced both at save/publish time and at runtime approve time), the review UI visibly warns that the responsible team is inactive (bullet 3), and revoking the individual member's own team membership or permission still blocks that specific person immediately (bullet 4, unchanged).
 - Domain: Customer Onboarding, Customer Change, Commercial Configuration, Go Live
-- Object / Record Type: workflow teams, workflow team membership
+- Object / Record Type: workflow teams, workflow team membership, workflow_nodes
 - Starting State: Team is marked inactive/deactivated at the team level, but its member rows remain ACTIVE and one or more workflow nodes still reference this team_id as responsible_team_id.
 - Personas: Team Admin (deactivating), team member (still active membership)
 - Preconditions: No node reassignment happens alongside the team deactivation.
-- Regular Path: A request reaches a node pointing at the deactivated team; a still-active member attempts to approve.
+- Regular Path: A request already sitting at a node pointing at the deactivated team; a still-active member attempts to approve it and succeeds, exactly as decided (existing in-flight work is never orphaned by a team-level deactivation). Separately, a request approaching that SAME node for the first time after the team went inactive is blocked from being newly routed there (WORKFLOW_TEAM_INACTIVE), confirming bullet 1 applies at runtime, not only at workflow-authoring time.
 - Stress Variant: N/A
-- Authorization Variant: Confirm whether the approve RPC checks team-level active status at all, or only membership-row active status (per grounding brief, the real check is membership eligibility: any ACTIVE non-revoked member of the responsible team, with no mention of a team-level deactivation gate).
+- Authorization Variant: fn_require_workflow_team_membership (the approval-eligibility gate) checks only user_teams.revoked_at, never teams.is_active, by design; this is the mechanism that makes the Regular Path's existing-work case succeed. Separately, all four approve RPCs now also check the NEXT node's team status before routing a request forward, which is the mechanism that makes the Regular Path's new-routing case fail cleanly.
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: If approval succeeds despite the team being "deactivated," this confirms the real inconsistency and should be flagged for product review.
+- Audit/Data Integrity Checks: The successful approval (existing work) is recorded normally, attributed to the acting member, with no error. The blocked new-routing attempt writes no transition row at all (clean rollback, no partial mutation).
 - Recovery/Resilience Variant: N/A
-- UX Checks: UI should ideally warn admins that deactivating a team does not automatically block its still-referenced nodes.
+- UX Checks: The request's own review page (not only the Operational Queue) shows a "Team inactive" banner naming the responsible team whenever it has been deactivated.
 - Historical Variant: N/A
-- Expected Business Result: Document the actual, confirmed-inconsistent behavior precisely; this is a known real gap per the grounding brief, not a hypothesis.
-- Expected Technical Invariants: N/A
+- Expected Business Result: This is decided, intentional product behavior, not an unresolved inconsistency: deactivating a team is a routing control (blocks new assignments) rather than a kill switch for members already eligible on work already assigned.
+- Expected Technical Invariants: fn_require_workflow_team_membership's WHERE clause references user_teams.revoked_at IS NULL only; it never joins/filters on teams.is_active. save_workflow_version_graph, publish_workflow_definition_version, and all four approve RPCs raise WORKFLOW_TEAM_INACTIVE for any node newly bound to, or newly routed into, an inactive team.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
-- Related Journeys: V-027, V-037
-- Notes: N/A
+- Related Journeys: O-005, T-019, V-027, V-037
+- Notes: This journey's own canonical text previously described the pre-decision state as an unresolved, confirmed inconsistency ("document the actual, confirmed-inconsistent behavior... a known real gap"), discovered independently of, but describing the exact same underlying mechanism as, O-005/T-019 (Teams pack). That gap was reconciled and decided as PG-040 on 2026-09-28, before Batch 28 began, and implemented (docs/OPEN_PRODUCT_GAPS.md, docs/AUTHORIZATION_MODEL.md section 27) with live verification already performed against real in-flight requests as part of that closure. Rewritten here, per the Batch 28 pre-flight reconciliation instruction, so this journey tests the CURRENT decided behavior during its own Batch 28 execution rather than rediscovering an already-closed gap; its own execution in this batch must still produce fresh, genuine evidence (its own persona and fixture), not merely cite PG-040's prior closure, per this run's own no-cross-reference-shortcut rule. Journey Discovery for this reconciliation: ALREADY_COVERED by the existing PG-040 decision and O-005/T-019's own already-rewritten canonical text; no new journey, no new Product Gap, no change to Batch 28's scheduled denominator (still 25 journeys, V-036 remains one of them).
 
 ### V-037: Reference Master value is deactivated while historical records still reference it
 - Pack: V - Concurrency (State-Mutation)
@@ -15950,25 +15950,26 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 
 ### V-038: User display name changes while historical actions attributed to them exist
 - Pack: V - Concurrency (State-Mutation)
-- Business Objective: Confirm changing a user's display name updates live-resolved Timeline attributions everywhere except the one true point-in-time snapshot view (Customer Master's Activity/former-name view).
+- Business Objective: Confirm changing a user's display name updates live-resolved Timeline attributions everywhere except the one true point-in-time snapshot view (Customer Master's Activity/History view).
 - Domain: Customer Onboarding, Customer Change, Commercial Configuration, Go Live
 - Object / Record Type: user profile, workflow_node_transitions, audit_log, customer_field_history
 - Starting State: A user has previously taken actions (approvals, submissions) recorded across several requests; their display name is then changed.
 - Personas: The renamed user, any viewer of historical Timelines
 - Preconditions: N/A
-- Regular Path: Admin/user changes display name; a viewer opens an old request's Timeline and the Customer Master's Activity/former-name view for a record this user acted on.
+- Regular Path: Admin/user changes display name; a viewer opens an old request's Timeline and the Customer Master's Activity/History view for a record this user acted on.
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Every Timeline outside Customer Master's Activity view shows the CURRENT display name (live resolution via resolveActorLabels), not the name-at-time-of-action; Customer Master's Activity/former-name view, backed by customer_field_history, correctly preserves the point-in-time name; the low-level audit_log's own actor_display_name_snapshot/actor_email_snapshot columns retain the original values but are not surfaced in the Timeline UI.
+- Audit/Data Integrity Checks: PG-058 (Product Decision, 2026-09-29, confirmed via Batch 28): an ordinary request Timeline (Onboarding/Change Request/Commercial Version/Go Live review pages) shows the CURRENT display name (live resolution via resolveActorLabels), not the name-at-time-of-action; this is unchanged, intentional behavior. Customer Master's Activity view AND its History tab's Field History table ("Approved By"/"Requested By") are the one true point-in-time snapshot surface: both now correctly show the actor's display name AS IT WAS at the moment of the historical action, resolved from `audit_log`'s own `actor_display_name_snapshot` (matched to the exact originating mutation by table/row/actor/timestamp correlation), never the actor's current name. A row with no correlating audit_log entry (pre-migration data, or an event with no audited source table) falls back to the actor's current name rather than fabricating a historical value.
 - Recovery/Resilience Variant: N/A
-- UX Checks: This live-resolution behavior should be verified as intentional, not assumed to be a bug, per the grounding brief.
+- UX Checks: Verified as intentional, not a bug: ordinary Timelines live-resolve; Customer Master Activity/History freezes to point-in-time identity, matching its own "historical evidence, can no longer be changed" framing used elsewhere in the product.
 - Historical Variant: This is fundamentally a historical-data journey; see also X-002 for deeper historical-attribution testing.
-- Expected Business Result: Consistent, documented (if surprising) attribution behavior across the two different resolution strategies used in the product.
-- Expected Technical Invariants: N/A
+- Expected Business Result: The maker/approver a reviewer sees on a Customer Master's historical record never silently changes because that person was later renamed elsewhere in the system.
+- Expected Technical Invariants: Point-in-time correlation is exact-match, not fuzzy: `audit_log.occurred_at` and the domain row's own lifecycle timestamp (createdAt/decidedAt/changedAt/sentBackAt) are set by the identical `now()` call inside the same transaction, so matching on (table, row id, actor id, timestamp) is reliable, never a heuristic.
 - Priority: P2
 - Automation Feasibility: FULL
+- Notes: PG-058 fix implemented 2026-09-29: `src/features/customers/domain/activity.ts` (`buildAuditIndex`/`historicalActorLabel`, used by `fieldChangeEvents`/`changeRequestEvents`/`commercialVersionEvents`/`onboardingOriginEvent`), `src/features/customers/server/activity.ts` (`loadCorrelatingAuditRows`, `resolveFieldHistoryActorLabels`), `src/platform/audit/data/audit-log.data.ts` (new `listAuditLogForRows` batch fetch), `src/features/customers/ui/customer-master-detail.tsx` (Field History labels now keyed by entry id, not actor id). 8 new unit tests. Verified live: renamed a real actor with real historical approvals, confirmed the ordinary Change Request Timeline showed the new name while the same customer's Activity tab and History/Field History table both continued showing the original, point-in-time name.
 - Dependencies: N/A
 - Related Journeys: X-002
 - Notes: N/A
@@ -16021,30 +16022,30 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: V-039
 - Notes: N/A
 
-### V-041: Commercial component is renamed (verify: no free-text rename field)
+### V-041: Commercial component is renamed via the component edit form's free-text Component Name field
 - Pack: V - Concurrency (State-Mutation)
-- Business Objective: Verify whether commercial components have any free-text rename capability; if not, document as a product gap rather than testing a nonexistent flow.
+- Business Objective: Confirm the real behavior of the component edit form's "Component Name" field: it is a genuine free-text input (not a locked catalogue label), it is editable while the parent commercial version is still a draft, and any rename only affects that draft (never retroactively rewrites an already-approved/frozen version's historical component label).
 - Domain: Commercial Configuration
 - Object / Record Type: commercial components
-- Starting State: An existing commercial component within a draft or active version.
+- Starting State: An existing commercial component within a draft commercial configuration version (component already populated, not a bare new draft).
 - Personas: Commercial Configuration Maker
 - Preconditions: N/A
-- Regular Path: Maker looks for a rename/label-edit control on an existing component.
+- Regular Path: Maker opens Edit on an existing draft component; the form shows a "Component Name" text input pre-filled with the current label (e.g. "SFA + DMS"), alongside Pricing Model, Rate, Per, Invoice Frequency, Invoice Timing, Minimum Usage Guarantee, Effective From/To, and Notes. The field accepts arbitrary free text and Save Component persists the new label against that draft's component row.
 - Stress Variant: N/A
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: N/A
+- Audit/Data Integrity Checks: A rename on a draft component must not alter the component label recorded against any other, already-approved commercial version (approved versions have no Edit control per the platform's approved-business-truth-is-never-edited-directly rule; see V-042 for the deeper frozen-history angle).
 - Recovery/Resilience Variant: N/A
-- UX Checks: Confirm actual available fields on the component edit form.
+- UX Checks: Confirmed live: MANUAL inspection of the Edit form for draft version CC-000014 (config 7f3a5750, version 5c3a9ea1, "SFA + DMS" recurring component) shows a real `textbox` (placeholder "e.g. SFA") labeled "Component Name" holding the current value "SFA + DMS", fully editable, not a disabled/read-only field and not a dropdown/select. This directly contradicts the earlier assumption (this journey previously expected N/A, no rename field). Corrected via Journey Discovery on 2026-09-29.
 - Historical Variant: N/A
-- Expected Business Result: Per the user's brief, expected to be N/A (no free-text rename field exists); confirm against actual code/UI and record precisely.
+- Expected Business Result: Commercial components DO have free-text rename capability while their parent version is a draft. This is consistent with the platform's general draft-vs-approved editability rule and is not itself a defect.
 - Expected Technical Invariants: N/A
 - Priority: P3
 - Automation Feasibility: MANUAL
 - Dependencies: N/A
-- Related Journeys: N/A
-- Notes: If a rename field is found, rewrite this journey with a real path; otherwise keep as a confirmed gap note.
+- Related Journeys: V-042 (frozen historical component values across versions), V-035 (the analogous team-rename check, which found no control and remains a confirmed gap)
+- Notes: Prior "no free-text rename field exists" product-gap note (see PRODUCT GAP NOTES section) was reconciled and corrected; this was a documentation error, not a live regression, since no prior journey run had actually opened this specific edit form to check.
 
 ### V-042: Commercial component is removed in a later commercial version
 - Pack: V - Concurrency (State-Mutation)
@@ -16161,7 +16162,7 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - UX Checks: N/A
 - Historical Variant: N/A
 - Expected Business Result: Consistent, immediate, batch-wide eligibility change.
-- Expected Technical Invariants: N/A
+- Expected Technical Invariants: The eligibility check (`fn_workflow_node_team` / `fn_require_workflow_team_membership`) resolves live from `workflow_nodes` / `user_teams` on every call with no caching, confirmed by direct mutation of `responsible_team_id` (Batch 28, 2026-09-28). No governed RPC currently exists to change a node's team on an already-published workflow version; the only product-supported path is authoring and publishing a new draft version, which by the platform's own deliberate immutability guarantee never retroactively affects requests already bound to the old published version. This journey's "Admin reassigns" premise therefore currently has no real user-reachable trigger; it validates a database-level invariant, not an action any admin flow can take today. A product decision is needed on whether node-team reassignment on a published version should become a real governed capability; until then this remains a database-invariant check, not a live product journey.
 - Priority: P1
 - Automation Feasibility: FULL
 - Dependencies: N/A
@@ -16255,10 +16256,10 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Idempotency Variant: The RPC's status-guard treats the second call as a no-op since the case is already past this node/status by the time it executes; real-world consequence being tested is specifically "double creation of Customer Master," per the user's own framing.
 - Audit/Data Integrity Checks: Exactly one Customer Master record created from this case; exactly one approval transition row.
 - Recovery/Resilience Variant: N/A
-- UX Checks: Second click sees a friendly already-approved message, not a duplicate-record error surfaced raw.
+- UX Checks: Either (A) the first click immediately puts the Approve control into a pending/disabled state, preventing a second request from ever being sent, or (B) a second request that does reach the server receives a clear already-actioned/already-approved response rather than a duplicate-record error surfaced raw. Both are valid outcomes; the invariant that must hold either way is no duplicate Customer Master, no duplicate transition, and server-side idempotency protecting against any retry that bypasses the client. Real double-click evidence (Batch 28, 2026-09-28): outcome A occurred, via the shared PendingButton component's synchronous disable-on-click.
 - Historical Variant: N/A
 - Expected Business Result: Exactly one Customer Master created, never two.
-- Expected Technical Invariants: Status-guard, not row lock alone, is what protects the same-actor repeat case (distinct from the two-different-actor race in V-002).
+- Expected Technical Invariants: Status-guard, not row lock alone, is what protects the same-actor repeat case (distinct from the two-different-actor race in V-002). This guard is reachable via two independent layers: the client's own pending/disabled control state (outcome A, the normal real-UI path), and the server-side RPC's own status check (outcome B, the safety net for a request that reaches the RPC a second time by a path that bypasses the client, e.g. a raw retried network call).
 - Priority: P0
 - Automation Feasibility: FULL
 - Dependencies: N/A
@@ -16278,10 +16279,10 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Idempotency Variant: Second call is a no-op per the status-guard; customers.row_version increments only once.
 - Audit/Data Integrity Checks: Exactly one field update applied; exactly one row_version increment; exactly one approval transition row.
 - Recovery/Resilience Variant: N/A
-- UX Checks: Friendly already-approved message on repeat.
+- UX Checks: Either (A) the first click immediately puts the Approve control into a pending/disabled state, preventing a second request from ever being sent, or (B) a second request that does reach the server receives a clear already-approved message on repeat rather than a raw error. Both are valid outcomes; the invariant that must hold either way is no duplicate field-mutation, no duplicate transition, and server-side idempotency protecting against any retry that bypasses the client. Real double-click evidence (Batch 28, 2026-09-28): outcome A occurred, via the shared PendingButton component's synchronous disable-on-click.
 - Historical Variant: N/A
 - Expected Business Result: No double field-mutation on Customer Master.
-- Expected Technical Invariants: N/A
+- Expected Technical Invariants: This guard is reachable via two independent layers: the client's own pending/disabled control state (outcome A, the normal real-UI path), and the server-side RPC's own status check (outcome B, the safety net for a request that reaches the RPC a second time by a path that bypasses the client, e.g. a raw retried network call).
 - Priority: P0
 - Automation Feasibility: FULL
 - Dependencies: N/A
@@ -20525,7 +20526,7 @@ The following are confirmed, real gaps in the current product, per the grounding
 
 - RECONCILED 2026-09-16, no longer an open gap: the migration wiring row_version-based optimistic concurrency for Customer Onboarding drafts, Commercial Configuration Version drafts, Go Live drafts, and the Workflow Builder's own draft graph save (`20260922000000_optimistic_locking_extension.sql`) is confirmed applied via the live Supabase migration ledger. All five draft-editing surfaces (Customer Change already had its own equivalent fix first) now reject a stale concurrent save with a named `*_DRAFT_STALE` error rather than silently overwriting. V-001, V-011 through V-015, A-030, E-013, K-010, and AA-014 are regression journeys proving this, not open-gap verifications.
 - No team-rename control exists: Team management currently has no free-text rename capability for workflow teams (see V-035). This should be verified against the live product on each catalogue refresh in case a rename control is later added.
-- No free-text component-rename field exists: Commercial components currently have no free-text rename/label-edit field (see V-041). Should be re-verified on each catalogue refresh.
+- RECONCILED 2026-09-29, this note was wrong: Commercial components DO have a free-text "Component Name" field on the component edit form, populated with the catalogue label (e.g. "SFA + DMS") and freely editable while the parent commercial version is still in draft (see V-041, rewritten with a real path).
 - No idempotency-key infrastructure exists anywhere in the product for a real external caller. The only idempotency protection today is each approve_*/submit_*/reject_*/send_back_*/save_* RPC's own internal status-guard/no-op-if-already-terminal logic, which only protects against a same-request-again scenario (double click, refresh-then-repeat, back/forward replay), not a distributed retry-with-idempotency-key scenario, since no external API write caller exists yet to need one (see all of Pack W).
 - No cron/scheduled job exists anywhere in the codebase for Go Live/Entitlement or anything else observed in this catalogue's scope. Future-dated Go Live dates and monthly usage-vs-go-live-month gating are computed fresh on every read, never asynchronously (see X-009, Y-015, Z-019). Any future feature that assumes background/scheduled processing should be flagged against this current reality.
 

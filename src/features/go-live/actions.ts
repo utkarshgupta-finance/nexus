@@ -12,6 +12,7 @@ import {
   approveGoLiveRequest,
   cancelGoLiveRequest,
   setGoLiveCustomerConfirmation,
+  refreshGoLiveRequestCommercialVersion,
 } from "./services/go-live.service"
 import { uploadGoLiveDocument, getGoLiveDocumentDownloadUrl } from "./services/documents.service"
 import type { GoLiveRequest, GoLiveDocumentType, PersistedGoLiveDocumentMetadata } from "./domain/types"
@@ -126,6 +127,17 @@ async function setGoLiveCustomerConfirmationAction(id: string, confirmed: boolea
   }
 }
 
+/** PG-057: lets this request's own creator explicitly rebind it to the customer's current active commercial version, once the version it referenced at creation has been superseded. Never called implicitly by approve/submit. */
+async function refreshGoLiveRequestCommercialVersionAction(id: string): Promise<GoLiveActionResult> {
+  try {
+    const actor = await requirePermission("go_live", "create")
+    const request = await refreshGoLiveRequestCommercialVersion(id, actor.appUserId)
+    return { ok: true, request }
+  } catch (error) {
+    return toGoLiveActionError(error)
+  }
+}
+
 type UploadGoLiveDocumentActionResult = { ok: true; document: PersistedGoLiveDocumentMetadata } | { ok: false; error: string }
 
 async function uploadGoLiveDocumentAction(
@@ -164,6 +176,7 @@ export {
   approveGoLiveRequestAction,
   cancelGoLiveRequestAction,
   setGoLiveCustomerConfirmationAction,
+  refreshGoLiveRequestCommercialVersionAction,
   uploadGoLiveDocumentAction,
   getGoLiveDocumentDownloadUrlAction,
 }

@@ -1,12 +1,14 @@
 import "server-only"
 
 import { commercialConfigurationService, getCommercialConfigurationOverview } from "@/features/commercial/server"
-import { listVersionsForConfiguration } from "@/features/customer-onboarding/server"
+import { listVersionsForConfiguration, loadVersion } from "@/features/customer-onboarding/server"
 import { deriveLineItemGoLiveStatus, currentGoLiveRequestForLineItem } from "../domain/types"
 import { listGoLiveRequestsForStableComponentKeys } from "../data/go-live.data"
 import { toGoLiveRequest } from "../domain/mappers"
+import { resolveReferencedVersionSnapshot } from "../domain/referenced-version"
 import type { GoLiveLineItem } from "../domain/line-items"
 import type { GoLiveRequest } from "../domain/types"
+import type { ReferencedCommercialVersionSnapshot } from "../domain/referenced-version"
 import type { ComponentSummary } from "@/features/commercial"
 
 /** A quantity-kind MUG commitment's own threshold, for display context only ("Minimum Usage Guarantee: 500 per month"); the exact metric/unit label is not yet a resolvable Commercial column (see docs/GO_LIVE_ENTITLEMENT_ARCHITECTURE.md), so this shows the number, never a fabricated unit name. */
@@ -88,4 +90,24 @@ async function listCurrentLineItemsForCustomer(customerId: string): Promise<GoLi
   })
 }
 
-export { listCurrentLineItemsForCustomer }
+/**
+ * PG-057: the Commercial Context a Go Live review page shows, locked to
+ * the version this specific request was created against, never the
+ * customer's current terms (that silent drift was the confirmed defect;
+ * see ../domain/referenced-version.ts). Null when the request has no
+ * bound commercial_version_id, or its referenced Component can no longer
+ * be resolved (should not normally happen for a real request).
+ */
+async function getReferencedCommercialVersionSnapshot(request: GoLiveRequest): Promise<ReferencedCommercialVersionSnapshot | null> {
+  if (!request.commercialVersionId) return null
+
+  const [overview, version] = await Promise.all([
+    getCommercialConfigurationOverview(request.commercialConfigurationId),
+    loadVersion(request.commercialVersionId),
+  ])
+  if (!overview || !version?.commercialChangeId) return null
+
+  return resolveReferencedVersionSnapshot(overview.versions, overview.components, version.commercialChangeId, request.stableComponentKey, mugSummaryForComponent)
+}
+
+export { listCurrentLineItemsForCustomer, getReferencedCommercialVersionSnapshot }
