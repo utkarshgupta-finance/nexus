@@ -181,9 +181,11 @@ Result: the replay raised `CUSTOMER_CHANGE_NOT_SUBMITTABLE: request ... has stat
 
 Journey Discovery: NONE.
 
-Classification: PASS (Manual UX dimension verified under real conditions; RPC-level idempotency dimension verified via replay; exact-timeout-injection dimension honestly scoped as TOOLING LIMITATION, not silently substituted).
+Missing dimension: genuine client-side timeout / apparent-failure perception while the original server call is still in flight. No local proxy or failpoint is available to delay or drop a real response without also blocking the request, so this canonical journey's own defining scenario was not reproduced. The Manual UX baseline (a real Submit resolving definitively) and the RPC-level retry/idempotency dimension were genuinely verified and remain valid.
 
-Journey W-012 complete — PASS.
+Classification: PARTIAL / TOOLING LIMITATION. The canonical journey's defining scenario, exact-timeout injection, is unsupported by available tooling and was not reproduced, so the overall journey is reclassified from PASS to PARTIAL. The supporting Manual UX and RPC-level idempotency evidence above is preserved and remains valid.
+
+Journey W-012 complete — PARTIAL / TOOLING LIMITATION.
 Batch 29: 5/25 attempted — 20 remaining.
 Active Product Gaps: 0.
 Next: W-013.
@@ -200,9 +202,11 @@ Result: raised `WORKFLOW_NODE_ALREADY_ADVANCED: this step was already decided by
 
 Journey Discovery: NONE.
 
-Classification: PASS (Manual UX dimension verified under real conditions; RPC-level idempotency dimension verified via replay; exact-timeout-injection dimension honestly scoped as TOOLING LIMITATION).
+Missing dimension: genuine client-side timeout / apparent-failure perception while the original server call is still in flight, for the Approve action. Same tooling caveat as W-012. The Manual UX baseline (a real Approve resolving definitively) and the RPC-level retry/idempotency dimension were genuinely verified and remain valid.
 
-Journey W-013 complete — PASS.
+Classification: PARTIAL / TOOLING LIMITATION. The canonical journey's defining scenario, exact-timeout injection, is unsupported by available tooling and was not reproduced, so the overall journey is reclassified from PASS to PARTIAL. The supporting Manual UX and RPC-level idempotency evidence above is preserved and remains valid.
+
+Journey W-013 complete — PARTIAL / TOOLING LIMITATION.
 Batch 29: 6/25 attempted — 19 remaining.
 Active Product Gaps: 0.
 Next: W-014.
@@ -417,9 +421,11 @@ Result: the replay raised `CUSTOMER_CHANGE_NOT_SUBMITTABLE: request ... has stat
 
 Journey Discovery: NONE. Confirms exactly one mutation is ever applied regardless of which of the two failure points actually occurred, per the canonical's Audit/Data Integrity Check, using the same status-guard mechanism already proven throughout Pack W.
 
-Classification: PASS (Manual UX dimension verified under real conditions; RPC-level idempotency dimension verified via replay covering both stress-variant failure points; exact-network-severance-timing injection honestly scoped as TOOLING LIMITATION, not silently substituted).
+Missing dimension: true post-send / pre-response network severance (the request reaching the server and being fully committed there, then the response being lost or the connection severed before the browser receives it). What was executed instead was a normal successful Submit followed by an identical direct RPC replay, which proves retry/idempotency safety but does not itself reproduce the response-severance timing the canonical journey describes.
 
-Journey Z-003 complete — PASS.
+Classification: PARTIAL / TOOLING LIMITATION. The canonical journey's defining scenario, genuine post-send network severance, is unsupported by available tooling and was not reproduced, so the overall journey is reclassified from PASS to PARTIAL. The Manual UX baseline and the RPC-level idempotency evidence above are preserved and remain valid.
+
+Journey Z-003 complete — PARTIAL / TOOLING LIMITATION.
 Batch 29: 17/25 attempted — 8 remaining.
 Active Product Gaps: 0.
 Next: Z-004.
@@ -573,9 +579,11 @@ Finding: this sequencing structurally prevents Z-011's exact bad state from ever
 
 Journey Discovery: NONE. This is a positive design confirmation (upload-then-insert ordering with no interleaving), not a gap: the specific failure mode this journey asks about cannot occur via the real upload flow in either of the two domains in scope. Recorded honestly as SOURCE INSPECTED rather than a fabricated MANUAL UX VERIFIED, per Step 16's no-conflated-evidence standard; not classified as a Product Gap since no contradictory behavior was found, and not silently merged into Z-010's evidence since the underlying reason (structural prevention) is a distinct, worthwhile finding in its own right.
 
-Classification: PASS.
+Missing dimension: genuine interrupted-upload failure injection, a real upload that is cut off or fails partway through before metadata is written. This browser tool does not support real OS file-picker interaction or severing a real multipart upload mid-transfer, so no live reproduction of the actual interrupted-upload scenario was attempted or achieved. The source-inspection finding above (upload-then-insert ordering) is a valid, distinct, worthwhile finding but is not itself a substitute for reproducing the canonical scenario, and Z-010's post-hoc missing-object technique is a different scenario, not a substitute for this one.
 
-Journey Z-011 complete — PASS.
+Classification: PARTIAL / TOOLING LIMITATION. The canonical journey's defining scenario, a genuine interrupted upload, was never reproduced, only inferred structurally unreachable via source inspection. The source-inspection finding is preserved and remains valid, but does not by itself justify PASS.
+
+Journey Z-011 complete — PARTIAL / TOOLING LIMITATION.
 Batch 29: 25/25 attempted — 0 remaining.
 Active Product Gaps: 0.
 Batch 29 fully executed.
