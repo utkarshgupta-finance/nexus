@@ -144,11 +144,9 @@ not only direct database access.
 
 ### Commit containing this documentation
 
-Recorded in the commit that introduces this file alongside the `CLAUDE.md`,
-`docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`, and `docs/TEST_FIXTURE_REGISTER.md`
-changes (see `git log -- docs/journey-runs/TEST_DATA_INCIDENTS.md` for the
-exact hash; this file is created in the same commit that closes this
-incident).
+`b46acea8d3ea603850d5f4c0dc6936fa751ac78e` (`team-preview`), introducing this
+file alongside the `CLAUDE.md`, `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`, and
+`docs/TEST_FIXTURE_REGISTER.md` changes in the same commit.
 
 **Classification:** not a Product Gap. This is a test-process safety failure,
 not a product defect; the product's own immutability design worked exactly as
