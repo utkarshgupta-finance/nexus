@@ -18228,12 +18228,12 @@ Packs V, W, X, Y, and Z are engine-level and cross-domain by design. Where a rac
 - Related Journeys: Z-022, Z-023
 - Notes: N/A
 
-### Z-025: Mutable search_path hardening gap across 61 Postgres functions (awareness-level)
+### Z-025: Mutable search_path hardening gap across Postgres functions (awareness-level)
 - Pack: Z - Failure / Recovery / Chaos
-- Business Objective: Record and track the known, deliberately-deferred defense-in-depth gap where 61 Postgres functions do not pin a fixed search_path, as a documented low-priority hardening item rather than a currently-exploitable functional bug.
+- Business Objective: Record and track the known, deliberately-deferred defense-in-depth gap where a growing set of Postgres functions do not pin a fixed search_path, as a documented low-priority hardening item rather than a currently-exploitable functional bug.
 - Domain: cross-cutting (database function layer underlying all four governed domains)
 - Object / Record Type: Postgres functions (RPCs)
-- Starting State: Current schema state, with the 61 affected functions as documented.
+- Starting State: Current schema state. Count re-verified live 2026-09-29 (Batch 30) via the Supabase security advisor: 115 functions, up from 61 when first documented, grown naturally as new governed RPCs were added across later batches (e.g. `refresh_go_live_request_commercial_version`, `reverse_settlement`). See `docs/TECH_DEBT.md` for the current count.
 - Personas: Database/security reviewer
 - Preconditions: N/A
 - Regular Path: Enumerate the affected functions and confirm the count/scope matches current documentation; confirm no functional test currently depends on exploiting this gap.

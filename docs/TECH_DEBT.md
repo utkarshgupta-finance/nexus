@@ -332,11 +332,15 @@ into a second backlog.
   found still calling `.toLocaleDateString()`/`.toLocaleString()`
   directly instead of the shared utility.
 - **Two Supabase security-linter findings, real but out of scope for
-  this closure pass (Platform Scale Closure, Phase S).** 61 functions
-  (every `SECURITY DEFINER`-style RPC in the schema, including ones
-  touched this program) have a mutable `search_path`, a standard
-  Postgres hardening gap (`function_search_path_mutable`), pre-existing
-  across the entire function set, not introduced by this round.
+  this closure pass (Platform Scale Closure, Phase S).** 115 functions
+  as of 2026-09-29 (count re-verified live against the Supabase security
+  advisor during Batch 30's Z-025; was 61 at the time this entry was
+  first written, grown naturally as new governed RPCs were added across
+  later batches, most recently `refresh_go_live_request_commercial_version`
+  and `reverse_settlement`) (every `SECURITY DEFINER`-style RPC in the
+  schema, including ones touched this program) have a mutable `search_path`,
+  a standard Postgres hardening gap (`function_search_path_mutable`),
+  pre-existing across the entire function set, not introduced by this round.
   Fixing it means adding `SET search_path = ''` (or a fixed schema) to
   every one, a real, sizable, dedicated pass, not a byproduct of an
   unrelated program; do not fix a handful ad hoc, since consistency

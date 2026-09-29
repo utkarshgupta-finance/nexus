@@ -163,6 +163,20 @@ Accepted meanwhile: yes.
 Trigger to reopen: a real business need for Go Live authorization to match
 its five sibling domains' granularity.
 
+### DF-010: No duplicate/near-duplicate customer name warning on creation
+Journey: Z-015, Batch 30
+Reason for deferral: the canonical journey's own Expected Business Result
+frames this as worth flagging for product consideration, not a decided
+requirement; `customers.name` has no uniqueness constraint (only the
+generated `key` slug is unique), so two customers with an identical or
+near-identical legal name remain fully distinct rows with zero forced-merge
+or data-corruption risk. Live-verified: entering an exact-match legal name
+of a real existing customer on a fresh onboarding draft produced no inline
+warning, soft-block, or any other signal.
+Accepted meanwhile: yes, no data-integrity or security impact.
+Trigger to reopen: a real data-quality incident from genuinely confused
+duplicate customer records, or a broader Customer Onboarding UX pass.
+
 ---
 
 ## D. CLOSED HISTORY (fixed, decided-and-accepted, or superseded; kept for traceability, not active)
@@ -409,6 +423,16 @@ compact summary is kept here.
   - After this pass: **Active (Decision Required): 0. Active
     (implementation pending): 0. To Verify: 1. Deferred / Accepted For
     Now: 9. Closed History: 49 (PG-059 added).**
+- **Eighth pass, 2026-09-29 (Batch 30): DF-010 added.** Z-015 found, live,
+  that no duplicate/near-duplicate customer name warning exists anywhere
+  in Customer Onboarding; the canonical journey's own framing treats this
+  as worth flagging rather than a decided requirement, and
+  `customers.name` carries no uniqueness constraint, so no data-integrity
+  risk exists. Registered as DF-010 in Section C, not a confirmed Product
+  Gap, no Product Decision requested.
+  - After this pass: **Active (Decision Required): 0. Active
+    (implementation pending): 0. To Verify: 1. Deferred / Accepted For
+    Now: 10 (DF-010 added). Closed History: 49 (unchanged).**
 - The zero-active-team-members mechanism (PG-005) remains the single
   most-reconfirmed gap in the project's history (O-018, A-027, C-025,
   E-028, J-011, M-025, V-027, anticipated again as Z-007/Z-009); the

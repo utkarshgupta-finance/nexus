@@ -1,10 +1,10 @@
 # Current Run Status
 
-Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_29_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
+Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `npm run journey:status`. Do not hand-edit this file. The batch ledger (`BATCH_30_RESULTS.md`) remains the authoritative evidence record; if this dashboard and the ledger ever disagree, the ledger wins and this file must be regenerated.
 
 ## Current run
 
-- **Current Batch:** 29 (Fresh execution: Batch 29 (W-008 through W-021, Z-001 through Z-011) - CLOSED (corrected 2026-09-29: W-012, W-013, Z-003, Z-011 reclassified PASS -> PARTIAL, bookkeeping only))
+- **Current Batch:** 30 (Fresh execution: Batch 30 (Z-012 through Z-030, X-001 through X-006) - CLOSED)
 - **Batch status:** COMPLETE
 - **Scheduled journey count:** 25
 - **Completed journey count:** 25
@@ -13,20 +13,20 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 - **Current journey ID:** None
 - **Current journey execution state:** COMPLETE
 
-> Batch 29 — COMPLETE — 25 / 25 reconciled
+> Batch 30 — COMPLETE — 25 / 25 reconciled
 
-## Continuous run (Batches 24-25-26-27-28-29)
+## Continuous run (Batches 24-25-26-27-28-29-30)
 
-> Overall: 152 / 235 complete — 83 remaining.
+> Overall: 177 / 235 complete — 58 remaining.
 
 ## Classification counts
 
-- **PASS:** 20
+- **PASS:** 17
 - **FAILED THEN FIXED + PASS:** 0
-- **PRODUCT GAP RESOLVED + PASS:** 1
+- **PRODUCT GAP RESOLVED + PASS:** 0
 - **PRODUCT GAP CONFIRMED:** 0
-- **EXPECTED BEHAVIOUR:** 0
-- **PARTIAL:** 4
+- **EXPECTED BEHAVIOUR:** 3
+- **PARTIAL:** 5
 - **BLOCKED:** 0
 - **EXTERNAL BLOCKER:** 0
 - **PRODUCT DECISION REQUIRED:** 0
@@ -34,7 +34,7 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Current activity
 
-- **Last journey completed:** Z-011
+- **Last journey completed:** X-006
 - **Journey currently executing:** None
 - **Next 3 journeys:** None
 
@@ -43,23 +43,23 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 - **Defects found:** 0
 - **Defects fixed:** 0
 - **Open defects:** 0
-- **Product Decisions found:** 1
+- **Product Decisions found:** 0
 - **Journey Discovery:**
   - ALREADY COVERED: 0
-  - EXPAND EXISTING JOURNEY: 0
+  - EXPAND EXISTING JOURNEY: 1
   - NEW JOURNEY REQUIRED: 0
   - REGRESSION TEST ONLY: 0
   - FUTURE MODULE: 0
-  - PRODUCT DECISION REQUIRED: 1
+  - PRODUCT DECISION REQUIRED: 0
 
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** f1e10fc
+- **Current HEAD:** 5d7c26b
 - **Working tree:** dirty
-- **Latest test checkpoint:** Batch 29 CORRECTED CLOSURE 2026-09-29 (bookkeeping only, no reruns, no implementation changes): all 25 scheduled journeys (W-008 through W-021, Z-001 through Z-011) genuinely executed. Corrected tally: 20 PASS, 1 PRODUCT_GAP_RESOLVED_PASS (Z-001), 4 PARTIAL / TOOLING LIMITATION (W-012, W-013, Z-003, Z-011). W-012 and W-013 verified the Manual UX baseline and RPC-level retry/idempotency dimension but did not reproduce genuine client-side timeout injection (unsupported by available tooling); Z-003 verified retry/idempotency via RPC replay but did not reproduce true post-send/pre-response network severance; Z-011 established via source inspection that the real upload-then-insert ordering structurally prevents its failure mode, but did not genuinely reproduce a live interrupted upload. Z-010 remains PASS: its core missing-storage-object scenario was genuinely reproduced with disposable self-created test data and real browser verification. Originally (before this correction): One Product Gap was found and immediately closed under the Product Gap Immediate-Closure Protocol: PG-059 (an expired/revoked session redirected to the same generic login form a first-time visitor sees, with no distinct 'session expired' messaging, discovered in Z-001) - user chose the query-param + login-banner approach (redirect to /login?reason=session-expired, distinct login-page banner, reusing the existing redirect and redirectTo return-navigation mechanisms, no new client-side session watcher); implemented via a new hasSupabaseAuthCookie helper (distinguishes 'was authenticated, now expired' from 'never authenticated' using only the existing sb-*-auth-token cookie), an optional expired flag on NexusSession's unauthenticated variant, AuthGate's conditional reason param, and a warning-styled LoginPage banner; 12 new unit tests, full suite (1110 tests) and tsc both pass; verified live end-to-end (revoked a real fictional persona's session mid-edit, confirmed the banner, confirmed zero partial/corrupted write, confirmed a plain /login visit shows no banner, confirmed re-authentication correctly returns to the original URL with the true persisted state). Z-002 reconfirmed the identical mechanism protects an in-flight Approve action with zero partial application and a clean real retry. W-008 through W-021 (idempotency/retry pack) all PASS, reconfirming PG-036 (same-actor replay) and PG-037 (cross-node segregation of duties) live, plus a newly observed but non-gap concurrency message ('This approval has already moved to the next step') for the two-tab-same-user race in W-018. Z-003 through Z-006 (chaos: network failure, refresh-during-save, browser-close-after-submit, stale-page-after-another-actor) all PASS via a mix of real browser action and honest TOOLING LIMITATION declarations where genuine network-severance injection is unsupported. Z-007 and Z-009 reconfirmed PG-040 and the accepted O-018/V-027 zero-active-members behavior live against the real WF-TEST Legal team (deactivate/reactivate and remove/restore membership, both fully reversed afterward). Z-008 confirmed a deactivated Reference Master value does not block a draft that already selected it. Z-010 confirmed a genuinely deleted storage object (created and removed by this session, not pre-existing history, after an earlier attempt on real shared data was correctly blocked by the safety classifier) produces a graceful, non-crashing error; Z-011 found via source inspection (not fabricated live reproduction) that the real upload-then-insert code sequencing in both Go Live and Customer Onboarding structurally prevents its exact failure mode from ever occurring. tsc --noEmit exits 0. npx vitest run: 118 test files, 1110 tests, all passing.
+- **Latest test checkpoint:** Batch 30 CLOSED 2026-09-29: all 25 scheduled journeys (Z-012 through Z-030, X-001 through X-006) genuinely executed. Tally: 17 PASS, 5 PARTIAL / TOOLING LIMITATION (Z-012, Z-013, Z-022, Z-028, Z-030), 3 EXPECTED BEHAVIOUR (Z-015, Z-025, Z-026), 0 PRODUCT_GAP_CONFIRMED, 0 PRODUCT_GAP_RESOLVED. No Product Gap found this batch; DF-010 registered (no duplicate-customer-name warning, a documented enhancement opportunity, not a confirmed defect) in docs/OPEN_PRODUCT_GAPS.md Section C. Z-012/Z-013 (document upload validation): real OS file-picker interaction confirmed unsupported by this browser tool; validation logic and no-early-write sequencing confirmed via source + existing automated tests. Z-014/X-001 (legacy-null rendering): genuine pre-actor-identity-snapshot-migration audit_log rows on the real aurora-consumer-labs customer rendered safely with honest fallback. X-002 (PG-058 regression): mechanism confirmed unchanged and rendering correctly. X-003 (deactivated master value, historical): real live toggle of the Mid Market segment value, customer detail page unaffected, fully restored. Z-015: real exact-duplicate customer name silently accepted, no warning exists (DF-010). Z-016 (huge comment): real 20,028-character reject reason persisted and processed cleanly, no DB limit exists. Z-017 (Unicode): real mixed-script/emoji/quote content round-tripped exactly and rendered correctly. Z-018/Z-019 (boundary/future dates): real 2028-02-29 leap-day effective date accepted exactly; real pre-existing 2027+ Commercial Versions correctly show 'Approved, Scheduled' fresh-on-read. Z-020/Z-021 (deep links): malformed/nonexistent/cross-domain/crafted ids all handled by the shared RequestUnavailable component; a genuinely deleted disposable Storage object confirmed via the real app code path (Batch 29 Z-010 mechanism, unchanged). Z-022 (DB constraint): real 23505 unique-violation triggered via direct RPC on Reference Master, clean rollback confirmed, friendly-message translation layer confirmed via source; live UI reproduction blocked by an environment rendering issue this pass. Z-023 (named errors): regression-confirmed via git history showing the four domains' error parsers unchanged since PG-056. Z-024 (unknown error): real 22P02 Postgres error triggered via a malformed RPC call, safe-degradation fallback confirmed via source. Z-025: search_path count corrected from 61 to 115 (live-verified via Supabase advisor), docs updated. Z-026 (two accounts, two tabs): live-confirmed single-shared-cookie session model, no misattribution. Z-027 (signed URL expiry): real 8-second signed URL against a disposable object, confirmed expiry enforcement. Z-028 (clock skew): client-side skew injection unsupported; server-authoritative time usage confirmed via source across every layer. Z-029 (XSS): real script/img/javascript: payload rejected a real Reject reason, rendered as literal escaped text, zero execution confirmed via console + DOM inspection. Z-030 (Auth admin API failure): source shows a try/catch already exists (contradicts the canonical's stale note describing none); live failure injection unsupported. X-004: real completed 4-node approval chain under a now-deactivated workflow definition renders its exact historical Timeline unchanged. X-005: real USD currency rate changed live from 91 to 99.5 and restored; historical fx_snapshot_rate (83.25) on real approved Commercial Versions confirmed completely unaffected throughout. X-006: audit_sequence confirmed to have zero consuming code references anywhere in the app; all real ordering is timestamp-based. tsc --noEmit exits 0. Full suite unchanged from Batch 29 (no implementation changes made this batch).
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-09-29 09:22:28 UTC
+- **Last status update:** 2026-09-29 12:20:19 UTC
