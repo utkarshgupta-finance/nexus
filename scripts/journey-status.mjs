@@ -22,12 +22,13 @@ const DASHBOARD_PATH = join(ROOT, "docs/journey-runs/CURRENT_RUN_STATUS.md")
 const CLASSIFICATION_LABELS = {
   PASS: "PASS",
   FIXED_PASS: "FAILED THEN FIXED + PASS",
+  PRODUCT_GAP_RESOLVED: "PRODUCT GAP RESOLVED + PASS",
+  PRODUCT_GAP: "PRODUCT GAP CONFIRMED",
   EXPECTED_BEHAVIOR: "EXPECTED BEHAVIOUR",
-  PRODUCT_GAP: "PRODUCT GAP",
-  PRODUCT_DECISION_REQUIRED: "PRODUCT DECISION REQUIRED",
+  PARTIAL: "PARTIAL",
   BLOCKED: "BLOCKED",
   EXTERNAL_BLOCKER: "EXTERNAL BLOCKER",
-  PARTIAL: "PARTIAL",
+  PRODUCT_DECISION_REQUIRED: "PRODUCT DECISION REQUIRED",
 }
 
 function gitInfo() {
@@ -126,6 +127,16 @@ function buildDashboardMarkdown(state, git, now) {
   for (const [key, label] of Object.entries(CLASSIFICATION_LABELS)) {
     lines.push(`- **${label}:** ${counts[key]}`)
   }
+  const classificationTotal =
+    counts.PASS +
+    counts.FIXED_PASS +
+    counts.PRODUCT_GAP_RESOLVED +
+    counts.PRODUCT_GAP +
+    counts.EXPECTED_BEHAVIOR +
+    counts.PARTIAL +
+    counts.BLOCKED +
+    counts.EXTERNAL_BLOCKER
+  lines.push(`- **TOTAL:** ${classificationTotal}`)
   lines.push(``)
   lines.push(`## Current activity`)
   lines.push(``)
@@ -183,10 +194,22 @@ function buildConsoleSummary(state, git) {
   }
   lines.push(pad("PASS", counts.PASS))
   lines.push(pad("FIXED + PASS", counts.FIXED_PASS))
+  lines.push(pad("PRODUCT GAP RESOLVED", counts.PRODUCT_GAP_RESOLVED))
+  lines.push(pad("PRODUCT GAP CONFIRMED", counts.PRODUCT_GAP))
   lines.push(pad("EXPECTED", counts.EXPECTED_BEHAVIOR))
-  lines.push(pad("PRODUCT GAP", counts.PRODUCT_GAP))
+  lines.push(pad("PARTIAL", counts.PARTIAL))
   lines.push(pad("PRODUCT DECISIONS", counts.PRODUCT_DECISION_REQUIRED))
   lines.push(pad("BLOCKED", counts.BLOCKED + counts.EXTERNAL_BLOCKER))
+  const total =
+    counts.PASS +
+    counts.FIXED_PASS +
+    counts.PRODUCT_GAP_RESOLVED +
+    counts.PRODUCT_GAP +
+    counts.EXPECTED_BEHAVIOR +
+    counts.PARTIAL +
+    counts.BLOCKED +
+    counts.EXTERNAL_BLOCKER
+  lines.push(pad("TOTAL", `${total}`))
   lines.push(``)
   lines.push(pad("Defects", `${state.defectsFound ?? 0} found / ${state.defectsFixed ?? 0} fixed / ${state.openDefects ?? 0} open`))
   const jd = state.journeyDiscovery ?? {}
