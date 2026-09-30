@@ -423,9 +423,15 @@ A live `teamName` field does exist (`WorkflowNodeDisplay`, populated via a live 
 
 **Conclusion:** individual approver attribution is immutable-person-identity-based and already confirmed safe (V-038/PG-058). Team names are never part of any Timeline audit entry in the first place, in any domain, so a hypothetical future team-rename feature could never corrupt historical Timeline display. The one place a team name IS shown live (the "current responsible team" badge) is an explicitly current-state indicator, not a historical record, so live-resolution there is correct and intentional, not a defect.
 
-**Journey Discovery:** none; no new Product Gap. This confirms the canonical's own "Expected Technical Invariant" exactly, as a documented product characteristic rather than a gap.
+**MANUAL UX VERIFIED (2026-09-30 reconciliation, added to close the source-only evidence gap):** logged in as `nexus-test-team-admin@example.test`, opened the real `/settings/teams` page (Team Master). Located the real `WF-TEST Legal` row (the same team used throughout AA-003/AA-006's approvals this batch) and inspected it directly: Team Code, Team Name, and Description render as plain static text, not inputs, links, or contenteditable elements; the only interactive element in the row is a single Deactivate/Activate button. Performed a genuine real click directly on the "WF-TEST Legal" team name cell: confirmed via the resulting DOM state that no inline edit field appeared, no navigation occurred (URL stayed `/settings/teams`), and the cell's text was unchanged. This matches Batch 28's V-035 finding exactly (same absence of any rename/edit-name control, confirmed independently this batch on a different team row) and confirms PG-033's register entry still holds live, not merely in source.
+- current Team UI inspected
+- no rename/edit-name control exists
+- source finding and live UI agree
+- AA-005 remains EXPECTED BEHAVIOUR
 
-**AA-005 classification: EXPECTED BEHAVIOUR (source-verified, no live mutation possible or required).**
+**Journey Discovery:** ALREADY COVERED. Reason: the canonical premise assumed a rename action that the current product does not expose; this was already reconciled under V-035 / Batch 31. No Product Gap created.
+
+**AA-005 classification: EXPECTED BEHAVIOUR (source-verified and Manual UX verified live; no live mutation performed or required).**
 
 ### AA-006: Two concurrent governed requests, neither corrupting or blocking the other
 
