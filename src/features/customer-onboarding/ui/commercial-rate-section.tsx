@@ -920,17 +920,6 @@ function ComponentEditor({
 
       <Separator />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel>Effective From</FieldLabel>
-          <Input type="date" value={component.effectiveFrom ?? ""} onChange={(event) => onChange({ ...component, effectiveFrom: event.target.value || null })} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel>Effective To (optional)</FieldLabel>
-          <Input type="date" value={component.effectiveTo ?? ""} onChange={(event) => onChange({ ...component, effectiveTo: event.target.value || null })} />
-        </div>
-      </div>
-
       <div className="flex flex-col gap-1.5">
         <FieldLabel>Notes (optional)</FieldLabel>
         <Input value={component.notes} onChange={(event) => onChange({ ...component, notes: event.target.value })} placeholder="Optional context for Finance" />

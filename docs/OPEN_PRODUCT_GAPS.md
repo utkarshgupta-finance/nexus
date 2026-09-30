@@ -30,16 +30,10 @@ bottom). Not from memory or `RUN_STATE.json` summaries alone.
 
 ## A. ACTIVE PRODUCT GAPS
 
-None currently open. The 8 confirmed gaps that previously stood here
-(PG-035, PG-036, PG-037, PG-038, PG-040, PG-044, PG-045, PG-053) were
-decided and closed on 2026-09-28. PG-056, found the same day via the
-mandatory post-fix Journey Discovery re-check on PG-040, was closed the
-same day under the Immediate-Closure Protocol. PG-057 and PG-058, found
-2026-09-28/29 during Batch 28's V-033 and V-038 respectively, were both
-decided/closed 2026-09-29. PG-059, found 2026-09-29 during Batch 29's
-Z-001, was decided and closed the same day; see **D. CLOSED HISTORY**
-below for every entry's decision, implementation, and verification
-evidence.
+None currently open. PG-063, found 2026-09-30 during Batch 31's AA-006, was
+decided and closed the same day under the Immediate-Closure Protocol; see
+**D. CLOSED HISTORY** below for its decision, implementation, and
+verification evidence.
 
 ---
 
@@ -177,6 +171,70 @@ Accepted meanwhile: yes, no data-integrity or security impact.
 Trigger to reopen: a real data-quality incident from genuinely confused
 duplicate customer records, or a broader Customer Onboarding UX pass.
 
+### DF-011 (PG-060): No UI surfaces a superseded (non-current) Customer Onboarding or Go Live document version
+Journey: X-008, Batch 31
+Reason for deferral: same shape as DF-006 (PG-051) — the underlying data is
+fully correct and immutable, only the viewing surface is missing.
+`customer_onboarding_documents`/`go_live_documents` both freeze prior
+versions via `is_current = false` rather than deleting them (see also
+`docs/journey-runs/TEST_DATA_INCIDENTS.md` INC-001 for the Go Live side of
+this same characteristic). On the Onboarding side specifically, the data
+layer even already has a ready-built, unit-tested reader for this exact case
+— `listDocumentsForRevision` (`src/features/customer-onboarding/data/documents.data.ts:104-118`),
+re-exported as `listOnboardingDocumentsForRevision`
+(`services/documents.service.ts:126-129`, `server.ts:40`) — but it has zero
+callers: no page, Server Action, or route ever invokes it. The only document
+readers actually wired to a page (`listCurrentDocumentsForRequest`,
+`documents.data.ts:76-86`) filter `is_current = true` unconditionally, same
+as Go Live's `listDocumentsForGoLiveRequest`. Live-verified (X-008): no
+"document history" or "previous revision" UI exists anywhere for either
+domain.
+Accepted meanwhile: yes, matching DF-006's precedent; no data-integrity risk
+(nothing is lost, only unsurfaced) and no caller currently depends on
+retrieving a superseded document.
+Trigger to reopen: a real compliance/audit need to review a prior document
+revision (e.g. disputing what was actually uploaded before a send-back), or
+wiring `listOnboardingDocumentsForRevision` into a real route as part of a
+broader document-history UX pass alongside DF-006.
+
+### DF-012 (PG-061): No cross-customer report/export surface exists
+Journey: X-015, Batch 31
+Reason for deferral: same shape as PG-025 (no Pricing Kernel) and PG-026 (no
+onboarding UI for spend commitments) — a genuinely unbuilt V1 module, not a
+defect. Confirmed via source: no CSV export, no "reports" page, and no
+cross-customer aggregate/tabular view exists anywhere in the app beyond the
+plain Customer Master list (`src/app/customers/page.tsx`) and the paginated
+JSON integration API (`src/app/api/v1/customers/route.ts`, JSON only, no
+aggregation). The canonical journey's premise (verify a legacy mixed-schema
+aggregate view handles heterogeneous customer data correctly) has no real
+surface to exercise.
+Accepted meanwhile: yes; reporting/export was never in this program's built
+scope.
+Trigger to reopen: a real reporting/export module gets built, at which point
+re-run this journey against the real surface for legacy-schema handling.
+
+### DF-013: Onboarding has no genuine reject/terminal state for a submitted case a reviewer will never approve
+Journey: AA-008, Batch 31 (re-confirms A-020's own already-documented design
+constraint, not a new discovery)
+Reason for deferral: `cancelOnboardingCase` is explicitly draft-only by
+design ("only a draft may be discarded", `case.service.ts:221`), confirmed
+server-side; a submitted/sent-back/resubmitted case has no cancel, reject,
+or admin-override control anywhere in the UI (confirmed live: a real
+resubmitted case, `CO-000102`, status "Submitted", revision 2, shows only
+"View Request", no cancel affordance). The only two ways out of that state
+are eventual approval or perpetual send-back/resubmit cycling. A-020's own
+canonical text already flags this as "a deliberate design constraint worth
+flagging."
+Accepted meanwhile: yes, with a partial mitigation already in place: a
+stuck/pending case is not invisible, it correctly surfaces on the
+Operational Queue (confirmed live, `CO-000102` appears there) for admin
+attention, satisfying the canonical's minimum UX bar ("stuck cases are
+visible/reportable to admins for manual attention").
+Trigger to reopen: if the business wants a genuine forced-terminal/reject
+path for onboarding (matching Customer Change's own reject state), this
+would need a dedicated remediation workflow (admin override or an explicit
+reject action), which is a real product decision, not a bounded bug fix.
+
 ---
 
 ## D. CLOSED HISTORY (fixed, decided-and-accepted, or superseded; kept for traceability, not active)
@@ -236,6 +294,8 @@ compact summary is kept here.
 | PG-057 | V-033 | 28 | Go Live review page labeled "Commercial Context (Locked)" always showed the customer's CURRENT commercial terms, silently tracking whatever version was active at view/approval time instead of the version the request was actually created against; no warning if the two diverged | DECIDED (2026-09-29: truly lock to the creation-time Commercial Version; block approval and require an explicit refresh if superseded, rather than silently tracking current terms) + FIXED | Migration `20261017000000_pg057_go_live_locks_referenced_commercial_version.sql`: `approve_go_live_request` now raises `GO_LIVE_COMMERCIAL_VERSION_SUPERSEDED` if the referenced version's component has been closed by a later one; new governed `refresh_go_live_request_commercial_version` RPC (creator-only) rebinds to the current version, preserving the old reference on new columns `previous_commercial_version_id`/`commercial_version_refreshed_by`/`commercial_version_refreshed_at`. New pure resolver `src/features/go-live/domain/referenced-version.ts` (unit tested, 4 tests) drives both the review page's locked display and its warning banner; `go-live-detail-page.tsx` now shows the referenced version's own terms (not current), a visible warning + "Refresh to Current Commercial Version" control when superseded, and disables Approve until refreshed. Full suite (1092 tests) and tsc pass. Verified live end-to-end: a request referencing V1 was blocked once V2 superseded it (confirmed via direct RPC and the real review page, which showed "Version 6" locked with a "Version 7 is now active" warning and a disabled Approve button); the creator's real "Refresh" click in the browser rebound it to V2 (confirmed in both the UI and the DB, with V1 preserved as `previous_commercial_version_id`), after which approval proceeded normally; a separate fresh Go Live request created directly against the current version approved with no false block. V-033's canonical text updated with the decided behavior. |
 | PG-058 | V-038 | 28 | Customer Master's Activity view and its History tab's Field History table ("Approved By") live-resolved the actor's CURRENT display name for every historical entry, identically to every other Timeline, despite being the one surface expected to be a frozen, point-in-time audit trail; `audit_log`'s own `actor_display_name_snapshot`/`actor_email_snapshot` columns already existed but were never read by this view | DECIDED (2026-09-29: freeze Customer Master Activity/History to the actor's point-in-time identity, sourced from `audit_log`'s existing snapshot columns; keep ordinary Timelines live-resolving, unchanged) + FIXED | `src/features/customers/domain/activity.ts`: new `buildAuditIndex`/`historicalActorLabel` (exact-match correlation on table/row id/actor id/timestamp, reliable because both the domain row's own lifecycle timestamp and `audit_log.occurred_at` are set by the identical `now()` inside the same transaction), used by `fieldChangeEvents`/`changeRequestEvents`/`commercialVersionEvents`/`onboardingOriginEvent` (the four Activity-tab builders that were live-resolving; `statusChangeEvents` already correctly used the snapshot via the pre-existing `auditRowActorLabel`). New `listAuditLogForRows` batch fetch (`src/platform/audit/data/audit-log.data.ts`) avoids an N-query fan-out. New `resolveFieldHistoryActorLabels` (`src/features/customers/server/activity.ts`) gives the separate History-tab Field History table the same point-in-time resolution, now keyed by field history entry id rather than actor id (a label keyed only by actor id could not represent the same actor's identity correctly at two different points in time). 8 new unit tests, full suite (1098 tests) and tsc pass. Verified live end-to-end: renamed a real actor (`nexus-test-legal`) with real historical approvals on a real customer; the ordinary Change Request Timeline correctly showed the new, renamed name (unchanged behavior); the same customer's Activity tab and History tab's Field History "Approved By" column both continued showing the original, pre-rename name for every one of that actor's historical entries. V-038's canonical text updated with the decided behavior; renamed test persona restored afterward. |
 | PG-059 | Z-001 | 29 | An expired/revoked session (`AuthGate`'s `unauthenticated` state) redirected to the exact same generic "Sign in to continue." login form a brand-new, never-authenticated visitor sees, with no messaging distinguishing "your session expired" from an ordinary first-time login; distinct from `AuthGate`'s existing separate "Session unavailable" (backend-unreachable) message, for which no equivalent existed | DECIDED (2026-09-29: redirect to `/login?reason=session-expired` and show a persistent login-page banner; carry the reason through the existing redirect rather than adding a new client-side session watcher; preserve the existing `redirectTo` return-navigation pattern) + FIXED | New `hasSupabaseAuthCookie` (`src/lib/supabase/server-auth-client.ts`) detects a stale `sb-*-auth-token` cookie still present after `getUser()` resolves to no user, distinguishing "was authenticated, now expired" from "never authenticated" without any new client-side detection. `NexusSession`'s `unauthenticated` variant gained an optional `expired` flag (`src/platform/auth/domain/types.ts`); `getCurrentNexusSession` (`src/platform/auth/server.ts`) sets it. `AuthGate` (`src/components/product/auth-gate.tsx`) appends `&reason=session-expired` to its existing `/login` redirect only when `expired` is set. `/login`'s route (`src/app/login/page.tsx`) reads the `reason` param and passes `sessionExpired` to `LoginPage` (`src/features/auth/ui/login-page.tsx`), which renders a `warning`-styled banner ("Your session expired. Please sign in again to continue.") reusing the existing design token, distinct from the destructive-styled sign-in error message. The existing `unavailable`/`inactive`/permission-denied states and the existing `redirectTo` return-navigation mechanism were untouched. 12 new unit tests (`hasSupabaseAuthCookie` cookie-name matching, `getCurrentNexusSession`'s expired branch, `AuthGate`'s two redirect variants plus its unaffected `unavailable`/`inactive` branches, `LoginPage`'s banner rendering); full suite (1110 tests) and tsc pass. Verified live end-to-end: revoked a real fictional persona's `auth.sessions` row mid-edit, attempted a real Save Draft, confirmed the redirect carried `reason=session-expired` and a hard-navigated login page showed the banner (screenshot captured); confirmed the draft's `row_version` and content were unchanged (no partial/corrupted write, no silent success); confirmed a plain `/login` visit (no `reason` param) shows no banner; confirmed re-authenticating from the expired-session redirect correctly returned to the original draft URL with its true, unsaved-edit-lost state, not a false "success" and not an auto-replayed mutation. Unsaved client-side form state is genuinely lost across the redirect (expected and disclosed, not hidden behind the messaging fix, per the canonical's own "ideally preserved" hedge). |
+| PG-062 | AA-002 (found while opening a Customer Change draft) | 31 | `approve_customer_onboarding_case`'s `customers` insert silently dropped `segment`, `business_unit`, `country`, and `industry` for every newly-onboarded customer, even though the onboarding form always collects them and Customer Change's governed-field registry treats all 4 as real, editable Customer Master columns; migration `20260913063000` had originally mapped these correctly from the submitted revision, but a later redefinition (`20261009000000`, carried forward through `20261015000000`/`20261016000000`) switched every other field to read from a new `p_customer_fields` parameter and never carried these 4 over, leaving them permanently `null` | CONFIRMED (regression, not a data-entry issue; root-caused via direct source diff across migration history, not guesswork) + FIXED | Root cause was two-layered: (1) `src/features/customer-onboarding/domain/onboarding-customer-field-mapping.ts`'s `extractGovernedCustomerFieldsFromOnboarding` never read `segment`/`business_unit`/`country`/`industry_category` off the submitted onboarding values into the `p_customer_fields` object it builds (despite its own doc comment asserting field-key parity with the governed-field registry); (2) the RPC's own `insert into customers (...)` column list never included these 4, even though `p_customer_fields ->> 'segment'` was already read elsewhere in the same function for workflow routing. Fixed both: added the 4 missing keys to the TS mapping function, and migration `20261018000000_fix_onboarding_approval_missing_governed_fields.sql` redefines `approve_customer_onboarding_case` with the 4 columns restored to the insert, sourced from `p_customer_fields` exactly like every sibling field. 4 new unit tests in `onboarding-customer-field-mapping.test.ts` (all 9 tests in the file pass); tsc clean. Live confirmation via the real UI was attempted (fresh disposable case `CO-000130`) but blocked by a known browser-automation quirk unrelated to the product (the geography-combobox's dropdown options intermittently would not register a trusted click in this automation environment, the same "trusted-click" pitfall already documented in this program's standing notes); the fix's correctness rests on the direct source diff (before/after insert column lists), the passing unit test exercising the exact broken mapping function, and the successfully-deployed migration, which together are conclusive for this direct, mechanically-simple column-list correction (unlike PG-fixes involving non-obvious runtime/timing behavior, which this program requires live proof for). AA-001's own customer (created before this fix) still has these 4 fields `null`; not backfilled, since AA-001 predates the fix and backfilling a real fixture's data directly would violate this program's own no-direct-mutation discipline. Every onboarding approval from this point forward is fixed. |
+| PG-063 | AA-006 (found while building the Commercial Version "V" side of the concurrency test) | 31 | A Commercial Component's own "Effective From"/"Effective To" date fields, shown as editable in the Add/Edit Component form (`ComponentEditor` in `commercial-rate-section.tsx`), were doubly non-functional: (1) their `onChange` handler never fired no matter how the field was set (real keyboard typing confirmed via a raw `addEventListener('input'/'change', ...)` probe to genuinely fire on the native `<input type="date">`, yet React's bound `onChange` prop was never invoked, reproduced on a completely fresh page load with no prior interaction); and (2) even if a value had been captured, it would have been silently discarded anyway, since `mapOnboardingComponentToCommercialComponentInsert` (`commercial-configuration-promotion.ts:213`) never read `component.effectiveFrom`/`effectiveTo` at all, always using the single container-level effective date passed in as its 4th argument (`version.effectiveDate` for a Commercial Version, the onboarding case's own `effectiveDate` for onboarding) uniformly for every component in the submission. Confirmed identical in both call sites (`commercial-version.service.ts:136`, `case.service.ts:430`). | DECIDED (2026-09-30: remove the two misleading, non-functional input controls rather than implement real per-component override, which would be architecturally nontrivial given AA-003's own effective-date-gap rule assumes uniform per-version dating) + FIXED | Deleted the "Effective From"/"Effective To" `<Input type="date">` block from `ComponentEditor` in `commercial-rate-section.tsx`. The domain type (`CommercialComponentDraft.effectiveFrom`/`effectiveTo`), the diff view, and the summary table's own read-only "Effective From" column (correctly populated for persisted/carried-forward components from their real historical data) were all left untouched, since none of those read the broken write path. `tsc` clean; full suite 1111/1111 passing. Verified live end-to-end on a fresh page load: the Add Component form no longer offers the two controls; a newly-added component now honestly shows "-" for Effective From in the draft table (no longer a silently-broken input pretending to work); after Submit-for-Approval with the version's own Effective Date, the new component correctly received that date, confirmed via `commercial_components` (new stable_component_key, `effective_from` matching the version's date, `effective_to = null`) alongside the two carried-forward components' own additive history remaining clean and non-overlapping. AA-006's canonical text unaffected (its own City/Commercial Version concurrency hypothesis was independently confirmed true). |
 
 ---
 

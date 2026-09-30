@@ -24,6 +24,20 @@ describe("extractGovernedCustomerFieldsFromOnboarding", () => {
     expect(fields.primary_contact_email).toBe("contact@example.com")
   })
 
+  it("maps segment, business_unit, country, and industry (previously silently dropped)", () => {
+    const values = {
+      [CUSTOMER_ONBOARDING_FIELD_KEYS.segment]: "SME",
+      [CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit]: "india_enterprise",
+      [CUSTOMER_ONBOARDING_FIELD_KEYS.country]: "IN",
+      [CUSTOMER_ONBOARDING_FIELD_KEYS.industry]: "fmcg",
+    }
+    const fields = extractGovernedCustomerFieldsFromOnboarding(values, null)
+    expect(fields.segment).toBe("SME")
+    expect(fields.business_unit).toBe("india_enterprise")
+    expect(fields.country).toBe("IN")
+    expect(fields.industry).toBe("fmcg")
+  })
+
   it("reads billing_currency from the Commercial Rate draft, never the vestigial top-level field", () => {
     const draft = { ...createEmptyCommercialRateDraft(), billingCurrency: "INR" }
     const fields = extractGovernedCustomerFieldsFromOnboarding({ billing_currency: "USD" }, draft)

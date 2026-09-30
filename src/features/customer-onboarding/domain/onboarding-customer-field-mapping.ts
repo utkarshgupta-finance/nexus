@@ -28,6 +28,10 @@ function extractGovernedCustomerFieldsFromOnboarding(
 ): Record<string, string | null> {
   return {
     brand_name: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.brandName]),
+    segment: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.segment]),
+    business_unit: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.businessUnit]),
+    country: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.country]),
+    industry: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.industry]),
     address: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.address]),
     state: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.state]),
     city: asGovernedText(values[CUSTOMER_ONBOARDING_FIELD_KEYS.city]),
