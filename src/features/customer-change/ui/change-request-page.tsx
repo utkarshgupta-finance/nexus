@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 import { labelForCaseStatus } from "@/platform/approvals/domain/inbox"
-import { saveChangeDraftAction, submitChangeRequestAction, cancelChangeRequestAction } from "../actions"
+import { saveChangeDraftAction, submitChangeRequestAction, cancelChangeRequestAction, checkForChangeRequestDuplicateAction } from "../actions"
 import { evaluateCustomerChangeRequirements } from "../domain/workflow-rules"
 import { formatChangeRequestId } from "../domain/types"
 import type { CustomerChangeRequest } from "../domain/types"
@@ -78,6 +78,14 @@ function ChangeRequestPage({
     }
   }
 
+  /**
+   * Customer Change GST/PAN Duplicate Prevention (AA-015, PG-064): a
+   * fast, client-side check run right after Save Draft, before Submit,
+   * so a requester sees a clear message here instead of only a raw error
+   * after clicking Submit. Purely a UX convenience:
+   * submitChangeRequestAction's own server-side check is what actually
+   * enforces the block, since a client-only check can always be bypassed.
+   */
   async function handleSubmit() {
     setActionError(null)
     setPendingAction("submit")
@@ -88,6 +96,16 @@ function ChangeRequestPage({
       return
     }
     setChangeRequest(saveResult.changeRequest)
+
+    const duplicateResult = await checkForChangeRequestDuplicateAction(requestId, formValues.gst_number ?? null, formValues.pan ?? null)
+    if (duplicateResult.ok && duplicateResult.matches.length > 0) {
+      setPendingAction(null)
+      const match = duplicateResult.matches[0]
+      const fieldLabel = match.fieldKey === "gst_number" ? "GST" : "PAN"
+      setActionError(`This ${fieldLabel} already belongs to another existing customer (${match.customerName}). Duplicate GST/PAN across customers is not allowed.`)
+      return
+    }
+
     const result = await submitChangeRequestAction(requestId, reason, effectiveDate)
     setPendingAction(null)
     if (result.ok) {

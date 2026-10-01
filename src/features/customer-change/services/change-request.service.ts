@@ -1,13 +1,16 @@
 import "server-only"
 
-import { getCustomerById } from "@/features/customers/server"
+import { getCustomerById, listCustomerMaster } from "@/features/customers/server"
 import { withLoggedOperation } from "@/platform/observability/server"
 
 import * as changeData from "../data/change-request.data"
 import { toCustomerChangeRequest, toProposedValues, toFieldHistoryEntry, toFormerNameMatch } from "../domain/change-request-mappers"
 import { evaluateCustomerChangeRequirements, toRequirementRpcRows } from "../domain/workflow-rules"
 import { GOVERNED_FIELD_KEYS } from "../domain/governed-fields"
+import { findChangeRequestGstPanDuplicates } from "../domain/duplicate-detection"
+import { ChangeRequestOperationError } from "../domain/change-errors"
 import type { CustomerChangeRequest, CustomerFieldHistoryEntry, FormerNameMatch } from "../domain/types"
+import type { ExistingCustomerTaxIdentity, GstPanDuplicateCandidate, GstPanDuplicateMatch } from "../domain/duplicate-detection"
 
 /**
  * Application service for the real, database-backed Customer Change
@@ -41,6 +44,67 @@ async function loadChangeRequest(requestId: string): Promise<CustomerChangeReque
   return toCustomerChangeRequest(row, latestRevision, requirementRows)
 }
 
+const GST_FIELD_KEY = "gst_number"
+const PAN_FIELD_KEY = "pan"
+
+/**
+ * The Change Request's own row plus its latest revision's proposed
+ * values, loaded once: shared by previewRequirements (Required Approvals
+ * preview) and submitChangeRequest (the authoritative Submit-time write),
+ * so neither duplicates the other's fetch.
+ */
+async function loadRequestContext(requestId: string) {
+  const [row, latestRevision] = await Promise.all([changeData.getChangeRequestByRequestId(requestId), changeData.getLatestRevisionForRequest(requestId)])
+  if (!row) throw new Error(`Change Request ${requestId} not found.`)
+  return { row, latestRevision, proposedValues: toProposedValues(latestRevision) }
+}
+
+/**
+ * Customer Change GST/PAN Duplicate Prevention (AA-015, PG-064): loads
+ * every OTHER customer's current GST/PAN and returns any exact match
+ * against the candidate values. Never throws; shared by the fast
+ * client-side pre-submit action (checkForChangeRequestDuplicateAction) and
+ * the authoritative server-side blocker below, so both read the exact
+ * same signal.
+ */
+async function findGstPanDuplicateMatches(customerId: string, candidate: GstPanDuplicateCandidate): Promise<GstPanDuplicateMatch[]> {
+  if (!candidate.gstNumber && !candidate.pan) return []
+  const customers = await listCustomerMaster()
+  const existingCustomers: ExistingCustomerTaxIdentity[] = customers.map(({ record }) => ({
+    customerId: record.id,
+    customerKey: record.key,
+    customerName: record.name,
+    gstNumber: record.gstNumber,
+    pan: record.pan,
+  }))
+  return findChangeRequestGstPanDuplicates(candidate, existingCustomers, customerId)
+}
+
+/**
+ * Server-side mirror of Customer Onboarding's own Submit-time hard
+ * blocker (case.service.ts's validateOnboardingCaseReadyForSubmit): a
+ * Customer Change Request may not propose a GST or PAN that exactly
+ * matches another, different, customer's current value. Closes AA-015 /
+ * PG-064, the gap where Customer Change had no equivalent to Onboarding's
+ * own GST/PAN duplicate blocker.
+ */
+async function validateChangeRequestGstPanDuplicate(customerId: string, proposedValues: Record<string, unknown>): Promise<void> {
+  const candidate: GstPanDuplicateCandidate = {
+    gstNumber: typeof proposedValues[GST_FIELD_KEY] === "string" ? (proposedValues[GST_FIELD_KEY] as string) : null,
+    pan: typeof proposedValues[PAN_FIELD_KEY] === "string" ? (proposedValues[PAN_FIELD_KEY] as string) : null,
+  }
+  const matches = await findGstPanDuplicateMatches(customerId, candidate)
+  if (matches.length > 0) {
+    const fieldLabel = matches[0].fieldKey === "gst_number" ? "GST" : "PAN"
+    throw new ChangeRequestOperationError({
+      kind: "invalid_input",
+      message: `This ${fieldLabel} already belongs to another existing customer (${matches[0].customerName}). Duplicate GST/PAN across customers is not allowed.`,
+      sqlState: null,
+      cause: "server-side submit validation: hard duplicate GST/PAN match",
+    })
+  }
+}
+
 async function createChangeRequest(customerId: string, actorUserId: string): Promise<CustomerChangeRequest> {
   const requestId = newId()
   await changeData.createChangeRequest({ newRequestId: requestId, customerId, initialRawData: {}, actorUserId })
@@ -64,16 +128,28 @@ async function saveChangeDraft(requestId: string, rawData: Record<string, unknow
  * §63).
  */
 async function previewRequirements(requestId: string) {
-  const [row, latestRevision] = await Promise.all([changeData.getChangeRequestByRequestId(requestId), changeData.getLatestRevisionForRequest(requestId)])
-  if (!row) throw new Error(`Change Request ${requestId} not found.`)
+  const { row, proposedValues } = await loadRequestContext(requestId)
   const currentValues = await getCurrentGovernedValues(row.customer_id)
-  const proposedValues = toProposedValues(latestRevision)
   return evaluateCustomerChangeRequirements(currentValues, proposedValues)
 }
 
-/** Serves both a first Submit and a post-send-back Resubmit; the RPC itself derives which one applies from the Change Request's current status. Requirements are (re-)computed fresh at submit time, never trusted from an earlier read. */
+/**
+ * Serves both a first Submit and a post-send-back Resubmit; the RPC
+ * itself derives which one applies from the Change Request's current
+ * status. Requirements are (re-)computed fresh at submit time, never
+ * trusted from an earlier read. The GST/PAN hard duplicate check
+ * (AA-015, PG-064) only ever runs when the current revision is genuinely
+ * a draft (a first Submit or a post-send-back resubmit), mirroring
+ * validateOnboardingCaseReadyForSubmit's own `draft.status === "draft"`
+ * gate in case.service.ts.
+ */
 async function submitChangeRequest(requestId: string, reason: string, effectiveDate: string, actorUserId: string): Promise<CustomerChangeRequest> {
-  const requirements = await previewRequirements(requestId)
+  const { row, latestRevision, proposedValues } = await loadRequestContext(requestId)
+  if (latestRevision && latestRevision.status === "draft") {
+    await validateChangeRequestGstPanDuplicate(row.customer_id, proposedValues)
+  }
+  const currentValues = await getCurrentGovernedValues(row.customer_id)
+  const requirements = evaluateCustomerChangeRequirements(currentValues, proposedValues)
   await changeData.submitChangeRequest({ requestId, reason, effectiveDate, requirements: toRequirementRpcRows(requirements), actorUserId })
   const changeRequest = await loadChangeRequest(requestId)
   if (!changeRequest) throw new Error(`Change Request ${requestId} not found after submitting.`)
@@ -268,5 +344,6 @@ export {
   getChangeRequestSendBackCount,
   getSendBackCountsForRequests,
   listChangeRequestRevisionSummaries,
+  findGstPanDuplicateMatches,
 }
 export type { ReviewQueueEntry, ChangeRequestSendBackEntry }

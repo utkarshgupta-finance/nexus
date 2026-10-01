@@ -1,6 +1,6 @@
 {
-    "batch": 31,
-    "batchLabel": "Fresh execution: Batch 31 (X-007 through X-021, AA-001 through AA-010) - CLOSED",
+    "batch": 32,
+    "batchLabel": "Fresh execution: Batch 32 (AA-011 through AA-022, Y-001 through Y-013) - CLOSED",
     "batchStatus": "COMPLETE",
     "scheduled": 25,
     "run": {
@@ -12,159 +12,44 @@
             "28",
             "29",
             "30",
-            "31"
+            "31",
+            "32"
         ],
         "scheduledTotal": 235,
-        "priorBatchesComplete": 177,
+        "priorBatchesComplete": 202,
         "runLabel": "Fresh execution: Batches 24-33 (234 journeys scheduled at launch + AB-043 discovered mid-run = 235; first time run, not historical revalidation)"
     },
     "journeys": [
-        {
-            "id": "X-007",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-008",
-            "status": "COMPLETE",
-            "classification": "EXPECTED_BEHAVIOR"
-        },
-        {
-            "id": "X-009",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-010",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-011",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-012",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-013",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-014",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-015",
-            "status": "COMPLETE",
-            "classification": "EXPECTED_BEHAVIOR"
-        },
-        {
-            "id": "X-016",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-017",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-018",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-019",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-020",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "X-021",
-            "status": "COMPLETE",
-            "classification": "EXPECTED_BEHAVIOR"
-        },
-        {
-            "id": "AA-001",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-002",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-003",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-004",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-005",
-            "status": "COMPLETE",
-            "classification": "EXPECTED_BEHAVIOR"
-        },
-        {
-            "id": "AA-006",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-007",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-008",
-            "status": "COMPLETE",
-            "classification": "EXPECTED_BEHAVIOR"
-        },
-        {
-            "id": "AA-009",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        },
-        {
-            "id": "AA-010",
-            "status": "COMPLETE",
-            "classification": "PASS"
-        }
+        { "id": "AA-011", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-012", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-013", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-014", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-015", "status": "COMPLETE", "classification": "PRODUCT_GAP_RESOLVED_PASS", "notes": "PG-064 found, decided (hard block, same as Onboarding), fixed, verified same day" },
+        { "id": "AA-016", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-017", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-018", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-019", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-020", "status": "COMPLETE", "classification": "PASS", "notes": "regression-confirmed via source/DB, not re-reproduced live" },
+        { "id": "AA-021", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "AA-022", "status": "COMPLETE", "classification": "PASS" },
+        { "id": "Y-001", "status": "COMPLETE", "classification": "PASS", "notes": "combined with Y-012, 30-node Workflow Builder graph" },
+        { "id": "Y-002", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "16 components reviewed, 4 approved/active; canonical 100+ not reached. PG-066 found (silent approve-error UI), deferred" },
+        { "id": "Y-003", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "3 of 10+ send-back cycles" },
+        { "id": "Y-004", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "341 of thousands of audit_log entries" },
+        { "id": "Y-005", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "6 of 100+ documents; Onboarding's doc mechanism is structurally fixed-slot" },
+        { "id": "Y-006", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "39 of tens-of-thousands customers" },
+        { "id": "Y-007", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "19 of hundreds+ single-team queue depth" },
+        { "id": "Y-008", "status": "COMPLETE", "classification": "BLOCKED", "notes": "team-membership scale-building blocked by session safety classifier (RBAC-modifying action)" },
+        { "id": "Y-009", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "3 of 200+ near-simultaneous approvals; audit ordering confirmed coherent" },
+        { "id": "Y-010", "status": "COMPLETE", "classification": "PASS", "notes": "4,200-character comment, full canonical scale reached" },
+        { "id": "Y-011", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "15 of hundreds+ Reference Master values" },
+        { "id": "Y-012", "status": "COMPLETE", "classification": "PASS", "notes": "combined with Y-001" },
+        { "id": "Y-013", "status": "COMPLETE", "classification": "PASS", "notes": "9 of 25 governed fields changed in one CCR" }
     ],
-    "currentJourney": null,
-    "currentExecutionState": "COMPLETE",
-    "defectsFound": 0,
-    "defectsFixed": 0,
-    "openDefects": 0,
-    "productDecisionsFound": 1,
-    "productDecisionsResolved": 1,
-    "openProductDecisions": 0,
-    "productGapsPermanent": 3,
-    "productGapsResolved": 2,
-    "productGapsConfirmed": 4,
-    "journeyDiscovery": {
-        "ALREADY_COVERED": 0,
-        "EXPAND_EXISTING_JOURNEY": 0,
-        "NEW_JOURNEY_REQUIRED": 0,
-        "REGRESSION_TEST_ONLY": 0,
-        "FUTURE_MODULE": 2,
-        "PRODUCT_DECISION_REQUIRED": 0
-    },
-    "lastCheckpoint": "Batch 31 CLOSED 2026-09-30: all 25 scheduled journeys executed (X-007 through X-021, AA-001 through AA-010). Tally: 20 PASS, 5 EXPECTED BEHAVIOUR (X-008, X-015, X-021, AA-005, AA-008, each confirming an already-documented or source-verified characteristic rather than a live defect). 4 Product Gaps found/confirmed this batch: PG-060 (DF-011, superseded document versions have no UI surface, accepted as-is/future module), PG-061 (DF-012, no cross-customer report/export surface, accepted as-is/future module), PG-062 (bounded live reconciliation of a prior-session fix: onboarding governed-field mapping regression, already FIXED with source diff + migration + unit tests; live UI confirmation attempted but blocked by a known combobox automation tooling limitation, disposition recorded as PARTIAL/TOOLING LIMITATION without reopening the already-fixed gap), and PG-063 (Commercial Component's per-component Effective From/To fields were non-functional and, even if working, silently ignored by the approval RPC; Product Decision asked and answered by the user same day - remove the misleading fields rather than implement architecturally-nontrivial per-component override - implemented immediately, tsc clean, full suite 1111/1111 passing, verified live end-to-end). DF-013 also registered (Section C, no PG number): AA-008 confirmed A-020's already-documented onboarding no-reject-state design constraint still holds, with Operational Queue visibility as the existing partial mitigation. AA-003 discovered and documented a real, previously-undocumented business rule during this batch (Commercial Version effective date must be strictly more than one day after the current active period's own start date), handled correctly as a genuine validation, not a defect. tsc --noEmit exits 0; full suite 1111 tests passing.",
-    "blockingIssue": null,
-    "notes": "Batch 31 CLOSED 2026-09-30. Full narrative and all 25 journeys' evidence in docs/journey-runs/BATCH_31_RESULTS.md. Executed strictly batch-by-batch: Batch 32 has NOT been started. PG-062 and PG-063 fixes are the only implementation code changes this batch (onboarding-customer-field-mapping.ts + migration 20261018000000 for PG-062, from a prior session; commercial-rate-section.tsx for PG-063, this session). All test/fixture actions were on disposable, self-created objects (the AA-001-originated 'aa-001-batch31-disposable-lifecycle-co' customer used throughout AA-001-AA-006, and fresh standalone onboarding cases CO-000132/CO-000133 for AA-007/AA-009 testing), or read-only inspection of pre-existing real records (X-007 through X-021's historical/regression checks, AA-008's read-only view of CO-000102). No real customer data was mutated. Do not start Batch 32 until the user reviews this closure."
+    "productGaps": {
+        "found": ["PG-064", "PG-065", "PG-066"],
+        "closedSameDay": ["PG-064", "PG-065"],
+        "deferred": ["PG-066"],
+        "activeAtClose": 0
+    }
 }

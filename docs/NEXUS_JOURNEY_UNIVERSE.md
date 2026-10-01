@@ -18684,30 +18684,30 @@ This pack exists because docs/UI_SYSTEM.md states a hard requirement (not an asp
 - Related Journeys: A-027, C-025
 - Notes: This cross-domain amplification of a known per-domain gap is a strong candidate for a recommended product improvement (e.g. a "stuck on workflow team" admin alert/dashboard spanning all domains). See PRODUCT GAP NOTES.
 
-### AA-011: Deactivated customer inconsistency, blocks new Change Request but not new Commercial Version
+### AA-011: Deactivated customer, consistent cross-domain blocking of new governed work
 - Pack: AA - Cross-Domain Customer Lifecycle
-- Business Objective: Confirm, end to end, the real-world business risk created by the documented inconsistency between B-010 (deactivation blocks new Customer Change creation) and B-011 (deactivation does NOT block new Commercial Version creation).
+- Business Objective: Confirm, end to end, that a deactivated customer consistently blocks all new governed work against it, both new Customer Change creation (B-010) and new Commercial Configuration Version creation (B-011), while existing historical records remain untouched and readable.
 - Domain: Customer Master, Customer Change, Commercial (see Pack D/E for Commercial internals)
 - Object / Record Type: customers (isActive: false), customer_change_request, commercial_configuration_version
 - Starting State: Customer is deactivated (B-008), presumably because the business relationship is paused, under review, or ended.
 - Personas: Maker attempting each type of action, Approver who deactivated the customer
 - Preconditions: N/A
-- Regular Path: Confirm createChangeRequestAction is blocked (B-010) while, in the same deactivated state, a new Commercial Version can still be created and potentially approved and go live (B-011) against this same, supposedly paused, customer; walk through the realistic business consequence, an operator could unknowingly commit new commercial terms to a customer the business has explicitly marked inactive.
-- Stress Variant: The new Commercial Version is not just created but fully approved and goes live while the customer remains inactive throughout.
+- Regular Path: Confirm createChangeRequestAction is blocked (B-010) AND `create_commercial_configuration_version` is blocked (`COMMERCIAL_VERSION_CUSTOMER_INACTIVE`), consistently, for the same deactivated customer; confirm existing historical records remain readable and no new governed work of any kind is silently created.
+- Stress Variant: N/A (the stress variant this journey originally described, a new Commercial Version being approved and going live while the customer stays inactive, is no longer reachable: creation itself is now blocked, so approval/go-live can never be reached from a deactivated starting state).
 - Authorization Variant: N/A
 - Concurrency Variant: N/A
 - Idempotency Variant: N/A
-- Audit/Data Integrity Checks: Confirm no compensating control elsewhere (e.g. a warning banner, a required override reason) currently exists to at least flag this inconsistency to the Commercial approver, per B-011's UX check.
+- Audit/Data Integrity Checks: Confirm zero new `customer_change_requests` or `commercial_configuration_versions` rows are created against the deactivated customer regardless of how many attempts are made.
 - Recovery/Resilience Variant: N/A
-- UX Checks: If Commercial's own UI does show an "inactive customer" indicator without blocking the action, document this as a partial-but-insufficient mitigation.
+- UX Checks: Confirm a clear inactive-customer indicator/error is shown to the maker attempting either action, not just a generic failure.
 - Historical Variant: N/A
-- Expected Business Result: Currently: a real, confirmed cross-domain inconsistency in how customer deactivation is enforced; recommend extending B-010's guard to Commercial Version creation for consistency. See PRODUCT GAP NOTES.
-- Expected Technical Invariants: N/A (the invariant that SHOULD exist, consistent enforcement of deactivation across all new-request creation, currently does not).
-- Priority: P0
-- Automation Feasibility: PARTIAL (Commercial creation path owned by Pack D/E)
+- Expected Business Result: Consistent, uniform enforcement of deactivation across every new-request creation surface; the cross-domain inconsistency this journey originally existed to expose is closed.
+- Expected Technical Invariants: Both `createChangeRequestAction` (TypeScript layer) and `create_commercial_configuration_version` (RPC layer) independently reject a deactivated customer's owning id before any row is created.
+- Priority: P1 (downgraded from P0: the confirmed gap this journey tracked is now closed; this is a regression/consistency confirmation, not an open risk)
+- Automation Feasibility: FULL
 - Dependencies: B-008, B-010, B-011
 - Related Journeys: B-010, B-011
-- Notes: This is the cross-domain end-to-end expression of the gap already identified per-domain in B-011; flagged as a priority product fix. See PRODUCT GAP NOTES.
+- Notes: Reconciled 2026-09-30 (Batch 32 Step 0A). Historical context: this journey originally tracked a real, confirmed cross-domain inconsistency (Customer Change blocked, Commercial Version not) flagged as PG-006 (`B-011 / PD-003`). PG-006 was decided (block) and fixed the same day this batch runs, via migration `20260930090000_block_commercial_version_creation_for_inactive_customer.sql`, which adds the `is_active` check directly inside the RPC (not only the TypeScript Server Action layer, closing a potential direct/RPC bypass too). This journey now confirms that fix holds, rather than rediscovering the original gap. See `docs/OPEN_PRODUCT_GAPS.md` PG-006 for the full closure record.
 
 ### AA-012: Permanent deletion eligibility verified end to end against a real onboarding-created customer
 - Pack: AA - Cross-Domain Customer Lifecycle

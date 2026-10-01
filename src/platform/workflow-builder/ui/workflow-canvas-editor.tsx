@@ -124,22 +124,27 @@ function WorkflowCanvasEditor({
   }, [])
 
   function addNode(nodeType: WorkflowNodeType) {
-    setNodes((current) => {
-      const nodeKey = nextNodeKey(current)
-      const newNode: FlowNode = {
-        id: nodeKey,
-        position: { x: 80 + current.length * 40, y: 80 + current.length * 30 },
-        data: {
-          label: NODE_TYPE_LABELS[nodeType],
-          nodeType,
-          responsibleTeamId: null,
-          requiredResource: null,
-          requiredAction: null,
-          requiredFields: [],
-        },
-      }
-      return [...current, newNode]
-    })
+    const nodeKey = nextNodeKey(nodes)
+    const newNode: FlowNode = {
+      id: nodeKey,
+      position: { x: 80 + nodes.length * 40, y: 80 + nodes.length * 30 },
+      data: {
+        label: NODE_TYPE_LABELS[nodeType],
+        nodeType,
+        responsibleTeamId: null,
+        requiredResource: null,
+        requiredAction: null,
+        requiredFields: [],
+      },
+    }
+    setNodes((current) => [...current, newNode])
+    // Select the node that was just added, so the properties panel always
+    // reflects what the admin just added instead of silently continuing to
+    // show (and risk overwriting) whichever node was selected before. See
+    // PG-065: without this, clicking Add Node then immediately editing the
+    // still-displayed panel overwrote the previously-selected node.
+    setSelectedNodeId(nodeKey)
+    setSelectedEdgeId(null)
   }
 
   function updateSelectedNodeData(patch: Partial<NodeData>) {

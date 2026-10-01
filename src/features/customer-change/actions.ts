@@ -15,8 +15,10 @@ import {
   approveChangeRequest,
   cancelChangeRequest,
   loadChangeRequest,
+  findGstPanDuplicateMatches,
 } from "./services/change-request.service"
 import type { CustomerChangeRequest } from "./domain/types"
+import type { GstPanDuplicateMatch } from "./domain/duplicate-detection"
 
 /**
  * Real, database-backed Customer Change Request lifecycle actions
@@ -105,6 +107,32 @@ async function submitChangeRequestAction(requestId: string, reason: string, effe
   }
 }
 
+type ChangeRequestDuplicateCheckActionResult = { ok: true; matches: GstPanDuplicateMatch[] } | { ok: false; error: string }
+
+/**
+ * Customer Change GST/PAN Duplicate Prevention (AA-015, PG-064): the
+ * fast, client-side pre-submit signal mirroring
+ * checkForDuplicateCustomersAction in
+ * src/features/customer-onboarding/actions.ts, so a requester sees a
+ * clear message before clicking Submit rather than only a raw error
+ * afterward. Purely informational; submitChangeRequestAction's own
+ * server-side check is the actual, authoritative enforcement. Gated on
+ * `customer.change_request`, the same permission Submit itself requires.
+ */
+async function checkForChangeRequestDuplicateAction(requestId: string, gstNumber: string | null, pan: string | null): Promise<ChangeRequestDuplicateCheckActionResult> {
+  try {
+    const customerId = await resolveChangeRequestCustomerId(requestId)
+    if (!customerId) return { ok: false, error: "Change Request not found." }
+    await requirePermissionForCustomer("customer", "change_request", customerId)
+    const matches = await findGstPanDuplicateMatches(customerId, { gstNumber, pan })
+    return { ok: true, matches }
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message }
+    if (error instanceof Error) return { ok: false, error: error.message }
+    return { ok: false, error: "An unexpected error occurred while checking for duplicate GST/PAN." }
+  }
+}
+
 async function sendBackChangeRequestAction(requestId: string, reason: string): Promise<ChangeRequestActionResult> {
   try {
     const customerId = await resolveChangeRequestCustomerId(requestId)
@@ -161,5 +189,6 @@ export {
   rejectChangeRequestAction,
   approveChangeRequestAction,
   cancelChangeRequestAction,
+  checkForChangeRequestDuplicateAction,
 }
-export type { ChangeRequestActionResult }
+export type { ChangeRequestActionResult, ChangeRequestDuplicateCheckActionResult }
