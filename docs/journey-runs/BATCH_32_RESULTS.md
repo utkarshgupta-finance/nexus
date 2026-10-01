@@ -1095,14 +1095,43 @@ functions correctly at this diff size. DB-verified the request reached
 specific customer record had non-empty values for plus the free-text
 identifiers), not literally all 25 (several of the remaining fields are
 dropdown-based, e.g. Segment/Business Unit/Country/Industry, and were
-left unchanged to keep this journey's scope to demonstrating the diff
-UI's handling of a genuinely large, not-cherry-picked change set, which 9
-fields already does).
+left unchanged, not because the UI or a fixture limitation prevented it,
+but as a scope choice made during execution).
 
-**Y-013 classification: PASS.** The diff/review UI correctly rendered a
-large (9-field) multi-field change set with no dropped or merged fields,
-which is the behavior this journey exists to verify; literal "every
-field" was not required to confirm this.
+**Reconciliation (2026-10-01):** re-reading the canonical text precisely,
+Y-013's own Starting State reads "a draft change request modifying a
+large number of Customer Master fields at once (**e.g. every editable
+field**)", and this journey has no separate Stress Variant (explicitly
+`N/A`) to escalate to, unlike Y-002's "100+, stress 500+" structure. That
+means Y-013's own Regular Path treats "every editable field" as the
+canonical example of the scale it expects, not a stretch goal reserved
+for a stress pass. 9 of 25 (36%) is a real, genuinely useful diff-size
+data point, but it is materially short of that bar, and the remaining
+fields were left unchanged by choice (dropdown interactions this session
+had already proven workable earlier in Batch 32, e.g. Y-002's onboarding
+fixture), not because of a structural or environment constraint. Per the
+standing instruction not to invent a threshold or rerun merely to
+inflate a number, and since reaching closer to "every field" would
+require building and approving a new CCR with several more dropdown
+interactions (not a trivial, one-line rerun), this is reclassified rather
+than re-executed.
+
+```
+Y-013 correctness/readability assertions = verified (all 9 changed
+  fields rendered distinctly in the diff, correct current/proposed
+  values, no dropped or merged fields, correct "9 of 25" summary count,
+  evidence-requirement logic still functioned correctly at this size)
+Y-013 tested field count                  = 9 of 25
+Y-013 untested dimension                  = broader, closer-to-every-
+  editable-field diff scale (canonical's own worked example)
+```
+
+**Y-013 classification: PARTIAL / TOOLING LIMITATION.** The diff/review
+UI's correctness and readability at a genuinely large (9-field,
+not-cherry-picked) change set is confirmed with no dropped or merged
+fields; the canonical's own "e.g. every editable field" scale for this
+journey's Regular Path was not reached, and that gap is disclosed rather
+than absorbed into a PASS.
 
 ---
 
@@ -1297,5 +1326,27 @@ discrete browser automation call, not a genuinely parallel HTTP request.
 (no false contention, coherent audit ordering) was confirmed correct at
 the scale actually reachable through this tool harness; 200+ and true
 wire-level concurrency were not reached.
+
+---
+
+## Batch 32 final tally (reconciled 2026-10-01)
+
+25 scheduled, 25 attempted.
+
+| Classification | Count | Journeys |
+| --- | --- | --- |
+| PASS | 14 | AA-011, AA-012, AA-013, AA-014, AA-016, AA-017, AA-018, AA-019, AA-020, AA-021, AA-022, Y-001, Y-010, Y-012 |
+| PRODUCT GAP RESOLVED + PASS | 1 | AA-015 (PG-064) |
+| PARTIAL / TOOLING LIMITATION | 9 | Y-002, Y-003, Y-004, Y-005, Y-006, Y-007, Y-009, Y-011, Y-013 |
+| BLOCKED | 1 | Y-008 |
+| **Total** | **25** | |
+
+Active Product Gaps at close: 0 (PG-064 and PG-065 fixed same day; PG-066
+deferred, Section C of `OPEN_PRODUCT_GAPS.md`, not active).
+
+This table supersedes the earlier in-chat tally, which mis-stated the
+PARTIAL / TOOLING LIMITATION count as 7 instead of 8 (an arithmetic typo,
+since corrected to the right total of 9 after Y-013's own reconciliation
+above moved it from PASS into this category).
 
 ---

@@ -44,8 +44,15 @@
         { "id": "Y-010", "status": "COMPLETE", "classification": "PASS", "notes": "4,200-character comment, full canonical scale reached" },
         { "id": "Y-011", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "15 of hundreds+ Reference Master values" },
         { "id": "Y-012", "status": "COMPLETE", "classification": "PASS", "notes": "combined with Y-001" },
-        { "id": "Y-013", "status": "COMPLETE", "classification": "PASS", "notes": "9 of 25 governed fields changed in one CCR" }
+        { "id": "Y-013", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "reconciled 2026-10-01: canonical Starting State's own worked example is 'every editable field' with no separate Stress Variant; 9 of 25 fields is real evidence of diff correctness/readability but materially below that bar" }
     ],
+    "classificationCounts": {
+        "PASS": 14,
+        "PRODUCT_GAP_RESOLVED_PASS": 1,
+        "PARTIAL_TOOLING_LIMITATION": 9,
+        "BLOCKED": 1,
+        "TOTAL": 25
+    },
     "productGaps": {
         "found": ["PG-064", "PG-065", "PG-066"],
         "closedSameDay": ["PG-064", "PG-065"],
