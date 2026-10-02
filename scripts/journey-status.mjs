@@ -49,13 +49,19 @@ function loadState() {
   return JSON.parse(readFileSync(STATE_PATH, "utf8"))
 }
 
+const CLASSIFICATION_ALIASES = {
+  PARTIAL_TOOLING_LIMITATION: "PARTIAL",
+  PRODUCT_GAP_RESOLVED_PASS: "PRODUCT_GAP_RESOLVED",
+}
+
 function computeCounts(state) {
   const counts = Object.fromEntries(Object.keys(CLASSIFICATION_LABELS).map((k) => [k, 0]))
   let complete = 0
   for (const j of state.journeys) {
     if (j.status === "COMPLETE") {
       complete += 1
-      if (j.classification && counts[j.classification] !== undefined) counts[j.classification] += 1
+      const key = CLASSIFICATION_ALIASES[j.classification] ?? j.classification
+      if (key && counts[key] !== undefined) counts[key] += 1
     }
   }
   const scheduled = state.scheduled ?? state.journeys.length

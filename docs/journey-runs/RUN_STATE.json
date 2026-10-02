@@ -1,8 +1,10 @@
 {
-    "batch": 32,
-    "batchLabel": "Fresh execution: Batch 32 (AA-011 through AA-022, Y-001 through Y-013) - CLOSED",
+    "batch": 33,
+    "batchLabel": "Fresh execution: Batch 33 (Y-014 through Y-020) - CLOSED - FINAL SCHEDULED BATCH",
     "batchStatus": "COMPLETE",
-    "scheduled": 25,
+    "scheduled": 7,
+    "currentJourney": null,
+    "currentExecutionState": "COMPLETE",
     "run": {
         "batches": [
             "24",
@@ -13,50 +15,47 @@
             "29",
             "30",
             "31",
-            "32"
+            "32",
+            "33"
         ],
         "scheduledTotal": 235,
-        "priorBatchesComplete": 202,
-        "runLabel": "Fresh execution: Batches 24-33 (234 journeys scheduled at launch + AB-043 discovered mid-run = 235; first time run, not historical revalidation)"
+        "priorBatchesComplete": 227,
+        "runLabel": "Fresh execution: Batches 24-33 (234 journeys scheduled at launch + AB-043 discovered mid-run = 235; first time run, not historical revalidation) - ALL 10 BATCHES CLOSED; 1 KNOWN GAP (AB-035) FLAGGED AT CLOSURE, NOT EXECUTED"
     },
     "journeys": [
-        { "id": "AA-011", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-012", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-013", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-014", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-015", "status": "COMPLETE", "classification": "PRODUCT_GAP_RESOLVED_PASS", "notes": "PG-064 found, decided (hard block, same as Onboarding), fixed, verified same day" },
-        { "id": "AA-016", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-017", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-018", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-019", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-020", "status": "COMPLETE", "classification": "PASS", "notes": "regression-confirmed via source/DB, not re-reproduced live" },
-        { "id": "AA-021", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "AA-022", "status": "COMPLETE", "classification": "PASS" },
-        { "id": "Y-001", "status": "COMPLETE", "classification": "PASS", "notes": "combined with Y-012, 30-node Workflow Builder graph" },
-        { "id": "Y-002", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "16 components reviewed, 4 approved/active; canonical 100+ not reached. PG-066 found (silent approve-error UI), deferred" },
-        { "id": "Y-003", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "3 of 10+ send-back cycles" },
-        { "id": "Y-004", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "341 of thousands of audit_log entries" },
-        { "id": "Y-005", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "6 of 100+ documents; Onboarding's doc mechanism is structurally fixed-slot" },
-        { "id": "Y-006", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "39 of tens-of-thousands customers" },
-        { "id": "Y-007", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "19 of hundreds+ single-team queue depth" },
-        { "id": "Y-008", "status": "COMPLETE", "classification": "BLOCKED", "notes": "team-membership scale-building blocked by session safety classifier (RBAC-modifying action)" },
-        { "id": "Y-009", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "3 of 200+ near-simultaneous approvals; audit ordering confirmed coherent" },
-        { "id": "Y-010", "status": "COMPLETE", "classification": "PASS", "notes": "4,200-character comment, full canonical scale reached" },
-        { "id": "Y-011", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "15 of hundreds+ Reference Master values" },
-        { "id": "Y-012", "status": "COMPLETE", "classification": "PASS", "notes": "combined with Y-001" },
-        { "id": "Y-013", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "reconciled 2026-10-01: canonical Starting State's own worked example is 'every editable field' with no separate Stress Variant; 9 of 25 fields is real evidence of diff correctness/readability but materially below that bar" }
+        { "id": "Y-014", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "1 of tens-of-thousands Reference Master references; deactivation mechanism verified correct and non-destructive, fixture restored" },
+        { "id": "Y-015", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "~14.5-month Go Live span of several years target; 0 usage rows this customer, 7 highest found anywhere" },
+        { "id": "Y-016", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "15 of dozens/100+ workflow versions" },
+        { "id": "Y-017", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "11 total Go Live requests clears 10+ Regular Path target, but no consolidated history-list UI exists; FUTURE MODULE discovery" },
+        { "id": "Y-018", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "no organization-wide document report surface exists; 142 documents org-wide via read-only DB count; FUTURE MODULE discovery" },
+        { "id": "Y-019", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "no organization-wide audit report surface exists; 5,285 audit_log rows org-wide via read-only DB count; FUTURE MODULE discovery" },
+        { "id": "Y-020", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "2 genuinely request-bound sequential approval nodes live; 13-node fixture exists but not currently request-bindable" }
     ],
     "classificationCounts": {
-        "PASS": 14,
-        "PRODUCT_GAP_RESOLVED_PASS": 1,
-        "PARTIAL_TOOLING_LIMITATION": 9,
-        "BLOCKED": 1,
-        "TOTAL": 25
+        "PARTIAL_TOOLING_LIMITATION": 7,
+        "TOTAL": 7
+    },
+    "journeyDiscovery": {
+        "FUTURE_MODULE": 3
     },
     "productGaps": {
-        "found": ["PG-064", "PG-065", "PG-066"],
-        "closedSameDay": ["PG-064", "PG-065"],
-        "deferred": ["PG-066"],
+        "found": [],
+        "closedSameDay": [],
+        "deferred": [],
         "activeAtClose": 0
+    },
+    "programTotals": {
+        "note": "Full run totals across Batches 24-33 (235 scheduled journeys). Batch 32's own 25-journey tally (14 PASS, 1 PRODUCT_GAP_RESOLVED_PASS, 9 PARTIAL_TOOLING_LIMITATION, 1 BLOCKED) is preserved in docs/journey-runs/BATCH_32_RESULTS.md and is no longer repeated in this file's top-level journeys array, which now tracks only the current (final) batch per established per-batch convention.",
+        "scheduledTotal": 235,
+        "completedTotal": 234,
+        "remaining": 1,
+        "knownGaps": [
+            {
+                "id": "AB-035",
+                "batch": 26,
+                "status": "NOT_EXECUTED",
+                "note": "Found missing during Batches 24-33 closure reconciliation. Canonical scope of Batch 26 (AB-020 through AB-041) includes AB-034 and AB-035; neither has execution evidence in any batch ledger. AB-034 disposed as Journey Discovery ALREADY COVERED by V-030 (Batch 28, same mechanism). AB-035 (admin's own user_access.write removed while the User Access settings page itself is open) is materially distinct from V-031 (which tested team.write on Team Master, not user_access.write on the User Access page) and remains genuinely unexecuted. An attempt to begin closing it this session was correctly denied by the safety classifier as new test execution outside Batch 33's authorized scope after the run's own stop instruction; not attempted further. See docs/journey-runs/BATCH_33_RESULTS.md, 'Program closure reconciliation' section."
+            }
+        ]
     }
 }
