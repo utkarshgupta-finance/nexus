@@ -17,26 +17,57 @@ Date: 2026-10-02.
 
 ## 1. Executive conclusion
 
-The Nexus journey-testing program has executed essentially its entire
-current canonical scope: **796 of 796 currently-executable journeys** in
-`docs/NEXUS_JOURNEY_UNIVERSE.md` have real evidence somewhere in the
-ledger, with **one** journey (AB-035) that sat silently unexecuted inside
-Batch 26's own stated scope until this final reconciliation pass caught it
-and closed it on 2026-10-02 (see section 3). No other silently-missing
-journey was found across Batches 1-33 after a mechanical, ID-by-ID check
-of every batch's own stated range.
+This is the second and final reconciliation pass over this audit's own
+first draft. The first draft contained real counting and mapping errors;
+this pass corrects them mechanically rather than by prose, per the
+reconciliation that produced it. Nothing below was derived from a new
+journey execution, a new test fixture, or a database read beyond what the
+prior sessions already recorded.
+
+**Exact figures** (every one individually reproducible from a named list
+in this document, not an estimate):
+
+| Metric | Count |
+|---|---|
+| Scheduled journeys (sum of all 33 `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md` batch ranges) | **794** |
+| True currently-executable Universe total (scheduled + 2 live discoveries never retroactively scheduled) | **796** |
+| Accounted for (have execution evidence somewhere in the ledger) | **796 / 796** |
+| Fully evidenced (terminal Final Status reflects complete verification) | **763** |
+| Partially evidenced (terminal `PARTIAL / TOOLING LIMITATION` classification) | **31** |
+| Blocked dimension (a specific, named, disclosed sub-dimension genuinely unverifiable with available tooling) | **2** (J-026, Y-008) |
+| Active Product Gaps | **0** |
+| Open Product Decisions | **0** (of 16 total, all closed) |
+| Open known defects | **0** (every FAILED chain traces to a fix and a rerun) |
+| Deferred / accepted Product Gap register entries (Section C, a count of register items, not journeys) | **14** |
+| Future-capability items (3 sub-groups, see section 10) | **9** |
+
+763 + 31 + 2 = 796: this is an exact, exhaustive, mutually-exclusive
+partition of the 796 total by evidence completeness (categories B, C, D
+in section 2's framing below). The 14 deferred and 9 future-capability
+counts are a **different axis entirely**: they count distinct Product Gap
+register entries and Journey Discovery dispositions, not journeys, and
+they are not summed against the 796 (see section 2 and section 9 for why
+these units cannot be added together).
+
+**One journey, AB-035, was found missing from Batch 26's own stated scope
+during the programme-closure review that preceded this audit, not by this
+audit itself.** It was separately authorized, executed, and passed before
+this document was written; this audit only reconfirms that evidence (see
+section 3). No other silently-missing journey was found across Batches
+1-33 after a mechanical, ID-by-ID check of every batch's own stated range.
 
 This is not the same statement as "Nexus has zero open product concerns."
 It is not. There are: zero **active** Product Gaps (Section A of the
-register is genuinely empty), 14 **deferred/accepted** items the business
-has knowingly chosen not to fix yet, roughly 6 **future capability** items
-that were never meant to exist in the current product, and a double-digit
-number of journeys across the historical batches whose PARTIAL or
-BLOCKED classification is a genuine, disclosed, permanent environment or
-tooling limitation rather than a closed loop. These are listed in full
-below, not summarized away.
+register is genuinely empty), 14 **deferred/accepted** register entries
+the business has knowingly chosen not to fix yet, 9 **future capability**
+items that were never meant to exist in the current product, and exactly
+31 journeys (all in Batches 24-33, the only era whose classification
+taxonomy includes this status) whose terminal classification is
+`PARTIAL / TOOLING LIMITATION`, plus 2 further journeys with a specific
+named dimension genuinely blocked. These are listed in full below, not
+summarized away.
 
-Three genuine documentation inconsistencies were found and corrected in
+Five genuine documentation inconsistencies were found and corrected in
 this pass (not journey evidence, only stale summary text): a stale
 `docs/TECH_DEBT.md` entry each for B-007/PG-053 and M-021/PG-018 (both
 describing issues that were in fact fixed), a stale Section C deferred-
@@ -46,21 +77,102 @@ item count in `docs/OPEN_PRODUCT_GAPS.md` (said 9-10, mechanically counted
 documents' agreement that M-021 was fixed, and stale "Product Decision
 needed: YES" rows in `docs/journey-runs/MORNING_RESIDUAL_QUEUE.md` for
 three decisions (AB-020, AB-039/AB-043, V-028) that were in fact decided
-and closed the same day the queue file was written. All four corrections
+and closed the same day the queue file was written. All five corrections
 are additive notes pointing at the real, later evidence; no historical
-journey evidence was rewritten.
+journey evidence was rewritten. This second pass corrects two further
+errors from this document's own first draft (the master denominator's
+exact figure and the J-026/I-037 mapping, both below), under the same
+additive-correction rule.
 
 ---
 
 ## 2. True master denominator
 
-**NEXUS_JOURNEY_COVERAGE_MATRIX.md states 785.** It says so explicitly,
-and also says it was "most recently" regenerated after Batch 1 added
-K-030. It was never regenerated again.
+**Method: mechanical enumeration, not prose.** Every one of
+`docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`'s 33 `**Journey IDs:**` lines was
+read directly and converted to an inclusive count per segment
+(`A-### through B-###` = `B-A+1`), summed per batch, then summed across
+all 33 batches. The full table:
 
-**NEXUS_JOURNEY_EXECUTION_PLAN.md's own batch-by-batch Journey-ID ranges
-sum to 794.** This is a mechanical sum of its own 33 written batch
-definitions, independently reconfirmed by direct count.
+| Batch | First ID(s) | Last / included Journey IDs | Scheduled count |
+|---|---|---|---|
+| 1 | K-001 | K-025 | 25 |
+| 2 | K-026 | K-030, L-001–L-021 | 26 |
+| 3 | L-022 | L-028, U-001–U-018 | 25 |
+| 4 | U-019 | U-020, N-001–N-023 | 25 |
+| 5 | N-024 | N-031, O-001–O-017 | 25 |
+| 6 | O-018 | O-025, P-001–P-017 | 25 |
+| 7 | P-018 | P-023, A-001–A-019 | 25 |
+| 8 | A-020 | A-035, ACC-001, B-001–B-008 | 25 |
+| 9 | B-009 | B-025, C-001–C-008 | 25 |
+| 10 | C-009 | C-033 | 25 |
+| 11 | C-034 | C-035, D-001–D-023 | 25 |
+| 12 | D-024 | E-001–E-024 | 25 |
+| 13 | E-025 | E-028, F-001–F-021 | 25 |
+| 14 | F-022 | G-001–G-024 | 25 |
+| 15 | G-025 | G-026, H-001–H-023 | 25 |
+| 16 | H-024 | H-043, I-001–I-005 | 25 |
+| 17 | I-006 | I-030 | 25 |
+| 18 | E-029 | E-030, E-031, E-032, H-044, AA-023, AB-042, ACC-002 (non-contiguous) | 8 |
+| 19 | I-031 | I-038, J-001–J-017 | 25 |
+| 20 | J-018 | J-030, M-001–M-012 | 25 |
+| 21 | M-013 | M-030, Q-001–Q-007 | 25 |
+| 22 | Q-008 | Q-020, R-001–R-012 | 25 |
+| 23 | Q-021 | R-013–R-020, S-001–S-017 | 26 |
+| 24 | S-018 | S-024, T-001–T-018 | 25 |
+| 25 | T-019 | T-025, AB-001–AB-019 | 26 |
+| 26 | AB-020 | AB-041, V-001–V-004 | 26 |
+| 27 | V-005 | V-029 | 25 |
+| 28 | V-030 | V-047, W-001–W-007 | 25 |
+| 29 | W-008 | W-021, Z-001–Z-011 | 25 |
+| 30 | Z-012 | Z-030, X-001–X-006 | 25 |
+| 31 | X-007 | X-021, AA-001–AA-010 | 25 |
+| 32 | AA-011 | AA-022, Y-001–Y-013 | 25 |
+| 33 | Y-014 | Y-020 | 7 |
+| **Sum** | | | **794** |
+
+Checksum (5-batch groups): 1-5 = 126; 6-10 = 125 (running 251); 11-15 =
+125 (running 376); 16-20 = 108 (running 484); 21-25 = 127 (running 611);
+26-30 = 126 (running 737); 31-33 = 57 (running **794**).
+
+**The mechanical result is 794, not 793 and not 796.** This figure was
+checked against an earlier claim of "793" and could not be reproduced:
+no combination of the 33 lines above sums to 793, and no single scheduled
+journey's removal from this table is justified by any ledger. 794 is the
+number this document stands behind, reproducible by anyone re-running the
+same per-line arithmetic above.
+
+**794 (scheduled) is not the same number as 796 (true currently-
+executable Universe total).** The gap is exactly **2**, not 3: both
+journeys are confirmed, named, and excluded from the scheduled 794 for a
+specific, correct reason, not by oversight.
+
+| Journey | Batch it was actually executed in | Why it is NOT in the 794 scheduled table above | Evidence it was genuinely executed |
+|---|---|---|---|
+| **A-036** | 7 | Discovered live during A-002/A-004's investigation; `docs/journey-runs/BATCH_07_RESULTS.md` explicitly states it is "not one of the 25" scheduled that batch, and the Execution Plan's own Batch 7 line stops at A-019, never amended afterward | PD-001 decided and implemented same day (creator-only draft read access); `case.service.ts` changed, unit tests added |
+| **AB-043** | 26 | Discovered live during AB-039's execution; `docs/journey-runs/BATCH_26_RESULTS.md`'s own text labels it "(discovered)"; the Execution Plan's own Batch 26 line stops at AB-041 and V-004, never amended afterward | PG-036 decided and fixed (migration `20261015000000`), re-confirmed across Batches 28-31 |
+
+Both are **discovered-and-executed-live journeys that were never
+retroactively written into the Execution Plan's own batch lines**, not
+"expansion-audit additions," not "regression-only," and not "future-
+module" or "evidence-only" placeholders. They genuinely ran, genuinely
+passed (or, for AB-043, genuinely informed a real decided-and-fixed
+Product Gap), and are counted in the true executable total for that
+reason, while correctly excluded from the *scheduled* table above since
+no batch's written plan ever listed them before they happened.
+
+**794 (scheduled) + 2 (A-036, AB-043) = 796 (true currently-executable
+Universe total, all with execution evidence).** This also independently
+reconciles the Batches 24-33 "fresh execution" program's own arithmetic:
+234 were scheduled at launch across those 10 batches; AB-043 was
+discovered and executed mid-run, bringing that sub-programme's own actual
+total to 235, exactly matching `docs/journey-runs/RUN_STATE.json`.
+
+For completeness, **NEXUS_JOURNEY_COVERAGE_MATRIX.md states 785.** It says
+so explicitly, and also says it was "most recently" regenerated after
+Batch 1 added K-030. It was never regenerated again, and 785 is
+superseded by the mechanical 794/796 figures above; see the correction
+already applied to that file's own header.
 
 **NEXUS_JOURNEY_UNIVERSE.md's own body content (every `### <ID>:` heading)
 mechanically counts to 840 total, 796 after excluding the two FUTURE
@@ -132,8 +244,8 @@ not necessarily the batch's own original closing number.
 | 16 | H-024–H-043, I-001–I-005 | 25 | 25/25 present | PASS 20, FIXED+PASS 2, EXPECTED 1, decided-before-Batch-17 2 | None |
 | 17 | I-006–I-030 | 25 | 25/25 present | PASS 20, FIXED+PASS 3, decided 2 | None |
 | 18 | E-029–E-032, H-044, AA-023, AB-042, ACC-002 (non-contiguous, 8 journeys) | 8 | 8/8 present | 7 PASS + 1 FIXED+PASS (H-044) | None |
-| 19 | I-031–I-038, J-001–J-017 | 25 | 25/25 present | PASS 22, FIXED+PASS 1, decided 2 | **I-037 remains the sole open item**: a CANCELLED-state Stress Variant manual-browser check is genuinely tooling-blocked (no authenticated session derivable), not closed as of any file read |
-| 20 | J-018–J-030, M-001–M-012 | 25 | 25/25 present | PASS 24, decided 1 | **J-026 remains the sole open item**: a true simultaneous two-connection race is not producible through a sequential RPC interface, honestly TOOLING-BLOCKED |
+| 19 | I-031–I-038, J-001–J-017 | 25 | 25/25 present | PASS 23, FIXED+PASS 1, decided 1 | I-037 is **PASS**, not open: its CANCELLED-state Stress Variant was closed via code-inspection equivalence (`deriveLineItemGoLiveStatus` already proven correct for three other states via the same code path), the same disclosed-equivalence method used successfully elsewhere in this programme. No residual. |
+| 20 | J-018–J-030, M-001–M-012 | 25 | 25/25 present | PASS 24 (per-batch ledger), decided 1 | J-026's own batch ledger also classifies it PASS (2-actor race proven, 5-actor Stress Variant closed by reasoned N-way generalization). **`docs/journey-runs/BATCH_20_EVIDENCE_AUDIT.md`, a later and more rigorous dedicated re-audit, explicitly overrides this**: its own residual table marks J-026 **TOOLING-BLOCKED** ("genuine simultaneous concurrency not producible; every non-concurrent aspect independently verified"), the *only* P0/Grade-B item that audit left open out of 17 reviewed. This audit treats the later, more rigorous, dedicated verdict as authoritative: **J-026's concurrency dimension is the one genuinely open true-concurrency residual in the entire programme.** |
 | 21 | M-013–M-030, Q-001–Q-007 | 25 | 25/25 present | PASS 24, PRODUCT GAP 1 (M-021) | **M-021 is FIXED** (see section 5); the ledger's own later addendum calling it unfixed is stale and corrected in this pass. Q-001/Q-002/Q-003/Q-007 Stress variants remain TOOLING-BLOCKED (disclosed, Regular Paths closed) |
 | 22 | Q-008–Q-020, R-001–R-012 | 25 | 25/25 present | PASS 20, EXPECTED 4, FIXED+PASS 1 | None open |
 | 23 | Q-021, R-013–R-020, S-001–S-017 | 26 | 26/26 present | PASS 24, FIXED+PASS 2, EXPECTED 2 | R-015 (500-row audit cap) unexercised at real scale (max churn 42 rows), honestly disclosed, mechanism-only PASS. S-013's route-expansion follow-up unscheduled at the time, closed later as PG-041 |
@@ -157,14 +269,16 @@ tooling-limited scale/concurrency items, plus Batch 32's 9, plus Batch
 Full per-batch detail for this range is preserved in each batch's own
 `BATCH_2{4-9}/3{0-3}_RESULTS.md` and is not re-derived here.
 
-### The one real gap: Batch 26's AB-034 / AB-035
+### The one real gap: Batch 26's AB-034 / AB-035 (found and closed before this audit; reconfirmed here, not rediscovered)
 
 Batch 26's own closing text claimed "26/26 genuinely executed, no
-unauthorized cross-references remaining." This was false. A later,
-dedicated cross-check (prompted by this same final-closure process, prior
-to this document) mechanically verified every ID in the stated
+unauthorized cross-references remaining." This was false. A dedicated
+cross-check performed during the programme-closure review that preceded
+this audit document mechanically verified every ID in the stated
 AB-020–AB-041 range and found **AB-034** and **AB-035** had no execution
-evidence anywhere in the ledger.
+evidence anywhere in the ledger. Both were resolved, under separate
+authorization, before this audit began; this section reconfirms that
+evidence rather than reporting a new finding.
 
 - **AB-034** ("Workflow Admin's publish permission revoked while an
   unpublished draft is open in the Builder") is, mechanism for mechanism,
@@ -192,31 +306,48 @@ genuinely evidenced.
 
 ---
 
-## 4. Journey outcome totals (program-wide, both eras)
+## 4. Journey outcome totals (program-wide, both eras, exact)
 
-Totals below combine Batches 1-23 (original execution + historical
-revalidation) and Batches 24-33 (fresh execution), using each journey's
-latest known classification, not its original one, per the standing rule
-that later revalidation evidence supersedes an earlier classification.
+Every count below is exact and individually reproducible: fully evidenced
+and partial/tooling-limited are summed directly from the per-batch tally
+column in section 3's table (which itself traces to each batch's own
+ledger); blocked, deferred, and future-capability are each a named,
+enumerable list (sections 8-10).
 
-| Classification | Approx. count | Notes |
-|---|---|---|
-| PASS | ~600+ | The large majority of the catalogue; includes journeys upgraded from PARTIAL/SOURCE-INSPECTED to full MANUAL UX VERIFIED during the Historical UX Revalidation passes |
-| FAILED THEN FIXED + PASS | ~35 | Every chain has a root cause, a fix (migration or commit reference), and a rerun; see section 6 |
-| PRODUCT GAP RESOLVED + PASS / PRODUCT GAP CONFIRMED (now closed) | ~53 | = the 53 CLOSED entries in the Product Gap register, section 7 |
-| EXPECTED BEHAVIOUR | ~30+ | Deliberate, documented design choices confirmed live, not defects |
-| PARTIAL / TOOLING LIMITATION | ~35-40 | See the full register in section 9; concentrated in Batches 5, 19, 20, 21, 32, 33 |
-| BLOCKED | 2 | A-011 (Batch 7, deliberate scope boundary, resolved to PASS via later evidence), Y-008 (Batch 32, safety-classifier-declined scale-building, genuinely still BLOCKED) |
-| PRODUCT DECISION REQUIRED (now closed) | 16 | 10 formally PD-numbered + 6 unnumbered; all 16 closed, see section 8 |
+| Category (evidence-completeness axis, mutually exclusive, exhaustive over 796) | Exact count |
+|---|---|
+| **B. Fully evidenced** (terminal Final Status reflects complete verification: PASS, FAILED THEN FIXED + PASS, EXPECTED BEHAVIOUR, or a closed Product Gap/Decision, at every required dimension) | **763** |
+| **C. Partially evidenced** (terminal `PARTIAL / TOOLING LIMITATION` classification; this status only exists in the Batches 24-33 taxonomy, see note below) | **31** |
+| **D. Blocked dimension** (a specific, named sub-dimension genuinely unverifiable with available tooling, disclosed rather than closed) | **2** (J-026's concurrency dimension, Y-008) |
+| **Sum (A. Accounted for)** | **796** |
 
-A precise, single program-wide number was not forced here where the
-underlying batch ledgers themselves disagree on exact sub-counts (e.g.
-several batches' own closing arithmetic had small, since-corrected
-errors, documented in each batch's own audit trail). What is precise and
-load-bearing: **0 journeys are silently unaccounted for** (section 2-3),
-**0 Product Gaps are currently Active** (section 7), and **2 journeys
-remain genuinely BLOCKED/unverified** (Y-008, and the now-closed AB-035's
-sibling tooling-blocked items I-037/J-026, detailed in section 9).
+**Why Batches 1-23 contribute 0 to the Partial/Blocked columns.** Batches
+1-23 used a different, earlier classification taxonomy whose only terminal
+Final Status values are PASS, FAILED THEN FIXED + PASS, EXPECTED BEHAVIOUR
+CONFIRMED EMPIRICALLY, PRODUCT GAP CONFIRMED, and BLOCKED. Where those
+batches' own text uses the word "PARTIAL," it describes a *sub-field*
+(Automation Feasibility rating, or a Stress/Concurrency Variant result)
+while the journey's own Final Status is still PASS, via a disclosed
+evidence-substitution method (architectural proof, N-way reasoning from a
+2-actor race, or borrowed cross-reference evidence) explicitly accepted
+throughout this programme. `PARTIAL / TOOLING LIMITATION` as a *terminal*
+classification was introduced only with the Batches 24-33 taxonomy. The
+31 counted here are the exact per-batch PARTIAL figures from section 3:
+Batch 26 (3), Batch 27 (2), Batch 29 (4), Batch 30 (6), Batch 32 (9),
+Batch 33 (7); 3+2+4+6+9+7 = 31.
+
+A-011 (Batch 7) was originally BLOCKED by deliberate scope decision, then
+resolved to PASS via borrowed out-of-batch evidence (a pre-existing
+approved case used as live proof); it is counted in the 763 Fully
+Evidenced bucket, not Blocked, since its terminal status is PASS.
+
+A separate axis (not summed against the 796, since it counts Product Gap
+register entries and Journey Discovery dispositions, not journeys):
+**E. Deferred/accepted = 14** register entries (section 9), **F. Future
+capability = 9** items in 3 named sub-groups (section 10). Active Product
+Gaps = **0**. Open Product Decisions = **0** of 16 total. Open known
+defects = **0**; every FAILED chain traces to a fix and a rerun (section
+5, 6).
 
 ---
 
@@ -265,19 +396,42 @@ ledger-vs-register contradiction was found.
   the register's own prose said 9-10, now corrected, see section 12).
   Two of these 14 (DF-010, DF-013) carry no PG-number at all, so PG-001
   through PG-066 does not fully enumerate every tracked deferred finding.
-- **FUTURE CAPABILITY: 4** of the 14 above (PG-025, PG-026, PG-031,
-  PG-061) are explicitly unbuilt-module items, not accepted defects.
+  Full per-ID table in section 9.
+- **FUTURE CAPABILITY (register-tagged): 4 distinct PG-IDs, only 1 of
+  which is part of the 14 above.** PG-061 (DF-012) is genuinely one of
+  Section C's 14 Deferred entries. **PG-025, PG-026, and PG-031 are not**:
+  they are recorded in Section D (Closed History) with the disposition
+  "ACCEPTED AS-IS / FUTURE MODULE," a permanently-settled acknowledgment
+  rather than a still-open deferral, and are correctly counted inside the
+  53 CLOSED figure above, not the 14 Deferred figure. This document's
+  first draft conflated these two groups; corrected here.
 - **ACTIVE: 0.** Section A's exact current text: *"None currently open.
   PG-063 ... PG-064 ... and PG-065 ... were all decided and closed the
   same day under the Immediate-Closure Protocol."* Verified true; all
   three are present and CLOSED in Section D.
-- **INCONSISTENT / NEEDS DOC RECONCILIATION: 1.** PG-005 (the recurring
-  zero-active-team-members gap, independently reconfirmed across 7+
-  journeys) carries its own self-disclosed, still-unresolved tension
-  between M-025's "no proactive flag anywhere" framing and the fix's own
-  Operations Queue banner. This is the register's own honest flag, not
-  something this audit discovered; it is surfaced here as a residual item
-  worth a product-owner look, not resolved by this audit.
+- **PG-005: historical wording inconsistency with current behaviour
+  already decided, not an active product contradiction.** PG-005 (the
+  zero-active-team-members gap) was decided and fixed in Batch 6 (commit
+  `1075ecb`, an Operational Queue "no eligible approver" banner). M-025
+  (Batch 21) restates "no proactive flag anywhere in My Work or the
+  Operational Queue," but its own text explicitly declines to
+  independently re-verify this, citing J-011 (Batch 19) and, through it,
+  A-027 (Batch 8), rather than checking live current behaviour; reading
+  M-025's own entry directly (`docs/journey-runs/BATCH_21_RESULTS.md`)
+  confirms it is a citation of a prior finding, not a fresh observation.
+  The Batch 6 fix's own evidence is a live, direct verification against a
+  real request; no later journey ever disputes that the banner exists, in
+  live evidence rather than restated prose. Best-supported classification:
+  the citation chain (A-027 → J-011 → M-025) repeated an earlier framing
+  without re-checking it against the then-already-shipped fix, most
+  plausibly because A-027/J-011/M-025 describe the absence of a flag
+  specifically in **My Work** (a personal worklist never in scope for
+  this fix) while correctly-but-confusingly also repeating "or the
+  Operational Queue" from the original pre-fix framing. This was not
+  independently re-verified live in this documentation-only pass (doing
+  so would be a new UI check, out of this audit's scope); the register's
+  own "not reconciled" flag should be read as a documentation-chain
+  staleness note, not as evidence of a live, present-day bug.
 - **TO-VERIFY: 1.** PG-042/TV-001 (H-020's cross-domain generalization
   question): AA-023 was allocated to verify whether Go Live's fix
   generalizes to the other three Workflow Runtime domains, and was
@@ -331,8 +485,7 @@ marked closed instead.
 | U-019, U-020 | 4 | Architectural proof of session-independence | Literal two-simultaneous-session reproduction | Tool shares one cookie jar across tabs | N/A, accepted as architectural-proof-equivalent | Permanent, accepted |
 | O-005, O-015, O-016 | 5 | Mechanism via source/RPC evidence | Live two-simultaneous-session UX | Same structural constraint as above | None found | Permanent, accepted |
 | A-031 | 8 | Everything except true-simultaneous-race timing | Concurrency dimension only | Unprovable with available tooling | None found | Permanent, accepted |
-| I-037 | 19 | Server/code-path evidence complete | Manual browser confirmation of the CANCELLED-state Stress Variant | No authenticated session could safely be derived for this specific state | None found | **Still genuinely open, tooling-blocked** |
-| J-026 | 20 | Every non-concurrent component of the safety property, independently reconfirmed | True simultaneous two-connection race | Cannot be produced through a sequential RPC interface | None found | **Still genuinely open, tooling-blocked** |
+| J-026 | 20 | Every non-concurrent component of the safety property, independently reconfirmed; its own batch ledger classifies it PASS via 2-actor race + reasoned N-way generalization | True simultaneous 5-actor concurrency (the Stress Variant specifically) | Cannot be produced through a sequential RPC interface | `docs/journey-runs/BATCH_20_EVIDENCE_AUDIT.md`'s own dedicated residual table explicitly marks this journey TOOLING-BLOCKED, overriding the main ledger's PASS for this one dimension; the only P0/Grade-B item that audit left open of 17 reviewed | **Still genuinely open, tooling-blocked (one dimension only; the Regular Path mechanism is proven)** |
 | Q-001, Q-002, Q-003, Q-007 | 21 | Regular Paths (Grade A) | Stress/boundary variants | Real file-storage I/O needs a live session or credentialed script | None found | Permanent, accepted |
 | R-015 | 23 | Mechanism at 42-row real scale | 500-row cap at real volume | No real dataset reaches the cap | None found | Permanent, accepted (mechanism-only PASS) |
 | Batches 24-31's scale/concurrency PARTIALs | 24-31 | Real accumulated TEST-environment scale at each journey's own honestly-disclosed number | Canonical "100+/500+/tens-of-thousands" targets | Environment is DEV/TEST, not production scale | N/A by nature | Permanent, accepted (disclosed numbers, not faked) |
@@ -340,8 +493,16 @@ marked closed instead.
 | Batch 32's 9 PARTIALs (Y-002 through Y-013 minus Y-001/Y-010/Y-012) | 32 | Real, honestly-disclosed tested scale (e.g. 16 components, 3 send-back cycles, 341 audit rows) | Canonical stress targets | DEV/TEST environment scale ceiling | N/A by nature | Permanent, accepted |
 | Batch 33's 7 PARTIALs (Y-014 through Y-020) | 33 | Real, honestly-disclosed tested scale (1 reference, ~14.5-month span, 15 workflow versions, 11 Go Live requests, 2 live approval nodes) | Canonical "tens of thousands / several years / dozens-100+ / 15+-30+" targets | DEV/TEST environment scale ceiling; Y-017/Y-018/Y-019 additionally found the canonical Regular Path's own UI surface doesn't exist (see section 10) | N/A by nature | Permanent, accepted |
 
-**Net residual count of genuinely open, unverified dimensions: 3** (I-037,
-J-026, Y-008). Everything else in this register is either a permanent,
+**Net residual count of genuinely open, unverified dimensions: 2** (J-026's
+concurrency Stress Variant, Y-008). I-037 is removed from this register in
+this reconciliation pass: its canonical definition is "Entitlement
+Dashboard Status Reflects Derived Go Live Line Item Status," not a
+concurrency journey, and its own Batch 19 ledger entry classifies it
+**PASS** (its CANCELLED-state Stress Variant was closed via disclosed
+code-inspection equivalence, not left open; this document's first draft
+incorrectly listed it here, conflating "not independently reproduced
+live" with "genuinely unverified" when the ledger itself had already
+resolved it). Everything else in this register is either a permanent,
 accepted, by-design limitation (disclosed honestly, not escalated) or has
 since been closed by later evidence.
 
@@ -349,29 +510,36 @@ since been closed by later evidence.
 
 ## 9. Deferred / accepted register
 
-The 14 Section C items from `docs/OPEN_PRODUCT_GAPS.md`, mechanically
-counted (see section 12 for the count correction):
+The exact 14 Section C items from `docs/OPEN_PRODUCT_GAPS.md`, each
+counted once, mechanically enumerated as the 14 `### DF-` headings
+between the Section C and Section D markers (see section 12 for the
+correction to this count's own stale prose). No ID below is combined with
+another; where two journeys independently found the same register entry,
+both are named in Origin journey but it is still one row, matching how
+the register itself treats it.
 
-| ID | One-line gap | Category |
-|---|---|---|
-| DF-00X (PG-066) | Commercial Version review decision fails silently on the client when the server rejects it | UX |
-| DF-001 (PG-046) | No support/debug surface for raw `pricing_rule_kind` | Observability |
-| DF-002 (PG-047) | Team-less Approval node has no publish-time UX warning | UX |
-| DF-003 (PG-048) | `provision_app_user` would surface a raw FK-violation error to a future non-UI caller | Correctness (latent) |
-| DF-004 (PG-049) | No self-service "my access" view | UX |
-| DF-005 (PG-050) | No search/filter on User Access or Team Master lists | UX/Scalability |
-| DF-006 (PG-051) | No UI surfaces historical audit/timeline data for several Settings areas | Observability |
-| DF-007 (PG-052) | Invoice Frequency `cadence_months` retroactivity architecturally unresolved but latent | Correctness (latent) |
-| DF-008 (PG-054) | Customer Master search and Approvals/Operational Queue have no server-side pagination | Scalability |
-| DF-009 (PG-055) | Go Live not extended to the full scoped-authorization model | Architecture |
-| DF-010 | No duplicate/near-duplicate customer name warning on creation | UX |
-| DF-011 (PG-060) | No UI surfaces a superseded Onboarding/Go Live document version | Observability |
-| DF-012 (PG-061) | No cross-customer report/export surface exists | Future capability |
-| DF-013 | Onboarding has no genuine reject/terminal state for a case a reviewer will never approve | UX/Process |
+| ID | Origin journey | Current disposition | Reason | Correctness-critical? | Where recorded |
+|---|---|---|---|---|---|
+| DF-00X (PG-066) | Y-002 (Batch 32) | Deferred, not fixed | Commercial Version review decision fails silently on the client when the server rejects it; UX polish, not a data-safety issue | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C |
+| DF-001 (PG-046) | F-020 (Batch 13) | Deferred, not fixed | No support/debug surface for raw `pricing_rule_kind` DB value | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-002 (PG-047) | K-003 (Batch 1) | Deferred, not fixed | Team-less Approval node has no publish-time UX warning | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-003 (PG-048) | T-008 (Batch 24) | Deferred, not fixed | `provision_app_user` would surface a raw FK-violation error only if a future non-UI caller ever invoked it; no current caller does | NO (latent, no live code path affected) | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-004 (PG-049) | N-026 (Batch 5) | Deferred, not fixed | No self-service "my access" view | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-005 (PG-050) | N-027, O-020 (Batches 5-6) | Deferred, not fixed | No search/filter on the User Access or Team Master lists | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-006 (PG-051) | N-029, O-023, R-013, R-014 (Batches 5, 6, 23) | Deferred, not fixed | No UI surfaces historical audit/timeline data for several Settings areas; underlying data confirmed intact | NO (presentation-layer only) | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-007 (PG-052) | P-012 (Batch 6) | Deferred, not fixed | Invoice Frequency `cadence_months` retroactivity architecturally unresolved but no live code path depends on it today | YES if a future call site ever derives a live financial outcome from the raw value (explicitly stated trigger); NO today | `docs/OPEN_PRODUCT_GAPS.md` Section C; `docs/TECH_DEBT.md` |
+| DF-008 (PG-054) | S-001, S-010 (Batch 23) | Deferred, not fixed | Customer Master search and Approvals/Operational Queue lists have no server-side pagination | NO (scalability, not correctness, at current data volume) | `docs/OPEN_PRODUCT_GAPS.md` Section C |
+| DF-009 (PG-055) | D-022 follow-up / PD-005 (Batch 11) | Deferred, not fixed | Go Live was never extended to the full Business Unit/Territory/Customer scoped-authorization model built for the other 5 domains | NO (Go Live's own permission gate is otherwise proven correct; this is a scoping-breadth gap, not a bypass) | `docs/OPEN_PRODUCT_GAPS.md` Section C |
+| DF-010 | Z-015 (Batch 30) | Deferred, not a confirmed Product Gap | No duplicate/near-duplicate customer name warning on creation; `customers.name` carries no uniqueness constraint, so no data-integrity risk | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C |
+| DF-011 (PG-060) | X-008 (Batch 31) | Deferred, not fixed | No UI surfaces a superseded (non-current) Onboarding or Go Live document version; the reader exists in code with zero callers, underlying data intact | NO (presentation-layer only) | `docs/OPEN_PRODUCT_GAPS.md` Section C |
+| DF-012 (PG-061) | X-015 (Batch 31) | Deferred, Future Capability | No cross-customer report/export surface exists; same shape as Forms Hub, never meant to exist yet | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C |
+| DF-013 | AA-008 (Batch 31) | Deferred, not a confirmed Product Gap | Onboarding has no genuine reject/terminal state for a submitted case a reviewer will never approve; a documented, deliberate design characteristic of the current workflow model | NO | `docs/OPEN_PRODUCT_GAPS.md` Section C |
 
-None of these are data-safety or correctness-critical; all are
-deliberate, business-acknowledged deferrals with a stated trigger for
-revisiting (see each entry's own text in `docs/OPEN_PRODUCT_GAPS.md`).
+None of these 14 are data-safety or correctness-critical **today**; DF-007
+is the one entry with a stated condition under which it would become
+correctness-relevant (a future call site deriving a live financial
+outcome from the unfrozen value), explicitly tracked as its own trigger
+to revisit, not a silent risk.
 
 ---
 
@@ -379,19 +547,39 @@ revisiting (see each entry's own text in `docs/OPEN_PRODUCT_GAPS.md`).
 
 Distinct from the deferred/accepted list above: these are capabilities
 that were never meant to exist in the current product, confirmed absent
-by source inspection rather than treated as a defect.
+by source inspection rather than treated as a defect. Exactly **9**, in
+three sub-groups by how each was found (a different axis than, and not
+summed against, the 14 in section 9, since 3 of these 9 overlap with
+Section C/D PG-register entries already counted there under a different
+lens; see each row's own citation):
+
+**Sub-group 1 — PG-register-tagged (3, found via journey testing,
+recorded in Section D as ACCEPTED AS-IS / FUTURE MODULE, not Section C):**
 
 | Item | Found via | Why it's future capability, not a defect |
 |---|---|---|
-| Pricing Kernel (centralized pricing-parameter validation) | F-014, G-001/002/003 | Explicitly deferred in the migration's own comment to a future architectural component |
-| `spend`-kind commitment onboarding UI | G-007 | RPC supports it; no UI was ever built, by design |
-| Forms Hub cross-domain aggregate view | S-019 through S-022 | Named future module in the Journey Universe itself |
-| Cross-customer report/export surface | X-015, DF-012 | Same shape as Forms Hub; explicitly unbuilt |
+| Pricing Kernel (centralized pricing-parameter validation) | F-014 (Batch 13), G-001/G-002/G-003 (Batch 14) → PG-025 | Explicitly deferred in the migration's own comment to a future architectural component |
+| `spend`-kind commitment onboarding UI | G-007 (Batch 14) → PG-026 | RPC supports it; no UI was ever built, by design |
+| Cross-customer report/export surface | X-015 (Batch 31) → PG-061 (this one IS also DF-012, one of the 14 in section 9) | Same shape as Forms Hub; explicitly unbuilt |
+
+**Sub-group 2 — Journey Discovery FUTURE MODULE dispositions (3, found in
+Batch 33, not registered as Product Gaps per the standing instruction not
+to equate a missing report surface with a defect):**
+
+| Item | Found via | Why it's future capability, not a defect |
+|---|---|---|
 | Consolidated per-customer Go Live history list | Y-017 (Batch 33) | The canonical Regular Path assumes a listing UI that doesn't exist; current UI only shows per-line-item current state plus individual request detail pages by direct link |
 | Organization-wide document report | Y-018 (Batch 33) | Both document tables are always case-scoped by design; no admin screen aggregates across cases |
 | Organization-wide audit export | Y-019 (Batch 33) | `audit_log` is only ever queried scoped to one row/table; no aggregation surface exists |
-| API/Import-sourced Entitlement Source creation | I-003/I-004, PG-027 | Manual-only for now, by decision |
-| MRR Recognition, Forms Hub (whole packs) | Journey Universe | Explicitly excluded from the 796 executable total; lighter-weight record format, no execution fields |
+
+**Sub-group 3 — Entirely excluded from the 796 executable total (2 whole
+Journey Universe packs) plus 1 further decided-manual-only item (3):**
+
+| Item | Found via | Why it's future capability, not a defect |
+|---|---|---|
+| Forms Hub (whole pack, including the S-019–S-022 cross-domain aggregate-view finding) | S-019 through S-022 (Batch 24); the pack itself is excluded from the Universe's 796 executable total | Named future module in the Journey Universe itself; the pack's lighter record format carries no execution fields |
+| MRR Recognition (whole pack) | Journey Universe | Explicitly excluded from the 796 executable total; lighter-weight record format, no execution fields |
+| API/Import-sourced Entitlement Source creation | I-003/I-004 (Batch 16) → PG-027 | Manual-only for now, by explicit decision, not an unbuilt pack but a deliberately narrowed scope |
 
 ---
 
@@ -465,26 +653,31 @@ stated grand total happens to be correct.
 
 ## 13. Items that remain genuinely unverified
 
-Stated plainly, with no softening:
+Stated plainly, with no softening. Exactly 2 journey dimensions remain
+open; everything else below is a documentation-currency note, not an open
+product behaviour.
 
-- **AB-035** was unverified as of the previous session's close; it is now
-  closed (section 3), so this is no longer an open item as of this
-  document.
-- **I-037**: CANCELLED-state Stress Variant for a Go Live scenario,
-  server/code evidence complete, manual browser confirmation genuinely
-  tooling-blocked.
-- **J-026**: true simultaneous two-connection race, cannot be produced
-  through this program's sequential RPC interface.
+- **J-026's concurrency Stress Variant**: a true 5-actor simultaneous race
+  cannot be produced through this program's sequential RPC interface.
+  The journey's own Regular Path (2-actor race) is proven PASS; only the
+  literal simultaneity of the Stress Variant is unverified, per
+  `docs/journey-runs/BATCH_20_EVIDENCE_AUDIT.md`'s own dedicated verdict
+  (section 8). This document's first draft incorrectly paired this with
+  I-037, which is unrelated (an Entitlement Dashboard status-derivation
+  journey) and was already PASS in its own Batch 19 ledger entry; I-037 is
+  not listed here.
 - **Y-008**: large team-membership scale, blocked by the safety
   classifier's correct refusal to autonomously perform an RBAC-modifying
   action at that volume without explicit per-grant authorization.
-- **TV-001/PG-042's own register status**: AA-023 (its verification
-  journey) executed PASS in Batch 18, but the register's "To Verify"
-  section header itself was never updated to reflect this; a reader of
-  the register alone would believe it's still pending.
-- **PG-005's self-disclosed internal tension**: the M-025-vs-O-018
-  framing discrepancy, carried forward unresolved by the register's own
-  admission across every subsequent reconfirmation of the same mechanism.
+- **TV-001/PG-042's own register status** (a documentation-currency note,
+  not an open behaviour): AA-023 (its verification journey) executed PASS
+  in Batch 18, but the register's "To Verify" section header itself was
+  never updated to reflect this; a reader of the register alone would
+  believe it's still pending.
+- **PG-005/M-025 wording** (a documentation-currency note, not an open
+  behaviour): see section 6's precise classification (historical wording
+  inconsistency with already-decided current behaviour, not an active
+  contradiction).
 
 Everything else that looked unverified on first read (stale "still open"
 text, a batch with no explicit numeric tally, a coverage-matrix total that
@@ -496,21 +689,26 @@ listed here as open.
 ## 14. Final programme state
 
 - **Programme execution: COMPLETE.** 796/796 currently-executable
-  journeys have real evidence; the one silent gap found (AB-035) is
-  closed as of this document.
+  journeys have real evidence. AB-035 was found missing by the
+  programme-closure review that preceded this audit, separately
+  authorized, executed, and passed before this document was written; this
+  audit only reconfirms that already-closed evidence (section 3), it did
+  not discover or close AB-035 itself.
 - **Product Gaps: 0 active, 53 closed, 14 deferred/accepted by deliberate
   business decision, 0 confirmed-but-unregistered.**
 - **Product Decisions: 0 open.** 16 total, all closed, with implementation
   and later validation evidence for the 13 that required code changes.
-- **Residual accepted/deferred risk**: 14 deferred Product Gaps (section
-  9) plus roughly 9 future-capability items (section 10), none
-  correctness- or data-safety-critical, all with a stated trigger for
-  revisiting.
+- **Residual accepted/deferred risk**: exactly 14 deferred Product Gap
+  register entries (section 9) plus exactly 9 future-capability items in
+  3 sub-groups (section 10), none correctness- or data-safety-critical
+  (DF-007 carries the one stated future trigger), all with a documented
+  reason.
 - **Dimensions not proven, because of tooling or scale, not because of a
-  product defect**: I-037, J-026, Y-008 (genuinely unverified), plus the
-  entire DEV/TEST-environment-scale family of PARTIAL classifications in
-  Batches 5, 19-21, 24-33 (verified correct at the scale actually
-  achievable, honestly short of production-scale canonical targets).
+  product defect**: exactly 2 (J-026's concurrency Stress Variant, Y-008),
+  plus the 31-journey DEV/TEST-environment-scale `PARTIAL / TOOLING
+  LIMITATION` population confined entirely to Batches 24-33 (verified
+  correct at the scale actually achievable, honestly short of
+  production-scale canonical targets).
 
 No further testing, no new batch, and no reopening of any closed journey
 was performed to produce this document, per its own scope.
