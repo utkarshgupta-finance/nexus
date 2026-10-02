@@ -536,6 +536,19 @@ compact summary is kept here.
   - After this pass: **Active (Decision Required): 0. Active
     (implementation pending): 0. To Verify: 1. Deferred / Accepted For
     Now: 10 (DF-010 added). Closed History: 49 (unchanged).**
+- **Final program-audit pass, 2026-10-02 (count correction only, no new
+  finding).** This running tally was never updated for three Section C
+  entries added after the eighth pass: DF-011 (PG-060, Batch 31), DF-012
+  (PG-061, Batch 31), and DF-013 (Batch 31), plus DF-00X (PG-066, Batch 32)
+  was already present in the section body but likewise never folded into
+  this count. A mechanical count of this document's own `### DF-` headings
+  in Section C (not this prose) gives **14**, not 10: DF-00X, DF-001
+  through DF-009, DF-010, DF-011, DF-012, DF-013. Corrected here; no gap's
+  disposition changed, only this summary arithmetic.
+  - Corrected count: **Active (Decision Required): 0. Active
+    (implementation pending): 0. To Verify: 1. Deferred / Accepted For
+    Now: 14. Closed History: 53 (PG-062 through PG-065 added across
+    Batches 31-32; PG-066 is DF-00X above, not Closed).**
 - The zero-active-team-members mechanism (PG-005) remains the single
   most-reconfirmed gap in the project's history (O-018, A-027, C-025,
   E-028, J-011, M-025, V-027, anticipated again as Z-007/Z-009); the

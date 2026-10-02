@@ -10,6 +10,15 @@ Each row: Journey ID, Batch, Classification, Reason, Evidence already captured, 
 evidence/action, Human input needed (YES/NO), Product Decision needed (YES/NO), Can retry independently
 (YES/NO).
 
+**Correction (2026-10-02, final program audit): this is a frozen mid-run
+snapshot, now stale for three rows.** AB-020 (PG-035), AB-039/AB-043
+(PG-036), and V-028 (PG-037) below were all decided and closed on
+2026-09-28, the same day this file's own rows were written; the queue was
+never updated afterward to reflect that. See `docs/OPEN_PRODUCT_GAPS.md`'s
+Closed History for each one's actual decision, implementation, and
+regression evidence. Treat every "Product Decision needed: YES" below as
+historical, not current.
+
 ## Queue
 
 | Journey ID | Batch | Classification | Reason | Evidence captured | Missing evidence/action | Human input needed | Product Decision needed | Can retry independently |

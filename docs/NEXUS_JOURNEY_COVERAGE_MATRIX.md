@@ -2,6 +2,21 @@
 
 Companion to [NEXUS_JOURNEY_UNIVERSE.md](NEXUS_JOURNEY_UNIVERSE.md). All counts below were regenerated mechanically (by parsing the structured fields of every journey record in that document), most recently after Batch 1 execution added K-030 as a regression journey for a real defect found and fixed live (see the Universe document's Pack K). 785 current-executable journeys across 29 packs; the two FUTURE packs, Forms Hub and MRR Recognition, are excluded from every table here since their lighter-weight record format carries no dimension/priority fields to count. A dimension is counted as "covered" for a journey when that journey's corresponding field is populated with something other than "N/A".
 
+**Stale as of 2026-10-02 (final program audit): the 785 figure above has
+not been regenerated since.** A mechanical count of every `### <ID>:`
+heading in the Universe document today gives **796** executable journeys
+(840 raw headings minus 44 in the two FUTURE packs), not 785. The 11-
+journey gap is fully accounted for: the Stage A Expansion Audit's 8 new
+journeys (E-029 through E-032, H-044, AA-023, AB-042, ACC-002, all executed
+in Batch 18), Q-021 (discovered Batch 22, executed Batch 23), T-025
+(discovered Batch 24, executed Batch 25), and AB-043 (discovered and
+executed live in Batch 26). See `docs/NEXUS_FINAL_PROGRAM_AUDIT.md` section
+2 for the full reconciliation, including two further journeys (A-036,
+AB-043) that were executed as live batch discoveries but never
+retroactively added to `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`'s own
+written schedule. The per-pack tables below were not regenerated for this
+audit; treat their absolute numbers as directional, not current.
+
 This matrix exists to make under-tested areas visible at a glance, not to imply every cell should be non-zero. A pricing-model pack correctly has zero Concurrency coverage of its own (races belong to Pack V, which references pricing-model journeys where relevant); an Audit pack correctly has near-total Audit coverage and near-zero Concurrency coverage. Read gaps in context, not as automatic defects.
 
 ## 1. Coverage by pack and test dimension

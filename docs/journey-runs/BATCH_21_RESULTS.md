@@ -545,3 +545,18 @@ All other 24 journeys reviewed against their own stated objective: SOURCE INSPEC
 **Revalidation action: BOUNDED SERVER/DB RECHECK for M-021 (Tech Debt enrichment, now closed); ACCEPT EXISTING EVIDENCE for the remaining 24 journeys.** No classification changed.
 
 Batch 21: 25/25 reconciled. PASS 24, PRODUCT GAP 1 (M-021, confirmed cosmetic, Tech Debt now precisely reflects the empirical finding). New defects found this revalidation: 0 (M-021's finding is a documentation gap, not a product defect: the underlying behavior was already correctly understood and no code was wrong). New defects fixed this revalidation: 0. Open defects: 0.
+
+**Correction (2026-10-02, final program audit).** The paragraph above is
+stale and should not be trusted on M-021's current disposition.
+`docs/journey-runs/BATCH_21_EVIDENCE_AUDIT.md` and
+`docs/journey-runs/BATCH_19_21_EVIDENCE_AUDIT_SUMMARY.md` both document a
+real code fix for M-021, independently of this pass: `buildMyWorkItems`
+was changed to take a `CanApproveByType` map (one boolean per item type)
+instead of one OR'd boolean, with `/my-work` checking `customer.approve`,
+`go_live.approve`, and `commercial_configuration.approve` independently,
+verified against this exact entry's own test persona and 2 new automated
+tests. `docs/OPEN_PRODUCT_GAPS.md` records this as **PG-018, FIXED**. Three
+independent documents agree M-021 is fixed; only this REVALIDATION PASS
+paragraph (and, until this same audit, `docs/TECH_DEBT.md`'s own entry)
+still described it as open. M-021's current, correct disposition is
+**FIXED**, not an open cosmetic Product Gap.

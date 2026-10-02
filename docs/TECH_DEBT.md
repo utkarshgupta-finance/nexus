@@ -255,30 +255,28 @@ into a second backlog.
 - **Two silent `catch {}` blocks in `app/customers/page.tsx`** (former-name
   search, reference snapshot) fail with no user-visible indication at all,
   unlike the third catch in the same file which does surface a message.
-- **Former-name search shows the most-recently-changed historical value, not necessarily the one that matched the search term (found live during the Batch 8/morning-catch-up execution of journey B-007).** `searchFormerCustomerNames`'s dedup (`change-request.service.ts`) keeps only the first row per customer in a most-recent-first ordering. When a customer has multiple historical names that share overlapping substrings (e.g. "Acme" then "Acme Global" then "Acme Global India"), searching for the earliest name still correctly finds the customer, but the "Former legal name: X" label shown can be a different, later historical value than the one actually searched for. The customer is always found correctly; only the specific label can be imprecise in this narrow case. Not fixed, since a real fix requires a small design choice (return the best-matching historical value per customer, or all matching values, rather than always the most recent) rather than being an unambiguous bug; revisit alongside any other former-name search change.
+- ~~Former-name search shows the most-recently-changed historical value,
+  not necessarily the one that matched the search term (B-007, Batch 8).~~
+  **CLOSED as PG-053** (2026-09-28): `searchFormerCustomerNames` rewritten
+  with a `matchSpecificity` helper returning the best-matching historical
+  name per customer, 5 new tests. Live re-verified in Batch 31's AA-004
+  (`docs/journey-runs/BATCH_31_RESULTS.md`): searching an old name still
+  correctly surfaces the customer with the matching label. See
+  `docs/OPEN_PRODUCT_GAPS.md`'s Closed History.
 
-- **My Work's `canApprove` imprecision now spans a fourth request type.**
-  `/my-work` ORs `customer.approve` with `go_live.approve` into one
-  boolean, same pre-existing approximation already accepted for
-  `commercial_configuration.approve` (`src/app/my-work/page.tsx`).
-  "Pending my approval" is still an approximation across every request
-  type until per-type routing exists; not made worse by Go Live, just
-  extended to it.
-  **Empirically confirmed, not just theorized (M-021, Batch 21,
-  2026-09-22).** A real test persona holding only `customer.approve` (no
-  `go_live`/`commercial_configuration` permission of any kind) was added
-  to a team responsible for a real, live go_live approval node. The My
-  Work classifier genuinely listed that go_live item as "Pending My
-  Approval" for this user, a concrete cross-domain leak, not a
-  hypothetical one. Ruled out as an authorization bypass: the real
-  approve action independently calls `requirePermission("go_live",
-  "approve")`, which rejected this exact user deterministically,
-  uninfluenced by the list's own imprecision. The gap is confirmed
-  cosmetic (a misleading list entry), never a security issue. Fixing it
-  correctly requires threading each item's own domain through the
-  classifier's permission check (today one caller-supplied boolean for
-  the whole list), a real design change, not a bounded fix; not built
-  here.
+- ~~My Work's `canApprove` imprecision across request types (M-021, Batch
+  21).~~ **CLOSED as PG-018**, fixed the same night in
+  `docs/journey-runs/BATCH_19_21_EVIDENCE_AUDIT_SUMMARY.md`:
+  `buildMyWorkItems` now takes a `CanApproveByType` map (one boolean per
+  item type) instead of one OR'd boolean; `/my-work` checks
+  `customer.approve`, `go_live.approve`, and
+  `commercial_configuration.approve` independently. Verified against the
+  original M-021 fixture persona (a `customer.approve`-only user who
+  previously saw a go_live item listed as "Pending My Approval"): the item
+  is now correctly excluded. 2 new tests. A later addendum appended to
+  `docs/journey-runs/BATCH_21_RESULTS.md` itself re-describes this as
+  still open; that addendum is stale and contradicts the EVIDENCE_AUDIT,
+  the SUMMARY, and this register, all three of which agree on FIXED.
 - **Entitlement scheduling has no formal "Entitlement Period" table.**
   `ADD_TO_EXISTING_ENTITLEMENT_PERIOD` and `CREATE_NEW_ENTITLEMENT_PERIOD`
   are both just "insert more `entitlement_schedule_months` rows"; there is
