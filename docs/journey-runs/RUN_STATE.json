@@ -19,8 +19,8 @@
             "33"
         ],
         "scheduledTotal": 235,
-        "priorBatchesComplete": 227,
-        "runLabel": "Fresh execution: Batches 24-33 (234 journeys scheduled at launch + AB-043 discovered mid-run = 235; first time run, not historical revalidation) - ALL 10 BATCHES CLOSED; 1 KNOWN GAP (AB-035) FLAGGED AT CLOSURE, NOT EXECUTED"
+        "priorBatchesComplete": 228,
+        "runLabel": "Fresh execution: Batches 24-33 (234 journeys scheduled at launch + AB-043 discovered mid-run = 235; first time run, not historical revalidation) - PROGRAM COMPLETE, 235/235 EVIDENCED"
     },
     "journeys": [
         { "id": "Y-014", "status": "COMPLETE", "classification": "PARTIAL_TOOLING_LIMITATION", "notes": "1 of tens-of-thousands Reference Master references; deactivation mechanism verified correct and non-destructive, fixture restored" },
@@ -45,16 +45,17 @@
         "activeAtClose": 0
     },
     "programTotals": {
-        "note": "Full run totals across Batches 24-33 (235 scheduled journeys). Batch 32's own 25-journey tally (14 PASS, 1 PRODUCT_GAP_RESOLVED_PASS, 9 PARTIAL_TOOLING_LIMITATION, 1 BLOCKED) is preserved in docs/journey-runs/BATCH_32_RESULTS.md and is no longer repeated in this file's top-level journeys array, which now tracks only the current (final) batch per established per-batch convention.",
+        "note": "Full run totals across Batches 24-33 (235 scheduled journeys). Batch 32's own 25-journey tally (14 PASS, 1 PRODUCT_GAP_RESOLVED_PASS, 9 PARTIAL_TOOLING_LIMITATION, 1 BLOCKED) is preserved in docs/journey-runs/BATCH_32_RESULTS.md and is no longer repeated in this file's top-level journeys array, which now tracks only the current (final) batch per established per-batch convention. AB-035 (Batch 26 scope) was found missing during closure reconciliation and executed under a separate bounded authorization on 2026-10-02; see docs/journey-runs/BATCH_26_RESULTS.md's own AB-035 section and BATCH_33_RESULTS.md's 'Program closure reconciliation' section.",
         "scheduledTotal": 235,
-        "completedTotal": 234,
-        "remaining": 1,
-        "knownGaps": [
+        "completedTotal": 235,
+        "remaining": 0,
+        "closedGaps": [
             {
                 "id": "AB-035",
                 "batch": 26,
-                "status": "NOT_EXECUTED",
-                "note": "Found missing during Batches 24-33 closure reconciliation. Canonical scope of Batch 26 (AB-020 through AB-041) includes AB-034 and AB-035; neither has execution evidence in any batch ledger. AB-034 disposed as Journey Discovery ALREADY COVERED by V-030 (Batch 28, same mechanism). AB-035 (admin's own user_access.write removed while the User Access settings page itself is open) is materially distinct from V-031 (which tested team.write on Team Master, not user_access.write on the User Access page) and remains genuinely unexecuted. An attempt to begin closing it this session was correctly denied by the safety classifier as new test execution outside Batch 33's authorized scope after the run's own stop instruction; not attempted further. See docs/journey-runs/BATCH_33_RESULTS.md, 'Program closure reconciliation' section."
+                "status": "PASS",
+                "closedAt": "2026-10-02",
+                "note": "Found missing during Batches 24-33 closure reconciliation; genuinely executed under a separate, explicitly bounded authorization naming AB-035 as the sole target. Mid-session revoke of Admin A's user_access.write while the User Access page stayed open; stale-page write attempt denied cleanly (UI message, network-confirmed server rejection, DB and audit_log unchanged); fresh reload correctly showed access-restricted; restoring the permission let the next attempt succeed cleanly with correct actor attribution. Both canonical personas and the test target user restored to their pre-journey baseline. See docs/journey-runs/BATCH_26_RESULTS.md."
             }
         ]
     }

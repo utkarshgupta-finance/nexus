@@ -17,7 +17,7 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 
 ## Continuous run (Batches 24-25-26-27-28-29-30-31-32-33)
 
-> Overall: 234 / 235 complete — 1 remaining.
+> Overall: 235 / 235 complete — 0 remaining.
 
 ## Classification counts
 
@@ -55,11 +55,11 @@ Live, human-readable operational dashboard, generated from `RUN_STATE.json` by `
 ## Environment
 
 - **Current branch:** team-preview
-- **Current HEAD:** 4b695c8
+- **Current HEAD:** fda887a
 - **Working tree:** dirty
 - **Latest test checkpoint:** None run yet this batch
 - **Blocking environment issue:** None
 
 ## Timestamp
 
-- **Last status update:** 2026-10-02 02:24:41 UTC
+- **Last status update:** 2026-10-02 04:08:27 UTC

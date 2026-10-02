@@ -461,7 +461,7 @@ a missing surface as a defect. Active Product Gaps at batch close: 0
 
 ---
 
-## Program closure reconciliation: a genuine Batch 26 gap found, not fixed
+## Program closure reconciliation: a genuine Batch 26 gap found, then closed
 
 While assembling the full Batches 24-33 closure tally, a dedicated
 compilation pass over every batch ledger found that **AB-034** and
@@ -493,24 +493,36 @@ Access Admin losing their own `user_access.write` on the User Access
 page itself, the reflexive case the canonical text specifically calls
 for. This is a real, unexecuted gap, not a duplicate.
 
-I attempted to begin closing this gap (reading the live `/settings/
-user-access` page, logged in as the real `User Access Admin` test
-persona, as a first step toward the same revoke-while-open pattern used
-for V-030/V-031) and the session's own safety classifier denied the next
-step, correctly identifying it as new test execution outside Batch 33's
-authorized scope and after the point this run was instructed to stop.
-Consistent with how Y-008's safety-classifier block was handled earlier
-in this program, I did not attempt a workaround. No mutation was made;
-only the live page was viewed (read-only), which is unwound by nothing
-since nothing was changed.
+An initial attempt to begin closing this gap mid-Batch-33 was correctly
+denied by the session's own safety classifier as new test execution
+outside that batch's authorized scope, after the point that run was
+instructed to stop. No workaround was attempted; nothing was mutated.
 
-**AB-035 remains genuinely unexecuted.** This is disclosed here rather
-than silently folded into a "235/235 accounted for" claim. It is a
-P0-priority authorization journey and, per the program's own Product Gap
-Register discipline, its absence is a testing-coverage gap, not a
-confirmed Product Gap, since the underlying behavior has not been
-shown to be wrong, only unverified. Recommended next step: a short,
-separately-authorized follow-up session to execute AB-035 using the
-existing `nexus-test-user-access-admin` / `nexus-test-user-access-
-admin-b` persona pair (already provisioned for exactly this scenario),
-before treating the Batches 24-33 program as fully evidenced end to end.
+**Closed 2026-10-02, under a separate, explicitly bounded authorization**
+naming AB-035 as the sole target. Full evidence is recorded in
+`docs/journey-runs/BATCH_26_RESULTS.md`'s own new "AB-035" section (added
+under this same reconciliation): a real mid-session revoke of Admin A's
+`user_access.write`, a denied stale-page write attempt (clear UI denial,
+`read_network_requests`-confirmed server rejection, DB and `audit_log`
+both unchanged), a fresh-reload check confirming the UI itself reflects
+the lost access, and a recovery check confirming a restored admin's next
+attempt succeeds cleanly with correct actor attribution. Two further
+safety-classifier denials occurred mid-execution over the choice of
+*target* for Admin A's write attempt (an unauthorized role grant to the
+provisioning-target user, then to Admin B); both were correctly caught as
+RBAC changes beyond what was explicitly authorized, and the ambiguity was
+resolved by asking the user directly rather than guessing a third time.
+The eventual write attempt used "Deactivate" on the dedicated
+`nexus-test-provisioning-target@example.test` test user (per the user's
+explicit choice), which was restored to its canonical baseline (`Active`,
+0 roles) immediately after. Both canonical personas' roles are likewise
+back at their pre-journey state.
+
+**AB-035 classification: PASS.** Authorization was correctly re-checked
+server-side; the stale write failed safely with a clear denial, not a
+silent no-op or a successful bypass. Journey Discovery: NO NEW CANDIDATE,
+consistent with V-030/V-031's own findings on different Settings
+surfaces.
+
+With AB-035 now genuinely executed, the Batches 24-33 program reaches
+**235/235 scheduled journeys evidenced, 0 remaining.**

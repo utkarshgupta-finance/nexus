@@ -469,8 +469,60 @@ unmistakable.
 independently confirmed in a **third** domain (customer_change, customer_onboarding_case,
 commercial_configuration_version all share the exact same final-approval-loser mechanism).
 
+## AB-035: Admin's own user_access.write removed while Settings > User Access page is still open (PERMISSION-CHANGE scenario 13)
+
+**Added 2026-10-02, during the Batches 24-33 final program-closure reconciliation.** This batch's own
+scheduled scope ("AB-020 through AB-041") always included AB-035, but no dedicated execution evidence for
+it existed anywhere in the journey-runs ledger until now; it was found missing by a closure-time audit, not
+executed in Batch 26's original pass. Unlike AB-034 (the same mechanism as V-030, genuinely covered), AB-035
+is materially distinct from V-031 (which tested `team.write` on Team Master, not `user_access.write` on the
+User Access page itself, the reflexive case this journey specifically calls for), so it required its own
+real execution rather than a disposition.
+
+Classification: MIXED MANUAL + SERVER.
+Personas: `nexus-test-user-access-admin` (Admin A, revoked), `nexus-test-user-access-admin-b` (Admin B,
+revokes and later restores). Target of Admin A's write attempt: `nexus-test-provisioning-target@example.test`,
+the dedicated provisioning-target test user (0 active roles, `is_active = true` at baseline).
+
+MANUAL UX VERIFIED: logged in as Admin A, navigated to `/settings/user-access`, confirmed the real page
+rendered with live "Assign a role...", "Add", and "Deactivate" controls for every row. Left this tab open
+and untouched. Revoked Admin A's `User Access Admin` role via the governed `revoke_user_role` RPC (actor:
+Admin B) without touching the tab. Returned to the still-open, unreloaded page and clicked the
+still-visible "Deactivate" button on the provisioning-target row: the page displayed "You do not have
+permission to write user_access." at the top of the page, and the target row's own `Status` column still
+read `Active` with its `Deactivate` button unchanged (not flipped to `Activate`), i.e. a clear denial, not a
+silent no-op. `read_network_requests` confirms one `POST /settings/user-access` fired, 200 at the transport
+level (Server Action error response, not an HTTP error code) with the denial in the response body. Then
+performed a fresh navigation (full reload) to the same URL: the page now showed "Access restricted: You do
+not have permission to view this page (requires user_access.read)", confirming the UI itself reflects the
+lost access once it re-checks, not just the mutating action.
+
+SERVER/DB VERIFIED: `app_users.is_active` and `updated_at` for the target user unchanged across the denied
+attempt (`updated_at` identical to the pre-attempt baseline, `2026-09-27 12:13:46.841744+00`). No
+`audit_log` row exists for the target user from this attempt; the denial happened entirely before any
+mutation, so nothing was recorded, not even a partial change.
+
+RECOVERY/RESILIENCE VERIFIED: restored Admin A's `User Access Admin` role via `grant_user_role` (actor:
+Admin B). On the next navigation to the same page, it rendered normally again (current UI matches current
+permission state). Clicked "Deactivate" on the same target row again: this time it succeeded cleanly,
+correctly attributed to Admin A ("by Nexus Test User Access Admin"), confirming a restored admin's next
+attempt succeeds cleanly exactly as canonical specifies. Restored the provisioning-target user back to
+`Active` immediately after, leaving it at its canonical baseline (0 active roles, `is_active = true`) for
+future reuse.
+
+Journey Discovery: NO NEW CANDIDATE. Matches canonical and is consistent with V-030/V-031's own findings on
+different Settings surfaces: the server-side `user_access.write` check gates the mutating action
+independently of client state, a fresh navigation correctly reflects revoked access, and restoring the
+permission while the page stays open lets the very next attempt succeed cleanly with correct actor
+attribution.
+
+Classification: PASS.
+
 ## Batch 26 status after reconciliation
 
 All 26 scheduled journeys (AB-020 through AB-041, V-001 through V-004) are now genuinely executed with
-their own dedicated evidence, no unauthorized cross-references remaining. See the exact closure tally in
-the final closure report delivered in chat.
+their own dedicated evidence. AB-034 is disposed as Journey Discovery ALREADY COVERED by V-030 (Batch 28,
+same mechanism); AB-035 was found missing during the Batches 24-33 final program-closure reconciliation
+(2026-10-02) and executed above as PASS. No unauthorized cross-references remain. See the exact closure
+tally in the final closure report delivered in chat and the Batches 24-33 program-closure reconciliation in
+`docs/journey-runs/BATCH_33_RESULTS.md`.
