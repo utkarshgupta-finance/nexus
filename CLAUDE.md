@@ -326,6 +326,52 @@ When editing existing text, remove em dashes if you encounter them.
 Do not change code operators, syntax, or data formats merely to enforce this
 writing rule.
 
+## Nexus Change Protocol
+
+Nexus has passed Baseline V1 (`docs/NEXUS_FINAL_PROGRAM_AUDIT.md`): a
+796-journey evidence base, a regression program, and a permanent change
+operating system now govern how the product evolves. This protocol
+triggers **before any product code is modified** whenever the user asks
+to change, build, remove, fix, or alter behaviour, UI, UX, flows,
+permissions, or architecture in Nexus (e.g. "change this," "build this,"
+"remove this," "make this flow different," "fix this," "change the
+UI/UX," "add this functionality").
+
+Full detail lives in `docs/NEXUS_CHANGE_GOVERNANCE.md`,
+`docs/NEXUS_ENGINEERING_WAY_OF_WORKING.md`,
+`docs/NEXUS_REGRESSION_PROGRAM.md`, `docs/NEXUS_JOURNEY_UNIVERSE.md`,
+`docs/NEXUS_JOURNEY_CHANGE_INDEX.md`, and
+`docs/changes/CHANGE_SET_TEMPLATE.md`; this is the short version that
+must not be skipped.
+
+**Before touching code:**
+1. Create or find the Change Set (`docs/changes/CHG-XXX_<name>.md` from
+   `docs/changes/CHANGE_SET_TEMPLATE.md`; next ID from
+   `docs/NEXUS_JOURNEY_CHANGE_INDEX.md`).
+2. Search `docs/NEXUS_JOURNEY_UNIVERSE.md` and
+   `docs/NEXUS_JOURNEY_CHANGE_INDEX.md` for affected journeys.
+3. State BEFORE / AFTER / UNCHANGED behaviour explicitly.
+4. Identify affected automated tests and the Journey Regression
+   classification (`docs/NEXUS_CHANGE_GOVERNANCE.md` section 5).
+
+**Then:**
+5. Implement.
+6. Add/update automated tests, or record `NO AUTOMATED TEST APPROPRIATE`
+   + reason (`docs/NEXUS_ENGINEERING_WAY_OF_WORKING.md` section 1).
+7. Run the targeted regression this change's Tier A/B/C classification
+   requires (`docs/NEXUS_REGRESSION_PROGRAM.md`); never the full 796.
+8. Run Journey Discovery again, post-implementation.
+9. Update canonical journeys (ACTIVE/UPDATED/SUPERSEDED/RETIRED) and the
+   Journey Change Index.
+10. Reconcile documentation (`docs/OPEN_PRODUCT_GAPS.md`,
+    `docs/TECH_DEBT.md`, architecture docs where structural).
+11. Report residuals explicitly; close the Change Set (CLOSED or
+    PARTIAL, never silently left open).
+
+**Never**: rewrite historical journey evidence, delete a journey for a
+functionality change, rerun the full 796-journey catalogue for a routine
+change, or call a change "verified" with an open `REGRESSION PENDING`.
+
 ## Prototype UI fields
 
 Fields, columns, labels, filters, statuses, and example records used in

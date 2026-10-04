@@ -497,19 +497,37 @@ Future capabilities: 9
 Known PARTIAL dimensions: 31 (+2 blocked)
 ```
 
-**Do not create a new baseline for every commit.** A new baseline
-(V1.1, V1.2, V2, ...) is created after a meaningful, *reconciled* set of
-product changes, typically corresponding to a real release or a
-deliberate checkpoint, not after each individual Change Set closes.
-Guideline for the version-number increment itself (not a rigid rule, use
-judgment):
+**Approved rule (2026-10-02):**
 
-- **Patch-level (V1.1, V1.2, ...)**: bug fixes, small UI/UX changes,
-  closed deferred items, accumulated Change Sets that don't change the
-  product's fundamental shape.
-- **Major (V2, V3, ...)**: a new domain/module, a removed domain/module,
-  an architecture change, or an accumulation of patch-level baselines
-  that collectively amount to a materially different product.
+**Use V1.1, V1.2, V1.3, ...** for a meaningful, reconciled set of product
+changes or a release where the product has materially evolved but the
+fundamental Nexus model (its domains, workflow model, commercial model,
+authorization model, architecture) is unchanged. This is the default
+increment for ordinary product work: a batch of closed Change Sets, a
+shipped feature, a resolved deferred item, a release to Production.
+
+**Use V2, V3, ...** only for a meaningful redesign of core product
+behaviour: a new or removed domain/module, a workflow-model change, a
+commercial-model change, an authorization-model change, an architecture
+change, or an accumulation of patch-level baselines that collectively
+amount to a materially different product than the last major boundary.
+The test is whether comparing against the prior baseline needs a clear
+major boundary to stay meaningful, not whether a lot of commits
+accumulated.
+
+**Do not create a new baseline for:**
+- documentation-only changes
+- test-only changes
+- trivial copy changes
+- isolated cosmetic UI changes
+- a tiny fix that does not materially alter the product baseline
+
+Change Sets already provide granular, permanent change history (`docs/
+NEXUS_JOURNEY_CHANGE_INDEX.md`); baselines are periodic reference points
+on top of that history, not a record of every change. A baseline is
+created when accumulated, reconciled Change Sets warrant a new reference
+point, never per-commit and never for work with no product-baseline
+effect.
 
 Each baseline must allow comparison against the previous one: the same
 seven-line summary above, plus a list of which Change Sets closed since
