@@ -17,6 +17,21 @@ middle path.
 
 ---
 
+## Relationship to the Change Set system
+
+`docs/NEXUS_CHANGE_GOVERNANCE.md` governs how Nexus evolves from Baseline
+V1 onward; every future product change gets a Change Set
+(`docs/changes/CHANGE_SET_TEMPLATE.md`). This document remains the single
+source of truth for *what* to run and *when*; the Change Set system adds
+only one thing on top: a per-change classification of **which** of this
+document's Tier A/B/C families actually apply to that specific change,
+and whether running them is MANDATORY BEFORE MERGE, RECOMMENDED, or CAN
+DEFER WITH DOCUMENTED RESIDUAL (`docs/NEXUS_CHANGE_GOVERNANCE.md` section
+5). A Change Set never invents a new testing tier; it scopes this
+document's existing ones to its own Change Impact Analysis.
+
+---
+
 ## Tier A — MUST NEVER BREAK
 
 The P0 concentration the Coverage Matrix itself identifies (247 of 796
