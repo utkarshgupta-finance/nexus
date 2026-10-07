@@ -172,6 +172,14 @@ rule this register exists to enforce:
   reasoning; used by X-005 for its own accumulated Commercial Version
   history spanning multiple real currencies and frozen rates.
 
+- `batch8-uxrevalidation-co` ("Batch8 UX Revalidation Co") — carries the
+  accumulated history from the Historical UX Revalidation pass (Batch 8);
+  read-only going forward, not disposable per-run data.
+- `batch11-immutability-probe-co` ("Batch11 Immutability Probe Co") — the
+  literal evidentiary fixture for an immutability-boundary finding from
+  Batch 11; its value is in staying exactly as it is, not in being reused
+  as disposable test data.
+
 If a future journey believes it genuinely needs to destructively mutate one
 of these, stop and ask first, per the pre-mutation check in
 `docs/NEXUS_JOURNEY_EXECUTION_PLAN.md`; do not add it here unilaterally.
